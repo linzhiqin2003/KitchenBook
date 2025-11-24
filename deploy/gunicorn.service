@@ -1,0 +1,24 @@
+[Unit]
+Description=Gunicorn daemon for KitchenBook
+After=network.target
+
+[Service]
+User=kitchenbook
+Group=www-data
+WorkingDirectory=/home/kitchenbook/KitchenBook/backend
+Environment="PATH=/home/kitchenbook/KitchenBook/venv/bin"
+EnvironmentFile=/home/kitchenbook/KitchenBook/backend/.env
+ExecStart=/home/kitchenbook/KitchenBook/venv/bin/gunicorn \
+    --workers 3 \
+    --bind unix:/home/kitchenbook/KitchenBook/backend/gunicorn.sock \
+    --access-logfile /home/kitchenbook/KitchenBook/backend/logs/gunicorn-access.log \
+    --error-logfile /home/kitchenbook/KitchenBook/backend/logs/gunicorn-error.log \
+    --log-level info \
+    config.wsgi:application
+
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+
