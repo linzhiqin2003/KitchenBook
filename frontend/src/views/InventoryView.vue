@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import API_BASE_URL from '../config/api'
 
 const ingredients = ref([])
 const loading = ref(true)
@@ -8,7 +9,7 @@ const newIngredientName = ref('')
 
 const fetchIngredients = async () => {
     try {
-        const response = await axios.get('http://127.0.0.1:8000/api/ingredients/')
+        const response = await axios.get(`${API_BASE_URL}/api/ingredients/`)
         ingredients.value = response.data
     } catch (e) {
         console.error(e)
@@ -29,7 +30,7 @@ const toggleStock = async (ingredient) => {
     ingredient.in_stock = newQuantity > 0
     
     try {
-        await axios.patch(`http://127.0.0.1:8000/api/ingredients/${ingredient.id}/`, {
+        await axios.patch(`${API_BASE_URL}/api/ingredients/${ingredient.id}/`, {
             quantity: newQuantity
         })
     } catch (e) {
@@ -43,7 +44,7 @@ const toggleStock = async (ingredient) => {
 const addIngredient = async () => {
     if (!newIngredientName.value.trim()) return
     try {
-        const response = await axios.post('http://127.0.0.1:8000/api/ingredients/', {
+        const response = await axios.post(`${API_BASE_URL}/api/ingredients/`, {
             name: newIngredientName.value,
             quantity: 100,  // Default stock quantity
             unit: 'g'       // Default unit
@@ -58,7 +59,7 @@ const addIngredient = async () => {
 const deleteIngredient = async (id) => {
     if (!confirm('确定删除该食材？')) return
     try {
-        await axios.delete(`http://127.0.0.1:8000/api/ingredients/${id}/`)
+        await axios.delete(`${API_BASE_URL}/api/ingredients/${id}/`)
         ingredients.value = ingredients.value.filter(i => i.id !== id)
     } catch (e) {
         alert('删除失败')

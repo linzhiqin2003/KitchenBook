@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import API_BASE_URL from '../config/api'
 import BookReader from '../components/BookReader.vue'
 
 const route = useRoute()
@@ -13,7 +14,7 @@ onMounted(async () => {
   try {
     const id = route.params.id
     // Chef mode: fetches full details including steps/ingredients
-    const response = await axios.get(`http://127.0.0.1:8000/api/recipes/${id}/?mode=chef`)
+        const response = await axios.get(`${API_BASE_URL}/api/recipes/${id}/?mode=chef`)
     recipe.value = response.data
   } catch (error) {
     console.error('Failed to fetch recipe', error)

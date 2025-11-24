@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import API_BASE_URL from '../config/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,7 +25,7 @@ onMounted(async () => {
     if (isEdit) {
         loading.value = true
         try {
-            const { data } = await axios.get(`http://127.0.0.1:8000/api/recipes/${route.params.id}/?mode=chef`)
+            const { data } = await axios.get(`${API_BASE_URL}/api/recipes/${route.params.id}/?mode=chef`)
             form.value = { ...data, cover_image: null } 
             imagePreview.value = data.cover_image
         } catch (e) {
@@ -58,9 +59,9 @@ const submit = async () => {
 
     try {
         if (isEdit) {
-            await axios.patch(`http://127.0.0.1:8000/api/recipes/${route.params.id}/`, formData)
+            await axios.patch(`${API_BASE_URL}/api/recipes/${route.params.id}/`, formData)
         } else {
-            await axios.post('http://127.0.0.1:8000/api/recipes/', formData)
+            await axios.post(`${API_BASE_URL}/api/recipes/`, formData)
         }
         router.push('/chef/recipes')
     } catch (e) {
@@ -182,7 +183,7 @@ const submit = async () => {
             
             <!-- Helper Link -->
             <div class="text-right">
-                <a href="http://127.0.0.1:8000/admin" target="_blank" class="inline-flex items-center gap-1 text-sm text-stone-400 hover:text-emerald-600 transition-colors">
+                <a href="/admin" target="_blank" class="inline-flex items-center gap-1 text-sm text-stone-400 hover:text-emerald-600 transition-colors">
                     需要编辑步骤详情？前往高级后台 ↗
                 </a>
             </div>

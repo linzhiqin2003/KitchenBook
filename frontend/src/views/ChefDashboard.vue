@@ -1,13 +1,14 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
+import API_BASE_URL from '../config/api'
 
 const orders = ref([])
 const loading = ref(true)
 
 const fetchOrders = async () => {
   try {
-    const response = await axios.get('http://127.0.0.1:8000/api/orders/')
+    const response = await axios.get(`${API_BASE_URL}/api/orders/`)
     orders.value = response.data
   } catch (error) {
     console.error('Fetch orders failed', error)
@@ -20,7 +21,7 @@ onMounted(fetchOrders)
 
 const updateStatus = async (order, status) => {
     try {
-        await axios.patch(`http://127.0.0.1:8000/api/orders/${order.id}/`, { status })
+        await axios.patch(`${API_BASE_URL}/api/orders/${order.id}/`, { status })
         order.status = status
         // Refetch to update stock usage implications if we implemented that
         // For now, just UI update
