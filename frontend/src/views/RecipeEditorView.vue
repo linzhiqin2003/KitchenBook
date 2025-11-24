@@ -47,11 +47,11 @@ const handleFileUpload = (event) => {
 const submit = async () => {
     const formData = new FormData()
     formData.append('title', form.value.title)
-    formData.append('description', form.value.description)
+    formData.append('description', form.value.description || '')
     formData.append('cooking_time', form.value.cooking_time)
-    formData.append('category', form.value.category)
-    formData.append('is_public', form.value.is_public ? 'True' : 'False')
-    formData.append('chef_notes', form.value.chef_notes)
+    formData.append('category', form.value.category || '')
+    formData.append('is_public', form.value.is_public ? 'true' : 'false')
+    formData.append('chef_notes', form.value.chef_notes || '')
     
     if (form.value.cover_image instanceof File) {
         formData.append('cover_image', form.value.cover_image)
