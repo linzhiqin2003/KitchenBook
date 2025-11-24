@@ -13,8 +13,8 @@ const isChefMode = computed(() => route.path.startsWith('/chef'))
     <header class="bg-emerald-800 text-white p-4 shadow-lg sticky top-0 z-30 border-b-4 border-amber-200/50">
       <div class="container mx-auto flex justify-between items-center">
         <router-link to="/" class="text-2xl font-bold flex items-center gap-3 font-display tracking-wide hover:text-amber-100 transition-colors">
-          <span class="text-3xl">📖</span> 
-          <span>KitchenBook</span>
+          <span class="text-3xl">🍳</span> 
+          <span>LZQ的私人厨房</span>
         </router-link>
         
         <nav v-if="!isChefMode" class="flex items-center gap-6 text-sm font-medium">
