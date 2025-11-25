@@ -21,32 +21,32 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] flex flex-col">
     <!-- View Switcher & Title -->
-    <div class="container mx-auto px-4 py-6 flex justify-between items-center" v-if="recipes.length > 0">
-      <h2 class="text-2xl font-display font-bold text-emerald-900">今日菜单</h2>
+    <div class="container mx-auto px-2 md:px-4 py-4 md:py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3" v-if="recipes.length > 0">
+      <h2 class="text-xl md:text-2xl font-display font-bold text-emerald-900">今日菜单</h2>
       
       <!-- Toggle Switch -->
-      <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-full shadow-sm border border-stone-100">
-        <span class="text-sm font-bold text-stone-600 font-serif">阅读模式</span>
+      <div class="flex items-center gap-2 md:gap-3 bg-white px-3 md:px-4 py-1.5 md:py-2 rounded-full shadow-sm border border-stone-100">
+        <span class="text-xs md:text-sm font-bold text-stone-600 font-serif">阅读模式</span>
         <button 
           @click="viewMode = viewMode === 'grid' ? 'book' : 'grid'"
-          class="w-12 h-6 rounded-full relative transition-colors duration-300 focus:outline-none shadow-inner cursor-pointer"
+          class="w-10 md:w-12 h-5 md:h-6 rounded-full relative transition-colors duration-300 focus:outline-none shadow-inner cursor-pointer"
           :class="viewMode === 'book' ? 'bg-emerald-500' : 'bg-stone-300'"
           aria-label="切换视图模式"
         >
           <div 
-            class="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 shadow-sm transition-transform duration-300"
-            :class="viewMode === 'book' ? 'translate-x-6' : 'translate-x-0'"
+            class="w-4 md:w-5 h-4 md:h-5 bg-white rounded-full absolute top-0.5 left-0.5 shadow-sm transition-transform duration-300"
+            :class="viewMode === 'book' ? 'translate-x-5 md:translate-x-6' : 'translate-x-0'"
           ></div>
         </button>
       </div>
     </div>
 
     <!-- Content Area -->
-    <div v-if="recipes.length > 0" class="flex-1 w-full container mx-auto px-4 pb-12">
+    <div v-if="recipes.length > 0" class="flex-1 w-full container mx-auto px-2 md:px-4 pb-8 md:pb-12">
       
       <Transition name="mode-switch" mode="out-in">
         <!-- Grid View (Default) -->
-        <div v-if="viewMode === 'grid'" key="grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div v-if="viewMode === 'grid'" key="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
           <RecipeCard 
             v-for="recipe in recipes" 
             :key="recipe.id" 
@@ -57,8 +57,8 @@ onMounted(async () => {
         <!-- Book View -->
         <div v-else key="book" class="flex flex-col items-center">
           <MenuBook :recipes="recipes" />
-          <div class="text-center pb-8 text-stone-400 text-sm font-serif animate-pulse mt-4">
-            Tip: 拖动页面或点击角落来翻阅菜单
+          <div class="text-center pb-4 md:pb-8 text-stone-400 text-xs md:text-sm font-serif animate-pulse mt-2 md:mt-4">
+            Tip: 滑动或点击角落来翻阅菜单
           </div>
         </div>
       </Transition>

@@ -63,17 +63,17 @@ onMounted(fetchMyOrders)
 
 <template>
   <div class="max-w-4xl mx-auto">
-    <div class="mb-8 flex items-center justify-between">
+    <div class="mb-6 md:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-            <h2 class="text-3xl font-bold text-emerald-900 mb-2">我的订单</h2>
-            <p class="text-stone-600">追踪您的美食制作进度</p>
+            <h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-1 md:mb-2">我的订单</h2>
+            <p class="text-stone-600 text-sm md:text-base">追踪您的美食制作进度</p>
         </div>
-        <div class="flex gap-2">
-            <button @click="fetchMyOrders" class="text-emerald-600 hover:text-emerald-800 font-bold text-sm flex items-center gap-1">
-                <span>↻</span> 刷新状态
+        <div class="flex gap-2 md:gap-3">
+            <button @click="fetchMyOrders" class="text-emerald-600 hover:text-emerald-800 font-bold text-xs md:text-sm flex items-center gap-1">
+                <span>↻</span> 刷新
             </button>
-            <button v-if="cart.myOrderIds.length > 0" @click="clearInvalidOrders" class="text-stone-400 hover:text-red-600 text-xs flex items-center gap-1">
-                🗑️ 清除记录
+            <button v-if="cart.myOrderIds.length > 0" @click="clearInvalidOrders" class="text-stone-400 hover:text-red-600 text-[10px] md:text-xs flex items-center gap-1">
+                🗑️ 清除
             </button>
         </div>
     </div>
@@ -94,14 +94,14 @@ onMounted(fetchMyOrders)
         </router-link>
     </div>
 
-    <div v-else class="space-y-6">
+    <div v-else class="space-y-4 md:space-y-6">
         <div v-for="order in myOrders" :key="order.id" class="bg-white rounded-xl shadow-sm border border-stone-100 overflow-hidden">
             <!-- Header -->
-            <div class="p-4 bg-stone-50 border-b border-stone-100 flex justify-between items-center">
-                <div class="text-stone-500 text-sm">
-                    订单号 #{{ order.id }} · {{ new Date(order.created_at).toLocaleString() }}
+            <div class="p-3 md:p-4 bg-stone-50 border-b border-stone-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div class="text-stone-500 text-xs md:text-sm">
+                    订单 #{{ order.id }} · {{ new Date(order.created_at).toLocaleString() }}
                 </div>
-                <div class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+                <div class="px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider flex items-center gap-1 md:gap-2"
                     :class="{
                         'bg-yellow-100 text-yellow-800': order.status === 'pending',
                         'bg-blue-100 text-blue-800': order.status === 'cooking',
@@ -112,32 +112,32 @@ onMounted(fetchMyOrders)
                     <span v-else>●</span>
                     
                     <span v-if="order.status === 'pending'">等待接单</span>
-                    <span v-else-if="order.status === 'cooking'">大厨烹饪中...</span>
+                    <span v-else-if="order.status === 'cooking'">烹饪中...</span>
                     <span v-else>已出餐</span>
                 </div>
             </div>
             
             <!-- Items -->
-            <div class="p-4">
-                <ul class="space-y-3">
+            <div class="p-3 md:p-4">
+                <ul class="space-y-2 md:space-y-3">
                     <li v-for="item in order.items" :key="item.id" class="flex justify-between items-center">
-                        <div class="flex items-center gap-3">
-                            <div class="w-12 h-12 bg-stone-100 rounded overflow-hidden">
+                        <div class="flex items-center gap-2 md:gap-3 min-w-0">
+                            <div class="w-10 h-10 md:w-12 md:h-12 bg-stone-100 rounded overflow-hidden flex-shrink-0">
                                 <img v-if="item.recipe_details && item.recipe_details.cover_image" :src="item.recipe_details.cover_image" class="w-full h-full object-cover" />
-                                <div v-else class="w-full h-full flex items-center justify-center text-lg">🥘</div>
+                                <div v-else class="w-full h-full flex items-center justify-center text-base md:text-lg">🥘</div>
                             </div>
-                            <span class="font-bold text-stone-800">{{ item.recipe_title }}</span>
+                            <span class="font-bold text-stone-800 text-sm md:text-base truncate">{{ item.recipe_title }}</span>
                         </div>
-                        <span class="font-mono text-stone-500">x{{ item.quantity }}</span>
+                        <span class="font-mono text-stone-500 text-sm md:text-base flex-shrink-0 ml-2">x{{ item.quantity }}</span>
                     </li>
                 </ul>
             </div>
             
             <!-- Footer -->
-            <div v-if="order.status === 'completed'" class="p-3 bg-green-50/50 text-center text-green-800 text-sm font-bold border-t border-green-100">
+            <div v-if="order.status === 'completed'" class="p-2 md:p-3 bg-green-50/50 text-center text-green-800 text-xs md:text-sm font-bold border-t border-green-100">
                 ✨ 美味已送达，祝您用餐愉快！
             </div>
-             <div v-else-if="order.status === 'cooking'" class="p-3 bg-blue-50/50 text-center text-blue-800 text-sm font-bold border-t border-blue-100">
+             <div v-else-if="order.status === 'cooking'" class="p-2 md:p-3 bg-blue-50/50 text-center text-blue-800 text-xs md:text-sm font-bold border-t border-blue-100">
                 🔥 厨房正在热火朝天地为您制作...
             </div>
         </div>
