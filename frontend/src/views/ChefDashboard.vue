@@ -104,8 +104,18 @@ const aggregatedShoppingList = computed(() => {
                     
                     <ul class="mb-3 md:mb-4 space-y-2 md:space-y-3 bg-stone-50 p-2 md:p-3 rounded">
                         <li v-for="item in order.items" :key="item.id" class="text-stone-700 font-medium">
-                            <div class="flex justify-between text-sm md:text-base">
-                                <span class="truncate">{{ item.recipe_title }}</span>
+                            <div class="flex justify-between text-sm md:text-base items-center">
+                                <!-- 烹饪中时，菜品名称可点击查看菜谱 -->
+                                <router-link 
+                                    v-if="order.status === 'cooking'"
+                                    :to="{name: 'recipe-book', params: {id: item.recipe}}" 
+                                    class="truncate text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1 group"
+                                    target="_blank"
+                                >
+                                    {{ item.recipe_title }}
+                                    <span class="text-blue-400 group-hover:text-blue-600 text-xs opacity-60">↗</span>
+                                </router-link>
+                                <span v-else class="truncate">{{ item.recipe_title }}</span>
                                 <span class="text-stone-500 flex-shrink-0 ml-2">x{{ item.quantity }}</span>
                             </div>
                             <!-- 备注显示 -->
@@ -116,16 +126,9 @@ const aggregatedShoppingList = computed(() => {
                         </li>
                     </ul>
                     
-                    <div class="flex flex-col sm:flex-row gap-2 justify-end items-stretch sm:items-center">
-                        <!-- Link to read recipe details for cooking -->
-                        <div v-if="order.status === 'cooking'" class="sm:mr-auto flex flex-wrap gap-1 md:gap-2">
-                            <router-link v-for="item in order.items" :key="item.id" :to="{name: 'recipe-book', params: {id: item.recipe}}" class="text-[10px] md:text-xs bg-stone-100 px-2 py-1 rounded hover:bg-stone-200 text-stone-600 flex items-center gap-1" target="_blank">
-                                📖 <span class="truncate max-w-[80px] md:max-w-none">{{ item.recipe_title }}</span>
-                            </router-link>
-                        </div>
-
-                        <button v-if="order.status === 'pending'" @click="updateStatus(order, 'cooking')" class="bg-blue-500 text-white px-3 md:px-4 py-2 rounded text-xs md:text-sm font-bold hover:bg-blue-600 shadow-sm transition-colors w-full sm:w-auto">开始制作 🔥</button>
-                        <button v-if="order.status === 'cooking'" @click="updateStatus(order, 'completed')" class="bg-green-500 text-white px-3 md:px-4 py-2 rounded text-xs md:text-sm font-bold hover:bg-green-600 shadow-sm transition-colors w-full sm:w-auto">完成 ✅</button>
+                    <div class="flex justify-end">
+                        <button v-if="order.status === 'pending'" @click="updateStatus(order, 'cooking')" class="bg-blue-500 text-white px-3 md:px-4 py-2 rounded text-xs md:text-sm font-bold hover:bg-blue-600 shadow-sm transition-colors">开始制作 🔥</button>
+                        <button v-if="order.status === 'cooking'" @click="updateStatus(order, 'completed')" class="bg-green-500 text-white px-3 md:px-4 py-2 rounded text-xs md:text-sm font-bold hover:bg-green-600 shadow-sm transition-colors">完成 ✅</button>
                     </div>
                 </div>
             </div>
