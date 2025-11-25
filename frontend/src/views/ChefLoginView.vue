@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import API_BASE_URL from '../config/api'
+import { auth } from '../store/auth'
 
 const router = useRouter()
 
@@ -10,6 +11,7 @@ const username = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const success = ref(false)
 
 const handleLogin = async () => {
     if (!username.value || !password.value) {
@@ -19,6 +21,7 @@ const handleLogin = async () => {
     
     loading.value = true
     error.value = ''
+    success.value = false
     
     try {
         const response = await axios.post(`${API_BASE_URL}/api/chef/login/`, {
@@ -27,12 +30,16 @@ const handleLogin = async () => {
         })
         
         if (response.data.success) {
-            // 保存 token
-            localStorage.setItem('chef_token', response.data.token)
-            localStorage.setItem('chef_logged_in', 'true')
+            // 更新 auth store（这会同时更新 localStorage）
+            auth.login(response.data.token)
             
-            // 跳转到后台首页
-            router.push('/chef')
+            // 显示成功提示
+            success.value = true
+            
+            // 稍微延迟后跳转，让用户看到成功提示
+            setTimeout(() => {
+                router.push('/chef')
+            }, 500)
         }
     } catch (err) {
         if (err.response?.status === 401) {
@@ -69,6 +76,12 @@ const handleLogin = async () => {
       <!-- 登录卡片 -->
       <div class="bg-white rounded-2xl shadow-xl p-8 border border-stone-100">
         <form @submit.prevent="handleLogin" class="space-y-6">
+          <!-- 成功提示 -->
+          <div v-if="success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+            <span class="animate-bounce">✅</span>
+            登录成功，正在跳转...
+          </div>
+          
           <!-- 错误提示 -->
           <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
             <span>⚠️</span>
