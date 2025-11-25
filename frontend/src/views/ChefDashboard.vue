@@ -102,10 +102,17 @@ const aggregatedShoppingList = computed(() => {
                         }">{{ order.status }}</span>
                     </div>
                     
-                    <ul class="mb-3 md:mb-4 space-y-1.5 md:space-y-2 bg-stone-50 p-2 md:p-3 rounded">
-                        <li v-for="item in order.items" :key="item.id" class="text-stone-700 font-medium flex justify-between text-sm md:text-base">
-                            <span class="truncate">{{ item.recipe_title }}</span>
-                            <span class="text-stone-500 flex-shrink-0 ml-2">x{{ item.quantity }}</span>
+                    <ul class="mb-3 md:mb-4 space-y-2 md:space-y-3 bg-stone-50 p-2 md:p-3 rounded">
+                        <li v-for="item in order.items" :key="item.id" class="text-stone-700 font-medium">
+                            <div class="flex justify-between text-sm md:text-base">
+                                <span class="truncate">{{ item.recipe_title }}</span>
+                                <span class="text-stone-500 flex-shrink-0 ml-2">x{{ item.quantity }}</span>
+                            </div>
+                            <!-- 备注显示 -->
+                            <div v-if="item.note" class="mt-1.5 flex items-start gap-1.5 text-xs">
+                                <span class="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-bold flex-shrink-0">备注</span>
+                                <span class="text-amber-800 italic">{{ item.note }}</span>
+                            </div>
                         </li>
                     </ul>
                     

@@ -79,6 +79,7 @@ class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
+    note = models.CharField(max_length=200, blank=True, help_text="Customer special request")
     
     def __str__(self):
         return f"{self.quantity}x {self.recipe.title}"

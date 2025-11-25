@@ -16,7 +16,7 @@ export const cart = reactive({
         if (existing) {
             existing.quantity++
         } else {
-            this.items.push({ recipe, quantity: 1 })
+            this.items.push({ recipe, quantity: 1, note: '' })
         }
         this.isOpen = true
     },
@@ -25,6 +25,13 @@ export const cart = reactive({
         const index = this.items.findIndex(i => i.recipe.id === recipeId)
         if (index > -1) {
             this.items.splice(index, 1)
+        }
+    },
+    
+    updateNote(recipeId, note) {
+        const item = this.items.find(i => i.recipe.id === recipeId)
+        if (item) {
+            item.note = note
         }
     },
     
@@ -43,7 +50,8 @@ export const cart = reactive({
                 customer_name: this.customerName,
                 items: this.items.map(i => ({
                     recipe: i.recipe.id,
-                    quantity: i.quantity
+                    quantity: i.quantity,
+                    note: i.note || ''
                 }))
             }
             

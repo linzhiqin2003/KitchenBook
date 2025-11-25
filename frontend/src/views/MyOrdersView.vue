@@ -119,16 +119,23 @@ onMounted(fetchMyOrders)
             
             <!-- Items -->
             <div class="p-3 md:p-4">
-                <ul class="space-y-2 md:space-y-3">
-                    <li v-for="item in order.items" :key="item.id" class="flex justify-between items-center">
-                        <div class="flex items-center gap-2 md:gap-3 min-w-0">
-                            <div class="w-10 h-10 md:w-12 md:h-12 bg-stone-100 rounded overflow-hidden flex-shrink-0">
-                                <img v-if="item.recipe_details && item.recipe_details.cover_image" :src="item.recipe_details.cover_image" class="w-full h-full object-cover" />
-                                <div v-else class="w-full h-full flex items-center justify-center text-base md:text-lg">🥘</div>
+                <ul class="space-y-3 md:space-y-4">
+                    <li v-for="item in order.items" :key="item.id">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2 md:gap-3 min-w-0">
+                                <div class="w-10 h-10 md:w-12 md:h-12 bg-stone-100 rounded overflow-hidden flex-shrink-0">
+                                    <img v-if="item.recipe_details && item.recipe_details.cover_image" :src="item.recipe_details.cover_image" class="w-full h-full object-cover" />
+                                    <div v-else class="w-full h-full flex items-center justify-center text-base md:text-lg">🥘</div>
+                                </div>
+                                <span class="font-bold text-stone-800 text-sm md:text-base truncate">{{ item.recipe_title }}</span>
                             </div>
-                            <span class="font-bold text-stone-800 text-sm md:text-base truncate">{{ item.recipe_title }}</span>
+                            <span class="font-mono text-stone-500 text-sm md:text-base flex-shrink-0 ml-2">x{{ item.quantity }}</span>
                         </div>
-                        <span class="font-mono text-stone-500 text-sm md:text-base flex-shrink-0 ml-2">x{{ item.quantity }}</span>
+                        <!-- 备注显示 -->
+                        <div v-if="item.note" class="mt-2 ml-12 md:ml-[60px] flex items-start gap-1.5 text-xs">
+                            <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-bold flex-shrink-0">📝 备注</span>
+                            <span class="text-stone-600 italic">{{ item.note }}</span>
+                        </div>
                     </li>
                 </ul>
             </div>
