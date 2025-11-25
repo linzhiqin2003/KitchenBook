@@ -6,8 +6,9 @@ import AdminLandingView from '../views/AdminLandingView.vue'
 import MyOrdersView from '../views/MyOrdersView.vue'
 import RecipeManagerView from '../views/RecipeManagerView.vue'
 import RecipeEditorView from '../views/RecipeEditorView.vue'
-
+import ChefLoginView from '../views/ChefLoginView.vue'
 import InventoryView from '../views/InventoryView.vue'
+import { auth } from '../store/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -27,38 +28,65 @@ const router = createRouter({
       name: 'recipe-book',
       component: RecipeBookView
     },
+    // 登录页面（不需要验证）
+    {
+      path: '/chef/login',
+      name: 'chef-login',
+      component: ChefLoginView,
+      meta: { requiresAuth: false }
+    },
+    // 以下路由需要登录验证
     {
       path: '/chef',
       name: 'chef-landing',
-      component: AdminLandingView
+      component: AdminLandingView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/chef/orders',
       name: 'chef-orders',
-      component: ChefDashboard
+      component: ChefDashboard,
+      meta: { requiresAuth: true }
     },
     {
       path: '/chef/recipes',
       name: 'chef-recipes',
-      component: RecipeManagerView
+      component: RecipeManagerView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/chef/recipes/new',
       name: 'chef-recipe-new',
-      component: RecipeEditorView
+      component: RecipeEditorView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/chef/recipes/:id/edit',
       name: 'chef-recipe-edit',
-      component: RecipeEditorView
+      component: RecipeEditorView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/chef/inventory',
       name: 'chef-inventory',
-      component: InventoryView
+      component: InventoryView,
+      meta: { requiresAuth: true }
     }
   ]
 })
 
-export default router
+// 路由守卫
+router.beforeEach((to, from, next) => {
+  // 检查路由是否需要认证
+  if (to.meta.requiresAuth) {
+    if (auth.checkAuth()) {
+      next() // 已登录，允许访问
+    } else {
+      next('/chef/login') // 未登录，跳转到登录页
+    }
+  } else {
+    next() // 不需要认证，直接访问
+  }
+})
 
+export default router

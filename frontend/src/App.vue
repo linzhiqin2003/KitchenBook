@@ -1,11 +1,14 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import CartSidebar from './components/CartSidebar.vue'
 import { cart } from './store/cart'
+import { auth } from './store/auth'
 
 const route = useRoute()
+const router = useRouter()
 const isChefMode = computed(() => route.path.startsWith('/chef'))
+const isLoginPage = computed(() => route.path === '/chef/login')
 
 // 移动端菜单状态
 const mobileMenuOpen = ref(false)
@@ -14,11 +17,17 @@ const mobileMenuOpen = ref(false)
 watch(() => route.path, () => {
   mobileMenuOpen.value = false
 })
+
+// 登出
+const handleLogout = () => {
+  auth.logout()
+  router.push('/chef/login')
+}
 </script>
 
 <template>
   <div class="min-h-screen bg-[#fcfaf5] text-stone-800 font-serif bg-texture">
-    <header class="bg-emerald-800 text-white p-3 md:p-4 shadow-lg sticky top-0 z-30 border-b-4 border-amber-200/50">
+    <header v-if="!isLoginPage" class="bg-emerald-800 text-white p-3 md:p-4 shadow-lg sticky top-0 z-30 border-b-4 border-amber-200/50">
       <div class="container mx-auto flex justify-between items-center">
         <router-link to="/" class="text-lg md:text-2xl font-bold flex items-center gap-2 md:gap-3 font-display tracking-wide hover:text-amber-100 transition-colors">
           <span class="text-2xl md:text-3xl">🍳</span> 
@@ -56,9 +65,9 @@ watch(() => route.path, () => {
            <router-link to="/chef/recipes" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>📝</span> 食谱
            </router-link>
-           <a href="/" class="bg-emerald-900/50 px-3 py-1.5 rounded-full hover:bg-emerald-900 transition-colors border border-emerald-600 flex items-center gap-1">
-              <span>👋</span> 退出后台
-           </a>
+           <button @click="handleLogout" class="bg-red-900/50 px-3 py-1.5 rounded-full hover:bg-red-900 transition-colors border border-red-600 flex items-center gap-1 cursor-pointer">
+              <span>🚪</span> 退出登录
+           </button>
         </nav>
 
         <!-- 移动端操作按钮 -->
@@ -116,15 +125,15 @@ watch(() => route.path, () => {
             <router-link to="/chef/recipes" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>📝</span> 食谱
             </router-link>
-            <a href="/" class="bg-emerald-900/50 px-3 py-2 rounded-lg hover:bg-emerald-900 transition-colors border border-emerald-600 flex items-center gap-2 mt-2">
-              <span>👋</span> 退出后台
-            </a>
+            <button @click="handleLogout" class="bg-red-900/50 px-3 py-2 rounded-lg hover:bg-red-900 transition-colors border border-red-600 flex items-center gap-2 mt-2 w-full cursor-pointer">
+              <span>🚪</span> 退出登录
+            </button>
           </nav>
         </div>
       </Transition>
     </header>
 
-    <main class="container mx-auto p-4 md:p-6 lg:p-8">
+    <main :class="isLoginPage ? '' : 'container mx-auto p-4 md:p-6 lg:p-8'">
       <RouterView />
     </main>
     

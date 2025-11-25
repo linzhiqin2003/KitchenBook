@@ -152,3 +152,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# 厨师登录凭证（从环境变量读取，默认值仅用于开发）
+CHEF_USERNAME = os.environ.get('CHEF_USERNAME', 'chef')
+CHEF_PASSWORD = os.environ.get('CHEF_PASSWORD', 'kitchen123')

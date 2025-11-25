@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RecipeViewSet, IngredientViewSet, OrderViewSet
+from .views import RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView
 
 router = DefaultRouter()
 router.register(r'recipes', RecipeViewSet)
@@ -9,5 +9,6 @@ router.register(r'orders', OrderViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('chef/login/', ChefAuthView.as_view(), name='chef-login'),
 ]
 
