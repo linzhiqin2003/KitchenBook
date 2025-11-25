@@ -22,7 +22,10 @@ onMounted(async () => {
   <div class="min-h-[calc(100vh-4rem)] flex flex-col">
     <!-- View Switcher & Title -->
     <div class="container mx-auto px-2 md:px-4 py-4 md:py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3" v-if="recipes.length > 0">
-      <h2 class="text-xl md:text-2xl font-display font-bold text-emerald-900">今日菜单</h2>
+      <div>
+        <h2 class="text-xl md:text-2xl font-display font-bold text-emerald-900">今日菜单</h2>
+        <p class="text-xs md:text-sm text-stone-500 mt-1 font-serif">精选当季食材，用心烹饪每一道佳肴</p>
+      </div>
       
       <!-- Toggle Switch -->
       <div class="flex items-center gap-2 md:gap-3 bg-white px-3 md:px-4 py-1.5 md:py-2 rounded-full shadow-sm border border-stone-100">
