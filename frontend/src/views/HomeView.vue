@@ -2,14 +2,15 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import API_BASE_URL from '../config/api'
+import MenuBook from '../components/MenuBook.vue'
 import RecipeCard from '../components/RecipeCard.vue'
 
 const recipes = ref([])
+const viewMode = ref('grid') // 默认使用网格(卡片)模式
 
 onMounted(async () => {
   try {
-    // Public mode: only fetches basic info
-        const response = await axios.get(`${API_BASE_URL}/api/recipes/`)
+    const response = await axios.get(`${API_BASE_URL}/api/recipes/`)
     recipes.value = response.data
   } catch (error) {
     console.error('Failed to fetch recipes', error)
@@ -18,26 +19,78 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
-    <div class="mb-12 text-center max-w-2xl mx-auto">
-      <div class="inline-block mb-4 p-3 bg-emerald-100 rounded-full text-emerald-800">
-          <span class="text-3xl">👨‍🍳</span>
+  <div class="min-h-[calc(100vh-4rem)] flex flex-col">
+    <!-- View Switcher & Title -->
+    <div class="container mx-auto px-4 py-6 flex justify-between items-center" v-if="recipes.length > 0">
+      <h2 class="text-2xl font-display font-bold text-emerald-900">今日菜单</h2>
+      
+      <!-- Toggle Switch -->
+      <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-full shadow-sm border border-stone-100">
+        <span class="text-sm font-bold text-stone-600 font-serif">阅读模式</span>
+        <button 
+          @click="viewMode = viewMode === 'grid' ? 'book' : 'grid'"
+          class="w-12 h-6 rounded-full relative transition-colors duration-300 focus:outline-none shadow-inner cursor-pointer"
+          :class="viewMode === 'book' ? 'bg-emerald-500' : 'bg-stone-300'"
+          aria-label="切换视图模式"
+        >
+          <div 
+            class="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 shadow-sm transition-transform duration-300"
+            :class="viewMode === 'book' ? 'translate-x-6' : 'translate-x-0'"
+          ></div>
+        </button>
       </div>
-      <h2 class="text-4xl font-display font-bold text-emerald-900 mb-4">今日特供菜单</h2>
-      <p class="text-stone-600 font-serif text-lg leading-relaxed italic">"这是我为您精心准备的私房菜肴。请随意浏览，挑选您心仪的美味，我将亲自为您烹饪。"</p>
-      <div class="w-24 h-1 bg-amber-300 mx-auto mt-6"></div>
+    </div>
+
+    <!-- Content Area -->
+    <div v-if="recipes.length > 0" class="flex-1 w-full container mx-auto px-4 pb-12">
+      
+      <Transition name="mode-switch" mode="out-in">
+        <!-- Grid View (Default) -->
+        <div v-if="viewMode === 'grid'" key="grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <RecipeCard 
+            v-for="recipe in recipes" 
+            :key="recipe.id" 
+            :recipe="recipe"
+          />
+        </div>
+
+        <!-- Book View -->
+        <div v-else key="book" class="flex flex-col items-center">
+          <MenuBook :recipes="recipes" />
+          <div class="text-center pb-8 text-stone-400 text-sm font-serif animate-pulse mt-4">
+            Tip: 拖动页面或点击角落来翻阅菜单
+          </div>
+        </div>
+      </Transition>
+
     </div>
     
-    <div v-if="recipes.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-4">
-      <RecipeCard 
-        v-for="recipe in recipes" 
-        :key="recipe.id" 
-        :recipe="recipe" 
-      />
-    </div>
-    <div v-else class="text-center py-16 bg-white rounded-xl shadow-sm border border-stone-100 mx-4">
-      <p class="text-xl text-stone-500 font-serif">主厨正在构思今日菜单...</p>
+    <!-- Empty State -->
+    <div v-else class="flex-1 flex items-center justify-center">
+      <div class="text-center py-16 bg-white rounded-xl shadow-sm border border-stone-100 mx-4 p-8">
+        <p class="text-xl text-stone-500 font-serif">主厨正在构思今日菜单...</p>
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Transition Styles */
+.mode-switch-enter-active,
+.mode-switch-leave-active {
+  transition: all 0.3s ease;
+}
+
+.mode-switch-enter-from,
+.mode-switch-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.mode-switch-enter-to,
+.mode-switch-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>
 

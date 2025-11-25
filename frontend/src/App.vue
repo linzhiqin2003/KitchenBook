@@ -19,10 +19,10 @@ const isChefMode = computed(() => route.path.startsWith('/chef'))
         
         <nav v-if="!isChefMode" class="flex items-center gap-6 text-sm font-medium">
            <router-link to="/" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
-             <span>🏠</span> 首页
+             <span>🍽️</span> 首页
            </router-link>
            <router-link to="/my-orders" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
-             <span>📦</span> 我的订单
+             <span>🧾</span> 我的订单
            </router-link>
            <!-- Simple Cart Toggle -->
            <button @click="cart.isOpen = true" class="relative bg-emerald-900/50 px-3 py-1.5 rounded-full hover:bg-emerald-900 transition-colors border border-emerald-600 cursor-pointer">

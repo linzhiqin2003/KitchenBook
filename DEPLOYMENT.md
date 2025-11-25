@@ -48,7 +48,11 @@ su - kitchenbook
 
 ```bash
 # 安装 Python 3.11 和相关工具
-sudo apt install -y python3.11 python3.11-venv python3-pip python3-dev
+# sudo apt install -y python3.11 python3.11-venv python3-pip python3-dev
+sudo apt install -y build-essential libssl-dev zlib1g-dev \
+libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
+libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
+libffi-dev liblzma-dev git
 
 # 安装 PostgreSQL
 sudo apt install -y postgresql postgresql-contrib libpq-dev
@@ -81,7 +85,7 @@ GRANT ALL PRIVILEGES ON DATABASE kitchenbook_db TO kitchenbook_user;
 cd ~
 
 # 从 Git 仓库克隆项目（替换为您的仓库地址）
-git clone https://github.com/yourusername/KitchenBook.git
+git clone https://github.com/linzhiqin2003/KitchenBook.git
 cd KitchenBook
 
 # 创建 Python 虚拟环境
@@ -200,6 +204,10 @@ sudo apt install -y nodejs
 
 # 构建前端
 cd ~/KitchenBook/frontend
+
+# 安装 terser 作为开发依赖
+npm install --save-dev terser
+
 npm install
 npm run build
 
