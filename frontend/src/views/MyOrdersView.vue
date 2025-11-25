@@ -132,9 +132,9 @@ onMounted(fetchMyOrders)
                             <span class="font-mono text-stone-500 text-sm md:text-base flex-shrink-0 ml-2">x{{ item.quantity }}</span>
                         </div>
                         <!-- 备注显示 -->
-                        <div v-if="item.note" class="mt-2 ml-12 md:ml-[60px] flex items-start gap-1.5 text-xs">
-                            <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-bold flex-shrink-0">📝 备注</span>
-                            <span class="text-stone-600 italic">{{ item.note }}</span>
+                        <div v-if="item.note" class="mt-1.5 ml-12 md:ml-[60px] text-xs text-stone-500 flex items-center gap-1">
+                            <span class="text-stone-400">—</span>
+                            <span class="italic">「{{ item.note }}」</span>
                         </div>
                     </li>
                 </ul>

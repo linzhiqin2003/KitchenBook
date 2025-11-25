@@ -63,14 +63,16 @@ const toggleNoteEdit = (recipeId) => {
                     </div>
                     
                     <!-- 备注区域 -->
-                    <div class="mt-3 pt-3 border-t border-stone-200/50">
+                    <div class="mt-2.5 pt-2.5 border-t border-stone-200/50">
                       <button 
                         @click="toggleNoteEdit(item.recipe.id)"
-                        class="text-xs flex items-center gap-1 text-stone-400 hover:text-emerald-600 transition-colors"
+                        class="text-xs flex items-center gap-1.5 text-stone-400 hover:text-stone-600 transition-colors w-full text-left"
                       >
-                        <span>📝</span>
-                        <span v-if="!item.note">添加备注（口味、忌口等）</span>
-                        <span v-else class="text-emerald-600">{{ item.note }}</span>
+                        <span v-if="!item.note" class="flex items-center gap-1">
+                          <span class="text-[10px]">✎</span>
+                          <span>添加备注</span>
+                        </span>
+                        <span v-else class="text-stone-500 italic truncate">「{{ item.note }}」</span>
                       </button>
                       
                       <!-- 备注输入框 -->
@@ -150,14 +152,16 @@ const toggleNoteEdit = (recipeId) => {
                     </div>
                     
                     <!-- 备注区域 -->
-                    <div class="mt-4 pt-3 border-t border-stone-200/50">
+                    <div class="mt-3 pt-3 border-t border-stone-200/50">
                       <button 
                         @click="toggleNoteEdit(item.recipe.id)"
-                        class="text-sm flex items-center gap-1.5 text-stone-400 hover:text-emerald-600 transition-colors"
+                        class="text-sm flex items-center gap-1.5 text-stone-400 hover:text-stone-600 transition-colors w-full text-left"
                       >
-                        <span>📝</span>
-                        <span v-if="!item.note">添加备注（口味偏好、忌口等）</span>
-                        <span v-else class="text-emerald-600 font-medium">{{ item.note }}</span>
+                        <span v-if="!item.note" class="flex items-center gap-1.5">
+                          <span class="text-xs">✎</span>
+                          <span>添加备注</span>
+                        </span>
+                        <span v-else class="text-stone-500 italic truncate">「{{ item.note }}」</span>
                       </button>
                       
                       <!-- 备注输入框 -->
