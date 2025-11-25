@@ -1,0 +1,44 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+.eggs/
+*.egg-info/
+*.egg
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build outputs
+dist/
+build/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursor/
+
+# Media uploads (optional - remove if you want to track uploads)
+backend/media/
+
+# OS files
+.DS_Store
+Thumbs.db
