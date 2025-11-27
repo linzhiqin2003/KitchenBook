@@ -8,6 +8,10 @@ import RecipeManagerView from '../views/RecipeManagerView.vue'
 import RecipeEditorView from '../views/RecipeEditorView.vue'
 import ChefLoginView from '../views/ChefLoginView.vue'
 import InventoryView from '../views/InventoryView.vue'
+import BlogListView from '../views/BlogListView.vue'
+import BlogPostView from '../views/BlogPostView.vue'
+import BlogEditorView from '../views/BlogEditorView.vue'
+import BlogManagerView from '../views/BlogManagerView.vue'
 import { auth } from '../store/auth'
 
 const router = createRouter({
@@ -27,6 +31,17 @@ const router = createRouter({
       path: '/recipe/:id',
       name: 'recipe-book',
       component: RecipeBookView
+    },
+    // 技术博客路由（公开访问）
+    {
+      path: '/blog',
+      name: 'blog',
+      component: BlogListView
+    },
+    {
+      path: '/blog/:slug',
+      name: 'blog-post',
+      component: BlogPostView
     },
     // 登录页面（不需要验证）
     {
@@ -70,6 +85,25 @@ const router = createRouter({
       path: '/chef/inventory',
       name: 'chef-inventory',
       component: InventoryView,
+      meta: { requiresAuth: true }
+    },
+    // 博客管理路由（需要登录）
+    {
+      path: '/chef/blog',
+      name: 'chef-blog',
+      component: BlogManagerView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/chef/blog/new',
+      name: 'chef-blog-new',
+      component: BlogEditorView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/chef/blog/:id/edit',
+      name: 'chef-blog-edit',
+      component: BlogEditorView,
       meta: { requiresAuth: true }
     }
   ]

@@ -83,3 +83,51 @@ class OrderItem(models.Model):
     
     def __str__(self):
         return f"{self.quantity}x {self.recipe.title}"
+
+
+# ==================== 技术博客模块 ====================
+
+class Tag(models.Model):
+    """博客标签"""
+    name = models.CharField(max_length=50, unique=True)
+    color = models.CharField(max_length=7, default='#10b981', help_text="Hex color code")
+    
+    def __str__(self):
+        return self.name
+
+
+class BlogPost(models.Model):
+    """技术博客文章"""
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=200, unique=True, blank=True)
+    summary = models.TextField(max_length=500, help_text="文章摘要", blank=True)
+    content = models.TextField(help_text="Markdown 格式内容")
+    cover_image = models.ImageField(upload_to='blog/', null=True, blank=True)
+    tags = models.ManyToManyField(Tag, related_name='posts', blank=True)
+    
+    # 元数据
+    is_published = models.BooleanField(default=False, help_text="是否发布")
+    is_featured = models.BooleanField(default=False, help_text="是否精选")
+    view_count = models.PositiveIntegerField(default=0)
+    
+    # 时间戳
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.title
+    
+    def save(self, *args, **kwargs):
+        # 自动生成 slug
+        if not self.slug:
+            from django.utils.text import slugify
+            import time
+            base_slug = slugify(self.title, allow_unicode=True)
+            if not base_slug:
+                base_slug = f"post-{int(time.time())}"
+            self.slug = base_slug
+        super().save(*args, **kwargs)

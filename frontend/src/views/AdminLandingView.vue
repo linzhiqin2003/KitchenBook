@@ -74,7 +74,7 @@ onMounted(() => {
       <!-- Recipe Management Card -->
       <router-link to="/chef/recipes" class="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-stone-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
         <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <span class="text-9xl">📝</span>
+            <span class="text-9xl">📖</span>
         </div>
         <div class="p-8 relative z-10">
             <div class="w-14 h-14 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-2xl mb-6 shadow-sm group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
@@ -91,6 +91,33 @@ onMounted(() => {
         <div class="h-1.5 bg-amber-500 w-0 group-hover:w-full transition-all duration-500 absolute bottom-0 left-0"></div>
       </router-link>
       
+    </div>
+
+    <!-- 技术博客管理 -->
+    <div class="mt-8">
+      <router-link to="/chef/blog" class="group relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl shadow-sm border border-purple-500/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block">
+        <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+        <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-30 transition-opacity">
+            <span class="text-9xl">✍️</span>
+        </div>
+        <div class="p-8 relative z-10 flex items-center justify-between">
+            <div class="flex items-center gap-6">
+                <div class="w-14 h-14 bg-purple-500/20 text-purple-300 rounded-xl flex items-center justify-center text-2xl shadow-sm group-hover:bg-purple-500 group-hover:text-white transition-colors duration-300">
+                    📝
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-white mb-1 font-display">技术博客</h2>
+                    <p class="text-purple-200/80 text-sm">
+                        记录学习历程，分享技术心得
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center text-purple-300 font-bold group-hover:translate-x-2 transition-transform">
+                开始写作 <span class="ml-2">→</span>
+            </div>
+        </div>
+        <div class="h-1.5 bg-gradient-to-r from-purple-500 to-indigo-500 w-0 group-hover:w-full transition-all duration-500 absolute bottom-0 left-0"></div>
+      </router-link>
     </div>
 
     <!-- Quick Stats / Info Row -->

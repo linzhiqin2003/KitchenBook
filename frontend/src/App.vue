@@ -26,7 +26,7 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#fcfaf5] text-stone-800 font-serif bg-texture">
+  <div class="min-h-screen bg-[#fcfaf5] text-stone-800 font-serif bg-texture flex flex-col">
     <header v-if="!isLoginPage" class="bg-emerald-800 text-white p-3 md:p-4 shadow-lg sticky top-0 z-30 border-b-4 border-amber-200/50">
       <div class="container mx-auto flex justify-between items-center">
         <router-link to="/" class="text-lg md:text-2xl font-bold flex items-center gap-2 md:gap-3 font-display tracking-wide hover:text-amber-100 transition-colors">
@@ -63,7 +63,10 @@ const handleLogout = () => {
              <span>📦</span> 库存
            </router-link>
            <router-link to="/chef/recipes" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
-             <span>📝</span> 食谱
+             <span>📖</span> 食谱
+           </router-link>
+           <router-link to="/chef/blog" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+             <span>✍️</span> 博客
            </router-link>
            <button @click="handleLogout" class="bg-red-900/50 px-3 py-1.5 rounded-full hover:bg-red-900 transition-colors border border-red-600 flex items-center gap-1 cursor-pointer">
               <span>🚪</span> 退出登录
@@ -123,7 +126,10 @@ const handleLogout = () => {
               <span>📦</span> 库存
             </router-link>
             <router-link to="/chef/recipes" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
-              <span>📝</span> 食谱
+              <span>📖</span> 食谱
+            </router-link>
+            <router-link to="/chef/blog" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+              <span>✍️</span> 博客
             </router-link>
             <button @click="handleLogout" class="bg-red-900/50 px-3 py-2 rounded-lg hover:bg-red-900 transition-colors border border-red-600 flex items-center gap-2 mt-2 w-full cursor-pointer">
               <span>🚪</span> 退出登录
@@ -133,9 +139,39 @@ const handleLogout = () => {
       </Transition>
     </header>
 
-    <main :class="isLoginPage ? '' : 'container mx-auto p-4 md:p-6 lg:p-8'">
+    <main :class="[isLoginPage ? '' : 'container mx-auto p-4 md:p-6 lg:p-8', 'flex-grow']">
       <RouterView />
     </main>
+    
+    <!-- 底部 Footer - 仅在客人模式显示 -->
+    <footer v-if="!isChefMode && !isLoginPage" class="mt-auto border-t border-stone-200/60 bg-gradient-to-b from-stone-50 to-stone-100">
+      <div class="container mx-auto px-4 py-6">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-stone-500">
+          <!-- 左侧：版权 -->
+          <div class="flex items-center gap-2">
+            <span>🍳</span>
+            <span>© 2025 LZQ的私人厨房</span>
+          </div>
+          
+          <!-- 中间：链接 -->
+          <div class="flex items-center gap-1 text-stone-400">
+            <span>也逛逛</span>
+            <router-link to="/blog" class="text-stone-600 hover:text-purple-600 transition-colors font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-purple-400">
+              我的技术博客
+            </router-link>
+            <span>？</span>
+          </div>
+          
+          <!-- 右侧：签名 -->
+          <div class="flex items-center gap-1.5 text-stone-400">
+            <span>Made with</span>
+            <span class="text-red-400">❤️</span>
+            <span>&</span>
+            <span>☕</span>
+          </div>
+        </div>
+      </div>
+    </footer>
     
     <CartSidebar v-if="!isChefMode" />
   </div>

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Recipe, RecipeStep, Ingredient, RecipeIngredient, Order, OrderItem
+from .models import Recipe, RecipeStep, Ingredient, RecipeIngredient, Order, OrderItem, BlogPost, Tag
 
 class RecipeStepSerializer(serializers.ModelSerializer):
     class Meta:
@@ -56,3 +56,73 @@ class OrderSerializer(serializers.ModelSerializer):
         for item_data in items_data:
             OrderItem.objects.create(order=order, **item_data)
         return order
+
+
+# ==================== 技术博客序列化器 ====================
+
+class TagSerializer(serializers.ModelSerializer):
+    post_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'color', 'post_count']
+    
+    def get_post_count(self, obj):
+        return obj.posts.filter(is_published=True).count()
+
+
+class BlogPostListSerializer(serializers.ModelSerializer):
+    """博客列表视图 - 简化版"""
+    tags = TagSerializer(many=True, read_only=True)
+    reading_time = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BlogPost
+        fields = ['id', 'title', 'slug', 'summary', 'cover_image', 'tags', 
+                  'is_featured', 'view_count', 'created_at', 'published_at', 'reading_time']
+    
+    def get_reading_time(self, obj):
+        # 估算阅读时间（中文约 400 字/分钟）
+        word_count = len(obj.content)
+        minutes = max(1, round(word_count / 400))
+        return minutes
+
+
+class BlogPostDetailSerializer(serializers.ModelSerializer):
+    """博客详情视图 - 完整版"""
+    tags = TagSerializer(many=True, read_only=True)
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(), 
+        many=True, 
+        write_only=True,
+        source='tags',
+        required=False
+    )
+    reading_time = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BlogPost
+        fields = ['id', 'title', 'slug', 'summary', 'content', 'cover_image', 
+                  'tags', 'tag_ids', 'is_published', 'is_featured', 'view_count',
+                  'created_at', 'updated_at', 'published_at', 'reading_time']
+        read_only_fields = ['slug', 'view_count', 'created_at', 'updated_at']
+    
+    def get_reading_time(self, obj):
+        word_count = len(obj.content)
+        minutes = max(1, round(word_count / 400))
+        return minutes
+    
+    def create(self, validated_data):
+        tags = validated_data.pop('tags', [])
+        post = BlogPost.objects.create(**validated_data)
+        post.tags.set(tags)
+        return post
+    
+    def update(self, instance, validated_data):
+        tags = validated_data.pop('tags', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if tags is not None:
+            instance.tags.set(tags)
+        return instance
