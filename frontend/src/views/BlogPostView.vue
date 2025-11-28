@@ -16,13 +16,24 @@ const parseMarkdown = (markdown) => {
   
   let html = markdown
   
-  // 代码块 (```code```)
-  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-    return `<pre class="code-block" data-lang="${lang || 'text'}"><code>${escapeHtml(code.trim())}</code></pre>`
+  // 先保存代码块，防止被其他规则处理
+  const codeBlocks = []
+  html = html.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
+    const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`
+    codeBlocks.push({
+      lang: lang || 'text',
+      code: code.trim()
+    })
+    return placeholder
   })
   
-  // 行内代码
-  html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+  // 行内代码 - 也先保存
+  const inlineCodes = []
+  html = html.replace(/`([^`]+)`/g, (match, code) => {
+    const placeholder = `__INLINE_CODE_${inlineCodes.length}__`
+    inlineCodes.push(code)
+    return placeholder
+  })
   
   // 标题
   html = html.replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
@@ -55,7 +66,7 @@ const parseMarkdown = (markdown) => {
   
   // 段落 (连续的非空行)
   html = html.split('\n\n').map(block => {
-    if (block.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr)/)) {
+    if (block.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr)/) || block.includes('__CODE_BLOCK_')) {
       return block
     }
     if (block.trim() && !block.match(/^<[a-z]/i)) {
@@ -63,6 +74,23 @@ const parseMarkdown = (markdown) => {
     }
     return block
   }).join('\n')
+  
+  // 恢复代码块
+  codeBlocks.forEach((block, i) => {
+    const escapedCode = escapeHtml(block.code)
+    html = html.replace(
+      `__CODE_BLOCK_${i}__`,
+      `<pre class="code-block" data-lang="${block.lang}"><code>${escapedCode}</code></pre>`
+    )
+  })
+  
+  // 恢复行内代码
+  inlineCodes.forEach((code, i) => {
+    html = html.replace(
+      `__INLINE_CODE_${i}__`,
+      `<code class="inline-code">${escapeHtml(code)}</code>`
+    )
+  })
   
   return html
 }
@@ -356,6 +384,9 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
   font-size: 0.9rem;
   color: #e5e7eb;
   line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: block;
 }
 
 .prose-content :deep(strong) {
