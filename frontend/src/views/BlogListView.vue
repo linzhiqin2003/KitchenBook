@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import API_BASE_URL from '../config/api'
@@ -11,6 +11,34 @@ const stats = ref({ total_posts: 0, total_views: 0, total_tags: 0 })
 const loading = ref(true)
 const selectedTag = ref('')
 const searchQuery = ref('')
+
+// 滚动动画观察器
+let observer = null
+const setupScrollAnimation = () => {
+  nextTick(() => {
+    observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed')
+          observer.unobserve(entry.target)
+        }
+      })
+    }, {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    })
+    
+    document.querySelectorAll('.scroll-reveal').forEach(el => {
+      observer.observe(el)
+    })
+  })
+}
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect()
+  }
+})
 
 // 默认封面渐变色
 const defaultCovers = [
@@ -48,6 +76,8 @@ const fetchPosts = async () => {
     console.error('Failed to fetch posts', error)
   } finally {
     loading.value = false
+    // 数据加载完成后设置滚动动画
+    setupScrollAnimation()
   }
 }
 
@@ -189,7 +219,7 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
     
     <!-- 搜索和筛选区域 -->
     <div class="container mx-auto px-4 py-8 -mt-4">
-      <div class="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-4 md:p-6 mb-10">
+      <div class="scroll-reveal bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-4 md:p-6 mb-10">
         <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
           <!-- 搜索框 -->
           <div class="relative w-full md:w-auto md:flex-1 md:max-w-md">
@@ -262,7 +292,7 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
       <div v-else-if="posts.length > 0">
         <!-- 精选文章 -->
         <div v-if="featuredPosts.length > 0 && !selectedTag && !searchQuery" class="mb-14">
-          <div class="flex items-center gap-3 mb-8">
+          <div class="scroll-reveal flex items-center gap-3 mb-8">
             <div class="w-1 h-8 bg-gradient-to-b from-yellow-400 to-orange-500 rounded-full"></div>
             <h2 class="text-2xl font-bold text-slate-800">精选推荐</h2>
           </div>
@@ -271,8 +301,8 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
               v-for="(post, index) in featuredPosts"
               :key="post.id"
               :to="`/blog/${post.slug}`"
-              class="group relative overflow-hidden rounded-2xl aspect-[4/3] cursor-pointer"
-              :style="{ animationDelay: `${index * 100}ms` }"
+              class="scroll-reveal group relative overflow-hidden rounded-2xl aspect-[4/3] cursor-pointer"
+              :style="{ transitionDelay: `${index * 100}ms` }"
             >
               <!-- 背景 -->
               <div 
@@ -321,7 +351,7 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
         
         <!-- 所有文章 -->
         <div>
-          <div v-if="featuredPosts.length > 0 && !selectedTag && !searchQuery" class="flex items-center gap-3 mb-8">
+          <div v-if="featuredPosts.length > 0 && !selectedTag && !searchQuery" class="scroll-reveal flex items-center gap-3 mb-8">
             <div class="w-1 h-8 bg-gradient-to-b from-purple-500 to-indigo-600 rounded-full"></div>
             <h2 class="text-2xl font-bold text-slate-800">最新文章</h2>
           </div>
@@ -331,8 +361,8 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
               v-for="(post, index) in (selectedTag || searchQuery ? posts : regularPosts)"
               :key="post.id"
               :to="`/blog/${post.slug}`"
-              class="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-purple-500/10 border border-slate-100 transition-all duration-500 hover:-translate-y-2 animate-fade-in-up"
-              :style="{ animationDelay: `${index * 50}ms` }"
+              class="scroll-reveal group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-purple-500/10 border border-slate-100 transition-all duration-500 hover:-translate-y-2"
+              :style="{ transitionDelay: `${index * 80}ms` }"
             >
               <!-- 封面图 -->
               <div class="aspect-[16/10] relative overflow-hidden">
@@ -423,6 +453,18 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 滚动浮现动画 */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(40px) scale(0.95);
+  transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 /* 动画 */
