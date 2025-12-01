@@ -85,6 +85,29 @@ const cleanAiResponse = (text) => {
   return cleaned
 }
 
+// 简单的 Markdown 渲染函数（支持粗体、斜体、列表）
+const renderMarkdown = (text) => {
+  if (!text) return ''
+  
+  let html = text
+    // 转义 HTML 特殊字符（防止 XSS）
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // 粗体 **text** 或 __text__
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    // 斜体 *text* 或 _text_（但不匹配已经是粗体的）
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, '<em>$1</em>')
+    // 行内代码 `code`
+    .replace(/`([^`]+)`/g, '<code class="bg-stone-100 px-1 rounded text-amber-700">$1</code>')
+    // 换行
+    .replace(/\n/g, '<br>')
+  
+  return html
+}
+
 const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) {
@@ -454,10 +477,8 @@ const toggleChat = () => {
                     </span>
                   </div>
                   
-                  <!-- 主要内容 -->
-                  <div v-if="msg.content" class="bg-white text-stone-700 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed">
-                    <div class="whitespace-pre-wrap">{{ msg.content }}</div>
-                  </div>
+                  <!-- 主要内容（支持 Markdown 渲染） -->
+                  <div v-if="msg.content" class="bg-white text-stone-700 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed ai-message-content" v-html="renderMarkdown(msg.content)"></div>
                   
                   <!-- 加载中状态（仅当该消息正在流式传输，且没有思维链且没有内容时） -->
                   <div v-else-if="msg._streaming && (!msg.thinking || msg.thinking.length === 0)" class="bg-white text-stone-500 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-3">
@@ -588,4 +609,16 @@ const toggleChat = () => {
 
 .overflow-x-auto::-webkit-scrollbar { display: none; }
 .overflow-x-auto { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* AI 消息内容样式 */
+.ai-message-content {
+  word-break: break-word;
+}
+.ai-message-content strong {
+  font-weight: 600;
+  color: #78350f; /* amber-900 */
+}
+.ai-message-content em {
+  font-style: italic;
+}
 </style>
