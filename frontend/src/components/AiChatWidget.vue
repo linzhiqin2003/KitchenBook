@@ -46,19 +46,44 @@ const saveMessages = () => {
   localStorage.setItem('ai_chat_messages', JSON.stringify(toSave))
 }
 
-// 清理 AI 回复中可能出现的工具调用标记
+// 清理 AI 回复中可能出现的工具调用标记 - 更强健的版本
 const cleanAiResponse = (text) => {
   if (!text) return text
-  // 移除各种可能的工具调用标记
-  return text
-    .replace(/<\s*\|?\s*DSML\s*\|?\s*[^>]*>[\s\S]*?<\/\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
-    .replace(/<\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
-    .replace(/<\/\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
-    .replace(/<function_calls?>[\s\S]*?<\/function_calls?>/gi, '')
-    .replace(/<invoke[^>]*>[\s\S]*?<\/invoke>/gi, '')
-    .replace(/<\|[^|]*\|>/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  
+  let cleaned = text
+  
+  // 1. 移除各种 DSML 变体标记（带空格、竖线、大小写混合）
+  // 匹配: < | DSML | ...>, <|DSML|...>, </|DSML|...> 等
+  cleaned = cleaned.replace(/<\s*\/?\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
+  
+  // 2. 移除 function_calls 相关标记
+  cleaned = cleaned.replace(/<\s*\/?\s*function_calls?\s*>/gi, '')
+  
+  // 3. 移除 invoke 标记
+  cleaned = cleaned.replace(/<\s*\/?\s*invoke[^>]*>/gi, '')
+  
+  // 4. 移除 antml 相关标记（Claude 特有）
+  cleaned = cleaned.replace(/<\s*\/?\s*antml[^>]*>/gi, '')
+  
+  // 5. 移除 tool_call 相关内容
+  cleaned = cleaned.replace(/<\s*\/?\s*tool_call[^>]*>/gi, '')
+  
+  // 6. 移除 <|...|> 格式的特殊标记
+  cleaned = cleaned.replace(/<\|[^|]*\|>/g, '')
+  
+  // 7. 移除 name="..." 参数残留
+  cleaned = cleaned.replace(/\bname\s*=\s*["'][^"']*["']/gi, '')
+  
+  // 8. 清理独立的竖线和多余符号
+  cleaned = cleaned.replace(/^\s*\|\s*$/gm, '')
+  
+  // 9. 清理多余空行
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
+  
+  // 10. 清理首尾空白
+  cleaned = cleaned.trim()
+  
+  return cleaned
 }
 
 const scrollToBottom = async () => {
@@ -121,17 +146,20 @@ const handleAction = (action) => {
   }
 }
 
-// 获取工具图标
-const getToolIcon = (tool) => {
-  const icons = {
-    'get_menu': '📋',
-    'get_recipe_detail': '🔍',
-    'add_to_cart': '🛒',
-    'view_cart': '👀',
-    'place_order': '📝'
+// 获取工具图标和友好名称
+const getToolInfo = (tool) => {
+  const toolMap = {
+    'get_menu': { icon: '📋', name: '查看菜单' },
+    'get_recipe_detail': { icon: '🔍', name: '查看菜品详情' },
+    'add_to_cart': { icon: '🛒', name: '添加到购物车' },
+    'view_cart': { icon: '👀', name: '查看购物车' },
+    'place_order': { icon: '📝', name: '提交订单' },
+    'get_cart': { icon: '🛒', name: '获取购物车' }
   }
-  return icons[tool] || '💭'
+  return toolMap[tool] || { icon: '💭', name: '处理中' }
 }
+
+const getToolIcon = (tool) => getToolInfo(tool).icon
 
 // 发送消息（流式处理）
 const sendMessage = async () => {
@@ -207,10 +235,13 @@ const sendMessage = async () => {
                 break
                 
               case 'content':
-                // 流式内容
+                // 流式内容 - 实时清理可能的技术标记
                 isThinking.value = false
-                messages.value[aiMessageIndex].content += parsed.content
-                scrollToBottom()
+                const cleanedChunk = cleanAiResponse(parsed.content)
+                if (cleanedChunk) {
+                  messages.value[aiMessageIndex].content += cleanedChunk
+                  scrollToBottom()
+                }
                 break
                 
               case 'action':
@@ -371,32 +402,36 @@ const toggleChat = () => {
               <!-- AI 消息 -->
               <div v-else-if="msg.role === 'assistant' && (msg.type === 'text' || !msg.type)" class="flex justify-start">
                 <div class="max-w-[85%] space-y-2">
-                  <!-- 思维链展示 -->
+                  <!-- 思维链展示 - 简洁版 -->
                   <Transition name="thinking-fade">
-                    <div v-if="msg.thinking && msg.thinking.length > 0" class="space-y-1.5">
-                      <TransitionGroup name="thinking-step">
-                        <div
-                          v-for="(step, stepIdx) in msg.thinking"
-                          :key="stepIdx"
-                          class="flex items-start gap-2 text-xs"
-                        >
-                          <div class="shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center border border-violet-200">
-                            <span class="text-sm">{{ getToolIcon(step.tool) }}</span>
-                          </div>
-                          <div class="flex-1 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl px-3 py-2 border border-violet-100/50">
-                            <div class="text-violet-600 font-medium flex items-center gap-1">
-                              <svg class="w-3 h-3 animate-spin" v-if="isThinking && stepIdx === msg.thinking.length - 1" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              <span v-else class="text-emerald-500">✓</span>
-                              <span>{{ step.text }}</span>
-                            </div>
-                          </div>
+                    <div v-if="msg.thinking && msg.thinking.length > 0 && isLoading" class="flex items-center gap-2 px-3 py-2 bg-amber-50/80 rounded-xl border border-amber-100/50">
+                      <div class="flex items-center gap-1.5">
+                        <div class="w-5 h-5 rounded-full bg-amber-400/20 flex items-center justify-center animate-pulse">
+                          <span class="text-xs">{{ getToolIcon(msg.thinking[msg.thinking.length - 1]?.tool) }}</span>
                         </div>
-                      </TransitionGroup>
+                        <span class="text-xs text-amber-700 font-medium">
+                          {{ getToolInfo(msg.thinking[msg.thinking.length - 1]?.tool).name }}...
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-0.5 ml-auto">
+                        <span class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                        <span class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 100ms"></span>
+                        <span class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 200ms"></span>
+                      </div>
                     </div>
                   </Transition>
+                  
+                  <!-- 完成的操作提示（思维链完成后显示） -->
+                  <div v-if="msg.thinking && msg.thinking.length > 0 && !isLoading && msg.content" class="flex flex-wrap gap-1.5 mb-1">
+                    <span 
+                      v-for="(step, stepIdx) in msg.thinking" 
+                      :key="stepIdx"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100"
+                    >
+                      <span class="text-emerald-500">✓</span>
+                      <span>{{ getToolInfo(step.tool).name }}</span>
+                    </span>
+                  </div>
                   
                   <!-- 主要内容 -->
                   <div v-if="msg.content" class="bg-white text-stone-700 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed">
@@ -508,16 +543,11 @@ const toggleChat = () => {
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* 思维链动画 */
-.thinking-fade-enter-active { transition: all 0.3s ease; }
-.thinking-fade-leave-active { transition: all 0.2s ease; }
-.thinking-fade-enter-from, .thinking-fade-leave-to { opacity: 0; }
-
-.thinking-step-enter-active { animation: thinking-step-in 0.4s ease-out; }
-@keyframes thinking-step-in {
-  0% { opacity: 0; transform: translateX(-10px); }
-  100% { opacity: 1; transform: translateX(0); }
-}
+/* 思维链动画 - 简化版 */
+.thinking-fade-enter-active { transition: all 0.2s ease-out; }
+.thinking-fade-leave-active { transition: all 0.15s ease-in; }
+.thinking-fade-enter-from { opacity: 0; transform: scale(0.95); }
+.thinking-fade-leave-to { opacity: 0; transform: scale(0.95); }
 
 /* 自定义滚动条 */
 .overflow-y-auto::-webkit-scrollbar { width: 6px; }
