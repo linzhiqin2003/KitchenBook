@@ -676,8 +676,8 @@ class DeepSeekSpecialeView(APIView):
                 response = client.chat.completions.create(
                     model="deepseek-reasoner",
                     messages=full_messages,
-                    stream=True,
-                    max_tokens=128000
+                    stream=True
+                    # max_tokens=128000  # 注释掉以避免思维链被截断
                 )
                 
                 current_reasoning = ""
