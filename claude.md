@@ -102,7 +102,7 @@ KitchenBook/
 /api/blog/posts/       # BlogPostViewSet - CRUD 博客
 /api/blog/tags/        # TagViewSet - CRUD 标签
 /api/chef/login/       # ChefAuthView - 厨师登录
-/api/ai/chat/          # AiChatView - AI 对话（流式响应）
+/api/ai/chat/          # AiAgentView - AI 智能体（支持工具调用）
 ```
 
 ### 重要参数
@@ -203,11 +203,12 @@ export const cart = reactive({
 - 固定右侧滑出
 - 实时编辑数量和备注
 
-### AiChatWidget.vue - AI 聊天助手
+### AiChatWidget.vue - AI 智能点餐助手
 - 悬浮气泡按钮（右下角）
-- 流式响应，实时显示 AI 回复
+- **工具调用**：支持 DeepSeek Function Calling
+- 可执行操作：查看菜单、推荐菜品、添加购物车、下单
 - 对话历史持久化到 localStorage
-- 自动注入菜单上下文，可推荐菜品
+- 快捷操作按钮
 
 ---
 

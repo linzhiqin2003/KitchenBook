@@ -192,61 +192,278 @@ class BlogPostViewSet(viewsets.ModelViewSet):
             return Response({'error': '文章不存在'}, status=status.HTTP_404_NOT_FOUND)
 
 
-# ==================== AI 对话助手 ====================
+# ==================== AI 智能体助手 ====================
 
-class AiChatView(APIView):
-    """AI 对话助手 - 使用 DeepSeek API"""
+class AiAgentView(APIView):
+    """AI 智能体助手 - 支持工具调用，可以推荐菜品、操作购物车、下单"""
     authentication_classes = []
     permission_classes = []
     
-    def get_menu_context(self):
-        """获取当前菜单作为上下文"""
-        recipes = Recipe.objects.filter(is_public=True)
-        menu_items = []
-        for recipe in recipes:
-            item = f"- {recipe.title}"
-            if recipe.description:
-                item += f"：{recipe.description[:50]}"
-            if recipe.cooking_time:
-                item += f"（烹饪时间约 {recipe.cooking_time} 分钟）"
-            menu_items.append(item)
-        return "\n".join(menu_items) if menu_items else "暂无菜品"
+    # 定义可用工具
+    TOOLS = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_menu",
+                "description": "获取餐厅的菜单列表，可按分类筛选。当用户询问有什么菜、想看菜单、或需要推荐时调用此工具。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "description": "菜品分类，可选值：烧烤、小炒、水煮、麻辣烫、小吃、主食、西餐、菜、大菜、奶茶。不传则返回全部菜品。"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_recipe_detail",
+                "description": "获取某道菜的详细信息，包括描述、烹饪时间、食材等。当用户想了解某道菜的详情时调用。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "recipe_id": {
+                            "type": "integer",
+                            "description": "菜品ID"
+                        },
+                        "recipe_name": {
+                            "type": "string",
+                            "description": "菜品名称，如果不知道ID可以用名称搜索"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "add_to_cart",
+                "description": "将菜品添加到用户的购物车。当用户说想要某道菜、点这个、加入购物车时调用。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "recipe_id": {
+                            "type": "integer",
+                            "description": "要添加的菜品ID"
+                        },
+                        "recipe_name": {
+                            "type": "string",
+                            "description": "菜品名称，用于确认"
+                        },
+                        "quantity": {
+                            "type": "integer",
+                            "description": "数量，默认为1",
+                            "default": 1
+                        },
+                        "note": {
+                            "type": "string",
+                            "description": "备注，如：不要辣、多加葱等"
+                        }
+                    },
+                    "required": ["recipe_id", "recipe_name"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "view_cart",
+                "description": "查看用户当前购物车中的菜品。当用户问购物车有什么、想看看点了什么时调用。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "place_order",
+                "description": "提交订单。当用户确认要下单、结账、提交订单时调用。需要顾客姓名。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "customer_name": {
+                            "type": "string",
+                            "description": "顾客姓名，用于取餐"
+                        }
+                    },
+                    "required": ["customer_name"]
+                }
+            }
+        }
+    ]
     
     def get_system_prompt(self):
         """构建系统提示词"""
-        menu = self.get_menu_context()
-        return f"""你是"LZQ的私人厨房"的 AI 小助手，名叫"小厨"。你的任务是帮助顾客了解菜品、推荐美食、回答关于烹饪的问题。
+        return """你是"LZQ的私人厨房"的 AI 点餐助手，名叫"小厨"。
 
-当前菜单：
-{menu}
+你的能力：
+1. 查看菜单并推荐菜品（使用 get_menu 工具）
+2. 介绍菜品详情（使用 get_recipe_detail 工具）
+3. 帮顾客添加菜品到购物车（使用 add_to_cart 工具）
+4. 查看购物车内容（使用 view_cart 工具）
+5. 帮顾客下单（使用 place_order 工具）
 
-你的性格特点：
-- 热情友好，像一个专业的服务员
-- 对美食充满热爱，会用生动的语言描述菜品
-- 会根据顾客的口味偏好推荐合适的菜品
-- 回答简洁明了，一般不超过 100 字
+工作流程：
+- 当用户想点菜时，先用 get_menu 获取菜单，然后推荐合适的菜品
+- 推荐时要热情地描述菜品特色，引导用户点餐
+- 用户确认想要某道菜后，使用 add_to_cart 添加到购物车
+- 下单前先用 view_cart 确认购物车内容
+- 下单时需要询问顾客姓名
 
-注意事项：
+你的性格：
+- 热情友好，像专业服务员
+- 善于推荐，会根据口味偏好给建议
+- 回答简洁，适当使用 emoji
+- 主动引导点餐流程
+
+注意：
 - 只推荐菜单上有的菜品
-- 如果顾客问的问题与美食/餐厅无关，礼貌地引导回美食话题
-- 使用轻松友好的语气，可以适当使用 emoji"""
+- 如果用户问无关问题，礼貌引导回点餐话题
+- 添加购物车和下单都需要用户明确确认"""
+    
+    # ===== 工具执行函数 =====
+    
+    def tool_get_menu(self, category=None):
+        """获取菜单"""
+        recipes = Recipe.objects.filter(is_public=True)
+        if category:
+            recipes = recipes.filter(category=category)
+        
+        menu_items = []
+        for r in recipes:
+            menu_items.append({
+                "id": r.id,
+                "name": r.title,
+                "description": r.description or "",
+                "category": r.category or "其他",
+                "cooking_time": r.cooking_time,
+                "cover_image": r.cover_image.url if r.cover_image else None
+            })
+        
+        return {
+            "success": True,
+            "total": len(menu_items),
+            "items": menu_items
+        }
+    
+    def tool_get_recipe_detail(self, recipe_id=None, recipe_name=None):
+        """获取菜品详情"""
+        try:
+            if recipe_id:
+                recipe = Recipe.objects.get(id=recipe_id, is_public=True)
+            elif recipe_name:
+                recipe = Recipe.objects.filter(title__icontains=recipe_name, is_public=True).first()
+                if not recipe:
+                    return {"success": False, "error": f"未找到名为'{recipe_name}'的菜品"}
+            else:
+                return {"success": False, "error": "请提供菜品ID或名称"}
+            
+            # 获取食材
+            ingredients = []
+            for ri in recipe.recipe_ingredients.all():
+                ingredients.append({
+                    "name": ri.ingredient.name,
+                    "amount": ri.quantity_display or f"{ri.amount} {ri.ingredient.unit}"
+                })
+            
+            return {
+                "success": True,
+                "recipe": {
+                    "id": recipe.id,
+                    "name": recipe.title,
+                    "description": recipe.description or "",
+                    "category": recipe.category or "其他",
+                    "cooking_time": recipe.cooking_time,
+                    "cover_image": recipe.cover_image.url if recipe.cover_image else None,
+                    "ingredients": ingredients
+                }
+            }
+        except Recipe.DoesNotExist:
+            return {"success": False, "error": "菜品不存在"}
+    
+    def tool_add_to_cart(self, recipe_id, recipe_name, quantity=1, note=None):
+        """添加到购物车 - 返回指令让前端执行"""
+        try:
+            recipe = Recipe.objects.get(id=recipe_id, is_public=True)
+            return {
+                "success": True,
+                "action": "add_to_cart",
+                "data": {
+                    "recipe_id": recipe.id,
+                    "recipe_name": recipe.title,
+                    "quantity": quantity,
+                    "note": note or "",
+                    "cover_image": recipe.cover_image.url if recipe.cover_image else None
+                },
+                "message": f"已将 {recipe.title} x{quantity} 加入购物车"
+            }
+        except Recipe.DoesNotExist:
+            return {"success": False, "error": f"菜品 {recipe_name} 不存在"}
+    
+    def tool_view_cart(self):
+        """查看购物车 - 返回指令让前端获取"""
+        return {
+            "success": True,
+            "action": "view_cart",
+            "message": "请查看右侧购物车"
+        }
+    
+    def tool_place_order(self, customer_name):
+        """下单 - 返回指令让前端执行"""
+        return {
+            "success": True,
+            "action": "place_order",
+            "data": {
+                "customer_name": customer_name
+            },
+            "message": f"正在为 {customer_name} 提交订单..."
+        }
+    
+    def execute_tool(self, tool_name, arguments):
+        """执行工具调用"""
+        tool_map = {
+            "get_menu": self.tool_get_menu,
+            "get_recipe_detail": self.tool_get_recipe_detail,
+            "add_to_cart": self.tool_add_to_cart,
+            "view_cart": self.tool_view_cart,
+            "place_order": self.tool_place_order
+        }
+        
+        if tool_name in tool_map:
+            return tool_map[tool_name](**arguments)
+        return {"success": False, "error": f"未知工具: {tool_name}"}
     
     def post(self, request):
-        """处理对话请求（流式响应）"""
+        """处理对话请求（支持工具调用）"""
         messages = request.data.get('messages', [])
+        cart_info = request.data.get('cart', [])  # 前端传入当前购物车状态
         
         if not messages:
             return Response({'error': '消息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # 检查 API 配置
         if not settings.DEEPSEEK_API_KEY:
             return Response({
                 'error': 'AI 服务未配置，请联系管理员'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         
-        # 构建完整的消息列表（加入系统提示）
+        # 构建系统提示，包含购物车状态
+        cart_status = ""
+        if cart_info:
+            cart_items = [f"- {item['name']} x{item['quantity']}" for item in cart_info]
+            cart_status = f"\n\n当前购物车：\n" + "\n".join(cart_items)
+        else:
+            cart_status = "\n\n当前购物车：空"
+        
         full_messages = [
-            {"role": "system", "content": self.get_system_prompt()}
+            {"role": "system", "content": self.get_system_prompt() + cart_status}
         ] + messages
         
         try:
@@ -257,33 +474,87 @@ class AiChatView(APIView):
                 base_url=settings.DEEPSEEK_BASE_URL
             )
             
-            # 流式请求
-            def generate():
-                stream = client.chat.completions.create(
+            # 收集所有需要前端执行的动作
+            actions = []
+            
+            # 工具调用循环（最多3轮）
+            for _ in range(3):
+                response = client.chat.completions.create(
                     model="deepseek-chat",
                     messages=full_messages,
-                    stream=True,
-                    max_tokens=500,
+                    tools=self.TOOLS,
+                    tool_choice="auto",
+                    max_tokens=1000,
                     temperature=0.7
                 )
                 
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        content = chunk.choices[0].delta.content
-                        # 发送 SSE 格式数据
-                        yield f"data: {json.dumps({'content': content}, ensure_ascii=False)}\n\n"
+                assistant_message = response.choices[0].message
                 
-                yield "data: [DONE]\n\n"
+                # 如果没有工具调用，直接返回文本
+                if not assistant_message.tool_calls:
+                    content = assistant_message.content or ""
+                    return Response({
+                        "type": "message",
+                        "content": content,
+                        "actions": actions
+                    })
+                
+                # 处理工具调用
+                full_messages.append({
+                    "role": "assistant",
+                    "content": assistant_message.content,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments
+                            }
+                        } for tc in assistant_message.tool_calls
+                    ]
+                })
+                
+                # 执行每个工具调用
+                for tool_call in assistant_message.tool_calls:
+                    func_name = tool_call.function.name
+                    func_args = json.loads(tool_call.function.arguments)
+                    
+                    # 执行工具
+                    result = self.execute_tool(func_name, func_args)
+                    
+                    # 收集需要前端执行的动作
+                    if result.get("action"):
+                        actions.append({
+                            "type": result["action"],
+                            "data": result.get("data", {}),
+                            "message": result.get("message", "")
+                        })
+                    
+                    # 添加工具结果到消息
+                    full_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": json.dumps(result, ensure_ascii=False)
+                    })
             
-            response = StreamingHttpResponse(
-                generate(),
-                content_type='text/event-stream'
+            # 如果循环结束还没返回，获取最终响应
+            final_response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=full_messages,
+                max_tokens=500,
+                temperature=0.7
             )
-            response['Cache-Control'] = 'no-cache'
-            response['X-Accel-Buffering'] = 'no'
-            return response
+            
+            return Response({
+                "type": "message",
+                "content": final_response.choices[0].message.content or "",
+                "actions": actions
+            })
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return Response({
                 'error': f'AI 服务暂时不可用：{str(e)}'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
