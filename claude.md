@@ -104,6 +104,7 @@ KitchenBook/
 /api/chef/login/       # ChefAuthView - 厨师登录
 /api/ai/chat/          # AiAgentView - AI 智能体（支持工具调用）
 /api/ai/speciale/      # DeepSeekSpecialeView - DeepSeek V3.2 Speciale 思考模型
+/api/ai/ocr/           # DeepSeekOCRView - 图片 OCR 识别（硅基流动 DeepSeek-OCR）
 ```
 
 ### 重要参数
@@ -213,10 +214,11 @@ export const cart = reactive({
 - 快捷操作按钮
 
 ### AiLabView.vue - AI 实验室（DeepSeek V3.2 Speciale）
-- 独立页面，深色主题
+- 独立全屏页面，浅色主题
 - **思维链展示**：完整显示模型的推理过程
 - 支持折叠/展开思维链
 - 流式输出，实时显示思考过程和最终回答
+- **图片 OCR**：支持上传/粘贴图片，自动识别数学题
 - 统计信息：思考时长、字数等
 
 ---
@@ -299,6 +301,7 @@ DB_ENGINE=django.db.backends.sqlite3
 DEEPSEEK_API_KEY=your-deepseek-api-key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_SPECIALE_BASE_URL=https://api.deepseek.com/v3.2_speciale_expires_on_20251215  # 可选，DeepSeek V3.2 Speciale 专用
+SILICONFLOW_API_KEY=your-siliconflow-api-key  # 硅基流动 API（用于 DeepSeek-OCR 图片识别）
 ```
 
 ### 前端 (.env.production)

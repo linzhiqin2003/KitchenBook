@@ -160,3 +160,7 @@ CHEF_PASSWORD = os.environ.get('CHEF_PASSWORD', 'kitchen123')
 # DeepSeek API 配置
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
+
+# 硅基流动 API 配置 (用于 DeepSeek-OCR)
+SILICONFLOW_API_KEY = os.environ.get('SILICONFLOW_API_KEY', 'sk-ywlsinkhxbuyohliisofjlkpjsilkqhceeibsgeakinkwjxj')
+SILICONFLOW_BASE_URL = os.environ.get('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')

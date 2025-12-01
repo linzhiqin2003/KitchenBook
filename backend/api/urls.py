@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView, BlogPostViewSet, TagViewSet, AiAgentView, DeepSeekSpecialeView
+from .views import RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView, BlogPostViewSet, TagViewSet, AiAgentView, DeepSeekSpecialeView, DeepSeekOCRView
 
 router = DefaultRouter()
 router.register(r'recipes', RecipeViewSet)
@@ -14,5 +14,6 @@ urlpatterns = [
     path('chef/login/', ChefAuthView.as_view(), name='chef-login'),
     path('ai/chat/', AiAgentView.as_view(), name='ai-chat'),
     path('ai/speciale/', DeepSeekSpecialeView.as_view(), name='ai-speciale'),
+    path('ai/ocr/', DeepSeekOCRView.as_view(), name='ai-ocr'),
 ]
 

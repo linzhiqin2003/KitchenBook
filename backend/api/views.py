@@ -720,3 +720,119 @@ class DeepSeekSpecialeView(APIView):
         response['Cache-Control'] = 'no-cache'
         response['X-Accel-Buffering'] = 'no'
         return response
+
+
+# ==================== DeepSeek-OCR 图片识别 ====================
+
+class DeepSeekOCRView(APIView):
+    """DeepSeek-OCR 图片识别 - 通过硅基流动 API 将图片转换为 Markdown"""
+    authentication_classes = []
+    permission_classes = []
+    
+    def post(self, request):
+        """处理图片 OCR 请求"""
+        import requests
+        import base64
+        
+        # 获取图片数据
+        image_file = request.FILES.get('image')
+        image_base64 = request.data.get('image_base64')
+        
+        if not image_file and not image_base64:
+            return Response({'error': '请上传图片'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 获取 API 密钥
+        siliconflow_api_key = getattr(settings, 'SILICONFLOW_API_KEY', '')
+        if not siliconflow_api_key:
+            return Response({
+                'error': 'OCR 服务未配置，请联系管理员'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        try:
+            # 处理图片
+            if image_file:
+                # 从上传的文件读取
+                image_data = image_file.read()
+                image_base64 = base64.b64encode(image_data).decode('utf-8')
+                # 获取 MIME 类型
+                content_type = image_file.content_type or 'image/png'
+            else:
+                # 已经是 base64 格式
+                # 检查是否包含 data URL 前缀
+                if image_base64.startswith('data:'):
+                    # 提取 MIME 类型和 base64 数据
+                    parts = image_base64.split(',', 1)
+                    if len(parts) == 2:
+                        mime_part = parts[0]  # data:image/png;base64
+                        image_base64 = parts[1]
+                        content_type = mime_part.split(':')[1].split(';')[0] if ':' in mime_part else 'image/png'
+                    else:
+                        content_type = 'image/png'
+                else:
+                    content_type = 'image/png'
+            
+            # 构建图片 URL (data URL 格式)
+            image_url = f"data:{content_type};base64,{image_base64}"
+            
+            # 调用硅基流动 DeepSeek-OCR API
+            url = f"{settings.SILICONFLOW_BASE_URL}/chat/completions"
+            
+            payload = {
+                "model": "deepseek-ai/DeepSeek-OCR",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_url
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": "请将图片中的内容转换为 Markdown 格式，特别注意数学公式要用 LaTeX 格式（行内公式用 $...$，块级公式用 $$...$$）。只输出转换后的内容，不要添加任何解释。"
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 4096
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {siliconflow_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=60)
+            
+            if response.status_code != 200:
+                error_msg = response.json().get('error', {}).get('message', '请求失败')
+                return Response({
+                    'error': f'OCR 识别失败: {error_msg}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            result = response.json()
+            ocr_text = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+            
+            if not ocr_text:
+                return Response({
+                    'error': '未能识别图片内容'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            return Response({
+                'success': True,
+                'markdown': ocr_text,
+                'usage': result.get('usage', {})
+            })
+            
+        except requests.exceptions.Timeout:
+            return Response({
+                'error': 'OCR 服务响应超时，请稍后重试'
+            }, status=status.HTTP_504_GATEWAY_TIMEOUT)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'error': f'OCR 处理失败: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
