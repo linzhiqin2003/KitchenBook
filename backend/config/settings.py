@@ -167,3 +167,10 @@ SILICONFLOW_BASE_URL = os.environ.get('SILICONFLOW_BASE_URL', 'https://api.silic
 
 # Groq API 配置 (用于 Whisper 语音转录)
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+
+# HTTPS 安全配置 (生产环境)
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
