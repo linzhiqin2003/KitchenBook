@@ -151,10 +151,13 @@ const handleLogout = () => {
       <RouterView />
     </main>
     
-    <!-- 底部 Footer - 仅在客人模式显示 -->
-    <footer v-if="!isChefMode && !isLoginPage" class="mt-auto border-t border-stone-200/60 bg-gradient-to-b from-stone-50 to-stone-100">
-      <div class="container mx-auto px-4 py-6">
-        <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-stone-500">
+    <!-- Footer 占位空间 - 防止内容被固定底栏遮挡 -->
+    <div v-if="!isChefMode && !isLoginPage" class="h-24 md:h-20"></div>
+    
+    <!-- 底部 Footer - 固定悬浮在底部，仅在客人模式显示 -->
+    <footer v-if="!isChefMode && !isLoginPage" class="fixed bottom-0 left-0 right-0 z-20 border-t border-stone-200/60 bg-gradient-to-b from-stone-50/95 to-stone-100/95 backdrop-blur-sm shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+      <div class="container mx-auto px-4 py-3 md:py-4">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4 text-sm text-stone-500">
           <!-- 左侧：版权 -->
           <div class="flex items-center gap-2">
             <span>🍳</span>
