@@ -379,32 +379,32 @@ const askExample = (text) => {
 </script>
 
 <template>
-  <div class="h-screen w-screen fixed inset-0 bg-[#1a1a2e] text-gray-100 flex flex-col overflow-hidden">
+  <div class="h-screen w-screen fixed inset-0 bg-gradient-to-b from-slate-50 to-white text-gray-800 flex flex-col overflow-hidden">
     <!-- 顶部导航栏 -->
-    <header class="shrink-0 h-14 bg-[#16162a] border-b border-[#2a2a4a] flex items-center px-4 gap-4">
+    <header class="shrink-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-4 shadow-sm">
       <router-link 
         to="/" 
-        class="w-9 h-9 rounded-lg bg-[#2a2a4a] hover:bg-[#3a3a5a] flex items-center justify-center transition-colors"
+        class="w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
         title="返回首页"
       >
-        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
         </svg>
       </router-link>
       
       <div class="flex items-center gap-3 flex-1">
-        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
           <span class="text-lg">🧠</span>
         </div>
         <div>
-          <h1 class="text-base font-medium text-white leading-tight">DeepSeek V3.2 Speciale</h1>
-          <p class="text-xs text-gray-500">思考模型 · 可见推理链</p>
+          <h1 class="text-base font-semibold text-gray-800 leading-tight">DeepSeek V3.2 Speciale</h1>
+          <p class="text-xs text-gray-400">思考模型 · 可见推理链</p>
         </div>
       </div>
       
       <button 
         @click="clearChat" 
-        class="h-9 px-3 text-xs text-gray-400 hover:text-white bg-[#2a2a4a] hover:bg-[#3a3a5a] rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
+        class="h-9 px-3 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -424,7 +424,7 @@ const askExample = (text) => {
             <!-- 用户消息 -->
             <div v-if="msg.role === 'user'" class="flex justify-end">
               <div class="max-w-[85%] md:max-w-[70%]">
-                <div class="bg-indigo-600 rounded-2xl rounded-br-sm px-4 py-3">
+                <div class="bg-indigo-600 text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-md">
                   <div class="whitespace-pre-wrap text-sm leading-relaxed">{{ msg.content }}</div>
                 </div>
               </div>
@@ -434,17 +434,17 @@ const askExample = (text) => {
             <div v-else-if="msg.role === 'assistant'" class="flex justify-start">
               <div class="max-w-[95%] md:max-w-[85%] space-y-3">
                 <!-- 思维链展示 -->
-                <div v-if="msg.reasoning" class="rounded-xl overflow-hidden border border-[#3a3a5a]">
+                <div v-if="msg.reasoning" class="rounded-xl overflow-hidden border border-amber-200 shadow-sm">
                   <button 
                     @click="toggleReasoning(index)"
-                    class="w-full text-left cursor-pointer flex items-center gap-2 px-4 py-2.5 bg-[#252540] hover:bg-[#2a2a4a] transition-colors"
+                    class="w-full text-left cursor-pointer flex items-center gap-2 px-4 py-2.5 bg-amber-50 hover:bg-amber-100 transition-colors"
                   >
                     <div class="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0">
                       <span class="text-xs">💭</span>
                     </div>
-                    <span class="text-sm font-medium text-amber-400">思维链</span>
-                    <span class="text-xs text-gray-500 ml-auto flex items-center gap-2">
-                      <span v-if="msg.isStreaming && isReasoningPhase" class="flex items-center gap-1 text-amber-400">
+                    <span class="text-sm font-medium text-amber-700">思维链</span>
+                    <span class="text-xs text-amber-600/70 ml-auto flex items-center gap-2">
+                      <span v-if="msg.isStreaming && isReasoningPhase" class="flex items-center gap-1 text-amber-600">
                         <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -453,7 +453,7 @@ const askExample = (text) => {
                       </span>
                       <span v-else>{{ msg.reasoning.length }} 字</span>
                       <svg 
-                        class="w-4 h-4 transition-transform text-gray-500" 
+                        class="w-4 h-4 transition-transform text-amber-500" 
                         :class="{ 'rotate-180': !reasoningCollapsed[index] }"
                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
                       >
@@ -464,15 +464,15 @@ const askExample = (text) => {
                   <Transition name="collapse">
                     <div 
                       v-if="!reasoningCollapsed[index]"
-                      class="bg-[#1e1e35] px-4 py-3 max-h-64 overflow-y-auto custom-scrollbar border-t border-[#3a3a5a]"
+                      class="bg-amber-50/50 px-4 py-3 max-h-64 overflow-y-auto custom-scrollbar border-t border-amber-200"
                     >
-                      <div class="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap font-mono text-xs">{{ msg.reasoning }}</div>
+                      <div class="text-gray-600 leading-relaxed whitespace-pre-wrap font-mono text-xs">{{ msg.reasoning }}</div>
                     </div>
                   </Transition>
                 </div>
                 
                 <!-- 主要内容 -->
-                <div class="bg-[#252540] rounded-2xl rounded-bl-sm px-4 py-3 border border-[#3a3a5a]">
+                <div class="bg-white rounded-2xl rounded-bl-sm px-4 py-3 border border-gray-200 shadow-sm">
                   <div 
                     v-if="msg.content" 
                     class="markdown-content text-sm leading-relaxed"
@@ -491,7 +491,7 @@ const askExample = (text) => {
                 </div>
                 
                 <!-- 统计信息 -->
-                <div v-if="msg.stats && msg.stats.endTime" class="flex items-center gap-4 px-1 text-xs text-gray-500">
+                <div v-if="msg.stats && msg.stats.endTime" class="flex items-center gap-4 px-1 text-xs text-gray-400">
                   <span class="flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -508,14 +508,14 @@ const askExample = (text) => {
         
         <!-- 空状态提示 -->
         <div v-if="messages.length <= 1" class="text-center py-12">
-          <div class="text-gray-500 mb-8">试试这些问题：</div>
+          <div class="text-gray-400 mb-8">试试这些问题：</div>
           <div class="flex flex-wrap justify-center gap-3">
             <button
               v-for="q in exampleQuestions"
               :key="q.text"
               @click="askExample(q.text)"
               :disabled="isLoading"
-              class="px-4 py-2.5 bg-[#252540] hover:bg-[#2a2a4a] border border-[#3a3a5a] hover:border-[#4a4a6a] rounded-xl text-sm text-gray-300 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              class="px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-xl text-sm text-gray-600 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2 shadow-sm"
             >
               <span>{{ q.icon }}</span>
               <span>{{ q.text }}</span>
@@ -526,9 +526,9 @@ const askExample = (text) => {
     </div>
     
     <!-- 输入区域 -->
-    <div class="shrink-0 bg-[#16162a] border-t border-[#2a2a4a] p-4">
+    <div class="shrink-0 bg-white border-t border-gray-200 p-4">
       <div class="max-w-4xl mx-auto">
-        <div class="bg-[#252540] rounded-xl border border-[#3a3a5a] focus-within:border-indigo-500/50 transition-colors">
+        <div class="bg-gray-50 rounded-xl border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
           <div class="flex items-end gap-3 p-3">
             <textarea
               v-model="inputMessage"
@@ -536,13 +536,13 @@ const askExample = (text) => {
               :disabled="isLoading"
               placeholder="问我任何需要深度思考的问题..."
               rows="1"
-              class="flex-1 resize-none bg-transparent border-0 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-0 max-h-32 min-h-[24px]"
+              class="flex-1 resize-none bg-transparent border-0 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-0 max-h-32 min-h-[24px]"
               style="field-sizing: content;"
             ></textarea>
             <button
               @click="sendMessage"
               :disabled="!inputMessage.trim() || isLoading"
-              class="w-10 h-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:bg-[#3a3a5a] disabled:text-gray-500 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+              class="w-10 h-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center shadow-sm"
             >
               <svg v-if="!isLoading" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
@@ -554,7 +554,7 @@ const askExample = (text) => {
             </button>
           </div>
         </div>
-        <div class="text-center mt-2 text-xs text-gray-600">
+        <div class="text-center mt-2 text-xs text-gray-400">
           由 DeepSeek V3.2 Speciale 驱动 · 思考过程完全可见
         </div>
       </div>
@@ -586,56 +586,56 @@ const askExample = (text) => {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { 
-  background: rgba(100, 100, 140, 0.4); 
+  background: rgba(200, 180, 140, 0.4); 
   border-radius: 3px; 
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { 
-  background: rgba(100, 100, 140, 0.6); 
+  background: rgba(200, 180, 140, 0.6); 
 }
 
 /* 消息区域滚动条 */
 .overflow-y-auto::-webkit-scrollbar { width: 8px; }
 .overflow-y-auto::-webkit-scrollbar-track { background: transparent; }
 .overflow-y-auto::-webkit-scrollbar-thumb { 
-  background: rgba(100, 100, 140, 0.3); 
+  background: rgba(150, 150, 170, 0.3); 
   border-radius: 4px; 
 }
 .overflow-y-auto::-webkit-scrollbar-thumb:hover { 
-  background: rgba(100, 100, 140, 0.5); 
+  background: rgba(150, 150, 170, 0.5); 
 }
 
 /* Markdown 内容样式 */
 .markdown-content {
-  color: #e5e5e5;
+  color: #374151;
 }
 
 .markdown-content :deep(.md-h1) {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #fff;
+  color: #111827;
   margin: 1.25rem 0 0.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #3a3a5a;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .markdown-content :deep(.md-h2) {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #fff;
+  color: #1f2937;
   margin: 1rem 0 0.5rem;
 }
 
 .markdown-content :deep(.md-h3) {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #f0f0f0;
+  color: #374151;
   margin: 0.75rem 0 0.5rem;
 }
 
 .markdown-content :deep(.md-h4) {
   font-size: 1rem;
   font-weight: 600;
-  color: #e0e0e0;
+  color: #4b5563;
   margin: 0.5rem 0 0.25rem;
 }
 
@@ -668,29 +668,29 @@ const askExample = (text) => {
   border-left: 3px solid #6366f1;
   padding-left: 1rem;
   margin: 0.75rem 0;
-  color: #a0a0a0;
+  color: #6b7280;
   font-style: italic;
 }
 
 .markdown-content :deep(.md-link) {
-  color: #818cf8;
+  color: #4f46e5;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .markdown-content :deep(.md-link:hover) {
-  color: #a5b4fc;
+  color: #6366f1;
 }
 
 .markdown-content :deep(.md-hr) {
   border: none;
-  border-top: 1px solid #3a3a5a;
+  border-top: 1px solid #e5e7eb;
   margin: 1rem 0;
 }
 
 .markdown-content :deep(.code-block) {
-  background: #1e1e35;
-  border: 1px solid #3a3a5a;
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: 0.5rem;
   padding: 1rem;
   margin: 0.75rem 0;
@@ -701,25 +701,26 @@ const askExample = (text) => {
 }
 
 .markdown-content :deep(.code-block code) {
-  color: #e0e0e0;
+  color: #e2e8f0;
 }
 
 .markdown-content :deep(.inline-code) {
-  background: #3a3a5a;
-  color: #a5b4fc;
+  background: #f1f5f9;
+  color: #6366f1;
   padding: 0.1rem 0.35rem;
   border-radius: 0.25rem;
   font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 0.85em;
+  border: 1px solid #e2e8f0;
 }
 
 .markdown-content :deep(strong) {
-  color: #fff;
+  color: #111827;
   font-weight: 600;
 }
 
 .markdown-content :deep(em) {
-  color: #c0c0c0;
+  color: #4b5563;
   font-style: italic;
 }
 
@@ -727,7 +728,8 @@ const askExample = (text) => {
 .markdown-content :deep(.math-block) {
   margin: 0.75rem 0;
   padding: 1rem;
-  background: #1e1e35;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   overflow-x: auto;
   text-align: center;
@@ -739,6 +741,6 @@ const askExample = (text) => {
 
 /* MathJax 样式覆盖 */
 .markdown-content :deep(mjx-container) {
-  color: #e0e0e0 !important;
+  color: #1f2937 !important;
 }
 </style>
