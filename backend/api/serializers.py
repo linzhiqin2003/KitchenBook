@@ -35,9 +35,11 @@ class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class IngredientSerializer(serializers.ModelSerializer):
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    
     class Meta:
         model = Ingredient
-        fields = ['id', 'name', 'quantity', 'unit', 'threshold', 'in_stock', 'is_low_stock']
+        fields = ['id', 'name', 'category', 'category_display', 'quantity', 'unit', 'threshold', 'in_stock', 'is_low_stock']
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
     ingredient_name = serializers.CharField(source='ingredient.name', read_only=True)

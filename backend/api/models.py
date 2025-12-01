@@ -9,7 +9,18 @@ class Ingredient(models.Model):
         ('pc', 'Piece'),
     ]
     
+    CATEGORY_CHOICES = [
+        ('meat', '肉类'),
+        ('seafood', '海鲜'),
+        ('vegetable', '蔬菜'),
+        ('seasoning', '调味料'),
+        ('staple', '主食/干货'),
+        ('dairy', '乳制品'),
+        ('other', '其他'),
+    ]
+    
     name = models.CharField(max_length=100)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other', help_text="食材分类")
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Current stock quantity")
     unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default='g')
     threshold = models.DecimalField(max_digits=10, decimal_places=2, default=10, help_text="Low stock alert threshold")
