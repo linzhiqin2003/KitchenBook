@@ -847,16 +847,16 @@ class DeepSeekOCRView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# ==================== 语音转录 (Groq Whisper) ====================
+# ==================== 语音转录 (Groq Whisper via OpenAI SDK) ====================
 
 class WhisperTranscribeView(APIView):
-    """语音转录 - 使用 Groq Whisper API 将语音转换为文字"""
+    """语音转录 - 使用 Groq Whisper API 将语音转换为文字（通过 OpenAI SDK 调用）"""
     authentication_classes = []
     permission_classes = []
     
     def post(self, request):
         """处理语音转录请求"""
-        from groq import Groq
+        from openai import OpenAI
         import tempfile
         import os
         
@@ -875,7 +875,6 @@ class WhisperTranscribeView(APIView):
         
         try:
             # 将上传的文件保存为临时文件
-            # Groq SDK 需要文件路径或文件对象
             suffix = '.webm'  # 默认 webm 格式
             content_type = audio_file.content_type or ''
             if 'mp3' in content_type:
@@ -891,39 +890,30 @@ class WhisperTranscribeView(APIView):
                 tmp_file_path = tmp_file.name
             
             try:
-                # 临时清除代理环境变量，避免 Groq SDK 冲突
-                proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']
-                saved_proxies = {}
-                for var in proxy_vars:
-                    if var in os.environ:
-                        saved_proxies[var] = os.environ.pop(var)
+                # 使用 OpenAI SDK 调用 Groq API（Groq 兼容 OpenAI API）
+                client = OpenAI(
+                    api_key=groq_api_key,
+                    base_url="https://api.groq.com/openai/v1"
+                )
                 
-                try:
-                    # 初始化 Groq 客户端
-                    client = Groq(api_key=groq_api_key)
-                    
-                    # 调用 Whisper API
-                    with open(tmp_file_path, 'rb') as f:
-                        transcription = client.audio.transcriptions.create(
-                            file=f,
-                            model="whisper-large-v3",
-                            prompt="转录音频，中文",
-                            response_format="text",
-                            language="zh",
-                            temperature=0.0
-                        )
-                    
-                    # Groq 返回的 transcription 直接是文本字符串
-                    text = transcription if isinstance(transcription, str) else str(transcription)
-                    
-                    return Response({
-                        'success': True,
-                        'text': text.strip()
-                    })
-                finally:
-                    # 恢复代理环境变量
-                    for var, value in saved_proxies.items():
-                        os.environ[var] = value
+                # 调用 Whisper API
+                with open(tmp_file_path, 'rb') as f:
+                    transcription = client.audio.transcriptions.create(
+                        file=f,
+                        model="whisper-large-v3",
+                        prompt="转录音频，中文",
+                        response_format="text",
+                        language="zh",
+                        temperature=0.0
+                    )
+                
+                # 返回转录结果
+                text = transcription if isinstance(transcription, str) else str(transcription)
+                
+                return Response({
+                    'success': True,
+                    'text': text.strip()
+                })
                 
             finally:
                 # 清理临时文件
