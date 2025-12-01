@@ -286,7 +286,7 @@ const toggleChat = () => {
 </script>
 
 <template>
-  <div class="fixed bottom-4 right-4 z-50 font-sans">
+  <div class="fixed bottom-20 right-4 z-50 font-sans">
     <!-- 聊天气泡按钮 -->
     <Transition name="bounce">
       <button
