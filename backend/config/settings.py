@@ -171,6 +171,6 @@ GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 # HTTPS 安全配置 (生产环境)
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = False  # Nginx 已处理 HTTPS 重定向
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
