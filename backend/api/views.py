@@ -549,10 +549,7 @@ class AiAgentView(APIView):
                             if chunk.choices[0].delta.content:
                                 yield f"data: {json.dumps({'type': 'content', 'content': chunk.choices[0].delta.content}, ensure_ascii=False)}\n\n"
                         
-                        # 发送动作
-                        if actions:
-                            yield f"data: {json.dumps({'type': 'actions', 'actions': actions}, ensure_ascii=False)}\n\n"
-                        
+                        # 注意：actions 已在工具调用时立即发送，这里不再重复发送
                         yield "data: [DONE]\n\n"
                         return
                     
@@ -623,9 +620,7 @@ class AiAgentView(APIView):
                     if chunk.choices[0].delta.content:
                         yield f"data: {json.dumps({'type': 'content', 'content': chunk.choices[0].delta.content}, ensure_ascii=False)}\n\n"
                 
-                if actions:
-                    yield f"data: {json.dumps({'type': 'actions', 'actions': actions}, ensure_ascii=False)}\n\n"
-                
+                # 注意：actions 已在工具调用时立即发送，这里不再重复发送
                 yield "data: [DONE]\n\n"
                 
             except Exception as e:
