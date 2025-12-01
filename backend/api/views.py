@@ -898,15 +898,18 @@ class WhisperTranscribeView(APIView):
                         'text': ''  # 返回空，不调用 API
                     })
                 
+                # 获取录音时长（从请求参数获取，单位：秒）
+                duration = float(request.data.get('duration', 0))
+                
                 # 使用 OpenAI SDK 调用 Groq API（Groq 兼容 OpenAI API）
-                client = OpenAI(
+                groq_client = OpenAI(
                     api_key=groq_api_key,
                     base_url="https://api.groq.com/openai/v1"
                 )
                 
-                # 调用 Whisper API（不使用 prompt 以减少幻觉）
+                # 调用 Whisper API
                 with open(tmp_file_path, 'rb') as f:
-                    transcription = client.audio.transcriptions.create(
+                    transcription = groq_client.audio.transcriptions.create(
                         file=f,
                         model="whisper-large-v3",
                         response_format="text",
@@ -914,27 +917,40 @@ class WhisperTranscribeView(APIView):
                         temperature=0.0
                     )
                 
-                # 返回转录结果
+                # 获取转录结果
                 text = transcription if isinstance(transcription, str) else str(transcription)
                 text = text.strip()
                 
-                # 过滤 Whisper 常见幻觉输出（空录音时容易产生）
-                hallucination_keywords = [
-                    '字幕', '志愿者', '订阅', '感谢观看', '谢谢观看', '谢谢收看',
-                    '翻译', '校对', '审核', '字幕组', '制作', '出品',
-                    'subscribe', 'thank you', 'thanks for watching',
-                    '请订阅', '点赞', '关注', '三连'
-                ]
-                text_lower = text.lower()
-                
-                # 如果转录结果很短且包含幻觉关键词，认为是幻觉
-                if len(text) < 30:
-                    for keyword in hallucination_keywords:
-                        if keyword in text_lower:
-                            return Response({
-                                'success': True,
-                                'text': ''  # 返回空
-                            })
+                # 如果录音超过10秒，用语言模型整合优化转录结果
+                if duration > 10 and text and len(text) > 20:
+                    try:
+                        deepseek_client = OpenAI(
+                            api_key=settings.DEEPSEEK_API_KEY,
+                            base_url=settings.DEEPSEEK_BASE_URL
+                        )
+                        
+                        completion = deepseek_client.chat.completions.create(
+                            model="deepseek-chat",
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": "你是一个语音转文字的后处理助手。用户会给你一段语音转录的原始文本，可能有一些重复、口语化或不连贯的地方。请帮助整理成通顺的文字，保持原意不变，不要添加或删除实质内容。直接输出整理后的文字，不要任何解释。"
+                                },
+                                {
+                                    "role": "user",
+                                    "content": f"请整理这段语音转录文本：\n\n{text}"
+                                }
+                            ],
+                            max_tokens=500,
+                            temperature=0.3
+                        )
+                        
+                        refined_text = completion.choices[0].message.content.strip()
+                        if refined_text:
+                            text = refined_text
+                    except Exception as e:
+                        # 语言模型整合失败，使用原始转录结果
+                        print(f"语音整合失败: {e}")
                 
                 return Response({
                     'success': True,

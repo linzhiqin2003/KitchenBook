@@ -650,8 +650,11 @@ const startRecording = async () => {
       // 创建音频 Blob
       const audioBlob = new Blob(audioChunks, { type: mimeType })
       
-      // 发送到后端转录
-      await transcribeAudio(audioBlob)
+      // 保存录音时长（在清零前）
+      const duration = recordingDuration.value
+      
+      // 发送到后端转录（传递录音时长）
+      await transcribeAudio(audioBlob, duration)
     }
     
     // 每秒更新录音时长
@@ -691,12 +694,13 @@ const stopRecording = () => {
 }
 
 // 发送音频到后端转录
-const transcribeAudio = async (audioBlob) => {
+const transcribeAudio = async (audioBlob, duration = 0) => {
   isTranscribing.value = true
   
   try {
     const formData = new FormData()
     formData.append('audio', audioBlob, 'recording.webm')
+    formData.append('duration', duration.toString())
     
     const response = await fetch(`${API_BASE_URL}/api/ai/transcribe/`, {
       method: 'POST',

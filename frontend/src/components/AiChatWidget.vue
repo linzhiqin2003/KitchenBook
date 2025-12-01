@@ -13,6 +13,14 @@ const messagesContainer = ref(null)
 // 思维链状态（用于当前正在发送的消息）
 const currentThinking = ref([])
 
+// 语音录制状态
+const isRecording = ref(false)
+const isTranscribing = ref(false)
+const recordingDuration = ref(0)
+let mediaRecorder = null
+let audioChunks = []
+let recordingTimer = null
+
 // 初始欢迎消息
 const welcomeMessage = {
   role: 'assistant',
@@ -358,6 +366,118 @@ const toggleChat = () => {
     nextTick(() => scrollToBottom())
   }
 }
+
+// ===== 语音录制功能 =====
+
+const toggleRecording = async () => {
+  if (isRecording.value) {
+    stopRecording()
+  } else {
+    await startRecording()
+  }
+}
+
+const startRecording = async () => {
+  try {
+    // 检查浏览器支持
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        alert('语音输入需要 HTTPS 安全连接')
+      } else {
+        alert('您的浏览器不支持语音录制功能')
+      }
+      return
+    }
+    
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    
+    // 选择支持的音频格式
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+    mediaRecorder = new MediaRecorder(stream, { mimeType })
+    audioChunks = []
+    
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data)
+      }
+    }
+    
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(track => track.stop())
+      const audioBlob = new Blob(audioChunks, { type: mimeType })
+      const duration = recordingDuration.value
+      await transcribeAudio(audioBlob, duration)
+    }
+    
+    // 每秒更新录音时长
+    recordingTimer = setInterval(() => {
+      recordingDuration.value++
+      if (recordingDuration.value >= 30) { // 最长 30 秒
+        stopRecording()
+      }
+    }, 1000)
+    
+    mediaRecorder.start(1000)
+    isRecording.value = true
+    
+  } catch (error) {
+    console.error('录音失败:', error)
+    if (error.name === 'NotAllowedError') {
+      alert('请允许麦克风访问权限')
+    } else {
+      alert('录音初始化失败')
+    }
+  }
+}
+
+const stopRecording = () => {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  if (recordingTimer) {
+    clearInterval(recordingTimer)
+    recordingTimer = null
+  }
+  isRecording.value = false
+}
+
+const transcribeAudio = async (audioBlob, duration = 0) => {
+  isTranscribing.value = true
+  
+  try {
+    const formData = new FormData()
+    formData.append('audio', audioBlob, 'recording.webm')
+    formData.append('duration', duration.toString())
+    
+    const response = await fetch(`${API_BASE_URL}/api/ai/transcribe/`, {
+      method: 'POST',
+      body: formData
+    })
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(data.error || '转录失败')
+    }
+    
+    if (data.text) {
+      inputMessage.value = (inputMessage.value ? inputMessage.value + ' ' : '') + data.text
+    }
+    
+  } catch (error) {
+    console.error('转录失败:', error)
+    // 静默失败，不弹窗打扰用户
+  } finally {
+    isTranscribing.value = false
+    recordingDuration.value = 0
+  }
+}
+
+const formatDuration = (seconds) => {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
 </script>
 
 <template>
@@ -541,28 +661,60 @@ const toggleChat = () => {
         </div>
         
         <!-- 输入区域 -->
-        <div class="p-3 border-t border-stone-100 bg-white shrink-0">
-          <div class="flex items-end gap-2">
+        <div class="p-2 sm:p-3 border-t border-stone-100 bg-white shrink-0">
+          <div class="flex items-center gap-1.5 sm:gap-2 bg-stone-50 rounded-xl px-2 py-1.5 border border-stone-200 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-100 transition-all">
+            <!-- 语音按钮 -->
+            <button
+              @click="toggleRecording"
+              :disabled="isLoading || isTranscribing"
+              :class="[
+                'w-8 h-8 rounded-lg transition-all shrink-0 cursor-pointer flex items-center justify-center',
+                isRecording 
+                  ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
+                  : 'bg-amber-100 hover:bg-amber-200 text-amber-600 hover:text-amber-700',
+                (isLoading || isTranscribing) && 'opacity-50 cursor-not-allowed'
+              ]"
+              :title="isRecording ? '停止录音' : '语音输入'"
+            >
+              <svg v-if="isTranscribing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <svg v-else-if="isRecording" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="2"/>
+              </svg>
+              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+              </svg>
+            </button>
+            
+            <!-- 录音时长 -->
+            <span v-if="isRecording" class="text-[10px] text-red-500 font-mono min-w-[28px]">
+              {{ formatDuration(recordingDuration) }}
+            </span>
+            
             <textarea
               v-model="inputMessage"
               @keydown="handleKeydown"
-              :disabled="isLoading"
-              placeholder="告诉小厨你想吃什么..."
+              :disabled="isLoading || isRecording"
+              :placeholder="isRecording ? '录音中...' : '告诉小厨你想吃什么...'"
               rows="1"
-              class="flex-1 resize-none border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:bg-stone-50 disabled:text-stone-400 max-h-24"
+              class="flex-1 resize-none bg-transparent border-0 text-sm focus:outline-none focus:ring-0 disabled:text-stone-400 max-h-20 min-h-[28px] py-1"
+              style="field-sizing: content;"
             ></textarea>
+            
             <button
               @click="sendMessage"
-              :disabled="!inputMessage.trim() || isLoading"
-              class="p-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer"
+              :disabled="!inputMessage.trim() || isLoading || isRecording || isTranscribing"
+              class="w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
               </svg>
             </button>
           </div>
-          <div class="text-[10px] text-stone-400 text-center mt-2">
-            由 DeepSeek AI 驱动 · 支持智能点餐
+          <div class="text-[10px] text-stone-400 text-center mt-1.5">
+            由 DeepSeek AI 驱动 · 支持语音点餐
           </div>
         </div>
       </div>
