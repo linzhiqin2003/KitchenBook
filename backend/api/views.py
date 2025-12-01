@@ -5,8 +5,10 @@ from rest_framework.views import APIView
 from django.conf import settings
 from django.utils import timezone
 from django.db.models import Sum
+from django.http import StreamingHttpResponse
 import hashlib
 import time
+import json
 from .models import Recipe, Ingredient, Order, BlogPost, Tag
 from .serializers import (
     RecipeSerializer, PublicRecipeSerializer, IngredientSerializer, OrderSerializer,
@@ -188,3 +190,100 @@ class BlogPostViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except BlogPost.DoesNotExist:
             return Response({'error': '文章不存在'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ==================== AI 对话助手 ====================
+
+class AiChatView(APIView):
+    """AI 对话助手 - 使用 DeepSeek API"""
+    authentication_classes = []
+    permission_classes = []
+    
+    def get_menu_context(self):
+        """获取当前菜单作为上下文"""
+        recipes = Recipe.objects.filter(is_public=True)
+        menu_items = []
+        for recipe in recipes:
+            item = f"- {recipe.title}"
+            if recipe.description:
+                item += f"：{recipe.description[:50]}"
+            if recipe.cooking_time:
+                item += f"（烹饪时间约 {recipe.cooking_time} 分钟）"
+            menu_items.append(item)
+        return "\n".join(menu_items) if menu_items else "暂无菜品"
+    
+    def get_system_prompt(self):
+        """构建系统提示词"""
+        menu = self.get_menu_context()
+        return f"""你是"LZQ的私人厨房"的 AI 小助手，名叫"小厨"。你的任务是帮助顾客了解菜品、推荐美食、回答关于烹饪的问题。
+
+当前菜单：
+{menu}
+
+你的性格特点：
+- 热情友好，像一个专业的服务员
+- 对美食充满热爱，会用生动的语言描述菜品
+- 会根据顾客的口味偏好推荐合适的菜品
+- 回答简洁明了，一般不超过 100 字
+
+注意事项：
+- 只推荐菜单上有的菜品
+- 如果顾客问的问题与美食/餐厅无关，礼貌地引导回美食话题
+- 使用轻松友好的语气，可以适当使用 emoji"""
+    
+    def post(self, request):
+        """处理对话请求（流式响应）"""
+        messages = request.data.get('messages', [])
+        
+        if not messages:
+            return Response({'error': '消息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 检查 API 配置
+        if not settings.DEEPSEEK_API_KEY:
+            return Response({
+                'error': 'AI 服务未配置，请联系管理员'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        # 构建完整的消息列表（加入系统提示）
+        full_messages = [
+            {"role": "system", "content": self.get_system_prompt()}
+        ] + messages
+        
+        try:
+            from openai import OpenAI
+            
+            client = OpenAI(
+                api_key=settings.DEEPSEEK_API_KEY,
+                base_url=settings.DEEPSEEK_BASE_URL
+            )
+            
+            # 流式请求
+            def generate():
+                stream = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=full_messages,
+                    stream=True,
+                    max_tokens=500,
+                    temperature=0.7
+                )
+                
+                for chunk in stream:
+                    if chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        # 发送 SSE 格式数据
+                        yield f"data: {json.dumps({'content': content}, ensure_ascii=False)}\n\n"
+                
+                yield "data: [DONE]\n\n"
+            
+            response = StreamingHttpResponse(
+                generate(),
+                content_type='text/event-stream'
+            )
+            response['Cache-Control'] = 'no-cache'
+            response['X-Accel-Buffering'] = 'no'
+            return response
+            
+        except Exception as e:
+            return Response({
+                'error': f'AI 服务暂时不可用：{str(e)}'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)

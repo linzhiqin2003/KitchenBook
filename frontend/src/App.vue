@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import CartSidebar from './components/CartSidebar.vue'
+import AiChatWidget from './components/AiChatWidget.vue'
 import { cart } from './store/cart'
 import { auth } from './store/auth'
 
@@ -174,6 +175,9 @@ const handleLogout = () => {
     </footer>
     
     <CartSidebar v-if="!isChefMode" />
+    
+    <!-- AI 聊天助手 - 仅在客人模式显示 -->
+    <AiChatWidget v-if="!isChefMode && !isLoginPage" />
   </div>
 </template>
 

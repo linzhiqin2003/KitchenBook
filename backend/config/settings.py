@@ -156,3 +156,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # 厨师登录凭证（从环境变量读取，默认值仅用于开发）
 CHEF_USERNAME = os.environ.get('CHEF_USERNAME', 'chef')
 CHEF_PASSWORD = os.environ.get('CHEF_PASSWORD', 'kitchen123')
+
+# DeepSeek API 配置
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
+DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
