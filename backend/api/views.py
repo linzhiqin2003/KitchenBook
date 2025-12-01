@@ -9,6 +9,7 @@ from django.http import StreamingHttpResponse
 import hashlib
 import time
 import json
+import re
 from .models import Recipe, Ingredient, Order, BlogPost, Tag
 from .serializers import (
     RecipeSerializer, PublicRecipeSerializer, IngredientSerializer, OrderSerializer,
@@ -199,6 +200,26 @@ class AiAgentView(APIView):
     authentication_classes = []
     permission_classes = []
     
+    @staticmethod
+    def clean_ai_response(text):
+        """清理 AI 回复中可能出现的工具调用标记"""
+        if not text:
+            return text
+        # 移除各种可能的工具调用标记
+        patterns = [
+            r'<\s*\|?\s*DSML\s*\|?\s*[^>]*>.*?</\s*\|?\s*DSML\s*\|?\s*[^>]*>',  # DSML 标签
+            r'<\s*\|?\s*DSML\s*\|?\s*[^>]*>',  # 单独的 DSML 开始标签
+            r'</\s*\|?\s*DSML\s*\|?\s*[^>]*>',  # 单独的 DSML 结束标签
+            r'<function_calls?>.*?</function_calls?>',  # function_calls 标签
+            r'<invoke[^>]*>.*?</invoke>',  # invoke 标签
+            r'<\|.*?\|>',  # 特殊标记 <|...|>
+        ]
+        for pattern in patterns:
+            text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
+        # 清理多余空行
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        return text.strip()
+    
     # 定义可用工具
     TOOLS = [
         {
@@ -304,18 +325,18 @@ class AiAgentView(APIView):
         """构建系统提示词"""
         return """你是"LZQ的私人厨房"的 AI 点餐助手，名叫"小厨"。
 
-你的能力：
-1. 查看菜单并推荐菜品（使用 get_menu 工具）
-2. 介绍菜品详情（使用 get_recipe_detail 工具）
-3. 帮顾客添加菜品到购物车（使用 add_to_cart 工具）
-4. 查看购物车内容（使用 view_cart 工具）
-5. 帮顾客下单（使用 place_order 工具）
+你的能力（通过系统内置工具实现，会自动调用）：
+1. 查看菜单并推荐菜品
+2. 介绍菜品详情
+3. 帮顾客添加菜品到购物车
+4. 查看购物车内容
+5. 帮顾客下单
 
 工作流程：
-- 当用户想点菜时，先用 get_menu 获取菜单，然后推荐合适的菜品
+- 当用户想点菜时，获取菜单后推荐合适的菜品
 - 推荐时要热情地描述菜品特色，引导用户点餐
-- 用户确认想要某道菜后，使用 add_to_cart 添加到购物车
-- 下单前先用 view_cart 确认购物车内容
+- 用户确认想要某道菜后，添加到购物车
+- 下单前确认购物车内容
 - 下单时需要询问顾客姓名
 
 你的性格：
@@ -324,10 +345,12 @@ class AiAgentView(APIView):
 - 回答简洁，适当使用 emoji
 - 主动引导点餐流程
 
-注意：
+重要规则：
 - 只推荐菜单上有的菜品
 - 如果用户问无关问题，礼貌引导回点餐话题
-- 添加购物车和下单都需要用户明确确认"""
+- 添加购物车和下单都需要用户明确确认
+- 绝对不要在回复中输出任何XML标签、代码块或技术内容
+- 直接用自然语言回复用户"""
     
     # ===== 工具执行函数 =====
     

@@ -25,7 +25,14 @@ onMounted(() => {
   const saved = localStorage.getItem('ai_chat_messages')
   if (saved) {
     try {
-      messages.value = JSON.parse(saved)
+      const parsed = JSON.parse(saved)
+      // 清理可能存在的脏数据
+      messages.value = parsed.map(msg => {
+        if (msg.role === 'assistant' && msg.content) {
+          return { ...msg, content: cleanAiResponse(msg.content) }
+        }
+        return msg
+      })
     } catch (e) {
       messages.value = [welcomeMessage]
     }
@@ -37,6 +44,21 @@ onMounted(() => {
 const saveMessages = () => {
   const toSave = messages.value.slice(-30)
   localStorage.setItem('ai_chat_messages', JSON.stringify(toSave))
+}
+
+// 清理 AI 回复中可能出现的工具调用标记
+const cleanAiResponse = (text) => {
+  if (!text) return text
+  // 移除各种可能的工具调用标记
+  return text
+    .replace(/<\s*\|?\s*DSML\s*\|?\s*[^>]*>[\s\S]*?<\/\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
+    .replace(/<\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
+    .replace(/<\/\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
+    .replace(/<function_calls?>[\s\S]*?<\/function_calls?>/gi, '')
+    .replace(/<invoke[^>]*>[\s\S]*?<\/invoke>/gi, '')
+    .replace(/<\|[^|]*\|>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 const scrollToBottom = async () => {
@@ -216,6 +238,8 @@ const sendMessage = async () => {
       }
     }
     
+    // 清理可能泄露的工具调用标记
+    messages.value[aiMessageIndex].content = cleanAiResponse(messages.value[aiMessageIndex].content)
     saveMessages()
     
   } catch (error) {
