@@ -1037,11 +1037,45 @@ const handlePaste = (event) => {
   text-align: center;
 }
 
+/* MathJax 样式覆盖 - 行内公式 */
 .markdown-content :deep(.math-inline) {
-  padding: 0 0.2rem;
+  display: inline !important;
+  padding: 0 0.1rem;
+  white-space: nowrap;
 }
 
-/* MathJax 样式覆盖 */
+.markdown-content :deep(.math-inline mjx-container),
+.markdown-content :deep(.math-inline mjx-container[jax="SVG"]),
+.markdown-content :deep(.math-inline mjx-container[jax="CHTML"]) {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  vertical-align: baseline !important;
+}
+
+.markdown-content :deep(.math-inline mjx-container svg) {
+  display: inline !important;
+  vertical-align: middle;
+}
+
+/* MathJax 样式覆盖 - 块级公式 */
+.markdown-content :deep(.math-block) {
+  display: block;
+  margin: 0.75rem 0;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.markdown-content :deep(.math-block mjx-container) {
+  display: block !important;
+  margin: 0 auto;
+}
+
+/* MathJax 通用样式 */
 .markdown-content :deep(mjx-container) {
   color: #1f2937 !important;
 }
