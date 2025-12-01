@@ -355,33 +355,39 @@ class AiAgentView(APIView):
         
         # 移除各种可能的工具调用标记（按优先级排序）
         patterns = [
-            # 1. 完整的 DSML 块（包含内容）
-            r'<\s*\|?\s*DSML\s*\|?\s*[^>]*>.*?<\s*/\s*\|?\s*DSML\s*\|?\s*[^>]*>',
-            # 2. 完整的 function_calls 块
-            r'<\s*function_calls?\s*>.*?<\s*/\s*function_calls?\s*>',
-            # 3. 完整的 invoke 块
-            r'<\s*invoke[^>]*>.*?<\s*/\s*invoke\s*>',
-            # 4. 完整的 antml 块（Claude 特有）
-            r'<\s*antml[^>]*>.*?<\s*/\s*antml[^>]*>',
-            # 5. 完整的 tool_call 块
-            r'<\s*tool_call[^>]*>.*?<\s*/\s*tool_call\s*>',
-            # 6. 单独的开始/结束标签（各种变体）
-            r'<\s*/?\s*\|?\s*DSML\s*\|?\s*[^>]*>',
+            # 1. 匹配 < | DSML | xxx> 格式的完整块（带空格和竖线的变体）
+            r'<\s*\|[^>]*>[\s\S]*?<\s*/\s*\|[^>]*>',
+            # 2. 匹配 <|xxx|> 或 </|xxx|> 单独标签
+            r'<\s*/?\s*\|[^>]*>',
+            # 3. 完整的 DSML 块
+            r'<\s*DSML[^>]*>[\s\S]*?<\s*/\s*DSML[^>]*>',
+            r'<\s*/?\s*DSML[^>]*>',
+            # 4. 完整的 function_calls 块
+            r'<\s*function_calls?\s*>[\s\S]*?<\s*/\s*function_calls?\s*>',
             r'<\s*/?\s*function_calls?\s*>',
+            # 5. 完整的 invoke 块
+            r'<\s*invoke[^>]*>[\s\S]*?<\s*/\s*invoke\s*>',
             r'<\s*/?\s*invoke[^>]*>',
+            # 6. 完整的 antml 块（Claude 特有）
+            r'<\s*antml[^>]*>[\s\S]*?<\s*/\s*antml[^>]*>',
             r'<\s*/?\s*antml[^>]*>',
+            # 7. 完整的 tool_call 块
+            r'<\s*tool_call[^>]*>[\s\S]*?<\s*/\s*tool_call\s*>',
             r'<\s*/?\s*tool_call[^>]*>',
+            # 8. parameter 标签
             r'<\s*/?\s*parameter[^>]*>',
-            # 7. 特殊标记 <|...|>
+            # 9. 特殊标记 <|...|>
             r'<\|[^|]*\|>',
-            # 8. name="..." 参数残留
-            r'\bname\s*=\s*["\'][^"\']*["\']',
-            # 9. JSON 代码块残留
-            r'```json\s*\{[^}]*\}\s*```',
+            # 10. name="..." 或 string="..." 参数残留
+            r'\b(name|string)\s*=\s*["\'][^"\']*["\']',
+            # 11. JSON 代码块残留
+            r'```json[\s\S]*?```',
+            # 12. 孤立的数字行（可能是参数残留如 "21" "1"）
+            r'^\s*\d+\s*$',
         ]
         
         for pattern in patterns:
-            text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
+            text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE | re.MULTILINE)
         
         # 清理多余空行和空白
         text = re.sub(r'\n{3,}', '\n\n', text)

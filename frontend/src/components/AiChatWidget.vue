@@ -59,46 +59,55 @@ const cleanAiResponse = (text) => {
   
   let cleaned = text
   
-  // 1. 移除完整的 DSML 块（包含内容）
-  cleaned = cleaned.replace(/<\s*\|?\s*DSML\s*\|?\s*[^>]*>[\s\S]*?<\s*\/\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
+  // 1. 匹配 < | DSML | xxx> 格式的完整块（带空格和竖线的变体）- 最重要！
+  cleaned = cleaned.replace(/<\s*\|[\s\S]*?<\s*\/\s*\|[^>]*>/gi, '')
   
-  // 2. 移除完整的 function_calls 块
+  // 2. 匹配 <|xxx|> 或 </|xxx|> 或 < | xxx |> 单独标签
+  cleaned = cleaned.replace(/<\s*\/?\s*\|[^>]*>/gi, '')
+  
+  // 3. 移除完整的 DSML 块
+  cleaned = cleaned.replace(/<\s*DSML[^>]*>[\s\S]*?<\s*\/\s*DSML[^>]*>/gi, '')
+  cleaned = cleaned.replace(/<\s*\/?\s*DSML[^>]*>/gi, '')
+  
+  // 4. 移除完整的 function_calls 块
   cleaned = cleaned.replace(/<\s*function_calls?\s*>[\s\S]*?<\s*\/\s*function_calls?\s*>/gi, '')
-  
-  // 3. 移除完整的 invoke 块
-  cleaned = cleaned.replace(/<\s*invoke[^>]*>[\s\S]*?<\s*\/\s*invoke\s*>/gi, '')
-  
-  // 4. 移除完整的 antml 块
-  cleaned = cleaned.replace(/<\s*antml[^>]*>[\s\S]*?<\s*\/\s*antml[^>]*>/gi, '')
-  
-  // 5. 移除完整的 tool_call 块
-  cleaned = cleaned.replace(/<\s*tool_call[^>]*>[\s\S]*?<\s*\/\s*tool_call\s*>/gi, '')
-  
-  // 6. 移除单独的开始/结束标签（各种变体）
-  cleaned = cleaned.replace(/<\s*\/?\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
   cleaned = cleaned.replace(/<\s*\/?\s*function_calls?\s*>/gi, '')
+  
+  // 5. 移除完整的 invoke 块
+  cleaned = cleaned.replace(/<\s*invoke[^>]*>[\s\S]*?<\s*\/\s*invoke\s*>/gi, '')
   cleaned = cleaned.replace(/<\s*\/?\s*invoke[^>]*>/gi, '')
+  
+  // 6. 移除完整的 antml 块
+  cleaned = cleaned.replace(/<\s*antml[^>]*>[\s\S]*?<\s*\/\s*antml[^>]*>/gi, '')
   cleaned = cleaned.replace(/<\s*\/?\s*antml[^>]*>/gi, '')
+  
+  // 7. 移除完整的 tool_call 块
+  cleaned = cleaned.replace(/<\s*tool_call[^>]*>[\s\S]*?<\s*\/\s*tool_call\s*>/gi, '')
   cleaned = cleaned.replace(/<\s*\/?\s*tool_call[^>]*>/gi, '')
+  
+  // 8. 移除 parameter 标签
   cleaned = cleaned.replace(/<\s*\/?\s*parameter[^>]*>/gi, '')
   
-  // 7. 移除 <|...|> 格式的特殊标记
+  // 9. 移除 <|...|> 格式的特殊标记
   cleaned = cleaned.replace(/<\|[^|]*\|>/g, '')
   
-  // 8. 移除 name="..." 参数残留
-  cleaned = cleaned.replace(/\bname\s*=\s*["'][^"']*["']/gi, '')
+  // 10. 移除 name="..." 或 string="..." 参数残留
+  cleaned = cleaned.replace(/\b(name|string)\s*=\s*["'][^"']*["']/gi, '')
   
-  // 9. 移除 JSON 代码块残留
-  cleaned = cleaned.replace(/```json\s*\{[\s\S]*?\}\s*```/gi, '')
+  // 11. 移除 JSON 代码块残留
+  cleaned = cleaned.replace(/```json[\s\S]*?```/gi, '')
   
-  // 10. 清理独立的竖线和多余符号
+  // 12. 清理独立的竖线和多余符号
   cleaned = cleaned.replace(/^\s*\|\s*$/gm, '')
   
-  // 11. 清理多余空行
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
-  cleaned = cleaned.replace(/^\s*\n/, '')  // 清理开头空行
+  // 13. 清理孤立的数字行（参数残留）
+  cleaned = cleaned.replace(/^\s*\d+\s*$/gm, '')
   
-  // 12. 清理首尾空白
+  // 14. 清理多余空行
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
+  cleaned = cleaned.replace(/^\s*\n/, '')
+  
+  // 15. 清理首尾空白
   cleaned = cleaned.trim()
   
   return cleaned
