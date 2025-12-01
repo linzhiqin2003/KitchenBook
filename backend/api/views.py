@@ -891,27 +891,39 @@ class WhisperTranscribeView(APIView):
                 tmp_file_path = tmp_file.name
             
             try:
-                # 初始化 Groq 客户端
-                client = Groq(api_key=groq_api_key)
+                # 临时清除代理环境变量，避免 Groq SDK 冲突
+                proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']
+                saved_proxies = {}
+                for var in proxy_vars:
+                    if var in os.environ:
+                        saved_proxies[var] = os.environ.pop(var)
                 
-                # 调用 Whisper API
-                with open(tmp_file_path, 'rb') as f:
-                    transcription = client.audio.transcriptions.create(
-                        file=f,
-                        model="whisper-large-v3",
-                        prompt="转录音频，中文",
-                        response_format="text",
-                        language="zh",
-                        temperature=0.0
-                    )
-                
-                # Groq 返回的 transcription 直接是文本字符串
-                text = transcription if isinstance(transcription, str) else str(transcription)
-                
-                return Response({
-                    'success': True,
-                    'text': text.strip()
-                })
+                try:
+                    # 初始化 Groq 客户端
+                    client = Groq(api_key=groq_api_key)
+                    
+                    # 调用 Whisper API
+                    with open(tmp_file_path, 'rb') as f:
+                        transcription = client.audio.transcriptions.create(
+                            file=f,
+                            model="whisper-large-v3",
+                            prompt="转录音频，中文",
+                            response_format="text",
+                            language="zh",
+                            temperature=0.0
+                        )
+                    
+                    # Groq 返回的 transcription 直接是文本字符串
+                    text = transcription if isinstance(transcription, str) else str(transcription)
+                    
+                    return Response({
+                        'success': True,
+                        'text': text.strip()
+                    })
+                finally:
+                    # 恢复代理环境变量
+                    for var, value in saved_proxies.items():
+                        os.environ[var] = value
                 
             finally:
                 # 清理临时文件
