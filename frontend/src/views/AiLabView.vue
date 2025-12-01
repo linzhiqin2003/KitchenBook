@@ -22,6 +22,11 @@ const isReasoningPhase = ref(false)
 const isContentPhase = ref(false)
 const reasoningCollapsed = ref({}) // 按消息索引存储折叠状态
 
+// 用于取消请求
+let abortController = null
+let currentReader = null
+let currentAiMessageIndex = null
+
 // 统计信息
 const stats = ref({
   reasoningLength: 0,
@@ -233,6 +238,49 @@ const toggleReasoning = (index) => {
   reasoningCollapsed.value[index] = !reasoningCollapsed.value[index]
 }
 
+// 停止生成
+const stopGeneration = async () => {
+  if (abortController) {
+    abortController.abort()
+  }
+  if (currentReader) {
+    try {
+      await currentReader.cancel()
+    } catch (e) {
+      // 忽略取消错误
+    }
+  }
+  
+  // 标记当前消息为已停止
+  if (currentAiMessageIndex !== null && messages.value[currentAiMessageIndex]) {
+    const msg = messages.value[currentAiMessageIndex]
+    msg.isStreaming = false
+    msg.stopped = true
+    // 如果有内容，添加停止标记
+    if (msg.content) {
+      msg.content += '\n\n*[已停止生成]*'
+    } else if (msg.reasoning) {
+      msg.content = '*[已停止生成]*'
+    }
+    // 更新统计
+    msg.stats = {
+      ...stats.value,
+      endTime: Date.now(),
+      reasoningLength: currentReasoning.value.length,
+      contentLength: currentContent.value.length
+    }
+    saveMessages()
+  }
+  
+  // 重置状态
+  isLoading.value = false
+  isReasoningPhase.value = false
+  isContentPhase.value = false
+  abortController = null
+  currentReader = null
+  currentAiMessageIndex = null
+}
+
 // 发送消息
 const sendMessage = async () => {
   const text = inputMessage.value.trim()
@@ -248,13 +296,19 @@ const sendMessage = async () => {
   stats.value = { reasoningLength: 0, contentLength: 0, startTime: Date.now(), endTime: null }
   scrollToBottom()
   
-  // 构建 API 消息（不包含 reasoning）
+  // 构建 API 消息（不包含 reasoning 和停止标记）
   const apiMessages = messages.value
     .filter(m => m.type === 'text' && (m.role === 'user' || m.role === 'assistant'))
-    .map(m => ({ role: m.role, content: m.content }))
+    .map(m => ({ 
+      role: m.role, 
+      // 移除停止标记
+      content: m.content?.replace(/\n\n\*\[已停止生成\]\*$/, '') || ''
+    }))
+    .filter(m => m.content) // 过滤掉空内容
   
   // 添加一个空的 AI 消息用于流式填充
   const aiMessageIndex = messages.value.length
+  currentAiMessageIndex = aiMessageIndex
   messages.value.push({
     role: 'assistant',
     content: '',
@@ -263,11 +317,15 @@ const sendMessage = async () => {
     isStreaming: true
   })
   
+  // 创建 AbortController
+  abortController = new AbortController()
+  
   try {
     const response = await fetch(`${API_BASE_URL}/api/ai/speciale/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: apiMessages })
+      body: JSON.stringify({ messages: apiMessages }),
+      signal: abortController.signal
     })
     
     if (!response.ok) {
@@ -276,12 +334,16 @@ const sendMessage = async () => {
     }
     
     const reader = response.body.getReader()
+    currentReader = reader // 保存引用以便取消
     const decoder = new TextDecoder()
     let buffer = '' // 用于存储跨 chunk 的不完整数据
     
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
+      
+      // 检查是否已被取消
+      if (!isLoading.value) break
       
       // 将新数据追加到 buffer
       buffer += decoder.decode(value, { stream: true })
@@ -357,6 +419,11 @@ const sendMessage = async () => {
     renderMath()
     
   } catch (error) {
+    // 如果是用户取消，不显示错误
+    if (error.name === 'AbortError') {
+      // 已在 stopGeneration 中处理
+      return
+    }
     messages.value[aiMessageIndex].content = `抱歉，我遇到了一点问题 😅\n\n${error.message}\n\n请稍后再试~`
     messages.value[aiMessageIndex].reasoning = ''
     messages.value[aiMessageIndex].isStreaming = false
@@ -364,6 +431,9 @@ const sendMessage = async () => {
     isLoading.value = false
     isReasoningPhase.value = false
     isContentPhase.value = false
+    abortController = null
+    currentReader = null
+    currentAiMessageIndex = null
     scrollToBottom()
   }
 }
@@ -745,17 +815,31 @@ const handlePaste = (event) => {
               style="field-sizing: content;"
             ></textarea>
             
+            <!-- 发送按钮 / 停止按钮 -->
             <button
+              v-if="!isLoading"
               @click="selectedImage ? sendWithImage() : sendMessage()"
-              :disabled="(!inputMessage.trim() && !ocrResult) || isLoading || isOcrProcessing"
+              :disabled="(!inputMessage.trim() && !ocrResult) || isOcrProcessing"
               class="w-10 h-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center shadow-sm"
             >
-              <svg v-if="!isLoading && !isOcrProcessing" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-if="!isOcrProcessing" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
               </svg>
               <svg v-else class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </button>
+            
+            <!-- 停止生成按钮 -->
+            <button
+              v-else
+              @click="stopGeneration"
+              class="w-10 h-10 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shrink-0 cursor-pointer flex items-center justify-center shadow-sm"
+              title="停止生成"
+            >
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="1"/>
               </svg>
             </button>
           </div>
