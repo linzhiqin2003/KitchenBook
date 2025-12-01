@@ -59,35 +59,46 @@ const cleanAiResponse = (text) => {
   
   let cleaned = text
   
-  // 1. 移除各种 DSML 变体标记（带空格、竖线、大小写混合）
-  // 匹配: < | DSML | ...>, <|DSML|...>, </|DSML|...> 等
+  // 1. 移除完整的 DSML 块（包含内容）
+  cleaned = cleaned.replace(/<\s*\|?\s*DSML\s*\|?\s*[^>]*>[\s\S]*?<\s*\/\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
+  
+  // 2. 移除完整的 function_calls 块
+  cleaned = cleaned.replace(/<\s*function_calls?\s*>[\s\S]*?<\s*\/\s*function_calls?\s*>/gi, '')
+  
+  // 3. 移除完整的 invoke 块
+  cleaned = cleaned.replace(/<\s*invoke[^>]*>[\s\S]*?<\s*\/\s*invoke\s*>/gi, '')
+  
+  // 4. 移除完整的 antml 块
+  cleaned = cleaned.replace(/<\s*antml[^>]*>[\s\S]*?<\s*\/\s*antml[^>]*>/gi, '')
+  
+  // 5. 移除完整的 tool_call 块
+  cleaned = cleaned.replace(/<\s*tool_call[^>]*>[\s\S]*?<\s*\/\s*tool_call\s*>/gi, '')
+  
+  // 6. 移除单独的开始/结束标签（各种变体）
   cleaned = cleaned.replace(/<\s*\/?\s*\|?\s*DSML\s*\|?\s*[^>]*>/gi, '')
-  
-  // 2. 移除 function_calls 相关标记
   cleaned = cleaned.replace(/<\s*\/?\s*function_calls?\s*>/gi, '')
-  
-  // 3. 移除 invoke 标记
   cleaned = cleaned.replace(/<\s*\/?\s*invoke[^>]*>/gi, '')
-  
-  // 4. 移除 antml 相关标记（Claude 特有）
   cleaned = cleaned.replace(/<\s*\/?\s*antml[^>]*>/gi, '')
-  
-  // 5. 移除 tool_call 相关内容
   cleaned = cleaned.replace(/<\s*\/?\s*tool_call[^>]*>/gi, '')
+  cleaned = cleaned.replace(/<\s*\/?\s*parameter[^>]*>/gi, '')
   
-  // 6. 移除 <|...|> 格式的特殊标记
+  // 7. 移除 <|...|> 格式的特殊标记
   cleaned = cleaned.replace(/<\|[^|]*\|>/g, '')
   
-  // 7. 移除 name="..." 参数残留
+  // 8. 移除 name="..." 参数残留
   cleaned = cleaned.replace(/\bname\s*=\s*["'][^"']*["']/gi, '')
   
-  // 8. 清理独立的竖线和多余符号
+  // 9. 移除 JSON 代码块残留
+  cleaned = cleaned.replace(/```json\s*\{[\s\S]*?\}\s*```/gi, '')
+  
+  // 10. 清理独立的竖线和多余符号
   cleaned = cleaned.replace(/^\s*\|\s*$/gm, '')
   
-  // 9. 清理多余空行
+  // 11. 清理多余空行
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
+  cleaned = cleaned.replace(/^\s*\n/, '')  // 清理开头空行
   
-  // 10. 清理首尾空白
+  // 12. 清理首尾空白
   cleaned = cleaned.trim()
   
   return cleaned

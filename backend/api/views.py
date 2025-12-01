@@ -352,19 +352,40 @@ class AiAgentView(APIView):
         """清理 AI 回复中可能出现的工具调用标记"""
         if not text:
             return text
-        # 移除各种可能的工具调用标记
+        
+        # 移除各种可能的工具调用标记（按优先级排序）
         patterns = [
-            r'<\s*\|?\s*DSML\s*\|?\s*[^>]*>.*?</\s*\|?\s*DSML\s*\|?\s*[^>]*>',  # DSML 标签
-            r'<\s*\|?\s*DSML\s*\|?\s*[^>]*>',  # 单独的 DSML 开始标签
-            r'</\s*\|?\s*DSML\s*\|?\s*[^>]*>',  # 单独的 DSML 结束标签
-            r'<function_calls?>.*?</function_calls?>',  # function_calls 标签
-            r'<invoke[^>]*>.*?</invoke>',  # invoke 标签
-            r'<\|.*?\|>',  # 特殊标记 <|...|>
+            # 1. 完整的 DSML 块（包含内容）
+            r'<\s*\|?\s*DSML\s*\|?\s*[^>]*>.*?<\s*/\s*\|?\s*DSML\s*\|?\s*[^>]*>',
+            # 2. 完整的 function_calls 块
+            r'<\s*function_calls?\s*>.*?<\s*/\s*function_calls?\s*>',
+            # 3. 完整的 invoke 块
+            r'<\s*invoke[^>]*>.*?<\s*/\s*invoke\s*>',
+            # 4. 完整的 antml 块（Claude 特有）
+            r'<\s*antml[^>]*>.*?<\s*/\s*antml[^>]*>',
+            # 5. 完整的 tool_call 块
+            r'<\s*tool_call[^>]*>.*?<\s*/\s*tool_call\s*>',
+            # 6. 单独的开始/结束标签（各种变体）
+            r'<\s*/?\s*\|?\s*DSML\s*\|?\s*[^>]*>',
+            r'<\s*/?\s*function_calls?\s*>',
+            r'<\s*/?\s*invoke[^>]*>',
+            r'<\s*/?\s*antml[^>]*>',
+            r'<\s*/?\s*tool_call[^>]*>',
+            r'<\s*/?\s*parameter[^>]*>',
+            # 7. 特殊标记 <|...|>
+            r'<\|[^|]*\|>',
+            # 8. name="..." 参数残留
+            r'\bname\s*=\s*["\'][^"\']*["\']',
+            # 9. JSON 代码块残留
+            r'```json\s*\{[^}]*\}\s*```',
         ]
+        
         for pattern in patterns:
             text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
-        # 清理多余空行
+        
+        # 清理多余空行和空白
         text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r'^\s*\n', '', text)  # 清理开头空行
         return text.strip()
     
     # 定义可用工具
@@ -472,32 +493,38 @@ class AiAgentView(APIView):
         """构建系统提示词"""
         return """你是"LZQ的私人厨房"的 AI 点餐助手，名叫"小厨"。
 
-你的能力（通过系统内置工具实现，会自动调用）：
-1. 查看菜单并推荐菜品
-2. 介绍菜品详情
-3. 帮顾客添加菜品到购物车
-4. 查看购物车内容
-5. 帮顾客下单
+## 你的能力
+你可以通过工具完成以下操作（系统会自动处理工具调用）：
+1. get_menu - 查看菜单
+2. get_recipe_detail - 查看菜品详情
+3. add_to_cart - 添加到购物车（需要 recipe_id 和 recipe_name）
+4. view_cart - 查看购物车
+5. place_order - 提交订单（需要 customer_name）
 
-工作流程：
-- 当用户想点菜时，获取菜单后推荐合适的菜品
-- 推荐时要热情地描述菜品特色，引导用户点餐
-- 用户确认想要某道菜后，添加到购物车
-- 下单前确认购物车内容
-- 下单时需要询问顾客姓名
+## 工作流程
+1. 用户想看菜单 → 调用 get_menu
+2. 用户想了解某道菜 → 调用 get_recipe_detail
+3. 用户说"我要这个"/"点这道" → 调用 add_to_cart
+4. 用户想看购物车 → 调用 view_cart
+5. 用户说"下单"/"结账" → 先确认姓名，再调用 place_order
 
-你的性格：
-- 热情友好，像专业服务员
-- 善于推荐，会根据口味偏好给建议
+## 重要：添加多道菜
+当用户想同时点多道菜时（如"这三个都要"、"都给我来一份"）：
+- 你需要为每道菜分别调用一次 add_to_cart 工具
+- 每次调用必须提供正确的 recipe_id 和 recipe_name
+- 调用完成后，用自然语言告诉用户已添加成功
+
+## 你的性格
+- 热情友好，像专业服务员 🧑‍🍳
+- 善于推荐，根据口味偏好给建议
 - 回答简洁，适当使用 emoji
 - 主动引导点餐流程
 
-重要规则：
-- 只推荐菜单上有的菜品
-- 如果用户问无关问题，礼貌引导回点餐话题
-- 添加购物车和下单都需要用户明确确认
-- 绝对不要在回复中输出任何XML标签、代码块或技术内容
-- 直接用自然语言回复用户"""
+## 绝对禁止
+- 不要在回复中输出任何 XML 标签、代码、JSON
+- 不要输出工具名称或参数格式
+- 不要输出 <function_calls>、<invoke>、<tool_call> 等任何技术标记
+- 只用纯自然语言和 emoji 与用户交流"""
     
     # ===== 工具执行函数 =====
     
@@ -692,9 +719,16 @@ class AiAgentView(APIView):
                             temperature=0.7
                         )
                         
+                        content_buffer = ""
                         for chunk in final_stream:
                             if chunk.choices[0].delta.content:
-                                yield f"data: {json.dumps({'type': 'content', 'content': chunk.choices[0].delta.content}, ensure_ascii=False)}\n\n"
+                                content_chunk = chunk.choices[0].delta.content
+                                content_buffer += content_chunk
+                        
+                        # 清理可能泄露的工具调用标记
+                        cleaned_content = self.clean_ai_response(content_buffer)
+                        if cleaned_content:
+                            yield f"data: {json.dumps({'type': 'content', 'content': cleaned_content}, ensure_ascii=False)}\n\n"
                         
                         # 注意：actions 已在工具调用时立即发送，这里不再重复发送
                         yield "data: [DONE]\n\n"
@@ -763,9 +797,16 @@ class AiAgentView(APIView):
                     temperature=0.7
                 )
                 
+                # 收集完整内容后再清理输出
+                content_buffer = ""
                 for chunk in final_stream:
                     if chunk.choices[0].delta.content:
-                        yield f"data: {json.dumps({'type': 'content', 'content': chunk.choices[0].delta.content}, ensure_ascii=False)}\n\n"
+                        content_buffer += chunk.choices[0].delta.content
+                
+                # 清理可能泄露的工具调用标记
+                cleaned_content = self.clean_ai_response(content_buffer)
+                if cleaned_content:
+                    yield f"data: {json.dumps({'type': 'content', 'content': cleaned_content}, ensure_ascii=False)}\n\n"
                 
                 # 注意：actions 已在工具调用时立即发送，这里不再重复发送
                 yield "data: [DONE]\n\n"
