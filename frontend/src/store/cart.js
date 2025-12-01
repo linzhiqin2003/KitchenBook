@@ -38,9 +38,11 @@ export const cart = reactive({
     async submitOrder() {
         if (!this.customerName) {
             alert('请告诉大厨您的称呼')
-            return
+            return { success: false, error: '请填写称呼' }
         }
-        if (this.items.length === 0) return
+        if (this.items.length === 0) {
+            return { success: false, error: '购物车为空' }
+        }
         
         try {
             // Save name for next time
@@ -61,6 +63,7 @@ export const cart = reactive({
             this.myOrderIds.push(response.data.id)
             localStorage.setItem('kitchen_book_orders', JSON.stringify(this.myOrderIds))
             
+            const orderId = response.data.id
             this.items = []
             this.isOpen = false
             
@@ -70,9 +73,50 @@ export const cart = reactive({
                 window.location.href = '/my-orders' // Simple redirect
             }
             
+            return { success: true, orderId }
+            
         } catch (error) {
             console.error('Order failed', error)
             alert('下单失败，请重试')
+            return { success: false, error: '下单失败' }
+        }
+    },
+    
+    // AI 助手专用的静默下单方法（不弹窗、不跳转）
+    async submitOrderSilent() {
+        if (!this.customerName) {
+            return { success: false, error: '请填写称呼' }
+        }
+        if (this.items.length === 0) {
+            return { success: false, error: '购物车为空' }
+        }
+        
+        try {
+            localStorage.setItem('kitchen_book_customer_name', this.customerName)
+
+            const payload = {
+                customer_name: this.customerName,
+                items: this.items.map(i => ({
+                    recipe: i.recipe.id,
+                    quantity: i.quantity,
+                    note: i.note || ''
+                }))
+            }
+            
+            const response = await axios.post(`${API_BASE_URL}/api/orders/`, payload)
+            
+            this.myOrderIds.push(response.data.id)
+            localStorage.setItem('kitchen_book_orders', JSON.stringify(this.myOrderIds))
+            
+            const orderId = response.data.id
+            this.items = []
+            // 不关闭购物车侧边栏，让用户可以看到变化
+            
+            return { success: true, orderId }
+            
+        } catch (error) {
+            console.error('Order failed', error)
+            return { success: false, error: '下单失败' }
         }
     }
 })

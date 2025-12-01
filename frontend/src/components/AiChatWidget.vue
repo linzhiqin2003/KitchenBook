@@ -128,13 +128,24 @@ const handleAction = (action) => {
     case 'place_order':
       if (action.data.customer_name) {
         cart.customerName = action.data.customer_name
-        cart.submitOrder().then(result => {
+        // 使用静默下单方法，不弹窗不跳转
+        cart.submitOrderSilent().then(result => {
           if (result.success) {
             messages.value.push({
               role: 'system',
               type: 'action',
               actionType: 'order_placed',
               data: { orderId: result.orderId }
+            })
+            saveMessages()
+            scrollToBottom()
+          } else {
+            // 下单失败也要提示
+            messages.value.push({
+              role: 'system',
+              type: 'action',
+              actionType: 'order_failed',
+              data: { error: result.error }
             })
             saveMessages()
             scrollToBottom()
@@ -478,6 +489,16 @@ const toggleChat = () => {
                     <span>订单提交成功！</span>
                   </div>
                   <div class="text-amber-600 mt-1">订单号：#{{ msg.data.orderId }}</div>
+                </div>
+              </div>
+              
+              <!-- 系统动作消息 - 下单失败 -->
+              <div v-else-if="msg.type === 'action' && msg.actionType === 'order_failed'" class="flex justify-center">
+                <div class="bg-red-50 text-red-700 px-4 py-2 rounded-xl text-xs border border-red-200 shadow-sm">
+                  <div class="flex items-center gap-2 font-medium">
+                    <span>❌</span>
+                    <span>下单失败：{{ msg.data.error }}</span>
+                  </div>
                 </div>
               </div>
             </template>
