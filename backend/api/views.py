@@ -662,16 +662,11 @@ class DeepSeekSpecialeView(APIView):
         def generate():
             """流式生成器"""
             from openai import OpenAI
-            import threading
             
             client = OpenAI(
                 api_key=deepseek_speciale_api_key,
                 base_url=deepseek_speciale_base_url
             )
-            
-            # 用于心跳的状态
-            last_activity = [time.time()]
-            is_done = [False]
             
             try:
                 # 发送初始状态
@@ -682,32 +677,19 @@ class DeepSeekSpecialeView(APIView):
                     model="deepseek-reasoner",
                     messages=full_messages,
                     stream=True
-                    # max_tokens 不设置，让模型自己决定
                 )
                 
                 current_reasoning = ""
                 current_content = ""
                 reasoning_started = False
                 content_started = False
-                chunk_count = 0
-                
-                print(f"[DeepSeek] 开始接收流式响应...")
                 
                 for chunk in response:
-                    chunk_count += 1
-                    last_activity[0] = time.time()
-                    
-                    # 每100个chunk打印日志
-                    if chunk_count % 100 == 0:
-                        print(f"[DeepSeek] 已处理 {chunk_count} 个 chunk, reasoning: {len(current_reasoning)} 字, content: {len(current_content)} 字")
-                        yield f": heartbeat {chunk_count}\n\n"
-                    
                     # 检查是否有有效的 choices
                     if not chunk.choices:
                         continue
                     
                     delta = chunk.choices[0].delta
-                    finish_reason = chunk.choices[0].finish_reason
                     
                     # 处理思维链 (reasoning_content)
                     if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
@@ -724,29 +706,19 @@ class DeepSeekSpecialeView(APIView):
                         current_content += content_chunk
                         if not content_started:
                             content_started = True
-                            print(f"[DeepSeek] 内容开始，思维链共 {len(current_reasoning)} 字")
                             # 标记思维链结束
                             if reasoning_started:
                                 yield f"data: {json.dumps({'type': 'reasoning_end'}, ensure_ascii=False)}\n\n"
                             yield f"data: {json.dumps({'type': 'content_start'}, ensure_ascii=False)}\n\n"
                         yield f"data: {json.dumps({'type': 'content', 'content': content_chunk}, ensure_ascii=False)}\n\n"
-                    
-                    # 检查是否完成
-                    if finish_reason:
-                        print(f"[DeepSeek] finish_reason: {finish_reason}")
-                
-                print(f"[DeepSeek] 循环结束，共 {chunk_count} 个 chunk, reasoning: {len(current_reasoning)} 字, content: {len(current_content)} 字")
                 
                 # 如果有思维链但没有内容，也要发送结束信号
                 if reasoning_started and not content_started:
-                    print(f"[DeepSeek] 只有思维链，没有内容输出")
                     yield f"data: {json.dumps({'type': 'reasoning_end'}, ensure_ascii=False)}\n\n"
                 
-                is_done[0] = True
                 # 发送完成信号
                 yield f"data: {json.dumps({'type': 'done', 'reasoning_length': len(current_reasoning), 'content_length': len(current_content)}, ensure_ascii=False)}\n\n"
                 yield "data: [DONE]\n\n"
-                print(f"[DeepSeek] 已发送完成信号")
                 
             except Exception as e:
                 import traceback
