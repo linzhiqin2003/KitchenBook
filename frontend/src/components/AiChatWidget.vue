@@ -361,15 +361,15 @@ const toggleChat = () => {
 </script>
 
 <template>
-  <div class="fixed bottom-20 right-4 z-50 font-sans">
+  <div class="fixed bottom-16 sm:bottom-20 right-3 sm:right-4 z-50 font-sans">
     <!-- 聊天气泡按钮 -->
     <Transition name="bounce">
       <button
         v-if="!isOpen"
         @click="toggleChat"
-        class="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center group cursor-pointer border-2 border-amber-300/50"
+        class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center group cursor-pointer border-2 border-amber-300/50"
       >
-        <svg class="w-8 h-8 group-hover:scale-110 transition-transform drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+        <svg class="w-7 h-7 sm:w-8 sm:h-8 group-hover:scale-110 transition-transform drop-shadow-sm" viewBox="0 0 64 64" fill="none">
           <ellipse cx="32" cy="14" rx="16" ry="8" fill="white"/>
           <rect x="18" y="12" width="28" height="12" fill="white"/>
           <ellipse cx="24" cy="10" rx="6" ry="5" fill="white"/>
@@ -395,7 +395,7 @@ const toggleChat = () => {
     <Transition name="chat-window">
       <div
         v-if="isOpen"
-        class="w-[340px] sm:w-[400px] h-[580px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-stone-200"
+        class="fixed sm:relative inset-x-2 sm:inset-auto bottom-2 sm:bottom-auto sm:w-[400px] h-[calc(100dvh-80px)] sm:h-[580px] max-h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-stone-200"
       >
         <!-- 头部 -->
         <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3 flex items-center justify-between shrink-0">

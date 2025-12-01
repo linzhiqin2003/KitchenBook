@@ -725,32 +725,32 @@ const transcribeAudio = async (audioBlob) => {
 </script>
 
 <template>
-  <div class="h-screen w-screen fixed inset-0 bg-gradient-to-b from-slate-50 to-white text-gray-800 flex flex-col overflow-hidden">
+  <div class="h-dvh w-full fixed inset-0 bg-gradient-to-b from-slate-50 to-white text-gray-800 flex flex-col overflow-hidden">
     <!-- 顶部导航栏 -->
-    <header class="shrink-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-4 shadow-sm">
+    <header class="shrink-0 h-12 sm:h-14 bg-white border-b border-gray-200 flex items-center px-3 sm:px-4 gap-2 sm:gap-4 shadow-sm safe-area-top">
       <router-link 
         to="/" 
-        class="w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+        class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
         title="返回首页"
       >
-        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
         </svg>
       </router-link>
       
-      <div class="flex items-center gap-3 flex-1">
-        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
-          <span class="text-lg">🧠</span>
+      <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
+          <span class="text-base sm:text-lg">🧠</span>
         </div>
-        <div>
-          <h1 class="text-base font-semibold text-gray-800 leading-tight">DeepSeek V3.2 Speciale</h1>
-          <p class="text-xs text-gray-400">思考模型 · 可见推理链</p>
+        <div class="min-w-0">
+          <h1 class="text-sm sm:text-base font-semibold text-gray-800 leading-tight truncate">DeepSeek V3.2 Speciale</h1>
+          <p class="text-[10px] sm:text-xs text-gray-400 hidden xs:block">思考模型 · 可见推理链</p>
         </div>
       </div>
       
       <button 
         @click="clearChat" 
-        class="h-9 px-3 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
+        class="h-8 sm:h-9 px-2 sm:px-3 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -875,7 +875,7 @@ const transcribeAudio = async (audioBlob) => {
     </div>
     
     <!-- 输入区域 -->
-    <div class="shrink-0 bg-white border-t border-gray-200 px-4 py-2">
+    <div class="shrink-0 bg-white border-t border-gray-200 px-2 sm:px-4 py-2 safe-area-bottom">
       <div class="max-w-4xl mx-auto">
         <!-- 图片预览区域 -->
         <Transition name="fade">
@@ -934,15 +934,15 @@ const transcribeAudio = async (audioBlob) => {
         />
         
         <div class="bg-gray-50 rounded-lg border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-          <div class="flex items-center gap-1.5 p-2">
+          <div class="flex items-center gap-1 sm:gap-1.5 p-1.5 sm:p-2">
             <!-- 上传图片按钮 -->
             <button
               @click="triggerFileInput"
               :disabled="isLoading || isOcrProcessing || isRecording"
-              class="w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
-              title="上传图片 (支持数学题识别)"
+              class="w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+              title="上传图片"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
             </button>
@@ -952,7 +952,7 @@ const transcribeAudio = async (audioBlob) => {
               @click="toggleRecording"
               :disabled="isLoading || isOcrProcessing || isTranscribing"
               :class="[
-                'w-8 h-8 rounded-md transition-all shrink-0 cursor-pointer flex items-center justify-center',
+                'w-7 h-7 sm:w-8 sm:h-8 rounded-md transition-all shrink-0 cursor-pointer flex items-center justify-center',
                 isRecording 
                   ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
                   : 'bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700',
@@ -960,20 +960,20 @@ const transcribeAudio = async (audioBlob) => {
               ]"
               :title="isRecording ? '停止录音' : '语音输入'"
             >
-              <svg v-if="isTranscribing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <svg v-if="isTranscribing" class="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
-              <svg v-else-if="isRecording" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <svg v-else-if="isRecording" class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 24 24">
                 <rect x="6" y="6" width="12" height="12" rx="1"/>
               </svg>
-              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-else class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
               </svg>
             </button>
             
             <!-- 录音时长显示 -->
-            <span v-if="isRecording" class="text-xs text-red-500 font-mono min-w-[40px]">
+            <span v-if="isRecording" class="text-[10px] sm:text-xs text-red-500 font-mono min-w-[32px] sm:min-w-[40px]">
               {{ formatDuration(recordingDuration) }}
             </span>
             
@@ -982,7 +982,7 @@ const transcribeAudio = async (audioBlob) => {
               @keydown="handleKeydown"
               @paste="handlePaste"
               :disabled="isLoading || isRecording"
-              :placeholder="isRecording ? '正在录音...' : '问我任何问题...（支持图片/语音）'"
+              :placeholder="isRecording ? '录音中...' : '问我任何问题...'"
               rows="1"
               class="flex-1 resize-none bg-transparent border-0 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-0 max-h-24 min-h-[24px] py-1"
               style="field-sizing: content;"
@@ -993,12 +993,12 @@ const transcribeAudio = async (audioBlob) => {
               v-if="!isLoading"
               @click="selectedImage ? sendWithImage() : sendMessage()"
               :disabled="(!inputMessage.trim() && !ocrResult) || isOcrProcessing || isRecording || isTranscribing"
-              class="w-8 h-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+              class="w-7 h-7 sm:w-8 sm:h-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
             >
-              <svg v-if="!isOcrProcessing && !isTranscribing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-if="!isOcrProcessing && !isTranscribing" class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
               </svg>
-              <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <svg v-else class="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
@@ -1008,16 +1008,16 @@ const transcribeAudio = async (audioBlob) => {
             <button
               v-else
               @click="stopGeneration"
-              class="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+              class="w-7 h-7 sm:w-8 sm:h-8 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors shrink-0 cursor-pointer flex items-center justify-center"
               title="停止生成"
             >
-              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 24 24">
                 <rect x="6" y="6" width="12" height="12" rx="1"/>
               </svg>
             </button>
           </div>
         </div>
-        <div class="text-center mt-1 text-xs text-gray-400">
+        <div class="text-center mt-1 text-[10px] sm:text-xs text-gray-400">
           DeepSeek V3.2 Speciale · 图片OCR · 语音输入
         </div>
       </div>
@@ -1026,6 +1026,20 @@ const transcribeAudio = async (audioBlob) => {
 </template>
 
 <style scoped>
+/* 动态视口高度兼容 */
+.h-dvh {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* 安全区域适配 (iPhone 等刘海屏设备) */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* 消息动画 */
 .message-enter-active { animation: message-in 0.3s ease-out; }
 @keyframes message-in {
