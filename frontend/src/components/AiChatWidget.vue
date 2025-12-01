@@ -10,9 +10,8 @@ const inputMessage = ref('')
 const messages = ref([])
 const messagesContainer = ref(null)
 
-// 思维链状态
+// 思维链状态（用于当前正在发送的消息）
 const currentThinking = ref([])
-const isThinking = ref(false)
 
 // 初始欢迎消息
 const welcomeMessage = {
@@ -169,7 +168,6 @@ const sendMessage = async () => {
   messages.value.push({ role: 'user', content: text, type: 'text' })
   inputMessage.value = ''
   isLoading.value = true
-  isThinking.value = true
   currentThinking.value = []
   scrollToBottom()
   
@@ -177,14 +175,21 @@ const sendMessage = async () => {
     .filter(m => m.type === 'text' && (m.role === 'user' || m.role === 'assistant'))
     .map(m => ({ role: m.role, content: m.content }))
   
+  // 生成唯一消息 ID
+  const messageId = Date.now()
+  
   // 添加一个空的 AI 消息用于流式填充
-  const aiMessageIndex = messages.value.length
   messages.value.push({
     role: 'assistant',
     content: '',
     type: 'text',
-    thinking: [] // 存储思维链
+    thinking: [],
+    _id: messageId, // 用于追踪这条消息
+    _streaming: true // 标记正在流式传输
   })
+  
+  // 找到当前消息的索引（用函数动态获取，避免索引问题）
+  const getAiMessage = () => messages.value.find(m => m._id === messageId)
   
   try {
     const response = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
@@ -218,6 +223,8 @@ const sendMessage = async () => {
           
           try {
             const parsed = JSON.parse(data)
+            const aiMsg = getAiMessage()
+            if (!aiMsg) continue
             
             switch (parsed.type) {
               case 'thinking':
@@ -226,22 +233,18 @@ const sendMessage = async () => {
                   text: parsed.content,
                   tool: parsed.tool
                 })
-                messages.value[aiMessageIndex].thinking = [...currentThinking.value]
+                aiMsg.thinking = [...currentThinking.value]
                 scrollToBottom()
                 break
                 
               case 'thinking_done':
-                isThinking.value = false
+                // 思维链完成
                 break
                 
               case 'content':
-                // 流式内容 - 实时清理可能的技术标记
-                isThinking.value = false
-                const cleanedChunk = cleanAiResponse(parsed.content)
-                if (cleanedChunk) {
-                  messages.value[aiMessageIndex].content += cleanedChunk
-                  scrollToBottom()
-                }
+                // 流式内容 - 直接追加，最后再清理
+                aiMsg.content += parsed.content
+                scrollToBottom()
                 break
                 
               case 'action':
@@ -269,16 +272,23 @@ const sendMessage = async () => {
       }
     }
     
-    // 清理可能泄露的工具调用标记
-    messages.value[aiMessageIndex].content = cleanAiResponse(messages.value[aiMessageIndex].content)
+    // 流式结束，清理可能泄露的工具调用标记
+    const aiMsg = getAiMessage()
+    if (aiMsg) {
+      aiMsg.content = cleanAiResponse(aiMsg.content)
+      aiMsg._streaming = false
+    }
     saveMessages()
     
   } catch (error) {
-    messages.value[aiMessageIndex].content = `抱歉，我遇到了一点问题 😅\n\n${error.message}\n\n请稍后再试~`
-    messages.value[aiMessageIndex].thinking = []
+    const aiMsg = getAiMessage()
+    if (aiMsg) {
+      aiMsg.content = `抱歉，我遇到了一点问题 😅\n\n${error.message}\n\n请稍后再试~`
+      aiMsg.thinking = []
+      aiMsg._streaming = false
+    }
   } finally {
     isLoading.value = false
-    isThinking.value = false
     currentThinking.value = []
     scrollToBottom()
   }
@@ -402,9 +412,9 @@ const toggleChat = () => {
               <!-- AI 消息 -->
               <div v-else-if="msg.role === 'assistant' && (msg.type === 'text' || !msg.type)" class="flex justify-start">
                 <div class="max-w-[85%] space-y-2">
-                  <!-- 思维链展示 - 简洁版 -->
+                  <!-- 思维链展示 - 简洁版（仅当该消息正在流式传输时显示） -->
                   <Transition name="thinking-fade">
-                    <div v-if="msg.thinking && msg.thinking.length > 0 && isLoading" class="flex items-center gap-2 px-3 py-2 bg-amber-50/80 rounded-xl border border-amber-100/50">
+                    <div v-if="msg.thinking && msg.thinking.length > 0 && msg._streaming" class="flex items-center gap-2 px-3 py-2 bg-amber-50/80 rounded-xl border border-amber-100/50">
                       <div class="flex items-center gap-1.5">
                         <div class="w-5 h-5 rounded-full bg-amber-400/20 flex items-center justify-center animate-pulse">
                           <span class="text-xs">{{ getToolIcon(msg.thinking[msg.thinking.length - 1]?.tool) }}</span>
@@ -421,8 +431,8 @@ const toggleChat = () => {
                     </div>
                   </Transition>
                   
-                  <!-- 完成的操作提示（思维链完成后显示） -->
-                  <div v-if="msg.thinking && msg.thinking.length > 0 && !isLoading && msg.content" class="flex flex-wrap gap-1.5 mb-1">
+                  <!-- 完成的操作提示（该消息完成后显示） -->
+                  <div v-if="msg.thinking && msg.thinking.length > 0 && !msg._streaming && msg.content" class="flex flex-wrap gap-1.5 mb-1">
                     <span 
                       v-for="(step, stepIdx) in msg.thinking" 
                       :key="stepIdx"
@@ -438,8 +448,8 @@ const toggleChat = () => {
                     <div class="whitespace-pre-wrap">{{ msg.content }}</div>
                   </div>
                   
-                  <!-- 加载中状态（仅当没有思维链且没有内容时） -->
-                  <div v-else-if="isLoading && (!msg.thinking || msg.thinking.length === 0)" class="bg-white text-stone-500 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-3">
+                  <!-- 加载中状态（仅当该消息正在流式传输，且没有思维链且没有内容时） -->
+                  <div v-else-if="msg._streaming && (!msg.thinking || msg.thinking.length === 0)" class="bg-white text-stone-500 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-3">
                     <div class="flex items-center gap-2">
                       <div class="flex items-center gap-1">
                         <span class="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
