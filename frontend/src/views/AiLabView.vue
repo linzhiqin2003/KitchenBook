@@ -337,16 +337,28 @@ const sendMessage = async () => {
     currentReader = reader // 保存引用以便取消
     const decoder = new TextDecoder()
     let buffer = '' // 用于存储跨 chunk 的不完整数据
+    let lastActivityTime = Date.now()
+    let chunkCount = 0
     
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        console.log(`[SSE] 流结束，共 ${chunkCount} 个 chunk`)
+        break
+      }
       
       // 检查是否已被取消
-      if (!isLoading.value) break
+      if (!isLoading.value) {
+        console.log('[SSE] 用户取消')
+        break
+      }
+      
+      chunkCount++
+      lastActivityTime = Date.now()
       
       // 将新数据追加到 buffer
-      buffer += decoder.decode(value, { stream: true })
+      const chunk = decoder.decode(value, { stream: true })
+      buffer += chunk
       
       // 按行分割，处理完整的行
       const lines = buffer.split('\n')
@@ -354,21 +366,28 @@ const sendMessage = async () => {
       buffer = lines.pop() || ''
       
       for (const line of lines) {
+        // 跳过心跳和空行
+        if (!line || line.startsWith(':')) continue
+        
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim()
-          if (data === '[DONE]') break
-          if (!data) continue // 跳过空数据
+          if (data === '[DONE]') {
+            console.log('[SSE] 收到 DONE 信号')
+            break
+          }
+          if (!data) continue
           
           try {
             const parsed = JSON.parse(data)
             
             switch (parsed.type) {
               case 'status':
-                // 状态更新
+                console.log('[SSE] 状态:', parsed.content)
                 break
                 
               case 'reasoning_start':
                 isReasoningPhase.value = true
+                console.log('[SSE] 思维链开始')
                 break
                 
               case 'reasoning':
@@ -379,10 +398,12 @@ const sendMessage = async () => {
                 
               case 'reasoning_end':
                 isReasoningPhase.value = false
+                console.log(`[SSE] 思维链结束，共 ${currentReasoning.value.length} 字`)
                 break
                 
               case 'content_start':
                 isContentPhase.value = true
+                console.log('[SSE] 内容开始')
                 break
                 
               case 'content':
@@ -396,17 +417,20 @@ const sendMessage = async () => {
                 stats.value.reasoningLength = parsed.reasoning_length
                 stats.value.contentLength = parsed.content_length
                 stats.value.endTime = Date.now()
+                console.log(`[SSE] 完成: 思维链 ${parsed.reasoning_length} 字, 内容 ${parsed.content_length} 字`)
                 break
                 
               case 'error':
+                console.error('[SSE] 服务端错误:', parsed.error)
                 throw new Error(parsed.error)
             }
           } catch (e) {
-            // JSON 解析失败，可能是数据不完整，将数据放回 buffer
             if (e instanceof SyntaxError) {
-              buffer = line + '\n' + buffer
+              // JSON 不完整，跳过这行（不放回 buffer，避免死循环）
+              console.warn('[SSE] JSON 解析跳过:', line.substring(0, 100))
             } else {
-              console.error('Parse error:', e)
+              console.error('[SSE] 处理错误:', e)
+              throw e
             }
           }
         }
