@@ -23,23 +23,177 @@ const stats = ref({
   endTime: null
 })
 
-// 计算思考时长
-const thinkingDuration = computed(() => {
-  if (stats.value.startTime && stats.value.endTime) {
-    return ((stats.value.endTime - stats.value.startTime) / 1000).toFixed(1)
+// HTML 转义
+const escapeHtml = (text) => {
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
+}
+
+// Markdown 解析器（支持 LaTeX 数学公式）
+const parseMarkdown = (markdown) => {
+  if (!markdown) return ''
+  
+  let html = markdown
+  
+  // 先保存 LaTeX 数学公式块，防止被其他规则处理
+  const mathBlocks = []
+  // 块级公式 \[ ... \] 或 $$ ... $$
+  html = html.replace(/\\\[([\s\S]*?)\\\]/g, (match, formula) => {
+    const placeholder = `__MATH_BLOCK_${mathBlocks.length}__`
+    mathBlocks.push({ type: 'block', formula: formula.trim() })
+    return placeholder
+  })
+  html = html.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
+    const placeholder = `__MATH_BLOCK_${mathBlocks.length}__`
+    mathBlocks.push({ type: 'block', formula: formula.trim() })
+    return placeholder
+  })
+  // 行内公式 \( ... \) 或 $ ... $
+  html = html.replace(/\\\(([\s\S]*?)\\\)/g, (match, formula) => {
+    const placeholder = `__MATH_INLINE_${mathBlocks.length}__`
+    mathBlocks.push({ type: 'inline', formula: formula.trim() })
+    return placeholder
+  })
+  html = html.replace(/\$([^\$\n]+?)\$/g, (match, formula) => {
+    const placeholder = `__MATH_INLINE_${mathBlocks.length}__`
+    mathBlocks.push({ type: 'inline', formula: formula.trim() })
+    return placeholder
+  })
+  
+  // 先保存代码块，防止被其他规则处理
+  const codeBlocks = []
+  html = html.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
+    const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`
+    codeBlocks.push({
+      lang: lang || 'text',
+      code: code.trim()
+    })
+    return placeholder
+  })
+  
+  // 行内代码 - 也先保存
+  const inlineCodes = []
+  html = html.replace(/`([^`]+)`/g, (match, code) => {
+    const placeholder = `__INLINE_CODE_${inlineCodes.length}__`
+    inlineCodes.push(code)
+    return placeholder
+  })
+  
+  // 标题
+  html = html.replace(/^#### (.+)$/gm, '<h4 class="md-h4">$1</h4>')
+  html = html.replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
+  html = html.replace(/^## (.+)$/gm, '<h2 class="md-h2">$1</h2>')
+  html = html.replace(/^# (.+)$/gm, '<h1 class="md-h1">$1</h1>')
+  
+  // 粗体和斜体
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  
+  // 链接
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="md-link" target="_blank" rel="noopener">$1</a>')
+  
+  // 无序列表
+  html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li class="md-li">$1</li>')
+  html = html.replace(/(<li class="md-li">.*<\/li>\n?)+/g, '<ul class="md-ul">$&</ul>')
+  
+  // 有序列表
+  html = html.replace(/^\s*\d+\.\s+(.+)$/gm, '<li class="md-oli">$1</li>')
+  html = html.replace(/(<li class="md-oli">.*<\/li>\n?)+/g, '<ol class="md-ol">$&</ol>')
+  
+  // 引用块
+  html = html.replace(/^>\s*(.+)$/gm, '<blockquote class="md-quote">$1</blockquote>')
+  
+  // 水平线
+  html = html.replace(/^---$/gm, '<hr class="md-hr" />')
+  
+  // 段落 (连续的非空行)
+  html = html.split('\n\n').map(block => {
+    if (block.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr)/) || 
+        block.includes('__CODE_BLOCK_') || 
+        block.includes('__MATH_BLOCK_')) {
+      return block
+    }
+    if (block.trim() && !block.match(/^<[a-z]/i)) {
+      return `<p class="md-p">${block.replace(/\n/g, '<br>')}</p>`
+    }
+    return block
+  }).join('\n')
+  
+  // 恢复代码块
+  codeBlocks.forEach((block, i) => {
+    const escapedCode = escapeHtml(block.code)
+    html = html.replace(
+      `__CODE_BLOCK_${i}__`,
+      `<pre class="code-block" data-lang="${block.lang}"><code>${escapedCode}</code></pre>`
+    )
+  })
+  
+  // 恢复行内代码
+  inlineCodes.forEach((code, i) => {
+    html = html.replace(
+      `__INLINE_CODE_${i}__`,
+      `<code class="inline-code">${escapeHtml(code)}</code>`
+    )
+  })
+  
+  // 恢复数学公式
+  mathBlocks.forEach((block, i) => {
+    if (block.type === 'block') {
+      html = html.replace(
+        `__MATH_BLOCK_${i}__`,
+        `<div class="math-block">\\[${escapeHtml(block.formula)}\\]</div>`
+      )
+    } else {
+      html = html.replace(
+        `__MATH_INLINE_${i}__`,
+        `<span class="math-inline">\\(${escapeHtml(block.formula)}\\)</span>`
+      )
+    }
+  })
+  
+  return html
+}
+
+// 渲染数学公式
+const renderMath = async () => {
+  await nextTick()
+  if (window.MathJax) {
+    window.MathJax.typesetPromise?.()
   }
-  return null
-})
+}
 
 // 初始欢迎消息
 const welcomeMessage = {
   role: 'assistant',
-  content: '你好！我是 DeepSeek V3.2 Speciale 🧠\n\n我是一个强大的思考模型，擅长复杂推理和深度分析。你可以问我：\n\n• 数学推理和证明\n• 代码分析和算法设计\n• 逻辑推理和问题解决\n• 深度分析和创意写作\n\n我的思考过程会完整展示给你，让你看到 AI 是如何一步步推理的。',
+  content: '你好！我是 **DeepSeek V3.2 Speciale** 🧠\n\n我是一个强大的思考模型，擅长复杂推理和深度分析。你可以问我：\n\n- 数学推理和证明\n- 代码分析和算法设计\n- 逻辑推理和问题解决\n- 深度分析和创意写作\n\n我的思考过程会完整展示给你，让你看到 AI 是如何一步步推理的。',
   reasoning: null,
   type: 'text'
 }
 
 onMounted(() => {
+  // 加载 MathJax
+  if (!window.MathJax) {
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+      },
+      svg: {
+        fontCache: 'global'
+      },
+      startup: {
+        ready: () => {
+          window.MathJax.startup.defaultReady()
+        }
+      }
+    }
+    const script = document.createElement('script')
+    script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js'
+    script.async = true
+    document.head.appendChild(script)
+  }
+  
   const saved = localStorage.getItem('ai_lab_messages')
   if (saved) {
     try {
@@ -50,6 +204,9 @@ onMounted(() => {
   } else {
     messages.value = [welcomeMessage]
   }
+  
+  // 初始渲染数学公式
+  setTimeout(renderMath, 500)
 })
 
 const saveMessages = () => {
@@ -156,6 +313,7 @@ const sendMessage = async () => {
                 currentContent.value += parsed.content
                 messages.value[aiMessageIndex].content = currentContent.value
                 scrollToBottom()
+                renderMath()
                 break
                 
               case 'done':
@@ -179,6 +337,7 @@ const sendMessage = async () => {
     messages.value[aiMessageIndex].isStreaming = false
     messages.value[aiMessageIndex].stats = { ...stats.value }
     saveMessages()
+    renderMath()
     
   } catch (error) {
     messages.value[aiMessageIndex].content = `抱歉，我遇到了一点问题 😅\n\n${error.message}\n\n请稍后再试~`
@@ -220,31 +379,31 @@ const askExample = (text) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 text-white">
+  <div class="min-h-screen bg-[#0f1419] text-slate-200 font-sans">
     <!-- 顶部导航 -->
-    <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-900/70 border-b border-purple-500/20">
+    <header class="sticky top-0 z-30 backdrop-blur-xl bg-[#0f1419]/90 border-b border-slate-700/50">
       <div class="container mx-auto px-4 py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <router-link to="/" class="text-purple-400 hover:text-purple-300 transition-colors">
+          <router-link to="/" class="text-slate-400 hover:text-white transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
             </svg>
           </router-link>
-          <div class="flex items-center gap-2">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
               <span class="text-xl">🧠</span>
             </div>
             <div>
-              <h1 class="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h1 class="text-lg font-semibold text-white">
                 DeepSeek V3.2 Speciale
               </h1>
-              <p class="text-xs text-purple-300/70">思考模型 · 可见推理链</p>
+              <p class="text-xs text-slate-500">思考模型 · 可见推理链</p>
             </div>
           </div>
         </div>
         <button 
           @click="clearChat" 
-          class="px-3 py-1.5 text-xs bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          class="px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -259,35 +418,35 @@ const askExample = (text) => {
       <!-- 消息列表 -->
       <div 
         ref="messagesContainer" 
-        class="flex-1 overflow-y-auto space-y-6 pb-4 scrollbar-thin scrollbar-thumb-purple-500/30 scrollbar-track-transparent"
+        class="flex-1 overflow-y-auto space-y-6 pb-4 custom-scrollbar"
       >
         <TransitionGroup name="message">
           <template v-for="(msg, index) in messages" :key="index">
             <!-- 用户消息 -->
             <div v-if="msg.role === 'user'" class="flex justify-end">
               <div class="max-w-[80%] md:max-w-[60%]">
-                <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl rounded-br-md px-5 py-3 shadow-lg shadow-purple-500/20">
-                  <div class="whitespace-pre-wrap text-sm leading-relaxed">{{ msg.content }}</div>
+                <div class="bg-cyan-600 rounded-2xl rounded-br-sm px-5 py-3 shadow-lg">
+                  <div class="whitespace-pre-wrap text-sm leading-relaxed text-white">{{ msg.content }}</div>
                 </div>
               </div>
             </div>
             
             <!-- AI 消息 -->
             <div v-else-if="msg.role === 'assistant'" class="flex justify-start">
-              <div class="max-w-[90%] md:max-w-[75%] space-y-3">
+              <div class="max-w-[90%] md:max-w-[80%] space-y-3">
                 <!-- 思维链展示 -->
                 <div v-if="msg.reasoning" class="relative">
                   <button 
                     @click="toggleReasoning(index)"
                     class="w-full text-left cursor-pointer"
                   >
-                    <div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-900/50 to-purple-900/50 rounded-t-xl border border-purple-500/30 border-b-0">
-                      <div class="w-6 h-6 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center">
+                    <div class="flex items-center gap-2 px-4 py-2.5 bg-slate-800/80 rounded-t-xl border border-slate-700 border-b-0">
+                      <div class="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
                         <span class="text-xs">💭</span>
                       </div>
-                      <span class="text-sm font-medium text-purple-300">思维链</span>
-                      <span class="text-xs text-purple-400/70 ml-auto flex items-center gap-1">
-                        <span v-if="msg.isStreaming && isReasoningPhase" class="flex items-center gap-1">
+                      <span class="text-sm font-medium text-amber-400">思维链</span>
+                      <span class="text-xs text-slate-500 ml-auto flex items-center gap-1">
+                        <span v-if="msg.isStreaming && isReasoningPhase" class="flex items-center gap-1 text-amber-400">
                           <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -296,7 +455,7 @@ const askExample = (text) => {
                         </span>
                         <span v-else>{{ msg.reasoning.length }} 字</span>
                         <svg 
-                          class="w-4 h-4 transition-transform" 
+                          class="w-4 h-4 transition-transform text-slate-400" 
                           :class="{ 'rotate-180': !reasoningCollapsed[index] }"
                           fill="none" stroke="currentColor" viewBox="0 0 24 24"
                         >
@@ -308,30 +467,34 @@ const askExample = (text) => {
                   <Transition name="collapse">
                     <div 
                       v-if="!reasoningCollapsed[index]"
-                      class="bg-slate-900/80 border border-purple-500/30 border-t-0 rounded-b-xl px-4 py-3 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500/30"
+                      class="bg-[#1a1f26] border border-slate-700 border-t-0 rounded-b-xl px-4 py-3 max-h-80 overflow-y-auto custom-scrollbar"
                     >
-                      <div class="text-sm text-purple-200/80 leading-relaxed whitespace-pre-wrap font-mono">{{ msg.reasoning }}</div>
+                      <div class="text-sm text-slate-400 leading-relaxed whitespace-pre-wrap font-mono">{{ msg.reasoning }}</div>
                     </div>
                   </Transition>
                 </div>
                 
                 <!-- 主要内容 -->
-                <div class="bg-slate-800/80 border border-slate-700/50 rounded-2xl rounded-bl-md px-5 py-3 shadow-lg">
-                  <div v-if="msg.content" class="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{{ msg.content }}</div>
+                <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl rounded-bl-sm px-5 py-4">
+                  <div 
+                    v-if="msg.content" 
+                    class="markdown-content text-sm leading-relaxed"
+                    v-html="parseMarkdown(msg.content)"
+                  ></div>
                   
                   <!-- 加载中状态 -->
-                  <div v-else-if="msg.isStreaming && !isReasoningPhase" class="flex items-center gap-2 text-purple-300">
+                  <div v-else-if="msg.isStreaming && !isReasoningPhase" class="flex items-center gap-2 text-slate-400">
                     <div class="flex items-center gap-1">
-                      <span class="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
-                      <span class="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
-                      <span class="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+                      <span class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                      <span class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                      <span class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
                     </div>
                     <span class="text-xs">{{ isReasoningPhase ? '深度思考中...' : '准备回答...' }}</span>
                   </div>
                 </div>
                 
                 <!-- 统计信息 -->
-                <div v-if="msg.stats && msg.stats.endTime" class="flex items-center gap-4 px-2 text-xs text-purple-400/60">
+                <div v-if="msg.stats && msg.stats.endTime" class="flex items-center gap-4 px-2 text-xs text-slate-500">
                   <span class="flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -354,14 +517,14 @@ const askExample = (text) => {
         
         <!-- 空状态提示 -->
         <div v-if="messages.length <= 1" class="text-center py-8">
-          <div class="text-purple-400/50 mb-6">试试这些问题：</div>
+          <div class="text-slate-500 mb-6">试试这些问题：</div>
           <div class="flex flex-wrap justify-center gap-3">
             <button
               v-for="q in exampleQuestions"
               :key="q.text"
               @click="askExample(q.text)"
               :disabled="isLoading"
-              class="px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-xl text-sm text-purple-300 transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-xl text-sm text-slate-300 transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-2"
             >
               <span>{{ q.icon }}</span>
               <span>{{ q.text }}</span>
@@ -371,8 +534,8 @@ const askExample = (text) => {
       </div>
       
       <!-- 输入区域 -->
-      <div class="shrink-0 pt-4 border-t border-purple-500/20">
-        <div class="bg-slate-800/50 rounded-2xl p-3 border border-purple-500/20">
+      <div class="shrink-0 pt-4 border-t border-slate-700/50">
+        <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700">
           <div class="flex items-end gap-3">
             <textarea
               v-model="inputMessage"
@@ -380,12 +543,12 @@ const askExample = (text) => {
               :disabled="isLoading"
               placeholder="问我任何需要深度思考的问题..."
               rows="2"
-              class="flex-1 resize-none bg-transparent border-0 text-sm text-white placeholder-purple-400/50 focus:outline-none focus:ring-0 max-h-32"
+              class="flex-1 resize-none bg-transparent border-0 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-0 max-h-32"
             ></textarea>
             <button
               @click="sendMessage"
               :disabled="!inputMessage.trim() || isLoading"
-              class="p-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-500 hover:to-pink-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer shadow-lg shadow-purple-500/30 disabled:shadow-none"
+              class="p-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer"
             >
               <svg v-if="!isLoading" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
@@ -397,7 +560,7 @@ const askExample = (text) => {
             </button>
           </div>
         </div>
-        <div class="text-center mt-3 text-xs text-purple-400/50">
+        <div class="text-center mt-3 text-xs text-slate-600">
           由 DeepSeek V3.2 Speciale 驱动 · 思考过程完全可见
         </div>
       </div>
@@ -428,14 +591,159 @@ const askExample = (text) => {
 }
 
 /* 自定义滚动条 */
-.scrollbar-thin::-webkit-scrollbar { width: 6px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb { 
-  background: rgba(168, 85, 247, 0.3); 
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { 
+  background: rgba(100, 116, 139, 0.4); 
   border-radius: 3px; 
 }
-.scrollbar-thin::-webkit-scrollbar-thumb:hover { 
-  background: rgba(168, 85, 247, 0.5); 
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+  background: rgba(100, 116, 139, 0.6); 
+}
+
+/* Markdown 内容样式 */
+.markdown-content {
+  color: #e2e8f0;
+}
+
+.markdown-content :deep(.md-h1) {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 1.5rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #334155;
+}
+
+.markdown-content :deep(.md-h2) {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 1.25rem 0 0.75rem;
+}
+
+.markdown-content :deep(.md-h3) {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin: 1rem 0 0.5rem;
+}
+
+.markdown-content :deep(.md-h4) {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.markdown-content :deep(.md-p) {
+  margin: 0.75rem 0;
+  line-height: 1.7;
+}
+
+.markdown-content :deep(.md-ul),
+.markdown-content :deep(.md-ol) {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.markdown-content :deep(.md-li),
+.markdown-content :deep(.md-oli) {
+  margin: 0.35rem 0;
+  line-height: 1.6;
+}
+
+.markdown-content :deep(.md-ul) {
+  list-style-type: disc;
+}
+
+.markdown-content :deep(.md-ol) {
+  list-style-type: decimal;
+}
+
+.markdown-content :deep(.md-quote) {
+  border-left: 3px solid #06b6d4;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.markdown-content :deep(.md-link) {
+  color: #22d3ee;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-content :deep(.md-link:hover) {
+  color: #67e8f9;
+}
+
+.markdown-content :deep(.md-hr) {
+  border: none;
+  border-top: 1px solid #334155;
+  margin: 1.5rem 0;
+}
+
+.markdown-content :deep(.code-block) {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.markdown-content :deep(.code-block code) {
+  color: #e2e8f0;
+}
+
+.markdown-content :deep(.inline-code) {
+  background: #334155;
+  color: #22d3ee;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.9em;
+}
+
+.markdown-content :deep(strong) {
+  color: #fff;
+  font-weight: 600;
+}
+
+.markdown-content :deep(em) {
+  color: #cbd5e1;
+  font-style: italic;
+}
+
+/* 数学公式样式 */
+.markdown-content :deep(.math-block) {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #1e293b;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.markdown-content :deep(.math-inline) {
+  padding: 0 0.25rem;
+}
+
+/* MathJax 样式覆盖 */
+.markdown-content :deep(mjx-container) {
+  color: #e2e8f0 !important;
+}
+
+.markdown-content :deep(mjx-container[jax="SVG"]) {
+  direction: ltr;
+}
+
+.markdown-content :deep(mjx-container svg) {
+  overflow: visible;
 }
 </style>
-
