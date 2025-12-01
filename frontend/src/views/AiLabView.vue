@@ -15,6 +15,14 @@ const isOcrProcessing = ref(false)
 const ocrResult = ref(null)
 const fileInputRef = ref(null)
 
+// 语音录制状态
+const isRecording = ref(false)
+const isTranscribing = ref(false)
+const recordingDuration = ref(0)
+let mediaRecorder = null
+let audioChunks = []
+let recordingTimer = null
+
 // 当前流式状态
 const currentReasoning = ref('')
 const currentContent = ref('')
@@ -580,6 +588,129 @@ const handlePaste = (event) => {
     }
   }
 }
+
+// ===== 语音录制功能 =====
+
+// 格式化录音时长
+const formatDuration = (seconds) => {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// 开始/停止录音
+const toggleRecording = async () => {
+  if (isRecording.value) {
+    stopRecording()
+  } else {
+    await startRecording()
+  }
+}
+
+// 开始录音
+const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      audio: {
+        channelCount: 1,
+        sampleRate: 16000
+      }
+    })
+    
+    // 使用 webm 格式（浏览器兼容性最好）
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+      ? 'audio/webm;codecs=opus' 
+      : 'audio/webm'
+    
+    mediaRecorder = new MediaRecorder(stream, { mimeType })
+    audioChunks = []
+    recordingDuration.value = 0
+    
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data)
+      }
+    }
+    
+    mediaRecorder.onstop = async () => {
+      // 停止所有音轨
+      stream.getTracks().forEach(track => track.stop())
+      
+      // 创建音频 Blob
+      const audioBlob = new Blob(audioChunks, { type: mimeType })
+      
+      // 发送到后端转录
+      await transcribeAudio(audioBlob)
+    }
+    
+    // 每秒更新录音时长
+    recordingTimer = setInterval(() => {
+      recordingDuration.value++
+      // 最长录音 60 秒
+      if (recordingDuration.value >= 60) {
+        stopRecording()
+      }
+    }, 1000)
+    
+    mediaRecorder.start(1000) // 每秒收集一次数据
+    isRecording.value = true
+    
+  } catch (error) {
+    console.error('录音失败:', error)
+    if (error.name === 'NotAllowedError') {
+      alert('请允许麦克风访问权限')
+    } else if (error.name === 'NotFoundError') {
+      alert('未找到麦克风设备')
+    } else {
+      alert('录音初始化失败: ' + error.message)
+    }
+  }
+}
+
+// 停止录音
+const stopRecording = () => {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  if (recordingTimer) {
+    clearInterval(recordingTimer)
+    recordingTimer = null
+  }
+  isRecording.value = false
+}
+
+// 发送音频到后端转录
+const transcribeAudio = async (audioBlob) => {
+  isTranscribing.value = true
+  
+  try {
+    const formData = new FormData()
+    formData.append('audio', audioBlob, 'recording.webm')
+    
+    const response = await fetch(`${API_BASE_URL}/api/ai/transcribe/`, {
+      method: 'POST',
+      body: formData
+    })
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(data.error || '转录失败')
+    }
+    
+    // 将转录文本填充到输入框
+    if (data.text) {
+      inputMessage.value = (inputMessage.value ? inputMessage.value + ' ' : '') + data.text
+    }
+    
+  } catch (error) {
+    console.error('转录失败:', error)
+    alert('语音转录失败: ' + error.message)
+  } finally {
+    isTranscribing.value = false
+    recordingDuration.value = 0
+  }
+}
 </script>
 
 <template>
@@ -733,7 +864,7 @@ const handlePaste = (event) => {
     </div>
     
     <!-- 输入区域 -->
-    <div class="shrink-0 bg-white border-t border-gray-200 p-4">
+    <div class="shrink-0 bg-white border-t border-gray-200 px-4 py-2">
       <div class="max-w-4xl mx-auto">
         <!-- 图片预览区域 -->
         <Transition name="fade">
@@ -791,28 +922,58 @@ const handlePaste = (event) => {
           @change="handleFileSelect"
         />
         
-        <div class="bg-gray-50 rounded-xl border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-          <div class="flex items-end gap-2 p-3">
+        <div class="bg-gray-50 rounded-lg border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+          <div class="flex items-center gap-1.5 p-2">
             <!-- 上传图片按钮 -->
             <button
               @click="triggerFileInput"
-              :disabled="isLoading || isOcrProcessing"
-              class="w-10 h-10 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+              :disabled="isLoading || isOcrProcessing || isRecording"
+              class="w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
               title="上传图片 (支持数学题识别)"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
             </button>
+            
+            <!-- 语音输入按钮 -->
+            <button
+              @click="toggleRecording"
+              :disabled="isLoading || isOcrProcessing || isTranscribing"
+              :class="[
+                'w-8 h-8 rounded-md transition-all shrink-0 cursor-pointer flex items-center justify-center',
+                isRecording 
+                  ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700',
+                (isLoading || isOcrProcessing || isTranscribing) && 'opacity-50 cursor-not-allowed'
+              ]"
+              :title="isRecording ? '停止录音' : '语音输入'"
+            >
+              <svg v-if="isTranscribing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <svg v-else-if="isRecording" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="1"/>
+              </svg>
+              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+              </svg>
+            </button>
+            
+            <!-- 录音时长显示 -->
+            <span v-if="isRecording" class="text-xs text-red-500 font-mono min-w-[40px]">
+              {{ formatDuration(recordingDuration) }}
+            </span>
             
             <textarea
               v-model="inputMessage"
               @keydown="handleKeydown"
               @paste="handlePaste"
-              :disabled="isLoading"
-              placeholder="问我任何需要深度思考的问题...（可粘贴或上传图片）"
+              :disabled="isLoading || isRecording"
+              :placeholder="isRecording ? '正在录音...' : '问我任何问题...（支持图片/语音）'"
               rows="1"
-              class="flex-1 resize-none bg-transparent border-0 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-0 max-h-32 min-h-[24px]"
+              class="flex-1 resize-none bg-transparent border-0 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-0 max-h-24 min-h-[24px] py-1"
               style="field-sizing: content;"
             ></textarea>
             
@@ -820,15 +981,15 @@ const handlePaste = (event) => {
             <button
               v-if="!isLoading"
               @click="selectedImage ? sendWithImage() : sendMessage()"
-              :disabled="(!inputMessage.trim() && !ocrResult) || isOcrProcessing"
-              class="w-10 h-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center shadow-sm"
+              :disabled="(!inputMessage.trim() && !ocrResult) || isOcrProcessing || isRecording || isTranscribing"
+              class="w-8 h-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center justify-center"
             >
-              <svg v-if="!isOcrProcessing" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-if="!isOcrProcessing && !isTranscribing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
               </svg>
-              <svg v-else class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
             </button>
             
@@ -836,17 +997,17 @@ const handlePaste = (event) => {
             <button
               v-else
               @click="stopGeneration"
-              class="w-10 h-10 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shrink-0 cursor-pointer flex items-center justify-center shadow-sm"
+              class="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors shrink-0 cursor-pointer flex items-center justify-center"
               title="停止生成"
             >
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <rect x="6" y="6" width="12" height="12" rx="1"/>
               </svg>
             </button>
           </div>
         </div>
-        <div class="text-center mt-2 text-xs text-gray-400">
-          由 DeepSeek V3.2 Speciale 驱动 · 支持图片 OCR 识别 · 思考过程完全可见
+        <div class="text-center mt-1 text-xs text-gray-400">
+          DeepSeek V3.2 Speciale · 图片OCR · 语音输入
         </div>
       </div>
     </div>

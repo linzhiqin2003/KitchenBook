@@ -164,3 +164,6 @@ DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.co
 # 硅基流动 API 配置 (用于 DeepSeek-OCR)
 SILICONFLOW_API_KEY = os.environ.get('SILICONFLOW_API_KEY', 'sk-ywlsinkhxbuyohliisofjlkpjsilkqhceeibsgeakinkwjxj')
 SILICONFLOW_BASE_URL = os.environ.get('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')
+
+# Groq API 配置 (用于 Whisper 语音转录)
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')

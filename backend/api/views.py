@@ -845,3 +845,82 @@ class DeepSeekOCRView(APIView):
             return Response({
                 'error': f'OCR 处理失败: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ==================== 语音转录 (Groq Whisper) ====================
+
+class WhisperTranscribeView(APIView):
+    """语音转录 - 使用 Groq Whisper API 将语音转换为文字"""
+    authentication_classes = []
+    permission_classes = []
+    
+    def post(self, request):
+        """处理语音转录请求"""
+        from groq import Groq
+        import tempfile
+        import os
+        
+        # 获取音频文件
+        audio_file = request.FILES.get('audio')
+        
+        if not audio_file:
+            return Response({'error': '请上传音频文件'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 获取 Groq API 密钥
+        groq_api_key = getattr(settings, 'GROQ_API_KEY', '')
+        if not groq_api_key:
+            return Response({
+                'error': '语音转录服务未配置，请联系管理员'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        try:
+            # 将上传的文件保存为临时文件
+            # Groq SDK 需要文件路径或文件对象
+            suffix = '.webm'  # 默认 webm 格式
+            content_type = audio_file.content_type or ''
+            if 'mp3' in content_type:
+                suffix = '.mp3'
+            elif 'wav' in content_type:
+                suffix = '.wav'
+            elif 'm4a' in content_type:
+                suffix = '.m4a'
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+                for chunk in audio_file.chunks():
+                    tmp_file.write(chunk)
+                tmp_file_path = tmp_file.name
+            
+            try:
+                # 初始化 Groq 客户端
+                client = Groq(api_key=groq_api_key)
+                
+                # 调用 Whisper API
+                with open(tmp_file_path, 'rb') as f:
+                    transcription = client.audio.transcriptions.create(
+                        file=f,
+                        model="whisper-large-v3",
+                        prompt="转录音频，中文",
+                        response_format="text",
+                        language="zh",
+                        temperature=0.0
+                    )
+                
+                # Groq 返回的 transcription 直接是文本字符串
+                text = transcription if isinstance(transcription, str) else str(transcription)
+                
+                return Response({
+                    'success': True,
+                    'text': text.strip()
+                })
+                
+            finally:
+                # 清理临时文件
+                if os.path.exists(tmp_file_path):
+                    os.unlink(tmp_file_path)
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'error': f'语音转录失败: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
