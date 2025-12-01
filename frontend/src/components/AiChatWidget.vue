@@ -154,12 +154,34 @@ const toggleChat = () => {
       <button
         v-if="!isOpen"
         @click="toggleChat"
-        class="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center group cursor-pointer"
+        class="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center group cursor-pointer border-2 border-amber-300/50"
       >
-        <span class="text-2xl group-hover:scale-110 transition-transform">🤖</span>
+        <!-- 可爱的小厨师图标 -->
+        <svg class="w-8 h-8 group-hover:scale-110 transition-transform drop-shadow-sm" viewBox="0 0 64 64" fill="none">
+          <!-- 厨师帽 -->
+          <ellipse cx="32" cy="14" rx="16" ry="8" fill="white"/>
+          <rect x="18" y="12" width="28" height="12" fill="white"/>
+          <ellipse cx="24" cy="10" rx="6" ry="5" fill="white"/>
+          <ellipse cx="40" cy="10" rx="6" ry="5" fill="white"/>
+          <ellipse cx="32" cy="8" rx="7" ry="6" fill="white"/>
+          <!-- 脸 -->
+          <circle cx="32" cy="36" r="16" fill="#FFECD2"/>
+          <!-- 眼睛 -->
+          <circle cx="26" cy="34" r="3" fill="#4A3728"/>
+          <circle cx="38" cy="34" r="3" fill="#4A3728"/>
+          <circle cx="27" cy="33" r="1" fill="white"/>
+          <circle cx="39" cy="33" r="1" fill="white"/>
+          <!-- 腮红 -->
+          <ellipse cx="22" cy="40" rx="3" ry="2" fill="#FFB5B5" opacity="0.6"/>
+          <ellipse cx="42" cy="40" rx="3" ry="2" fill="#FFB5B5" opacity="0.6"/>
+          <!-- 微笑 -->
+          <path d="M27 42 Q32 47 37 42" stroke="#4A3728" stroke-width="2" stroke-linecap="round" fill="none"/>
+        </svg>
         <!-- 小气泡提示 -->
-        <span class="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping"></span>
-        <span class="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full"></span>
+        <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full animate-ping"></span>
+        <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+          <span class="text-[8px] font-bold">AI</span>
+        </span>
       </button>
     </Transition>
     
@@ -170,12 +192,25 @@ const toggleChat = () => {
         class="w-80 sm:w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-stone-200"
       >
         <!-- 头部 -->
-        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-3 flex items-center justify-between shrink-0">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-2">
-            <span class="text-xl">🤖</span>
+            <!-- 小厨师头像 -->
+            <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+              <svg class="w-7 h-7" viewBox="0 0 64 64" fill="none">
+                <ellipse cx="32" cy="14" rx="14" ry="7" fill="white"/>
+                <rect x="20" y="12" width="24" height="10" fill="white"/>
+                <ellipse cx="25" cy="11" rx="5" ry="4" fill="white"/>
+                <ellipse cx="39" cy="11" rx="5" ry="4" fill="white"/>
+                <ellipse cx="32" cy="9" rx="6" ry="5" fill="white"/>
+                <circle cx="32" cy="34" r="14" fill="#FFECD2"/>
+                <circle cx="27" cy="32" r="2.5" fill="#4A3728"/>
+                <circle cx="37" cy="32" r="2.5" fill="#4A3728"/>
+                <path d="M28 40 Q32 44 36 40" stroke="#4A3728" stroke-width="2" stroke-linecap="round" fill="none"/>
+              </svg>
+            </div>
             <div>
               <div class="font-semibold text-sm">小厨 AI 助手</div>
-              <div class="text-[10px] text-emerald-100">随时为您服务</div>
+              <div class="text-[10px] text-amber-100">随时为您服务</div>
             </div>
           </div>
           <div class="flex items-center gap-1">
