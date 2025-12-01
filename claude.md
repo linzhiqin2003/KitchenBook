@@ -309,3 +309,28 @@ SILICONFLOW_API_KEY=your-siliconflow-api-key  # 硅基流动 API（用于 DeepSe
 VITE_API_URL=https://your_domain.com
 ```
 
+---
+
+## 📅 更新日志
+
+### 2025-12-01: 菜谱编辑器重构
+
+**问题**：原菜谱编辑器只能编辑基本信息，步骤和食材需要通过 Django Admin 添加，导致：
+- 菜谱详情页显示"0个步骤"
+- 食材页只有主厨提示，没有食材列表
+
+**解决方案**：
+
+1. **后端新增 API**
+   - `/api/recipe-steps/` - 步骤管理 (`RecipeStepViewSet`)
+     - `POST batch-update/` - 批量更新步骤
+     - `POST {id}/upload-image/` - 上传步骤图片
+   - `/api/recipe-ingredients/` - 食材管理 (`RecipeIngredientViewSet`)
+     - `POST batch-update/` - 批量更新食材
+
+2. **前端 RecipeEditorView 重构**
+   - 采用 Tab 页设计：基础信息 / 食材清单 / 烹饪步骤
+   - 食材支持从已有食材库自动补全
+   - 步骤支持排序、图片上传
+   - 保存时自动同步更新步骤和食材
+
