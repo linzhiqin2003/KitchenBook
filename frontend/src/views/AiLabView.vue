@@ -277,18 +277,25 @@ const sendMessage = async () => {
     
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
+    let buffer = '' // 用于存储跨 chunk 的不完整数据
     
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
       
-      const chunk = decoder.decode(value)
-      const lines = chunk.split('\n')
+      // 将新数据追加到 buffer
+      buffer += decoder.decode(value, { stream: true })
+      
+      // 按行分割，处理完整的行
+      const lines = buffer.split('\n')
+      // 最后一行可能不完整，保留到下次处理
+      buffer = lines.pop() || ''
       
       for (const line of lines) {
         if (line.startsWith('data: ')) {
-          const data = line.slice(6)
+          const data = line.slice(6).trim()
           if (data === '[DONE]') break
+          if (!data) continue // 跳过空数据
           
           try {
             const parsed = JSON.parse(data)
@@ -333,7 +340,10 @@ const sendMessage = async () => {
                 throw new Error(parsed.error)
             }
           } catch (e) {
-            if (e.message !== 'Unexpected end of JSON input') {
+            // JSON 解析失败，可能是数据不完整，将数据放回 buffer
+            if (e instanceof SyntaxError) {
+              buffer = line + '\n' + buffer
+            } else {
               console.error('Parse error:', e)
             }
           }
@@ -594,22 +604,25 @@ const handlePaste = (event) => {
                   </Transition>
                 </div>
                 
-                <!-- 主要内容 -->
-                <div class="bg-white rounded-2xl rounded-bl-sm px-4 py-3 border border-gray-200 shadow-sm">
+                <!-- 主要内容 - 只在有内容或思维链结束后显示 -->
+                <div 
+                  v-if="msg.content || (!isReasoningPhase && msg.isStreaming && !msg.reasoning)"
+                  class="bg-white rounded-2xl rounded-bl-sm px-4 py-3 border border-gray-200 shadow-sm"
+                >
                   <div 
                     v-if="msg.content" 
                     class="markdown-content text-sm leading-relaxed"
                     v-html="parseMarkdown(msg.content)"
                   ></div>
                   
-                  <!-- 加载中状态 -->
-                  <div v-else-if="msg.isStreaming" class="flex items-center gap-2 text-gray-400 py-1">
+                  <!-- 加载中状态 - 只在没有思维链输出时显示 -->
+                  <div v-else-if="msg.isStreaming && !msg.reasoning" class="flex items-center gap-2 text-gray-400 py-1">
                     <div class="flex items-center gap-1">
                       <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
                       <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
                       <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
                     </div>
-                    <span class="text-xs">{{ isReasoningPhase ? '深度思考中...' : '准备回答...' }}</span>
+                    <span class="text-xs">正在连接...</span>
                   </div>
                 </div>
                 
