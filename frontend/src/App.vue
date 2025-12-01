@@ -155,12 +155,21 @@ const handleLogout = () => {
           </div>
           
           <!-- 中间：链接 -->
-          <div class="flex items-center gap-1 text-stone-400">
-            <span>也逛逛</span>
-            <router-link to="/blog" class="text-stone-600 hover:text-purple-600 transition-colors font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-purple-400">
-              我的技术博客
-            </router-link>
-            <span>？</span>
+          <div class="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-stone-400">
+            <div class="flex items-center gap-1">
+              <span>也逛逛</span>
+              <router-link to="/blog" class="text-stone-600 hover:text-purple-600 transition-colors font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-purple-400">
+                我的技术博客
+              </router-link>
+              <span>？</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span>或者体验</span>
+              <router-link to="/ai-lab" class="text-stone-600 hover:text-pink-600 transition-colors font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-pink-400">
+                更强大的AI开源模型
+              </router-link>
+              <span>？</span>
+            </div>
           </div>
           
           <!-- 右侧：签名 -->

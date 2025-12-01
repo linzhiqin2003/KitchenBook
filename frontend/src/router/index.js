@@ -12,6 +12,7 @@ import BlogListView from '../views/BlogListView.vue'
 import BlogPostView from '../views/BlogPostView.vue'
 import BlogEditorView from '../views/BlogEditorView.vue'
 import BlogManagerView from '../views/BlogManagerView.vue'
+import AiLabView from '../views/AiLabView.vue'
 import { auth } from '../store/auth'
 
 const router = createRouter({
@@ -42,6 +43,12 @@ const router = createRouter({
       path: '/blog/:slug',
       name: 'blog-post',
       component: BlogPostView
+    },
+    // AI 实验室 - DeepSeek V3.2 Speciale 思考模型
+    {
+      path: '/ai-lab',
+      name: 'ai-lab',
+      component: AiLabView
     },
     // 登录页面（不需要验证）
     {
