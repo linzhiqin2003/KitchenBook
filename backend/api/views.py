@@ -890,18 +890,25 @@ class WhisperTranscribeView(APIView):
                 tmp_file_path = tmp_file.name
             
             try:
+                # 检查音频文件大小（过小可能是空录音）
+                file_size = os.path.getsize(tmp_file_path)
+                if file_size < 1000:  # 小于 1KB 可能是空录音
+                    return Response({
+                        'success': True,
+                        'text': ''  # 返回空，不调用 API
+                    })
+                
                 # 使用 OpenAI SDK 调用 Groq API（Groq 兼容 OpenAI API）
                 client = OpenAI(
                     api_key=groq_api_key,
                     base_url="https://api.groq.com/openai/v1"
                 )
                 
-                # 调用 Whisper API
+                # 调用 Whisper API（不使用 prompt 避免幻觉）
                 with open(tmp_file_path, 'rb') as f:
                     transcription = client.audio.transcriptions.create(
                         file=f,
                         model="whisper-large-v3",
-                        prompt="转录音频，中文",
                         response_format="text",
                         language="zh",
                         temperature=0.0
@@ -909,10 +916,22 @@ class WhisperTranscribeView(APIView):
                 
                 # 返回转录结果
                 text = transcription if isinstance(transcription, str) else str(transcription)
+                text = text.strip()
+                
+                # 过滤常见的幻觉输出
+                hallucination_patterns = [
+                    '字幕', '志愿者', '订阅', '感谢观看', '谢谢', 
+                    'subscribe', 'thank you', '翻译', '校对'
+                ]
+                if any(pattern in text.lower() for pattern in hallucination_patterns) and len(text) < 50:
+                    return Response({
+                        'success': True,
+                        'text': ''  # 可能是幻觉，返回空
+                    })
                 
                 return Response({
                     'success': True,
-                    'text': text.strip()
+                    'text': text
                 })
                 
             finally:
