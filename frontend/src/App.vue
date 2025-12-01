@@ -10,6 +10,7 @@ const route = useRoute()
 const router = useRouter()
 const isChefMode = computed(() => route.path.startsWith('/chef'))
 const isLoginPage = computed(() => route.path === '/chef/login')
+const isAiLabPage = computed(() => route.path === '/ai-lab')
 
 // 移动端菜单状态
 const mobileMenuOpen = ref(false)
@@ -27,7 +28,13 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#fcfaf5] text-stone-800 font-serif bg-texture flex flex-col">
+  <!-- AI Lab 全屏模式 -->
+  <div v-if="isAiLabPage" class="min-h-screen">
+    <RouterView />
+  </div>
+  
+  <!-- 普通页面模式 -->
+  <div v-else class="min-h-screen bg-[#fcfaf5] text-stone-800 font-serif bg-texture flex flex-col">
     <header v-if="!isLoginPage" class="bg-emerald-800 text-white p-3 md:p-4 shadow-lg sticky top-0 z-30 border-b-4 border-amber-200/50">
       <div class="container mx-auto flex justify-between items-center">
         <router-link to="/" class="text-lg md:text-2xl font-bold flex items-center gap-2 md:gap-3 font-display tracking-wide hover:text-amber-100 transition-colors">
