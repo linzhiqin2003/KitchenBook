@@ -4,7 +4,35 @@ from .models import Recipe, RecipeStep, Ingredient, RecipeIngredient, Order, Ord
 class RecipeStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecipeStep
-        fields = ['id', 'step_number', 'description', 'image']
+        fields = ['id', 'recipe', 'step_number', 'description', 'image']
+        extra_kwargs = {
+            'recipe': {'required': False}  # 在创建时可以从URL获取
+        }
+
+
+class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
+    """用于创建/更新食材关联"""
+    ingredient_name = serializers.CharField(write_only=True, required=False)
+    
+    class Meta:
+        model = RecipeIngredient
+        fields = ['id', 'recipe', 'ingredient', 'ingredient_name', 'amount', 'quantity_display']
+        extra_kwargs = {
+            'recipe': {'required': False},
+            'ingredient': {'required': False},
+            'amount': {'required': False, 'default': 0}
+        }
+    
+    def create(self, validated_data):
+        # 如果提供了ingredient_name但没有ingredient，创建或查找食材
+        ingredient_name = validated_data.pop('ingredient_name', None)
+        if ingredient_name and not validated_data.get('ingredient'):
+            ingredient, created = Ingredient.objects.get_or_create(
+                name=ingredient_name,
+                defaults={'quantity': 0, 'unit': 'g'}
+            )
+            validated_data['ingredient'] = ingredient
+        return super().create(validated_data)
 
 class IngredientSerializer(serializers.ModelSerializer):
     class Meta:

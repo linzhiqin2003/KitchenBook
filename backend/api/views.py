@@ -10,10 +10,11 @@ import hashlib
 import time
 import json
 import re
-from .models import Recipe, Ingredient, Order, BlogPost, Tag
+from .models import Recipe, Ingredient, Order, BlogPost, Tag, RecipeStep, RecipeIngredient
 from .serializers import (
     RecipeSerializer, PublicRecipeSerializer, IngredientSerializer, OrderSerializer,
-    BlogPostListSerializer, BlogPostDetailSerializer, TagSerializer
+    BlogPostListSerializer, BlogPostDetailSerializer, TagSerializer,
+    RecipeStepSerializer, RecipeIngredientSerializer, RecipeIngredientWriteSerializer
 )
 
 
@@ -81,6 +82,152 @@ class IngredientViewSet(viewsets.ModelViewSet):
     serializer_class = IngredientSerializer
     authentication_classes = []
     permission_classes = []
+
+
+class RecipeStepViewSet(viewsets.ModelViewSet):
+    """菜谱步骤管理"""
+    serializer_class = RecipeStepSerializer
+    authentication_classes = []
+    permission_classes = []
+    
+    def get_queryset(self):
+        recipe_id = self.request.query_params.get('recipe')
+        if recipe_id:
+            return RecipeStep.objects.filter(recipe_id=recipe_id).order_by('step_number')
+        return RecipeStep.objects.all().order_by('recipe_id', 'step_number')
+    
+    def perform_create(self, serializer):
+        recipe_id = self.request.data.get('recipe')
+        if recipe_id:
+            serializer.save(recipe_id=recipe_id)
+        else:
+            serializer.save()
+    
+    @action(detail=False, methods=['post'], url_path='batch-update')
+    def batch_update(self, request):
+        """批量更新步骤 - 一次性替换某菜谱的所有步骤"""
+        recipe_id = request.data.get('recipe_id')
+        steps_data = request.data.get('steps', [])
+        
+        if not recipe_id:
+            return Response({'error': '请提供菜谱ID'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            recipe = Recipe.objects.get(id=recipe_id)
+        except Recipe.DoesNotExist:
+            return Response({'error': '菜谱不存在'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # 获取现有步骤
+        existing_steps = {step.id: step for step in recipe.steps.all()}
+        updated_ids = set()
+        
+        for step_data in steps_data:
+            step_id = step_data.get('id')
+            
+            if step_id and step_id in existing_steps:
+                # 更新现有步骤
+                step = existing_steps[step_id]
+                step.step_number = step_data.get('step_number', step.step_number)
+                step.description = step_data.get('description', step.description)
+                # 图片单独处理（通过单独的API上传）
+                step.save()
+                updated_ids.add(step_id)
+            else:
+                # 创建新步骤
+                new_step = RecipeStep.objects.create(
+                    recipe=recipe,
+                    step_number=step_data.get('step_number', 1),
+                    description=step_data.get('description', '')
+                )
+                updated_ids.add(new_step.id)
+        
+        # 删除不在更新列表中的步骤
+        for step_id, step in existing_steps.items():
+            if step_id not in updated_ids:
+                step.delete()
+        
+        # 返回更新后的步骤列表
+        updated_steps = RecipeStep.objects.filter(recipe=recipe).order_by('step_number')
+        serializer = RecipeStepSerializer(updated_steps, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='upload-image')
+    def upload_image(self, request, pk=None):
+        """为步骤上传图片"""
+        step = self.get_object()
+        image = request.FILES.get('image')
+        if not image:
+            return Response({'error': '请上传图片'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        step.image = image
+        step.save()
+        return Response(RecipeStepSerializer(step).data)
+
+
+class RecipeIngredientViewSet(viewsets.ModelViewSet):
+    """菜谱食材关联管理"""
+    authentication_classes = []
+    permission_classes = []
+    
+    def get_queryset(self):
+        recipe_id = self.request.query_params.get('recipe')
+        if recipe_id:
+            return RecipeIngredient.objects.filter(recipe_id=recipe_id)
+        return RecipeIngredient.objects.all()
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update', 'batch_update']:
+            return RecipeIngredientWriteSerializer
+        return RecipeIngredientSerializer
+    
+    def perform_create(self, serializer):
+        recipe_id = self.request.data.get('recipe')
+        if recipe_id:
+            serializer.save(recipe_id=recipe_id)
+        else:
+            serializer.save()
+    
+    @action(detail=False, methods=['post'], url_path='batch-update')
+    def batch_update(self, request):
+        """批量更新食材 - 一次性替换某菜谱的所有食材"""
+        recipe_id = request.data.get('recipe_id')
+        ingredients_data = request.data.get('ingredients', [])
+        
+        if not recipe_id:
+            return Response({'error': '请提供菜谱ID'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            recipe = Recipe.objects.get(id=recipe_id)
+        except Recipe.DoesNotExist:
+            return Response({'error': '菜谱不存在'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # 删除现有食材关联
+        recipe.ingredients.all().delete()
+        
+        # 创建新的食材关联
+        for ing_data in ingredients_data:
+            ingredient_name = ing_data.get('ingredient_name', '')
+            quantity_display = ing_data.get('quantity_display', '')
+            
+            if ingredient_name:
+                # 查找或创建食材
+                ingredient, _ = Ingredient.objects.get_or_create(
+                    name=ingredient_name,
+                    defaults={'quantity': 0, 'unit': 'g'}
+                )
+                
+                RecipeIngredient.objects.create(
+                    recipe=recipe,
+                    ingredient=ingredient,
+                    amount=ing_data.get('amount', 0),
+                    quantity_display=quantity_display
+                )
+        
+        # 返回更新后的食材列表
+        updated_ingredients = RecipeIngredient.objects.filter(recipe=recipe)
+        serializer = RecipeIngredientSerializer(updated_ingredients, many=True)
+        return Response(serializer.data)
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all().order_by('-created_at')

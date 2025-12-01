@@ -1,11 +1,17 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView, BlogPostViewSet, TagViewSet, AiAgentView, DeepSeekSpecialeView, DeepSeekOCRView, WhisperTranscribeView
+from .views import (
+    RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView, 
+    BlogPostViewSet, TagViewSet, AiAgentView, DeepSeekSpecialeView, 
+    DeepSeekOCRView, WhisperTranscribeView, RecipeStepViewSet, RecipeIngredientViewSet
+)
 
 router = DefaultRouter()
 router.register(r'recipes', RecipeViewSet)
 router.register(r'ingredients', IngredientViewSet)
 router.register(r'orders', OrderViewSet)
+router.register(r'recipe-steps', RecipeStepViewSet, basename='recipe-step')
+router.register(r'recipe-ingredients', RecipeIngredientViewSet, basename='recipe-ingredient')
 router.register(r'blog/posts', BlogPostViewSet, basename='blogpost')
 router.register(r'blog/tags', TagViewSet)
 
