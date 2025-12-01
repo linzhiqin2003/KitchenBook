@@ -441,10 +441,21 @@ class AiAgentView(APIView):
             return tool_map[tool_name](**arguments)
         return {"success": False, "error": f"未知工具: {tool_name}"}
     
+    def get_tool_thinking_text(self, tool_name, arguments):
+        """根据工具名生成思考文字"""
+        thinking_map = {
+            "get_menu": "让我看看今天有什么好吃的...",
+            "get_recipe_detail": f"查一下这道菜的详细信息...",
+            "add_to_cart": f"好的，帮你加入购物车...",
+            "view_cart": "看看购物车里有什么...",
+            "place_order": "正在提交订单..."
+        }
+        return thinking_map.get(tool_name, "思考中...")
+    
     def post(self, request):
-        """处理对话请求（支持工具调用）"""
+        """处理对话请求（流式响应 + 思维链展示）"""
         messages = request.data.get('messages', [])
-        cart_info = request.data.get('cart', [])  # 前端传入当前购物车状态
+        cart_info = request.data.get('cart', [])
         
         if not messages:
             return Response({'error': '消息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
@@ -454,7 +465,7 @@ class AiAgentView(APIView):
                 'error': 'AI 服务未配置，请联系管理员'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         
-        # 构建系统提示，包含购物车状态
+        # 构建系统提示
         cart_status = ""
         if cart_info:
             cart_items = [f"- {item['name']} x{item['quantity']}" for item in cart_info]
@@ -466,7 +477,8 @@ class AiAgentView(APIView):
             {"role": "system", "content": self.get_system_prompt() + cart_status}
         ] + messages
         
-        try:
+        def generate():
+            """流式生成器"""
             from openai import OpenAI
             
             client = OpenAI(
@@ -474,87 +486,131 @@ class AiAgentView(APIView):
                 base_url=settings.DEEPSEEK_BASE_URL
             )
             
-            # 收集所有需要前端执行的动作
             actions = []
+            thinking_steps = []
             
-            # 工具调用循环（最多3轮）
-            for _ in range(3):
-                response = client.chat.completions.create(
+            try:
+                # 工具调用循环
+                for round_num in range(3):
+                    # 发送思考状态
+                    if round_num == 0:
+                        yield f"data: {json.dumps({'type': 'thinking', 'content': '让我想想...'}, ensure_ascii=False)}\n\n"
+                    
+                    response = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=full_messages,
+                        tools=self.TOOLS,
+                        tool_choice="auto",
+                        max_tokens=1000,
+                        temperature=0.7
+                    )
+                    
+                    assistant_message = response.choices[0].message
+                    
+                    # 没有工具调用，流式输出最终回复
+                    if not assistant_message.tool_calls:
+                        # 发送思维链完成
+                        if thinking_steps:
+                            yield f"data: {json.dumps({'type': 'thinking_done', 'steps': thinking_steps}, ensure_ascii=False)}\n\n"
+                        
+                        # 流式输出最终内容
+                        final_stream = client.chat.completions.create(
+                            model="deepseek-chat",
+                            messages=full_messages,
+                            stream=True,
+                            max_tokens=500,
+                            temperature=0.7
+                        )
+                        
+                        for chunk in final_stream:
+                            if chunk.choices[0].delta.content:
+                                yield f"data: {json.dumps({'type': 'content', 'content': chunk.choices[0].delta.content}, ensure_ascii=False)}\n\n"
+                        
+                        # 发送动作
+                        if actions:
+                            yield f"data: {json.dumps({'type': 'actions', 'actions': actions}, ensure_ascii=False)}\n\n"
+                        
+                        yield "data: [DONE]\n\n"
+                        return
+                    
+                    # 处理工具调用
+                    full_messages.append({
+                        "role": "assistant",
+                        "content": assistant_message.content,
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            } for tc in assistant_message.tool_calls
+                        ]
+                    })
+                    
+                    # 执行每个工具调用
+                    for tool_call in assistant_message.tool_calls:
+                        func_name = tool_call.function.name
+                        func_args = json.loads(tool_call.function.arguments)
+                        
+                        # 发送工具调用思考状态
+                        thinking_text = self.get_tool_thinking_text(func_name, func_args)
+                        thinking_steps.append({
+                            "tool": func_name,
+                            "text": thinking_text,
+                            "args": func_args
+                        })
+                        yield f"data: {json.dumps({'type': 'thinking', 'content': thinking_text, 'tool': func_name}, ensure_ascii=False)}\n\n"
+                        
+                        # 执行工具
+                        result = self.execute_tool(func_name, func_args)
+                        
+                        # 收集动作
+                        if result.get("action"):
+                            action_data = {
+                                "type": result["action"],
+                                "data": result.get("data", {}),
+                                "message": result.get("message", "")
+                            }
+                            actions.append(action_data)
+                            # 立即发送动作
+                            yield f"data: {json.dumps({'type': 'action', 'action': action_data}, ensure_ascii=False)}\n\n"
+                        
+                        # 添加工具结果
+                        full_messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": json.dumps(result, ensure_ascii=False)
+                        })
+                
+                # 循环结束，获取最终响应
+                if thinking_steps:
+                    yield f"data: {json.dumps({'type': 'thinking_done', 'steps': thinking_steps}, ensure_ascii=False)}\n\n"
+                
+                final_stream = client.chat.completions.create(
                     model="deepseek-chat",
                     messages=full_messages,
-                    tools=self.TOOLS,
-                    tool_choice="auto",
-                    max_tokens=1000,
+                    stream=True,
+                    max_tokens=500,
                     temperature=0.7
                 )
                 
-                assistant_message = response.choices[0].message
+                for chunk in final_stream:
+                    if chunk.choices[0].delta.content:
+                        yield f"data: {json.dumps({'type': 'content', 'content': chunk.choices[0].delta.content}, ensure_ascii=False)}\n\n"
                 
-                # 如果没有工具调用，直接返回文本
-                if not assistant_message.tool_calls:
-                    content = assistant_message.content or ""
-                    return Response({
-                        "type": "message",
-                        "content": content,
-                        "actions": actions
-                    })
+                if actions:
+                    yield f"data: {json.dumps({'type': 'actions', 'actions': actions}, ensure_ascii=False)}\n\n"
                 
-                # 处理工具调用
-                full_messages.append({
-                    "role": "assistant",
-                    "content": assistant_message.content,
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.function.name,
-                                "arguments": tc.function.arguments
-                            }
-                        } for tc in assistant_message.tool_calls
-                    ]
-                })
+                yield "data: [DONE]\n\n"
                 
-                # 执行每个工具调用
-                for tool_call in assistant_message.tool_calls:
-                    func_name = tool_call.function.name
-                    func_args = json.loads(tool_call.function.arguments)
-                    
-                    # 执行工具
-                    result = self.execute_tool(func_name, func_args)
-                    
-                    # 收集需要前端执行的动作
-                    if result.get("action"):
-                        actions.append({
-                            "type": result["action"],
-                            "data": result.get("data", {}),
-                            "message": result.get("message", "")
-                        })
-                    
-                    # 添加工具结果到消息
-                    full_messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(result, ensure_ascii=False)
-                    })
-            
-            # 如果循环结束还没返回，获取最终响应
-            final_response = client.chat.completions.create(
-                model="deepseek-chat",
-                messages=full_messages,
-                max_tokens=500,
-                temperature=0.7
-            )
-            
-            return Response({
-                "type": "message",
-                "content": final_response.choices[0].message.content or "",
-                "actions": actions
-            })
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return Response({
-                'error': f'AI 服务暂时不可用：{str(e)}'
-            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+        
+        response = StreamingHttpResponse(generate(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response

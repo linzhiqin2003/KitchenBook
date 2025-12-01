@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick, onMounted, computed } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import API_BASE_URL from '../config/api'
 import { cart } from '../store/cart'
 
@@ -10,6 +10,10 @@ const inputMessage = ref('')
 const messages = ref([])
 const messagesContainer = ref(null)
 
+// 思维链状态
+const currentThinking = ref([])
+const isThinking = ref(false)
+
 // 初始欢迎消息
 const welcomeMessage = {
   role: 'assistant',
@@ -18,7 +22,6 @@ const welcomeMessage = {
 }
 
 onMounted(() => {
-  // 加载本地存储的对话历史
   const saved = localStorage.getItem('ai_chat_messages')
   if (saved) {
     try {
@@ -31,13 +34,11 @@ onMounted(() => {
   }
 })
 
-// 保存对话历史到本地存储
 const saveMessages = () => {
   const toSave = messages.value.slice(-30)
   localStorage.setItem('ai_chat_messages', JSON.stringify(toSave))
 }
 
-// 滚动到底部
 const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) {
@@ -45,7 +46,6 @@ const scrollToBottom = async () => {
   }
 }
 
-// 获取当前购物车信息传给后端
 const getCartInfo = () => {
   return cart.items.map(item => ({
     id: item.recipe.id,
@@ -54,79 +54,92 @@ const getCartInfo = () => {
   }))
 }
 
-// 处理 AI 返回的动作
-const handleActions = (actions) => {
-  for (const action of actions) {
-    switch (action.type) {
-      case 'add_to_cart':
-        // 添加到购物车
-        const recipeData = {
-          id: action.data.recipe_id,
-          title: action.data.recipe_name,
-          cover_image: action.data.cover_image
-        }
-        cart.addItem(recipeData)
-        if (action.data.note) {
-          cart.updateNote(action.data.recipe_id, action.data.note)
-        }
-        // 显示成功提示
-        messages.value.push({
-          role: 'system',
-          type: 'action',
-          actionType: 'cart_added',
-          data: action.data
+// 处理单个动作
+const handleAction = (action) => {
+  switch (action.type) {
+    case 'add_to_cart':
+      const recipeData = {
+        id: action.data.recipe_id,
+        title: action.data.recipe_name,
+        cover_image: action.data.cover_image
+      }
+      cart.addItem(recipeData)
+      if (action.data.note) {
+        cart.updateNote(action.data.recipe_id, action.data.note)
+      }
+      messages.value.push({
+        role: 'system',
+        type: 'action',
+        actionType: 'cart_added',
+        data: action.data
+      })
+      break
+      
+    case 'view_cart':
+      cart.isOpen = true
+      break
+      
+    case 'place_order':
+      if (action.data.customer_name) {
+        cart.customerName = action.data.customer_name
+        cart.submitOrder().then(result => {
+          if (result.success) {
+            messages.value.push({
+              role: 'system',
+              type: 'action',
+              actionType: 'order_placed',
+              data: { orderId: result.orderId }
+            })
+            saveMessages()
+            scrollToBottom()
+          }
         })
-        break
-        
-      case 'view_cart':
-        // 打开购物车侧边栏
-        cart.isOpen = true
-        break
-        
-      case 'place_order':
-        // 设置顾客名称并下单
-        if (action.data.customer_name) {
-          cart.customerName = action.data.customer_name
-          cart.submitOrder().then(result => {
-            if (result.success) {
-              messages.value.push({
-                role: 'system',
-                type: 'action',
-                actionType: 'order_placed',
-                data: { orderId: result.orderId }
-              })
-              saveMessages()
-              scrollToBottom()
-            }
-          })
-        }
-        break
-    }
+      }
+      break
   }
 }
 
-// 发送消息
+// 获取工具图标
+const getToolIcon = (tool) => {
+  const icons = {
+    'get_menu': '📋',
+    'get_recipe_detail': '🔍',
+    'add_to_cart': '🛒',
+    'view_cart': '👀',
+    'place_order': '📝'
+  }
+  return icons[tool] || '💭'
+}
+
+// 发送消息（流式处理）
 const sendMessage = async () => {
   const text = inputMessage.value.trim()
   if (!text || isLoading.value) return
   
-  // 添加用户消息
   messages.value.push({ role: 'user', content: text, type: 'text' })
   inputMessage.value = ''
   isLoading.value = true
+  isThinking.value = true
+  currentThinking.value = []
   scrollToBottom()
   
-  // 准备发送给 API 的消息（只发送文本消息）
   const apiMessages = messages.value
     .filter(m => m.type === 'text' && (m.role === 'user' || m.role === 'assistant'))
     .map(m => ({ role: m.role, content: m.content }))
   
+  // 添加一个空的 AI 消息用于流式填充
+  const aiMessageIndex = messages.value.length
+  messages.value.push({
+    role: 'assistant',
+    content: '',
+    type: 'text',
+    thinking: [] // 存储思维链
+  })
+  
   try {
     const response = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         messages: apiMessages,
         cart: getCartInfo()
@@ -138,32 +151,80 @@ const sendMessage = async () => {
       throw new Error(error.error || '请求失败')
     }
     
-    const data = await response.json()
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
     
-    // 添加 AI 回复
-    if (data.content) {
-      messages.value.push({
-        role: 'assistant',
-        content: data.content,
-        type: 'text'
-      })
-    }
-    
-    // 处理动作
-    if (data.actions && data.actions.length > 0) {
-      handleActions(data.actions)
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      
+      const chunk = decoder.decode(value)
+      const lines = chunk.split('\n')
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6)
+          if (data === '[DONE]') break
+          
+          try {
+            const parsed = JSON.parse(data)
+            
+            switch (parsed.type) {
+              case 'thinking':
+                // 更新思维链
+                currentThinking.value.push({
+                  text: parsed.content,
+                  tool: parsed.tool
+                })
+                messages.value[aiMessageIndex].thinking = [...currentThinking.value]
+                scrollToBottom()
+                break
+                
+              case 'thinking_done':
+                isThinking.value = false
+                break
+                
+              case 'content':
+                // 流式内容
+                isThinking.value = false
+                messages.value[aiMessageIndex].content += parsed.content
+                scrollToBottom()
+                break
+                
+              case 'action':
+                // 单个动作
+                handleAction(parsed.action)
+                scrollToBottom()
+                break
+                
+              case 'actions':
+                // 批量动作
+                for (const action of parsed.actions) {
+                  handleAction(action)
+                }
+                break
+                
+              case 'error':
+                throw new Error(parsed.error)
+            }
+          } catch (e) {
+            if (e.message !== 'Unexpected end of JSON input') {
+              console.error('Parse error:', e)
+            }
+          }
+        }
+      }
     }
     
     saveMessages()
     
   } catch (error) {
-    messages.value.push({
-      role: 'assistant',
-      content: `抱歉，我遇到了一点问题 😅\n\n${error.message}\n\n请稍后再试~`,
-      type: 'text'
-    })
+    messages.value[aiMessageIndex].content = `抱歉，我遇到了一点问题 😅\n\n${error.message}\n\n请稍后再试~`
+    messages.value[aiMessageIndex].thinking = []
   } finally {
     isLoading.value = false
+    isThinking.value = false
+    currentThinking.value = []
     scrollToBottom()
   }
 }
@@ -180,19 +241,11 @@ const sendQuickAction = (text) => {
   sendMessage()
 }
 
-// 一键添加推荐菜品到购物车
-const addRecommendedToCart = (recipe) => {
-  inputMessage.value = `我要点 ${recipe.name}`
-  sendMessage()
-}
-
-// 清空对话
 const clearChat = () => {
   messages.value = [welcomeMessage]
   localStorage.removeItem('ai_chat_messages')
 }
 
-// 按回车发送
 const handleKeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
@@ -200,19 +253,11 @@ const handleKeydown = (e) => {
   }
 }
 
-// 切换打开状态
 const toggleChat = () => {
   isOpen.value = !isOpen.value
   if (isOpen.value) {
     nextTick(() => scrollToBottom())
   }
-}
-
-// 获取图片URL
-const getImageUrl = (path) => {
-  if (!path) return null
-  if (path.startsWith('http')) return path
-  return `${API_BASE_URL}${path}`
 }
 </script>
 
@@ -225,7 +270,6 @@ const getImageUrl = (path) => {
         @click="toggleChat"
         class="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center group cursor-pointer border-2 border-amber-300/50"
       >
-        <!-- 可爱的小厨师图标 -->
         <svg class="w-8 h-8 group-hover:scale-110 transition-transform drop-shadow-sm" viewBox="0 0 64 64" fill="none">
           <ellipse cx="32" cy="14" rx="16" ry="8" fill="white"/>
           <rect x="18" y="12" width="28" height="12" fill="white"/>
@@ -241,7 +285,6 @@ const getImageUrl = (path) => {
           <ellipse cx="42" cy="40" rx="3" ry="2" fill="#FFB5B5" opacity="0.6"/>
           <path d="M27 42 Q32 47 37 42" stroke="#4A3728" stroke-width="2" stroke-linecap="round" fill="none"/>
         </svg>
-        <!-- 小气泡提示 -->
         <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full animate-ping"></span>
         <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
           <span class="text-[8px] font-bold">AI</span>
@@ -253,7 +296,7 @@ const getImageUrl = (path) => {
     <Transition name="chat-window">
       <div
         v-if="isOpen"
-        class="w-[340px] sm:w-[400px] h-[560px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-stone-200"
+        class="w-[340px] sm:w-[400px] h-[580px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-stone-200"
       >
         <!-- 头部 -->
         <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3 flex items-center justify-between shrink-0">
@@ -277,19 +320,12 @@ const getImageUrl = (path) => {
             </div>
           </div>
           <div class="flex items-center gap-1">
-            <button
-              @click="clearChat"
-              class="p-1.5 hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
-              title="清空对话"
-            >
+            <button @click="clearChat" class="p-1.5 hover:bg-white/20 rounded-lg transition-colors cursor-pointer" title="清空对话">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
             </button>
-            <button
-              @click="toggleChat"
-              class="p-1.5 hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
-            >
+            <button @click="toggleChat" class="p-1.5 hover:bg-white/20 rounded-lg transition-colors cursor-pointer">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
               </svg>
@@ -298,35 +334,68 @@ const getImageUrl = (path) => {
         </div>
         
         <!-- 消息列表 -->
-        <div
-          ref="messagesContainer"
-          class="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-stone-50 to-white"
-        >
+        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-stone-50 to-white">
           <TransitionGroup name="message">
             <template v-for="(msg, index) in messages" :key="index">
-              <!-- 普通文本消息 -->
-              <div
-                v-if="msg.type === 'text' || !msg.type"
-                :class="[
-                  'flex',
-                  msg.role === 'user' ? 'justify-end' : 'justify-start'
-                ]"
-              >
-                <div
-                  :class="[
-                    'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
-                    msg.role === 'user'
-                      ? 'bg-amber-500 text-white rounded-br-md'
-                      : 'bg-white text-stone-700 shadow-sm border border-stone-100 rounded-bl-md'
-                  ]"
-                >
+              <!-- 用户消息 -->
+              <div v-if="msg.role === 'user' && msg.type === 'text'" class="flex justify-end">
+                <div class="max-w-[85%] bg-amber-500 text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed">
                   <div class="whitespace-pre-wrap">{{ msg.content }}</div>
+                </div>
+              </div>
+              
+              <!-- AI 消息 -->
+              <div v-else-if="msg.role === 'assistant' && (msg.type === 'text' || !msg.type)" class="flex justify-start">
+                <div class="max-w-[85%] space-y-2">
+                  <!-- 思维链展示 -->
+                  <Transition name="thinking-fade">
+                    <div v-if="msg.thinking && msg.thinking.length > 0" class="space-y-1.5">
+                      <TransitionGroup name="thinking-step">
+                        <div
+                          v-for="(step, stepIdx) in msg.thinking"
+                          :key="stepIdx"
+                          class="flex items-start gap-2 text-xs"
+                        >
+                          <div class="shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center border border-violet-200">
+                            <span class="text-sm">{{ getToolIcon(step.tool) }}</span>
+                          </div>
+                          <div class="flex-1 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl px-3 py-2 border border-violet-100/50">
+                            <div class="text-violet-600 font-medium flex items-center gap-1">
+                              <svg class="w-3 h-3 animate-spin" v-if="isThinking && stepIdx === msg.thinking.length - 1" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span v-else class="text-emerald-500">✓</span>
+                              <span>{{ step.text }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </TransitionGroup>
+                    </div>
+                  </Transition>
+                  
+                  <!-- 主要内容 -->
+                  <div v-if="msg.content" class="bg-white text-stone-700 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed">
+                    <div class="whitespace-pre-wrap">{{ msg.content }}</div>
+                  </div>
+                  
+                  <!-- 加载中状态（仅当没有思维链且没有内容时） -->
+                  <div v-else-if="isLoading && (!msg.thinking || msg.thinking.length === 0)" class="bg-white text-stone-500 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-3">
+                    <div class="flex items-center gap-2">
+                      <div class="flex items-center gap-1">
+                        <span class="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                        <span class="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                        <span class="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+                      </div>
+                      <span class="text-xs text-stone-400">小厨正在思考...</span>
+                    </div>
+                  </div>
                 </div>
               </div>
               
               <!-- 系统动作消息 - 添加购物车成功 -->
               <div v-else-if="msg.type === 'action' && msg.actionType === 'cart_added'" class="flex justify-center">
-                <div class="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full text-xs flex items-center gap-2 border border-emerald-200">
+                <div class="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full text-xs flex items-center gap-2 border border-emerald-200 shadow-sm">
                   <span>✅</span>
                   <span>{{ msg.data.recipe_name }} 已加入购物车</span>
                 </div>
@@ -334,7 +403,7 @@ const getImageUrl = (path) => {
               
               <!-- 系统动作消息 - 下单成功 -->
               <div v-else-if="msg.type === 'action' && msg.actionType === 'order_placed'" class="flex justify-center">
-                <div class="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl text-xs border border-amber-200">
+                <div class="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl text-xs border border-amber-200 shadow-sm">
                   <div class="flex items-center gap-2 font-medium">
                     <span>🎉</span>
                     <span>订单提交成功！</span>
@@ -344,20 +413,6 @@ const getImageUrl = (path) => {
               </div>
             </template>
           </TransitionGroup>
-          
-          <!-- 加载动画 -->
-          <div v-if="isLoading" class="flex justify-start">
-            <div class="bg-white text-stone-500 shadow-sm border border-stone-100 rounded-2xl rounded-bl-md px-4 py-3">
-              <div class="flex items-center gap-2">
-                <div class="flex items-center gap-1">
-                  <span class="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
-                  <span class="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
-                  <span class="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
-                </div>
-                <span class="text-xs text-stone-400">小厨正在思考...</span>
-              </div>
-            </div>
-          </div>
         </div>
         
         <!-- 快捷操作 -->
@@ -396,7 +451,7 @@ const getImageUrl = (path) => {
             </button>
           </div>
           <div class="text-[10px] text-stone-400 text-center mt-2">
-            由 DeepSeek AI 驱动 · 可帮你点餐下单
+            由 DeepSeek AI 驱动 · 支持智能点餐
           </div>
         </div>
       </div>
@@ -406,12 +461,8 @@ const getImageUrl = (path) => {
 
 <style scoped>
 /* 气泡按钮动画 */
-.bounce-enter-active {
-  animation: bounce-in 0.4s ease-out;
-}
-.bounce-leave-active {
-  animation: bounce-in 0.2s ease-in reverse;
-}
+.bounce-enter-active { animation: bounce-in 0.4s ease-out; }
+.bounce-leave-active { animation: bounce-in 0.2s ease-in reverse; }
 @keyframes bounce-in {
   0% { transform: scale(0); opacity: 0; }
   50% { transform: scale(1.1); }
@@ -419,59 +470,37 @@ const getImageUrl = (path) => {
 }
 
 /* 聊天窗口动画 */
-.chat-window-enter-active {
-  animation: chat-in 0.3s ease-out;
-}
-.chat-window-leave-active {
-  animation: chat-in 0.2s ease-in reverse;
-}
+.chat-window-enter-active { animation: chat-in 0.3s ease-out; }
+.chat-window-leave-active { animation: chat-in 0.2s ease-in reverse; }
 @keyframes chat-in {
-  0% {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* 消息动画 */
-.message-enter-active {
-  animation: message-in 0.3s ease-out;
-}
+.message-enter-active { animation: message-in 0.3s ease-out; }
 @keyframes message-in {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* 思维链动画 */
+.thinking-fade-enter-active { transition: all 0.3s ease; }
+.thinking-fade-leave-active { transition: all 0.2s ease; }
+.thinking-fade-enter-from, .thinking-fade-leave-to { opacity: 0; }
+
+.thinking-step-enter-active { animation: thinking-step-in 0.4s ease-out; }
+@keyframes thinking-step-in {
+  0% { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
 /* 自定义滚动条 */
-.overflow-y-auto::-webkit-scrollbar {
-  width: 6px;
-}
-.overflow-y-auto::-webkit-scrollbar-track {
-  background: transparent;
-}
-.overflow-y-auto::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
-}
-.overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
+.overflow-y-auto::-webkit-scrollbar { width: 6px; }
+.overflow-y-auto::-webkit-scrollbar-track { background: transparent; }
+.overflow-y-auto::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+.overflow-y-auto::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
-/* 横向滚动隐藏滚动条 */
-.overflow-x-auto::-webkit-scrollbar {
-  display: none;
-}
-.overflow-x-auto {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+.overflow-x-auto::-webkit-scrollbar { display: none; }
+.overflow-x-auto { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
