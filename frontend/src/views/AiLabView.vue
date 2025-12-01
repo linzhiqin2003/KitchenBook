@@ -610,6 +610,17 @@ const toggleRecording = async () => {
 // 开始录音
 const startRecording = async () => {
   try {
+    // 检查浏览器是否支持 MediaDevices API
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      // 检查是否是因为非 HTTPS
+      if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        alert('语音输入需要 HTTPS 安全连接。请使用 HTTPS 访问本站，或在本地开发环境中使用。')
+      } else {
+        alert('您的浏览器不支持语音录制功能，请使用最新版本的 Chrome、Firefox 或 Safari。')
+      }
+      return
+    }
+    
     const stream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         channelCount: 1,
