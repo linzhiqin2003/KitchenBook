@@ -625,17 +625,17 @@ const handlePaste = (event) => {
         <TransitionGroup name="message">
           <template v-for="(msg, index) in messages" :key="index">
             <!-- 用户消息 -->
-            <div v-if="msg.role === 'user'" class="flex justify-end">
-              <div class="max-w-[85%] md:max-w-[70%]">
+            <div v-if="msg.role === 'user'" class="flex justify-end w-full">
+              <div class="max-w-[85%] md:max-w-[70%] min-w-[120px]">
                 <div class="bg-indigo-600 text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-md">
-                  <div class="whitespace-pre-wrap text-sm leading-relaxed">{{ msg.content }}</div>
+                  <div class="whitespace-pre-wrap text-sm leading-relaxed break-words">{{ msg.content }}</div>
                 </div>
               </div>
             </div>
             
             <!-- AI 消息 -->
-            <div v-else-if="msg.role === 'assistant'" class="flex justify-start">
-              <div class="max-w-[95%] md:max-w-[85%] space-y-3">
+            <div v-else-if="msg.role === 'assistant'" class="flex justify-start w-full">
+              <div class="max-w-[95%] md:max-w-[85%] min-w-[200px] space-y-3">
                 <!-- 思维链展示 -->
                 <div v-if="msg.reasoning" class="rounded-xl overflow-hidden border border-amber-200 shadow-sm">
                   <button 

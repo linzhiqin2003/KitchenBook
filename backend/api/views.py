@@ -662,11 +662,16 @@ class DeepSeekSpecialeView(APIView):
         def generate():
             """流式生成器"""
             from openai import OpenAI
+            import threading
             
             client = OpenAI(
                 api_key=deepseek_speciale_api_key,
                 base_url=deepseek_speciale_base_url
             )
+            
+            # 用于心跳的状态
+            last_activity = [time.time()]
+            is_done = [False]
             
             try:
                 # 发送初始状态
@@ -677,18 +682,32 @@ class DeepSeekSpecialeView(APIView):
                     model="deepseek-reasoner",
                     messages=full_messages,
                     stream=True
-                    # max_tokens=128000  # 注释掉以避免思维链被截断
+                    # max_tokens 不设置，让模型自己决定
                 )
                 
                 current_reasoning = ""
                 current_content = ""
                 reasoning_started = False
                 content_started = False
+                chunk_count = 0
                 
                 for chunk in response:
+                    chunk_count += 1
+                    last_activity[0] = time.time()
+                    
+                    # 每50个chunk发送一次心跳（保持连接活跃）
+                    if chunk_count % 50 == 0:
+                        yield f": heartbeat\n\n"
+                    
+                    # 检查是否有有效的 choices
+                    if not chunk.choices:
+                        continue
+                    
+                    delta = chunk.choices[0].delta
+                    
                     # 处理思维链 (reasoning_content)
-                    if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
-                        reasoning_chunk = chunk.choices[0].delta.reasoning_content
+                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                        reasoning_chunk = delta.reasoning_content
                         current_reasoning += reasoning_chunk
                         if not reasoning_started:
                             reasoning_started = True
@@ -696,8 +715,8 @@ class DeepSeekSpecialeView(APIView):
                         yield f"data: {json.dumps({'type': 'reasoning', 'content': reasoning_chunk}, ensure_ascii=False)}\n\n"
                     
                     # 处理最终内容 (content)
-                    if hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
-                        content_chunk = chunk.choices[0].delta.content
+                    if hasattr(delta, 'content') and delta.content:
+                        content_chunk = delta.content
                         current_content += content_chunk
                         if not content_started:
                             content_started = True
@@ -707,6 +726,7 @@ class DeepSeekSpecialeView(APIView):
                             yield f"data: {json.dumps({'type': 'content_start'}, ensure_ascii=False)}\n\n"
                         yield f"data: {json.dumps({'type': 'content', 'content': content_chunk}, ensure_ascii=False)}\n\n"
                 
+                is_done[0] = True
                 # 发送完成信号
                 yield f"data: {json.dumps({'type': 'done', 'reasoning_length': len(current_reasoning), 'content_length': len(current_content)}, ensure_ascii=False)}\n\n"
                 yield "data: [DONE]\n\n"
