@@ -12,106 +12,66 @@ const post = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
-// 配置 marked 使用 highlight.js 进行代码高亮
+// 配置 marked
 marked.setOptions({
-  highlight: function(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return hljs.highlight(code, { language: lang }).value
-      } catch (err) {
-        console.error('Highlight error:', err)
-      }
-    }
-    return hljs.highlightAuto(code).value
-  },
-  breaks: true,      // 支持 GFM 换行
-  gfm: true,         // 启用 GitHub Flavored Markdown
-  headerIds: true,   // 为标题生成 ID
-  mangle: false,     // 不混淆邮箱地址
-  pedantic: false,
-  sanitize: false,
-  smartLists: true,
-  smartypants: false
+  breaks: true,
+  gfm: true
 })
 
-// 自定义渲染器，添加样式类
-const renderer = new marked.Renderer()
-
-// 标题
-renderer.heading = (text, level) => {
-  const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-  return `<h${level} id="${id}" class="md-h${level}">${text}</h${level}>`
-}
-
-// 代码块
-renderer.code = (code, language) => {
-  const lang = language || 'text'
-  let highlighted = code
+// 代码高亮函数
+const highlightCode = (code, lang) => {
   if (lang && hljs.getLanguage(lang)) {
     try {
-      highlighted = hljs.highlight(code, { language: lang }).value
-    } catch (err) {
-      highlighted = hljs.highlightAuto(code).value
+      return hljs.highlight(code, { language: lang }).value
+    } catch (e) {
+      return hljs.highlightAuto(code).value
     }
-  } else {
-    highlighted = hljs.highlightAuto(code).value
   }
-  return `<pre class="code-block" data-lang="${lang}"><code class="hljs language-${lang}">${highlighted}</code></pre>`
+  return hljs.highlightAuto(code).value
 }
 
-// 行内代码
-renderer.codespan = (code) => {
-  return `<code class="inline-code">${code}</code>`
-}
-
-// 链接
-renderer.link = (href, title, text) => {
-  const titleAttr = title ? ` title="${title}"` : ''
-  return `<a href="${href}"${titleAttr} class="md-link" target="_blank" rel="noopener noreferrer">${text}</a>`
-}
-
-// 图片
-renderer.image = (href, title, text) => {
-  const titleAttr = title ? ` title="${title}"` : ''
-  return `<figure class="md-figure"><img src="${href}" alt="${text}"${titleAttr} class="md-img" loading="lazy" />${text ? `<figcaption>${text}</figcaption>` : ''}</figure>`
-}
-
-// 列表
-renderer.list = (body, ordered) => {
-  const tag = ordered ? 'ol' : 'ul'
-  return `<${tag} class="md-${tag}">${body}</${tag}>`
-}
-
-renderer.listitem = (text) => {
-  return `<li class="md-li">${text}</li>`
-}
-
-// 引用
-renderer.blockquote = (quote) => {
-  return `<blockquote class="md-quote">${quote}</blockquote>`
-}
-
-// 段落
-renderer.paragraph = (text) => {
-  return `<p class="md-p">${text}</p>`
-}
-
-// 水平线
-renderer.hr = () => {
-  return '<hr class="md-hr" />'
-}
-
-// 表格
-renderer.table = (header, body) => {
-  return `<div class="md-table-wrapper"><table class="md-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`
-}
-
-marked.use({ renderer })
-
-// Markdown 解析函数
+// Markdown 解析函数 - 使用后处理方式添加样式类
 const parseMarkdown = (markdown) => {
   if (!markdown) return ''
-  return marked.parse(markdown)
+  
+  let html = marked.parse(markdown)
+  
+  // 后处理：添加样式类
+  html = html.replace(/<h1([^>]*)>/g, '<h1$1 class="md-h1">')
+  html = html.replace(/<h2([^>]*)>/g, '<h2$1 class="md-h2">')
+  html = html.replace(/<h3([^>]*)>/g, '<h3$1 class="md-h3">')
+  html = html.replace(/<h4([^>]*)>/g, '<h4$1 class="md-h4">')
+  html = html.replace(/<h5([^>]*)>/g, '<h5$1 class="md-h5">')
+  html = html.replace(/<h6([^>]*)>/g, '<h6$1 class="md-h6">')
+  html = html.replace(/<p>/g, '<p class="md-p">')
+  html = html.replace(/<ul>/g, '<ul class="md-ul">')
+  html = html.replace(/<ol>/g, '<ol class="md-ol">')
+  html = html.replace(/<li>/g, '<li class="md-li">')
+  html = html.replace(/<blockquote>/g, '<blockquote class="md-quote">')
+  html = html.replace(/<a /g, '<a class="md-link" target="_blank" rel="noopener noreferrer" ')
+  html = html.replace(/<img /g, '<img class="md-img" loading="lazy" ')
+  html = html.replace(/<hr>/g, '<hr class="md-hr">')
+  html = html.replace(/<table>/g, '<div class="md-table-wrapper"><table class="md-table">')
+  html = html.replace(/<\/table>/g, '</table></div>')
+  
+  // 代码块高亮
+  html = html.replace(/<pre><code class="language-(\w+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
+    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    const highlighted = highlightCode(decoded, lang)
+    return `<pre class="code-block" data-lang="${lang}"><code class="hljs language-${lang}">${highlighted}</code></pre>`
+  })
+  
+  // 无语言代码块
+  html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
+    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    const highlighted = highlightCode(decoded, '')
+    return `<pre class="code-block"><code class="hljs">${highlighted}</code></pre>`
+  })
+  
+  // 行内代码
+  html = html.replace(/<code>/g, '<code class="inline-code">')
+  
+  return html
 }
 
 // 获取文章详情

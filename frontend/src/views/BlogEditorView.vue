@@ -603,93 +603,66 @@ const savePost = async (publish = false) => {
   }
 }
 
-// 配置 marked - 编辑器预览用
-const editorRenderer = new marked.Renderer()
+// 配置 marked - 使用简单配置
+marked.setOptions({
+  breaks: true,
+  gfm: true
+})
 
-editorRenderer.heading = (text, level) => {
-  const sizes = {
-    1: 'text-2xl font-bold mt-8 mb-4 pb-2 border-b border-slate-200',
-    2: 'text-xl font-bold mt-6 mb-3',
-    3: 'text-lg font-bold mt-5 mb-2',
-    4: 'text-base font-bold mt-4 mb-2',
-    5: 'text-sm font-bold mt-3 mb-1',
-    6: 'text-xs font-bold mt-3 mb-1 uppercase tracking-wide text-slate-500'
-  }
-  return `<h${level} class="${sizes[level] || ''}">${text}</h${level}>`
-}
-
-editorRenderer.code = (code, lang) => {
-  let highlighted = code
+// 简单的代码高亮函数
+const highlightCode = (code, lang) => {
   if (lang && hljs.getLanguage(lang)) {
     try {
-      highlighted = hljs.highlight(code, { language: lang }).value
+      return hljs.highlight(code, { language: lang }).value
     } catch (e) {
-      highlighted = hljs.highlightAuto(code).value
+      return hljs.highlightAuto(code).value
     }
-  } else {
-    highlighted = hljs.highlightAuto(code).value
   }
-  return `<pre class="bg-slate-800 text-slate-200 p-4 rounded-lg my-4 overflow-x-auto text-sm" data-lang="${lang || 'text'}"><code class="hljs">${highlighted}</code></pre>`
+  return hljs.highlightAuto(code).value
 }
 
-editorRenderer.codespan = (code) => {
-  return `<code class="bg-slate-100 px-1.5 py-0.5 rounded text-purple-600 text-sm font-mono">${code}</code>`
-}
-
-editorRenderer.link = (href, title, text) => {
-  return `<a href="${href}" class="text-purple-600 underline hover:text-purple-800" target="_blank" rel="noopener">${text}</a>`
-}
-
-editorRenderer.image = (href, title, text) => {
-  return `<img src="${href}" alt="${text}" class="max-w-full rounded-lg my-4 shadow-md" loading="lazy" />`
-}
-
-editorRenderer.blockquote = (quote) => {
-  return `<blockquote class="border-l-4 border-purple-400 pl-4 my-4 text-slate-600 italic">${quote}</blockquote>`
-}
-
-editorRenderer.list = (body, ordered) => {
-  const tag = ordered ? 'ol' : 'ul'
-  const cls = ordered ? 'list-decimal' : 'list-disc'
-  return `<${tag} class="${cls} ml-6 my-3 space-y-1">${body}</${tag}>`
-}
-
-editorRenderer.listitem = (text) => {
-  return `<li>${text}</li>`
-}
-
-editorRenderer.paragraph = (text) => {
-  return `<p class="my-3 leading-relaxed">${text}</p>`
-}
-
-editorRenderer.hr = () => {
-  return '<hr class="my-6 border-t-2 border-slate-200" />'
-}
-
-editorRenderer.table = (header, body) => {
-  return `<div class="overflow-x-auto my-4"><table class="min-w-full border-collapse border border-slate-200"><thead class="bg-slate-50">${header}</thead><tbody>${body}</tbody></table></div>`
-}
-
-editorRenderer.tablerow = (content) => {
-  return `<tr class="border-b border-slate-200">${content}</tr>`
-}
-
-editorRenderer.tablecell = (content, flags) => {
-  const tag = flags.header ? 'th' : 'td'
-  const align = flags.align ? ` class="text-${flags.align}"` : ''
-  return `<${tag} class="px-4 py-2 border border-slate-200"${align}>${content}</${tag}>`
-}
-
-// Markdown 预览解析
+// Markdown 预览解析 - 使用后处理方式添加样式
 const parseMarkdown = (markdown) => {
   if (!markdown) return '<p class="text-slate-400 italic">开始输入内容，右侧实时预览...</p>'
   
-  return marked.parse(markdown, { 
-    renderer: editorRenderer,
-    breaks: true,
-    gfm: true,
-    headerIds: false
+  let html = marked.parse(markdown)
+  
+  // 后处理：添加样式类
+  html = html.replace(/<h1>/g, '<h1 class="text-2xl font-bold mt-8 mb-4 pb-2 border-b border-slate-200">')
+  html = html.replace(/<h2>/g, '<h2 class="text-xl font-bold mt-6 mb-3">')
+  html = html.replace(/<h3>/g, '<h3 class="text-lg font-bold mt-5 mb-2">')
+  html = html.replace(/<h4>/g, '<h4 class="text-base font-bold mt-4 mb-2">')
+  html = html.replace(/<h5>/g, '<h5 class="text-sm font-bold mt-3 mb-1">')
+  html = html.replace(/<h6>/g, '<h6 class="text-xs font-bold mt-3 mb-1 uppercase tracking-wide text-slate-500">')
+  html = html.replace(/<p>/g, '<p class="my-3 leading-relaxed">')
+  html = html.replace(/<ul>/g, '<ul class="list-disc ml-6 my-3 space-y-1">')
+  html = html.replace(/<ol>/g, '<ol class="list-decimal ml-6 my-3 space-y-1">')
+  html = html.replace(/<blockquote>/g, '<blockquote class="border-l-4 border-purple-400 pl-4 my-4 text-slate-600 italic">')
+  html = html.replace(/<a /g, '<a class="text-purple-600 underline hover:text-purple-800" target="_blank" rel="noopener" ')
+  html = html.replace(/<img /g, '<img class="max-w-full rounded-lg my-4 shadow-md" loading="lazy" ')
+  html = html.replace(/<hr>/g, '<hr class="my-6 border-t-2 border-slate-200">')
+  html = html.replace(/<table>/g, '<table class="min-w-full border-collapse border border-slate-200 my-4">')
+  html = html.replace(/<th>/g, '<th class="px-4 py-2 border border-slate-200 bg-slate-50">')
+  html = html.replace(/<td>/g, '<td class="px-4 py-2 border border-slate-200">')
+  
+  // 代码块高亮
+  html = html.replace(/<pre><code class="language-(\w+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
+    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    const highlighted = highlightCode(decoded, lang)
+    return `<pre class="bg-slate-800 text-slate-200 p-4 rounded-lg my-4 overflow-x-auto text-sm" data-lang="${lang}"><code class="hljs">${highlighted}</code></pre>`
   })
+  
+  // 无语言代码块
+  html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
+    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    const highlighted = highlightCode(decoded, '')
+    return `<pre class="bg-slate-800 text-slate-200 p-4 rounded-lg my-4 overflow-x-auto text-sm"><code class="hljs">${highlighted}</code></pre>`
+  })
+  
+  // 行内代码
+  html = html.replace(/<code>/g, '<code class="bg-slate-100 px-1.5 py-0.5 rounded text-purple-600 text-sm font-mono">')
+  
+  return html
 }
 
 const renderedContent = computed(() => parseMarkdown(form.value.content))
@@ -698,47 +671,31 @@ const renderedContent = computed(() => parseMarkdown(form.value.content))
 const renderAiMarkdown = (text) => {
   if (!text) return ''
   
-  const aiRenderer = new marked.Renderer()
+  let html = marked.parse(text)
   
-  aiRenderer.code = (code, lang) => {
-    let highlighted = code
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        highlighted = hljs.highlight(code, { language: lang }).value
-      } catch (e) {
-        highlighted = hljs.highlightAuto(code).value
-      }
-    } else {
-      highlighted = hljs.highlightAuto(code).value
-    }
+  // 简化样式
+  html = html.replace(/<h[1-6]>/g, '<h4 class="font-bold my-2">')
+  html = html.replace(/<\/h[1-6]>/g, '</h4>')
+  html = html.replace(/<p>/g, '<p class="my-2">')
+  html = html.replace(/<ul>/g, '<ul class="list-disc ml-4 my-2 text-sm">')
+  html = html.replace(/<ol>/g, '<ol class="list-decimal ml-4 my-2 text-sm">')
+  
+  // 代码块高亮
+  html = html.replace(/<pre><code class="language-(\w+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
+    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    const highlighted = highlightCode(decoded, lang)
     return `<pre class="bg-slate-800 text-slate-200 p-3 rounded-lg my-2 overflow-x-auto text-xs"><code class="hljs">${highlighted}</code></pre>`
-  }
-  
-  aiRenderer.codespan = (code) => {
-    return `<code class="bg-purple-100 px-1 py-0.5 rounded text-purple-700 text-xs font-mono">${code}</code>`
-  }
-  
-  aiRenderer.paragraph = (text) => {
-    return `<p class="my-2">${text}</p>`
-  }
-  
-  aiRenderer.heading = (text, level) => {
-    const sizes = { 1: 'text-lg', 2: 'text-base', 3: 'text-sm', 4: 'text-sm', 5: 'text-xs', 6: 'text-xs' }
-    return `<h${level} class="${sizes[level]} font-bold my-2">${text}</h${level}>`
-  }
-  
-  aiRenderer.list = (body, ordered) => {
-    const tag = ordered ? 'ol' : 'ul'
-    const cls = ordered ? 'list-decimal' : 'list-disc'
-    return `<${tag} class="${cls} ml-4 my-2 text-sm">${body}</${tag}>`
-  }
-  
-  return marked.parse(text, { 
-    renderer: aiRenderer,
-    breaks: true,
-    gfm: true,
-    headerIds: false
   })
+  
+  html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
+    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    const highlighted = highlightCode(decoded, '')
+    return `<pre class="bg-slate-800 text-slate-200 p-3 rounded-lg my-2 overflow-x-auto text-xs"><code class="hljs">${highlighted}</code></pre>`
+  })
+  
+  html = html.replace(/<code>/g, '<code class="bg-purple-100 px-1 py-0.5 rounded text-purple-700 text-xs font-mono">')
+  
+  return html
 }
 
 // 获取操作标签
