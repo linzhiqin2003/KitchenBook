@@ -2,6 +2,8 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
 import API_BASE_URL from '../config/api'
 
 const route = useRoute()
@@ -10,96 +12,106 @@ const post = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
-// 简单的 Markdown 解析器
-const parseMarkdown = (markdown) => {
-  if (!markdown) return ''
-  
-  let html = markdown
-  
-  // 先保存代码块，防止被其他规则处理
-  const codeBlocks = []
-  html = html.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
-    const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`
-    codeBlocks.push({
-      lang: lang || 'text',
-      code: code.trim()
-    })
-    return placeholder
-  })
-  
-  // 行内代码 - 也先保存
-  const inlineCodes = []
-  html = html.replace(/`([^`]+)`/g, (match, code) => {
-    const placeholder = `__INLINE_CODE_${inlineCodes.length}__`
-    inlineCodes.push(code)
-    return placeholder
-  })
-  
-  // 标题
-  html = html.replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
-  html = html.replace(/^## (.+)$/gm, '<h2 class="md-h2">$1</h2>')
-  html = html.replace(/^# (.+)$/gm, '<h1 class="md-h1">$1</h1>')
-  
-  // 粗体和斜体
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  
-  // 链接
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="md-link" target="_blank" rel="noopener">$1</a>')
-  
-  // 图片
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="md-img" loading="lazy" />')
-  
-  // 无序列表
-  html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li class="md-li">$1</li>')
-  html = html.replace(/(<li class="md-li">.*<\/li>\n?)+/g, '<ul class="md-ul">$&</ul>')
-  
-  // 有序列表
-  html = html.replace(/^\s*\d+\.\s+(.+)$/gm, '<li class="md-oli">$1</li>')
-  html = html.replace(/(<li class="md-oli">.*<\/li>\n?)+/g, '<ol class="md-ol">$&</ol>')
-  
-  // 引用块
-  html = html.replace(/^>\s*(.+)$/gm, '<blockquote class="md-quote">$1</blockquote>')
-  
-  // 水平线
-  html = html.replace(/^---$/gm, '<hr class="md-hr" />')
-  
-  // 段落 (连续的非空行)
-  html = html.split('\n\n').map(block => {
-    if (block.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr)/) || block.includes('__CODE_BLOCK_')) {
-      return block
+// 配置 marked 使用 highlight.js 进行代码高亮
+marked.setOptions({
+  highlight: function(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(code, { language: lang }).value
+      } catch (err) {
+        console.error('Highlight error:', err)
+      }
     }
-    if (block.trim() && !block.match(/^<[a-z]/i)) {
-      return `<p class="md-p">${block.replace(/\n/g, '<br>')}</p>`
-    }
-    return block
-  }).join('\n')
-  
-  // 恢复代码块
-  codeBlocks.forEach((block, i) => {
-    const escapedCode = escapeHtml(block.code)
-    html = html.replace(
-      `__CODE_BLOCK_${i}__`,
-      `<pre class="code-block" data-lang="${block.lang}"><code>${escapedCode}</code></pre>`
-    )
-  })
-  
-  // 恢复行内代码
-  inlineCodes.forEach((code, i) => {
-    html = html.replace(
-      `__INLINE_CODE_${i}__`,
-      `<code class="inline-code">${escapeHtml(code)}</code>`
-    )
-  })
-  
-  return html
+    return hljs.highlightAuto(code).value
+  },
+  breaks: true,      // 支持 GFM 换行
+  gfm: true,         // 启用 GitHub Flavored Markdown
+  headerIds: true,   // 为标题生成 ID
+  mangle: false,     // 不混淆邮箱地址
+  pedantic: false,
+  sanitize: false,
+  smartLists: true,
+  smartypants: false
+})
+
+// 自定义渲染器，添加样式类
+const renderer = new marked.Renderer()
+
+// 标题
+renderer.heading = (text, level) => {
+  const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+  return `<h${level} id="${id}" class="md-h${level}">${text}</h${level}>`
 }
 
-// HTML 转义
-const escapeHtml = (text) => {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
+// 代码块
+renderer.code = (code, language) => {
+  const lang = language || 'text'
+  let highlighted = code
+  if (lang && hljs.getLanguage(lang)) {
+    try {
+      highlighted = hljs.highlight(code, { language: lang }).value
+    } catch (err) {
+      highlighted = hljs.highlightAuto(code).value
+    }
+  } else {
+    highlighted = hljs.highlightAuto(code).value
+  }
+  return `<pre class="code-block" data-lang="${lang}"><code class="hljs language-${lang}">${highlighted}</code></pre>`
+}
+
+// 行内代码
+renderer.codespan = (code) => {
+  return `<code class="inline-code">${code}</code>`
+}
+
+// 链接
+renderer.link = (href, title, text) => {
+  const titleAttr = title ? ` title="${title}"` : ''
+  return `<a href="${href}"${titleAttr} class="md-link" target="_blank" rel="noopener noreferrer">${text}</a>`
+}
+
+// 图片
+renderer.image = (href, title, text) => {
+  const titleAttr = title ? ` title="${title}"` : ''
+  return `<figure class="md-figure"><img src="${href}" alt="${text}"${titleAttr} class="md-img" loading="lazy" />${text ? `<figcaption>${text}</figcaption>` : ''}</figure>`
+}
+
+// 列表
+renderer.list = (body, ordered) => {
+  const tag = ordered ? 'ol' : 'ul'
+  return `<${tag} class="md-${tag}">${body}</${tag}>`
+}
+
+renderer.listitem = (text) => {
+  return `<li class="md-li">${text}</li>`
+}
+
+// 引用
+renderer.blockquote = (quote) => {
+  return `<blockquote class="md-quote">${quote}</blockquote>`
+}
+
+// 段落
+renderer.paragraph = (text) => {
+  return `<p class="md-p">${text}</p>`
+}
+
+// 水平线
+renderer.hr = () => {
+  return '<hr class="md-hr" />'
+}
+
+// 表格
+renderer.table = (header, body) => {
+  return `<div class="md-table-wrapper"><table class="md-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`
+}
+
+marked.use({ renderer })
+
+// Markdown 解析函数
+const parseMarkdown = (markdown) => {
+  if (!markdown) return ''
+  return marked.parse(markdown)
 }
 
 // 获取文章详情
@@ -361,6 +373,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
   color: #cbd5e1;
 }
 
+/* 标题 h1-h6 */
 .prose-content :deep(.md-h1) {
   font-size: 2rem;
   font-weight: 700;
@@ -384,6 +397,29 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
   margin: 1.5rem 0 0.5rem;
 }
 
+.prose-content :deep(.md-h4) {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #a5b4c8;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.prose-content :deep(.md-h5) {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin: 1rem 0 0.5rem;
+}
+
+.prose-content :deep(.md-h6) {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  margin: 1rem 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .prose-content :deep(.md-p) {
   margin: 1rem 0;
 }
@@ -392,12 +428,14 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
   color: #a78bfa;
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: color 0.2s;
 }
 
 .prose-content :deep(.md-link:hover) {
   color: #c4b5fd;
 }
 
+/* 图片和 figure */
 .prose-content :deep(.md-img) {
   max-width: 100%;
   border-radius: 0.75rem;
@@ -405,14 +443,26 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
+.prose-content :deep(.md-figure) {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.prose-content :deep(.md-figure figcaption) {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* 列表 */
 .prose-content :deep(.md-ul),
 .prose-content :deep(.md-ol) {
   margin: 1rem 0;
   padding-left: 1.5rem;
 }
 
-.prose-content :deep(.md-li),
-.prose-content :deep(.md-oli) {
+.prose-content :deep(.md-li) {
   margin: 0.5rem 0;
 }
 
@@ -424,6 +474,15 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
   list-style-type: decimal;
 }
 
+/* 嵌套列表 */
+.prose-content :deep(.md-ul .md-ul),
+.prose-content :deep(.md-ol .md-ol),
+.prose-content :deep(.md-ul .md-ol),
+.prose-content :deep(.md-ol .md-ul) {
+  margin: 0.25rem 0;
+}
+
+/* 引用 */
 .prose-content :deep(.md-quote) {
   border-left: 4px solid #8b5cf6;
   padding: 1rem 1.5rem;
@@ -434,21 +493,36 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
   border-radius: 0 0.5rem 0.5rem 0;
 }
 
+.prose-content :deep(.md-quote p) {
+  margin: 0.5rem 0;
+}
+
+.prose-content :deep(.md-quote p:first-child) {
+  margin-top: 0;
+}
+
+.prose-content :deep(.md-quote p:last-child) {
+  margin-bottom: 0;
+}
+
+/* 水平线 */
 .prose-content :deep(.md-hr) {
   border: none;
   border-top: 2px solid rgba(255,255,255,0.1);
   margin: 2rem 0;
 }
 
+/* 行内代码 */
 .prose-content :deep(.inline-code) {
   background: rgba(139, 92, 246, 0.2);
   padding: 0.2rem 0.4rem;
   border-radius: 0.25rem;
-  font-family: 'Fira Code', 'Monaco', monospace;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
   font-size: 0.9em;
   color: #c4b5fd;
 }
 
+/* 代码块 */
 .prose-content :deep(.code-block) {
   background: #0d0d12;
   border-radius: 0.75rem;
@@ -467,18 +541,77 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
   font-size: 0.75rem;
   color: #4b5563;
   text-transform: uppercase;
+  font-weight: 500;
 }
 
 .prose-content :deep(.code-block code) {
-  font-family: 'Fira Code', 'Monaco', monospace;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
   font-size: 0.9rem;
   color: #e2e8f0;
   line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: pre;
   display: block;
 }
 
+/* highlight.js 语法高亮样式 - 暗色主题 */
+.prose-content :deep(.hljs-comment),
+.prose-content :deep(.hljs-quote) {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.prose-content :deep(.hljs-keyword),
+.prose-content :deep(.hljs-selector-tag),
+.prose-content :deep(.hljs-type) {
+  color: #c792ea;
+}
+
+.prose-content :deep(.hljs-string),
+.prose-content :deep(.hljs-template-variable),
+.prose-content :deep(.hljs-addition) {
+  color: #c3e88d;
+}
+
+.prose-content :deep(.hljs-number),
+.prose-content :deep(.hljs-literal),
+.prose-content :deep(.hljs-variable),
+.prose-content :deep(.hljs-template-tag) {
+  color: #f78c6c;
+}
+
+.prose-content :deep(.hljs-function),
+.prose-content :deep(.hljs-title) {
+  color: #82aaff;
+}
+
+.prose-content :deep(.hljs-attribute),
+.prose-content :deep(.hljs-symbol),
+.prose-content :deep(.hljs-bullet) {
+  color: #ffcb6b;
+}
+
+.prose-content :deep(.hljs-built_in),
+.prose-content :deep(.hljs-class .hljs-title) {
+  color: #89ddff;
+}
+
+.prose-content :deep(.hljs-deletion) {
+  color: #ff5370;
+}
+
+.prose-content :deep(.hljs-meta) {
+  color: #f78c6c;
+}
+
+.prose-content :deep(.hljs-emphasis) {
+  font-style: italic;
+}
+
+.prose-content :deep(.hljs-strong) {
+  font-weight: bold;
+}
+
+/* 粗体和斜体 */
 .prose-content :deep(strong) {
   color: #f1f5f9;
   font-weight: 600;
@@ -486,5 +619,52 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 
 .prose-content :deep(em) {
   font-style: italic;
+}
+
+/* 表格 */
+.prose-content :deep(.md-table-wrapper) {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  border-radius: 0.5rem;
+}
+
+.prose-content :deep(.md-table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.prose-content :deep(.md-table th),
+.prose-content :deep(.md-table td) {
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  text-align: left;
+}
+
+.prose-content :deep(.md-table th) {
+  background: rgba(139, 92, 246, 0.1);
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.prose-content :deep(.md-table tr:hover) {
+  background: rgba(255,255,255,0.02);
+}
+
+/* 删除线 */
+.prose-content :deep(del) {
+  color: #64748b;
+  text-decoration: line-through;
+}
+
+/* 任务列表 */
+.prose-content :deep(.task-list-item) {
+  list-style: none;
+  margin-left: -1.5rem;
+  padding-left: 1.5rem;
+}
+
+.prose-content :deep(.task-list-item input) {
+  margin-right: 0.5rem;
 }
 </style>

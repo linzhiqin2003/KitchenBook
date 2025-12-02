@@ -2,6 +2,8 @@
 import { ref, onMounted, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
 import API_BASE_URL from '../config/api'
 import { auth } from '../store/auth'
 
@@ -601,52 +603,142 @@ const savePost = async (publish = false) => {
   }
 }
 
-// 简单的 Markdown 预览
+// 配置 marked - 编辑器预览用
+const editorRenderer = new marked.Renderer()
+
+editorRenderer.heading = (text, level) => {
+  const sizes = {
+    1: 'text-2xl font-bold mt-8 mb-4 pb-2 border-b border-slate-200',
+    2: 'text-xl font-bold mt-6 mb-3',
+    3: 'text-lg font-bold mt-5 mb-2',
+    4: 'text-base font-bold mt-4 mb-2',
+    5: 'text-sm font-bold mt-3 mb-1',
+    6: 'text-xs font-bold mt-3 mb-1 uppercase tracking-wide text-slate-500'
+  }
+  return `<h${level} class="${sizes[level] || ''}">${text}</h${level}>`
+}
+
+editorRenderer.code = (code, lang) => {
+  let highlighted = code
+  if (lang && hljs.getLanguage(lang)) {
+    try {
+      highlighted = hljs.highlight(code, { language: lang }).value
+    } catch (e) {
+      highlighted = hljs.highlightAuto(code).value
+    }
+  } else {
+    highlighted = hljs.highlightAuto(code).value
+  }
+  return `<pre class="bg-slate-800 text-slate-200 p-4 rounded-lg my-4 overflow-x-auto text-sm" data-lang="${lang || 'text'}"><code class="hljs">${highlighted}</code></pre>`
+}
+
+editorRenderer.codespan = (code) => {
+  return `<code class="bg-slate-100 px-1.5 py-0.5 rounded text-purple-600 text-sm font-mono">${code}</code>`
+}
+
+editorRenderer.link = (href, title, text) => {
+  return `<a href="${href}" class="text-purple-600 underline hover:text-purple-800" target="_blank" rel="noopener">${text}</a>`
+}
+
+editorRenderer.image = (href, title, text) => {
+  return `<img src="${href}" alt="${text}" class="max-w-full rounded-lg my-4 shadow-md" loading="lazy" />`
+}
+
+editorRenderer.blockquote = (quote) => {
+  return `<blockquote class="border-l-4 border-purple-400 pl-4 my-4 text-slate-600 italic">${quote}</blockquote>`
+}
+
+editorRenderer.list = (body, ordered) => {
+  const tag = ordered ? 'ol' : 'ul'
+  const cls = ordered ? 'list-decimal' : 'list-disc'
+  return `<${tag} class="${cls} ml-6 my-3 space-y-1">${body}</${tag}>`
+}
+
+editorRenderer.listitem = (text) => {
+  return `<li>${text}</li>`
+}
+
+editorRenderer.paragraph = (text) => {
+  return `<p class="my-3 leading-relaxed">${text}</p>`
+}
+
+editorRenderer.hr = () => {
+  return '<hr class="my-6 border-t-2 border-slate-200" />'
+}
+
+editorRenderer.table = (header, body) => {
+  return `<div class="overflow-x-auto my-4"><table class="min-w-full border-collapse border border-slate-200"><thead class="bg-slate-50">${header}</thead><tbody>${body}</tbody></table></div>`
+}
+
+editorRenderer.tablerow = (content) => {
+  return `<tr class="border-b border-slate-200">${content}</tr>`
+}
+
+editorRenderer.tablecell = (content, flags) => {
+  const tag = flags.header ? 'th' : 'td'
+  const align = flags.align ? ` class="text-${flags.align}"` : ''
+  return `<${tag} class="px-4 py-2 border border-slate-200"${align}>${content}</${tag}>`
+}
+
+// Markdown 预览解析
 const parseMarkdown = (markdown) => {
   if (!markdown) return '<p class="text-slate-400 italic">开始输入内容，右侧实时预览...</p>'
   
-  let html = markdown
-  
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full rounded-lg my-4" />')
-  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-    return `<pre class="bg-slate-800 text-slate-200 p-4 rounded-lg my-4 overflow-x-auto text-sm"><code>${code.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`
+  return marked.parse(markdown, { 
+    renderer: editorRenderer,
+    breaks: true,
+    gfm: true,
+    headerIds: false
   })
-  html = html.replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1.5 py-0.5 rounded text-purple-600 text-sm">$1</code>')
-  html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-6 mb-2">$1</h3>')
-  html = html.replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-3">$1</h2>')
-  html = html.replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 pb-2 border-b">$1</h1>')
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-purple-600 underline" target="_blank">$1</a>')
-  html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li class="ml-4">$1</li>')
-  html = html.replace(/^>\s*(.+)$/gm, '<blockquote class="border-l-4 border-purple-400 pl-4 my-4 text-slate-600 italic">$1</blockquote>')
-  html = html.replace(/^---$/gm, '<hr class="my-6 border-t-2 border-slate-200" />')
-  
-  html = html.split('\n\n').map(block => {
-    if (!block.trim()) return ''
-    if (block.match(/^<[a-z]/i)) return block
-    return `<p class="my-3">${block.replace(/\n/g, '<br>')}</p>`
-  }).join('')
-  
-  return html
 }
 
 const renderedContent = computed(() => parseMarkdown(form.value.content))
 
-// AI Markdown 渲染
+// AI Markdown 渲染 (简化版，用于浮窗)
 const renderAiMarkdown = (text) => {
   if (!text) return ''
-  let html = text
   
-  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-    return `<pre class="bg-slate-800 text-slate-200 p-3 rounded-lg my-2 overflow-x-auto text-xs"><code>${code.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`
+  const aiRenderer = new marked.Renderer()
+  
+  aiRenderer.code = (code, lang) => {
+    let highlighted = code
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        highlighted = hljs.highlight(code, { language: lang }).value
+      } catch (e) {
+        highlighted = hljs.highlightAuto(code).value
+      }
+    } else {
+      highlighted = hljs.highlightAuto(code).value
+    }
+    return `<pre class="bg-slate-800 text-slate-200 p-3 rounded-lg my-2 overflow-x-auto text-xs"><code class="hljs">${highlighted}</code></pre>`
+  }
+  
+  aiRenderer.codespan = (code) => {
+    return `<code class="bg-purple-100 px-1 py-0.5 rounded text-purple-700 text-xs font-mono">${code}</code>`
+  }
+  
+  aiRenderer.paragraph = (text) => {
+    return `<p class="my-2">${text}</p>`
+  }
+  
+  aiRenderer.heading = (text, level) => {
+    const sizes = { 1: 'text-lg', 2: 'text-base', 3: 'text-sm', 4: 'text-sm', 5: 'text-xs', 6: 'text-xs' }
+    return `<h${level} class="${sizes[level]} font-bold my-2">${text}</h${level}>`
+  }
+  
+  aiRenderer.list = (body, ordered) => {
+    const tag = ordered ? 'ol' : 'ul'
+    const cls = ordered ? 'list-decimal' : 'list-disc'
+    return `<${tag} class="${cls} ml-4 my-2 text-sm">${body}</${tag}>`
+  }
+  
+  return marked.parse(text, { 
+    renderer: aiRenderer,
+    breaks: true,
+    gfm: true,
+    headerIds: false
   })
-  html = html.replace(/`([^`]+)`/g, '<code class="bg-purple-100 px-1 py-0.5 rounded text-purple-700 text-xs font-mono">$1</code>')
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-purple-600 underline" target="_blank">$1</a>')
-  html = html.replace(/\n/g, '<br>')
-  
-  return html
 }
 
 // 获取操作标签
