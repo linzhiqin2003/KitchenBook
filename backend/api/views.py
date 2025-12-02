@@ -338,6 +338,138 @@ class BlogPostViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except BlogPost.DoesNotExist:
             return Response({'error': '文章不存在'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['post'], url_path='upload-image')
+    def upload_image(self, request):
+        """上传博客内容图片"""
+        if 'image' not in request.FILES:
+            return Response({'error': '请选择图片文件'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        image_file = request.FILES['image']
+        
+        # 验证文件类型
+        allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+        if image_file.content_type not in allowed_types:
+            return Response({'error': '不支持的图片格式'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 验证文件大小 (限制 5MB)
+        if image_file.size > 5 * 1024 * 1024:
+            return Response({'error': '图片大小不能超过 5MB'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 生成唯一文件名
+        import os
+        import uuid
+        ext = os.path.splitext(image_file.name)[1].lower()
+        filename = f"blog_content/{uuid.uuid4().hex}{ext}"
+        
+        # 保存文件
+        from django.core.files.storage import default_storage
+        path = default_storage.save(filename, image_file)
+        
+        # 返回图片 URL
+        url = request.build_absolute_uri(settings.MEDIA_URL + path)
+        
+        return Response({
+            'success': True,
+            'url': url,
+            'markdown': f'![image]({url})'
+        })
+
+
+class BlogAiAssistView(APIView):
+    """博客 AI 写作助手"""
+    authentication_classes = []
+    permission_classes = []
+    
+    def post(self, request):
+        """AI 辅助写作"""
+        import requests
+        
+        action = request.data.get('action', 'continue')  # continue, polish, summarize, expand
+        content = request.data.get('content', '')
+        context = request.data.get('context', '')  # 上下文（如标题、摘要）
+        
+        if not content:
+            return Response({'error': '请提供内容'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 根据不同操作构建提示词
+        prompts = {
+            'continue': f'''你是一个技术博客写作助手。请根据以下内容继续写作，保持风格一致，自然衔接。
+
+{f"文章背景：{context}" if context else ""}
+
+已有内容：
+{content}
+
+请继续写作（直接输出续写内容，不要重复已有内容，不要加任何前缀说明）：''',
+            
+            'polish': f'''你是一个专业的文字编辑。请润色以下技术文章内容，使其更加通顺、专业，同时保持原意。
+
+原文：
+{content}
+
+请输出润色后的内容（直接输出润色结果，不要加任何前缀说明）：''',
+            
+            'summarize': f'''请为以下技术文章内容生成一个简洁的摘要（1-2句话，适合作为文章摘要展示）。
+
+内容：
+{content}
+
+摘要：''',
+            
+            'expand': f'''你是一个技术博客写作助手。请扩展以下内容，添加更多细节、示例或解释，使其更加丰富完整。
+
+原内容：
+{content}
+
+扩展后的内容（直接输出，不要加前缀）：''',
+            
+            'code_explain': f'''请为以下代码添加详细的中文注释和解释。
+
+代码：
+{content}
+
+带注释的代码和解释：''',
+        }
+        
+        prompt = prompts.get(action, prompts['continue'])
+        
+        try:
+            api_key = getattr(settings, 'DEEPSEEK_API_KEY', None)
+            base_url = getattr(settings, 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
+            
+            if not api_key:
+                return Response({'error': 'AI 服务未配置'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            response = requests.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    'model': 'deepseek-chat',
+                    'messages': [{'role': 'user', 'content': prompt}],
+                    'temperature': 0.7,
+                    'max_tokens': 2000
+                },
+                timeout=60
+            )
+            
+            if response.status_code != 200:
+                return Response({'error': 'AI 服务请求失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            result = response.json()
+            ai_content = result['choices'][0]['message']['content']
+            
+            return Response({
+                'success': True,
+                'content': ai_content,
+                'action': action
+            })
+            
+        except Exception as e:
+            return Response({'error': f'AI 服务错误: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ==================== AI 智能体助手 ====================

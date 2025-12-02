@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView, 
     BlogPostViewSet, TagViewSet, AiAgentView, DeepSeekSpecialeView, 
-    DeepSeekOCRView, WhisperTranscribeView, RecipeStepViewSet, RecipeIngredientViewSet
+    DeepSeekOCRView, WhisperTranscribeView, RecipeStepViewSet, RecipeIngredientViewSet,
+    BlogAiAssistView
 )
 
 router = DefaultRouter()
@@ -22,5 +23,6 @@ urlpatterns = [
     path('ai/speciale/', DeepSeekSpecialeView.as_view(), name='ai-speciale'),
     path('ai/ocr/', DeepSeekOCRView.as_view(), name='ai-ocr'),
     path('ai/transcribe/', WhisperTranscribeView.as_view(), name='ai-transcribe'),
+    path('blog/ai-assist/', BlogAiAssistView.as_view(), name='blog-ai-assist'),
 ]
 
