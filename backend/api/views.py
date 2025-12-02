@@ -1,3 +1,4 @@
+# API Views for KitchenBook
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view
@@ -6,10 +7,15 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.models import Sum
 from django.http import StreamingHttpResponse
+from django.core.files.storage import default_storage
 import hashlib
 import time
 import json
 import re
+import os
+import uuid
+import base64
+import tempfile
 from .models import Recipe, Ingredient, Order, BlogPost, Tag, RecipeStep, RecipeIngredient
 from .serializers import (
     RecipeSerializer, PublicRecipeSerializer, IngredientSerializer, OrderSerializer,
@@ -357,13 +363,10 @@ class BlogPostViewSet(viewsets.ModelViewSet):
             return Response({'error': '图片大小不能超过 5MB'}, status=status.HTTP_400_BAD_REQUEST)
         
         # 生成唯一文件名
-        import os
-        import uuid
         ext = os.path.splitext(image_file.name)[1].lower()
         filename = f"blog_content/{uuid.uuid4().hex}{ext}"
         
         # 保存文件
-        from django.core.files.storage import default_storage
         path = default_storage.save(filename, image_file)
         
         # 返回图片 URL
@@ -383,8 +386,6 @@ class BlogAiAssistView(APIView):
     
     def post(self, request):
         """AI 辅助写作"""
-        import requests
-        
         action = request.data.get('action', 'continue')  # continue, polish, summarize, expand
         content = request.data.get('content', '')
         context = request.data.get('context', '')  # 上下文（如标题、摘要）
@@ -441,26 +442,21 @@ class BlogAiAssistView(APIView):
             if not api_key:
                 return Response({'error': 'AI 服务未配置'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
-            response = requests.post(
-                f"{base_url}/chat/completions",
-                headers={
-                    'Authorization': f'Bearer {api_key}',
-                    'Content-Type': 'application/json'
-                },
-                json={
-                    'model': 'deepseek-chat',
-                    'messages': [{'role': 'user', 'content': prompt}],
-                    'temperature': 0.7,
-                    'max_tokens': 2000
-                },
-                timeout=60
+            from openai import OpenAI
+            
+            client = OpenAI(
+                api_key=api_key,
+                base_url=base_url
             )
             
-            if response.status_code != 200:
-                return Response({'error': 'AI 服务请求失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            response = client.chat.completions.create(
+                model='deepseek-chat',
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=0.7,
+                max_tokens=2000
+            )
             
-            result = response.json()
-            ai_content = result['choices'][0]['message']['content']
+            ai_content = response.choices[0].message.content
             
             return Response({
                 'success': True,
@@ -1071,9 +1067,6 @@ class DeepSeekOCRView(APIView):
     
     def post(self, request):
         """处理图片 OCR 请求"""
-        import requests
-        import base64
-        
         # 获取图片数据
         image_file = request.FILES.get('image')
         image_base64 = request.data.get('image_base64')
@@ -1144,15 +1137,31 @@ class DeepSeekOCRView(APIView):
                 "Content-Type": "application/json"
             }
             
-            response = requests.post(url, json=payload, headers=headers, timeout=60)
+            # 使用 urllib 替代 requests
+            import urllib.request
+            import urllib.error
             
-            if response.status_code != 200:
-                error_msg = response.json().get('error', {}).get('message', '请求失败')
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers=headers,
+                method='POST'
+            )
+            
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    result = json.loads(resp.read().decode('utf-8'))
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode('utf-8')
+                try:
+                    error_data = json.loads(error_body)
+                    error_msg = error_data.get('error', {}).get('message', '请求失败')
+                except:
+                    error_msg = '请求失败'
                 return Response({
                     'error': f'OCR 识别失败: {error_msg}'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
-            result = response.json()
             ocr_text = result.get('choices', [{}])[0].get('message', {}).get('content', '')
             
             if not ocr_text:
@@ -1166,10 +1175,12 @@ class DeepSeekOCRView(APIView):
                 'usage': result.get('usage', {})
             })
             
-        except requests.exceptions.Timeout:
-            return Response({
-                'error': 'OCR 服务响应超时，请稍后重试'
-            }, status=status.HTTP_504_GATEWAY_TIMEOUT)
+        except urllib.error.URLError as e:
+            if 'timed out' in str(e):
+                return Response({
+                    'error': 'OCR 服务响应超时，请稍后重试'
+                }, status=status.HTTP_504_GATEWAY_TIMEOUT)
+            raise
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1188,8 +1199,6 @@ class WhisperTranscribeView(APIView):
     def post(self, request):
         """处理语音转录请求"""
         from openai import OpenAI
-        import tempfile
-        import os
         
         # 获取音频文件
         audio_file = request.FILES.get('audio')
