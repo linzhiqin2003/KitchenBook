@@ -60,6 +60,18 @@ const aiPopup = ref({
   selectionEnd: 0
 })
 
+// 提问输入框
+const askModal = ref({
+  show: false,
+  question: '',
+  x: 0,
+  y: 0,
+  selectedText: '',
+  selectionStart: 0,
+  selectionEnd: 0
+})
+const askInputRef = ref(null)
+
 // AI 操作选项
 const aiActions = [
   { id: 'continue', label: '续写', icon: '✨', desc: '继续写作' },
@@ -182,11 +194,13 @@ const handleKeyUp = (e) => {
 const handleClickOutside = (e) => {
   if (!e.target.closest('.ai-selection-menu') && 
       !e.target.closest('.ai-result-popup') &&
+      !e.target.closest('.ai-ask-modal') &&
       !e.target.closest('textarea')) {
     selectionMenu.value.show = false
     if (!aiPopup.value.loading) {
       aiPopup.value.show = false
     }
+    askModal.value.show = false
   }
 }
 
@@ -204,27 +218,24 @@ onUnmounted(() => {
 const handleAiAction = async (action) => {
   const { text, start, end, x, y } = selectionMenu.value
   
-  // 隐藏选择菜单，显示 AI 弹窗
+  // 隐藏选择菜单
   selectionMenu.value.show = false
   
-  // 如果是提问，显示输入框
+  // 如果是提问，显示自定义输入框
   if (action === 'ask') {
-    const question = prompt('请输入你的问题：')
-    if (!question) return
-    
-    aiPopup.value = {
+    askModal.value = {
       show: true,
-      x: Math.min(x, window.innerWidth - 420),
-      y: Math.min(y + 10, window.innerHeight - 300),
-      loading: true,
-      content: '',
-      action: 'ask',
+      question: '',
+      x: Math.min(x, window.innerWidth - 380),
+      y: Math.min(y + 10, window.innerHeight - 250),
+      selectedText: text,
       selectionStart: start,
-      selectionEnd: end,
-      question
+      selectionEnd: end
     }
-    
-    await callAiStream('chat', question, text)
+    // 聚焦输入框
+    nextTick(() => {
+      askInputRef.value?.focus()
+    })
     return
   }
   
@@ -335,6 +346,37 @@ const closeAiPopup = () => {
   aiPopup.value.show = false
   aiPopup.value.content = ''
   aiPopup.value.loading = false
+}
+
+// 提交提问
+const submitAskQuestion = async () => {
+  const { question, selectedText, selectionStart, selectionEnd, x, y } = askModal.value
+  
+  if (!question.trim()) return
+  
+  // 关闭提问输入框
+  askModal.value.show = false
+  
+  // 显示 AI 响应弹窗
+  aiPopup.value = {
+    show: true,
+    x: Math.min(x, window.innerWidth - 420),
+    y: Math.min(y, window.innerHeight - 300),
+    loading: true,
+    content: '',
+    action: 'ask',
+    selectionStart,
+    selectionEnd
+  }
+  
+  // 调用 AI
+  await callAiStream('chat', question, selectedText)
+}
+
+// 关闭提问输入框
+const closeAskModal = () => {
+  askModal.value.show = false
+  askModal.value.question = ''
 }
 
 // 处理封面图上传
@@ -874,6 +916,86 @@ const getActionLabel = (action) => {
           </div>
           <!-- 小三角 -->
           <div class="absolute -top-2 left-6 w-4 h-4 bg-slate-900 transform rotate-45"></div>
+        </div>
+      </Transition>
+    </Teleport>
+    
+    <!-- 自定义提问输入框 -->
+    <Teleport to="body">
+      <Transition name="popup-scale">
+        <div
+          v-if="askModal.show"
+          class="ai-ask-modal fixed z-50 w-80"
+          :style="{ left: askModal.x + 'px', top: askModal.y + 'px' }"
+        >
+          <div class="bg-white rounded-2xl shadow-2xl border border-purple-100 overflow-hidden">
+            <!-- 头部 -->
+            <div class="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 px-4 py-3">
+              <div class="flex items-center gap-2 text-white">
+                <span class="text-xl">❓</span>
+                <span class="font-semibold">向 AI 提问</span>
+              </div>
+              <p class="text-xs text-white/70 mt-1">基于选中的文本内容进行提问</p>
+            </div>
+            
+            <!-- 选中文本预览 -->
+            <div v-if="askModal.selectedText" class="px-4 py-2 bg-purple-50 border-b border-purple-100">
+              <div class="text-xs text-purple-600 font-medium mb-1">📝 选中内容</div>
+              <div class="text-xs text-slate-600 line-clamp-2 italic">
+                "{{ askModal.selectedText.slice(0, 100) }}{{ askModal.selectedText.length > 100 ? '...' : '' }}"
+              </div>
+            </div>
+            
+            <!-- 输入区域 -->
+            <div class="p-4">
+              <div class="relative">
+                <textarea
+                  ref="askInputRef"
+                  v-model="askModal.question"
+                  @keydown.enter.exact.prevent="submitAskQuestion"
+                  @keydown.escape="closeAskModal"
+                  placeholder="输入你的问题，按 Enter 发送..."
+                  rows="3"
+                  class="w-full px-3 py-2.5 border border-purple-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400"
+                ></textarea>
+                <div class="absolute bottom-2 right-2 text-xs text-slate-400">
+                  {{ askModal.question.length }}/500
+                </div>
+              </div>
+              
+              <!-- 提示 -->
+              <div class="flex items-center gap-4 mt-3 text-xs text-slate-400">
+                <span class="flex items-center gap-1">
+                  <kbd class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">Enter</kbd>
+                  发送
+                </span>
+                <span class="flex items-center gap-1">
+                  <kbd class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">Esc</kbd>
+                  取消
+                </span>
+              </div>
+            </div>
+            
+            <!-- 底部按钮 -->
+            <div class="flex items-center justify-end gap-2 px-4 py-3 bg-slate-50 border-t border-slate-100">
+              <button
+                @click="closeAskModal"
+                class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                @click="submitAskQuestion"
+                :disabled="!askModal.question.trim()"
+                class="px-5 py-2 text-sm bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                发送
+              </button>
+            </div>
+          </div>
         </div>
       </Transition>
     </Teleport>
