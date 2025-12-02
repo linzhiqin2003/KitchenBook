@@ -260,9 +260,21 @@ class BlogPostViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = BlogPost.objects.all()
         
-        # 访客模式只显示已发布的文章
-        if self.request.query_params.get('mode') != 'chef':
-            queryset = queryset.filter(is_published=True)
+        # 对于更新/删除/获取单个对象的操作，不限制 is_published
+        # 这样厨师可以编辑草稿文章
+        if self.action in ['update', 'partial_update', 'destroy', 'retrieve']:
+            # 如果是 chef 模式或者是修改操作，返回所有文章
+            if self.request.query_params.get('mode') == 'chef':
+                pass  # 不过滤
+            elif self.action in ['update', 'partial_update', 'destroy']:
+                pass  # 修改和删除操作不过滤
+            elif self.action == 'retrieve' and self.request.query_params.get('mode') != 'chef':
+                # 访客获取单篇文章时，只能看已发布的
+                queryset = queryset.filter(is_published=True)
+        elif self.action == 'list':
+            # 列表页：访客模式只显示已发布的文章
+            if self.request.query_params.get('mode') != 'chef':
+                queryset = queryset.filter(is_published=True)
         
         # 按标签筛选
         tag = self.request.query_params.get('tag')
