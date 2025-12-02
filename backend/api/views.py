@@ -392,92 +392,130 @@ class BlogPostViewSet(viewsets.ModelViewSet):
 
 
 class BlogAiAssistView(APIView):
-    """博客 AI 写作助手"""
+    """博客 AI 写作助手 - 支持流式输出"""
     authentication_classes = []
     permission_classes = []
     
     def post(self, request):
-        """AI 辅助写作"""
-        action = request.data.get('action', 'continue')  # continue, polish, summarize, expand
+        """AI 辅助写作 - 流式输出"""
+        action = request.data.get('action', 'chat')  # chat, continue, polish, summarize, expand, code_explain
         content = request.data.get('content', '')
-        context = request.data.get('context', '')  # 上下文（如标题、摘要）
+        context = request.data.get('context', '')  # 上下文（如标题、摘要、文章内容）
+        message = request.data.get('message', '')  # 用户自由输入的消息
         
-        if not content:
-            return Response({'error': '请提供内容'}, status=status.HTTP_400_BAD_REQUEST)
+        # 系统提示词
+        system_prompt = '''你是一个专业的技术博客写作助手。你的任务是帮助用户写作、润色、扩展技术文章。
+请用 Markdown 格式输出，代码要用代码块包裹。
+回答要简洁专业，直接输出内容，不要加"好的"、"没问题"等客套话。'''
         
-        # 根据不同操作构建提示词
-        prompts = {
-            'continue': f'''你是一个技术博客写作助手。请根据以下内容继续写作，保持风格一致，自然衔接。
-
-{f"文章背景：{context}" if context else ""}
+        # 根据不同操作构建用户提示词
+        if action == 'chat':
+            # 自由对话模式
+            if not message:
+                return Response({'error': '请输入问题'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            user_prompt = message
+            if context:
+                user_prompt = f"【当前文章内容参考】\n{context[:2000]}\n\n【用户问题】\n{message}"
+        
+        elif action == 'continue':
+            if not content:
+                return Response({'error': '请提供要续写的内容'}, status=status.HTTP_400_BAD_REQUEST)
+            user_prompt = f'''请根据以下内容继续写作，保持风格一致，自然衔接。
 
 已有内容：
 {content}
 
-请继续写作（直接输出续写内容，不要重复已有内容，不要加任何前缀说明）：''',
-            
-            'polish': f'''你是一个专业的文字编辑。请润色以下技术文章内容，使其更加通顺、专业，同时保持原意。
+请继续写作（直接输出续写内容，不要重复已有内容）：'''
+        
+        elif action == 'polish':
+            if not content:
+                return Response({'error': '请提供要润色的内容'}, status=status.HTTP_400_BAD_REQUEST)
+            user_prompt = f'''请润色以下技术文章内容，使其更加通顺、专业，同时保持原意。
 
 原文：
 {content}
 
-请输出润色后的内容（直接输出润色结果，不要加任何前缀说明）：''',
-            
-            'summarize': f'''请为以下技术文章内容生成一个简洁的摘要（1-2句话，适合作为文章摘要展示）。
+请输出润色后的内容：'''
+        
+        elif action == 'summarize':
+            if not content:
+                return Response({'error': '请提供要生成摘要的内容'}, status=status.HTTP_400_BAD_REQUEST)
+            user_prompt = f'''请为以下技术文章内容生成一个简洁的摘要（1-2句话，适合作为文章摘要展示）。
 
 内容：
 {content}
 
-摘要：''',
-            
-            'expand': f'''你是一个技术博客写作助手。请扩展以下内容，添加更多细节、示例或解释，使其更加丰富完整。
+摘要：'''
+        
+        elif action == 'expand':
+            if not content:
+                return Response({'error': '请提供要扩展的内容'}, status=status.HTTP_400_BAD_REQUEST)
+            user_prompt = f'''请扩展以下内容，添加更多细节、示例或解释，使其更加丰富完整。
 
 原内容：
 {content}
 
-扩展后的内容（直接输出，不要加前缀）：''',
-            
-            'code_explain': f'''请为以下代码添加详细的中文注释和解释。
+扩展后的内容：'''
+        
+        elif action == 'code_explain':
+            if not content:
+                return Response({'error': '请提供要解释的代码'}, status=status.HTTP_400_BAD_REQUEST)
+            user_prompt = f'''请为以下代码添加详细的中文注释和解释。
 
 代码：
 {content}
 
-带注释的代码和解释：''',
-        }
+带注释的代码和解释：'''
         
-        prompt = prompts.get(action, prompts['continue'])
+        else:
+            return Response({'error': '无效的操作类型'}, status=status.HTTP_400_BAD_REQUEST)
         
-        try:
-            api_key = getattr(settings, 'DEEPSEEK_API_KEY', None)
-            base_url = getattr(settings, 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
-            
-            if not api_key:
-                return Response({'error': 'AI 服务未配置'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            from openai import OpenAI
-            
-            client = OpenAI(
-                api_key=api_key,
-                base_url=base_url
-            )
-            
-            response = client.chat.completions.create(
-                model='deepseek-chat',
-                messages=[{'role': 'user', 'content': prompt}],
-                temperature=0.7,
-                max_tokens=2000
-            )
-            
-            ai_content = response.choices[0].message.content
-            
-            return Response({
-                'success': True,
-                'content': ai_content,
-                'action': action
-            })
-            
-        except Exception as e:
-            return Response({'error': f'AI 服务错误: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # 流式输出
+        def generate_stream():
+            try:
+                api_key = getattr(settings, 'DEEPSEEK_API_KEY', None)
+                base_url = getattr(settings, 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
+                
+                if not api_key:
+                    yield f"data: {json.dumps({'type': 'error', 'content': 'AI 服务未配置'}, ensure_ascii=False)}\n\n"
+                    return
+                
+                from openai import OpenAI
+                
+                client = OpenAI(
+                    api_key=api_key,
+                    base_url=base_url
+                )
+                
+                stream = client.chat.completions.create(
+                    model='deepseek-chat',
+                    messages=[
+                        {'role': 'system', 'content': system_prompt},
+                        {'role': 'user', 'content': user_prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=2000,
+                    stream=True
+                )
+                
+                for chunk in stream:
+                    if chunk.choices[0].delta.content:
+                        content_chunk = chunk.choices[0].delta.content
+                        yield f"data: {json.dumps({'type': 'content', 'content': content_chunk}, ensure_ascii=False)}\n\n"
+                
+                yield f"data: {json.dumps({'type': 'done', 'action': action}, ensure_ascii=False)}\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
+        
+        response = StreamingHttpResponse(
+            generate_stream(),
+            content_type='text/event-stream'
+        )
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
 
 
 # ==================== AI 智能体助手 ====================
