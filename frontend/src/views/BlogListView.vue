@@ -538,7 +538,7 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
             <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">联系我</h4>
             <div class="flex items-center gap-4">
               <a 
-                href="https://lzzyl" 
+                href="https://github.com/linzhiqin2003" 
                 target="_blank"
                 class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all"
               >
