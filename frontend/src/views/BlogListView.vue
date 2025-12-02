@@ -405,15 +405,15 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
       </div>
       
       <!-- 文章列表区域 -->
-      <div class="bg-[#0f0f15] min-h-[50vh]">
+      <div :class="['min-h-[50vh] transition-colors duration-500', isDarkTheme ? 'bg-[#0f0f15]' : 'bg-slate-50']">
         <div class="container mx-auto px-4 py-12">
           <!-- 加载状态 -->
           <div v-if="loading" class="flex flex-col justify-center items-center py-20">
             <div class="relative w-16 h-16">
-              <div class="absolute inset-0 border-4 border-violet-500/20 rounded-full"></div>
+              <div :class="['absolute inset-0 border-4 rounded-full', isDarkTheme ? 'border-violet-500/20' : 'border-violet-300']"></div>
               <div class="absolute inset-0 border-4 border-violet-500 rounded-full border-t-transparent animate-spin"></div>
             </div>
-            <p class="mt-4 text-slate-500">加载中...</p>
+            <p :class="['mt-4', isDarkTheme ? 'text-slate-500' : 'text-slate-600']">加载中...</p>
           </div>
           
           <!-- 文章列表 -->
@@ -566,13 +566,16 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
           
           <!-- 空状态 -->
           <div v-else class="text-center py-20">
-            <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-slate-800 to-slate-900 rounded-full mb-6 border border-white/10">
-              <svg class="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div :class="[
+              'inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 border',
+              isDarkTheme ? 'bg-gradient-to-br from-slate-800 to-slate-900 border-white/10' : 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300'
+            ]">
+              <svg :class="['w-10 h-10', isDarkTheme ? 'text-slate-600' : 'text-slate-400']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-white mb-2">暂无文章</h3>
-            <p class="text-slate-500">
+            <h3 :class="['text-xl font-bold mb-2', isDarkTheme ? 'text-white' : 'text-slate-700']">暂无文章</h3>
+            <p :class="isDarkTheme ? 'text-slate-500' : 'text-slate-500'">
               {{ searchQuery ? '没有找到匹配的文章，试试其他关键词？' : '博主还没有发布任何文章，敬请期待！' }}
             </p>
           </div>
