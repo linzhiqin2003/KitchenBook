@@ -333,7 +333,10 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
       </div>
       
       <!-- 搜索和筛选区域 -->
-      <div class="bg-[#12121a] border-y border-white/5">
+      <div :class="[
+        'border-y transition-colors duration-500',
+        isDarkTheme ? 'bg-[#12121a] border-white/5' : 'bg-white border-slate-200'
+      ]">
         <div class="container mx-auto px-4 py-6">
           <div class="scroll-reveal flex flex-col md:flex-row gap-4 items-center justify-between">
             <!-- 搜索框 -->
