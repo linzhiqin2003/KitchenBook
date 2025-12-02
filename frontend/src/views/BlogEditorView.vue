@@ -39,22 +39,35 @@ const form = ref({
 
 const coverPreview = ref('')
 
-// ============== AI 助手浮窗 ==============
-const aiPanelOpen = ref(false)
-const aiLoading = ref(false)
-const aiMessage = ref('')
-const aiResponse = ref('')
-const aiChatHistory = ref([]) // 对话历史
-const aiPanelRef = ref(null)
-const aiResponseRef = ref(null)
+// ============== 选中文本 AI 助手 ==============
+const selectionMenu = ref({
+  show: false,
+  x: 0,
+  y: 0,
+  text: '',
+  start: 0,
+  end: 0
+})
 
-// 快捷操作
+const aiPopup = ref({
+  show: false,
+  x: 0,
+  y: 0,
+  loading: false,
+  content: '',
+  action: '',
+  selectionStart: 0,
+  selectionEnd: 0
+})
+
+// AI 操作选项
 const aiActions = [
-  { id: 'continue', label: '✨ 续写', icon: '✨' },
-  { id: 'polish', label: '💎 润色', icon: '💎' },
-  { id: 'expand', label: '📝 扩展', icon: '📝' },
-  { id: 'summarize', label: '📋 摘要', icon: '📋' },
-  { id: 'code_explain', label: '💻 解释代码', icon: '💻' },
+  { id: 'continue', label: '续写', icon: '✨', desc: '继续写作' },
+  { id: 'polish', label: '润色', icon: '💎', desc: '优化文字' },
+  { id: 'expand', label: '扩展', icon: '📝', desc: '丰富内容' },
+  { id: 'summarize', label: '摘要', icon: '📋', desc: '生成摘要' },
+  { id: 'code_explain', label: '解释', icon: '💻', desc: '解释代码' },
+  { id: 'ask', label: '提问', icon: '❓', desc: '询问 AI' },
 ]
 
 // 获取所有标签
@@ -97,10 +110,232 @@ const fetchPost = async () => {
   }
 }
 
+// 监听文本选中
+const handleSelectionChange = () => {
+  const textarea = editorRef.value
+  if (!textarea) return
+  
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  
+  if (start !== end && document.activeElement === textarea) {
+    const selectedText = form.value.content.substring(start, end)
+    
+    if (selectedText.trim().length > 0) {
+      // 计算选中文本的位置
+      const rect = textarea.getBoundingClientRect()
+      
+      // 获取光标大致位置（简化计算）
+      const textBeforeSelection = form.value.content.substring(0, start)
+      const lines = textBeforeSelection.split('\n')
+      const lineHeight = 24 // 估算行高
+      const charWidth = 8 // 估算字符宽度
+      
+      const currentLine = lines.length - 1
+      const currentCol = lines[lines.length - 1].length
+      
+      // 计算菜单位置
+      const menuX = rect.left + Math.min(currentCol * charWidth, rect.width - 200) + 16
+      const menuY = rect.top + Math.min(currentLine * lineHeight, textarea.scrollTop + 100) + 40
+      
+      selectionMenu.value = {
+        show: true,
+        x: Math.max(menuX, rect.left + 20),
+        y: Math.min(menuY, rect.bottom - 60),
+        text: selectedText,
+        start,
+        end
+      }
+    } else {
+      selectionMenu.value.show = false
+    }
+  } else {
+    // 延迟隐藏，避免点击菜单时立即消失
+    setTimeout(() => {
+      if (!aiPopup.value.show) {
+        selectionMenu.value.show = false
+      }
+    }, 200)
+  }
+}
+
+// 处理鼠标抬起事件
+const handleMouseUp = (e) => {
+  // 如果点击的是菜单或弹窗，不处理
+  if (e.target.closest('.ai-selection-menu') || e.target.closest('.ai-result-popup')) {
+    return
+  }
+  
+  setTimeout(() => {
+    handleSelectionChange()
+  }, 10)
+}
+
+// 处理键盘选择
+const handleKeyUp = (e) => {
+  if (e.shiftKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+    handleSelectionChange()
+  }
+}
+
+// 点击其他地方关闭菜单
+const handleClickOutside = (e) => {
+  if (!e.target.closest('.ai-selection-menu') && 
+      !e.target.closest('.ai-result-popup') &&
+      !e.target.closest('textarea')) {
+    selectionMenu.value.show = false
+    if (!aiPopup.value.loading) {
+      aiPopup.value.show = false
+    }
+  }
+}
+
 onMounted(() => {
   fetchTags()
   fetchPost()
+  document.addEventListener('click', handleClickOutside)
 })
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
+
+// AI 操作
+const handleAiAction = async (action) => {
+  const { text, start, end, x, y } = selectionMenu.value
+  
+  // 隐藏选择菜单，显示 AI 弹窗
+  selectionMenu.value.show = false
+  
+  // 如果是提问，显示输入框
+  if (action === 'ask') {
+    const question = prompt('请输入你的问题：')
+    if (!question) return
+    
+    aiPopup.value = {
+      show: true,
+      x: Math.min(x, window.innerWidth - 420),
+      y: Math.min(y + 10, window.innerHeight - 300),
+      loading: true,
+      content: '',
+      action: 'ask',
+      selectionStart: start,
+      selectionEnd: end,
+      question
+    }
+    
+    await callAiStream('chat', question, text)
+    return
+  }
+  
+  aiPopup.value = {
+    show: true,
+    x: Math.min(x, window.innerWidth - 420),
+    y: Math.min(y + 10, window.innerHeight - 300),
+    loading: true,
+    content: '',
+    action,
+    selectionStart: start,
+    selectionEnd: end
+  }
+  
+  await callAiStream(action, '', text)
+}
+
+// 流式调用 AI
+const callAiStream = async (action, customMessage = '', selectedText = '') => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/blog/ai-assist/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action,
+        content: selectedText || form.value.content.slice(-500),
+        context: form.value.content.slice(0, 2000),
+        message: customMessage
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error('请求失败')
+    }
+    
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      
+      const chunk = decoder.decode(value)
+      const lines = chunk.split('\n')
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6))
+            
+            if (data.type === 'content') {
+              aiPopup.value.content += data.content
+            } else if (data.type === 'done') {
+              aiPopup.value.loading = false
+            } else if (data.type === 'error') {
+              aiPopup.value.content = `❌ 错误：${data.content}`
+              aiPopup.value.loading = false
+            }
+          } catch (e) {
+            // 忽略解析错误
+          }
+        }
+      }
+    }
+    
+    aiPopup.value.loading = false
+    
+  } catch (error) {
+    console.error('AI assist failed', error)
+    aiPopup.value.content = `❌ 请求失败：${error.message}`
+    aiPopup.value.loading = false
+  }
+}
+
+// AI 结果操作
+const applyAiResult = (mode) => {
+  const { content, selectionStart, selectionEnd, action } = aiPopup.value
+  if (!content) return
+  
+  const textarea = editorRef.value
+  
+  if (mode === 'replace') {
+    // 替换选中内容
+    const text = form.value.content
+    form.value.content = text.substring(0, selectionStart) + content + text.substring(selectionEnd)
+  } else if (mode === 'insert') {
+    // 在选中内容后插入
+    const text = form.value.content
+    form.value.content = text.substring(0, selectionEnd) + '\n\n' + content + text.substring(selectionEnd)
+  } else if (mode === 'copy') {
+    navigator.clipboard.writeText(content)
+    return // 不关闭弹窗
+  } else if (mode === 'summary') {
+    form.value.summary = content
+  }
+  
+  closeAiPopup()
+  
+  // 聚焦回编辑器
+  nextTick(() => {
+    textarea?.focus()
+  })
+}
+
+const closeAiPopup = () => {
+  aiPopup.value.show = false
+  aiPopup.value.content = ''
+  aiPopup.value.loading = false
+}
 
 // 处理封面图上传
 const handleCoverUpload = (event) => {
@@ -202,15 +437,6 @@ const insertAtCursor = (text) => {
   })
 }
 
-const insertAtEnd = (text) => {
-  form.value.content += text
-  nextTick(() => {
-    if (editorRef.value) {
-      editorRef.value.scrollTop = editorRef.value.scrollHeight
-    }
-  })
-}
-
 // 触发图片上传
 const triggerImageUpload = () => {
   imageInputRef.value?.click()
@@ -221,13 +447,11 @@ const handleImageUpload = async (event) => {
   const file = event.target.files[0]
   if (!file) return
   
-  // 验证文件类型
   if (!file.type.startsWith('image/')) {
     alert('请选择图片文件')
     return
   }
   
-  // 验证文件大小 (5MB)
   if (file.size > 5 * 1024 * 1024) {
     alert('图片大小不能超过 5MB')
     return
@@ -240,9 +464,7 @@ const handleImageUpload = async (event) => {
     formData.append('image', file)
     
     const response = await axios.post(`${API_BASE_URL}/api/blog/posts/upload-image/`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+      headers: { 'Content-Type': 'multipart/form-data' }
     })
     
     if (response.data.url) {
@@ -255,167 +477,6 @@ const handleImageUpload = async (event) => {
     uploadingImage.value = false
     event.target.value = ''
   }
-}
-
-// ============== AI 助手功能 ==============
-
-// 获取选中的文本或上下文
-const getSelectedContent = () => {
-  const textarea = editorRef.value
-  if (!textarea) return ''
-  
-  const start = textarea.selectionStart
-  const end = textarea.selectionEnd
-  
-  if (start !== end) {
-    return form.value.content.substring(start, end)
-  }
-  
-  // 没有选中时返回最后 500 字符
-  return form.value.content.slice(-500)
-}
-
-// 流式调用 AI
-const callAiStream = async (action, customMessage = '') => {
-  const content = getSelectedContent()
-  
-  if (action !== 'chat' && !content.trim()) {
-    // 添加系统消息
-    aiChatHistory.value.push({
-      role: 'assistant',
-      content: '请先在编辑器中输入一些内容，或选中要处理的文本。'
-    })
-    return
-  }
-  
-  // 添加用户消息到历史
-  const userMessage = customMessage || `[${aiActions.find(a => a.id === action)?.label || action}]`
-  aiChatHistory.value.push({
-    role: 'user',
-    content: userMessage,
-    action: action
-  })
-  
-  // 添加占位的 AI 响应
-  const aiMsgIndex = aiChatHistory.value.length
-  aiChatHistory.value.push({
-    role: 'assistant',
-    content: '',
-    loading: true
-  })
-  
-  try {
-    aiLoading.value = true
-    
-    const response = await fetch(`${API_BASE_URL}/api/blog/ai-assist/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action,
-        content: action !== 'chat' ? content : '',
-        context: form.value.content.slice(0, 2000),
-        message: customMessage
-      })
-    })
-    
-    if (!response.ok) {
-      throw new Error('请求失败')
-    }
-    
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let fullContent = ''
-    
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      
-      const chunk = decoder.decode(value)
-      const lines = chunk.split('\n')
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6))
-            
-            if (data.type === 'content') {
-              fullContent += data.content
-              // 更新 AI 响应
-              aiChatHistory.value[aiMsgIndex] = {
-                role: 'assistant',
-                content: fullContent,
-                loading: false,
-                action: data.action
-              }
-              // 滚动到底部
-              scrollToBottom()
-            } else if (data.type === 'done') {
-              aiChatHistory.value[aiMsgIndex].action = data.action
-            } else if (data.type === 'error') {
-              aiChatHistory.value[aiMsgIndex] = {
-                role: 'assistant',
-                content: `❌ 错误：${data.content}`,
-                error: true
-              }
-            }
-          } catch (e) {
-            // 忽略解析错误
-          }
-        }
-      }
-    }
-    
-  } catch (error) {
-    console.error('AI assist failed', error)
-    aiChatHistory.value[aiMsgIndex] = {
-      role: 'assistant',
-      content: `❌ 请求失败：${error.message}`,
-      error: true
-    }
-  } finally {
-    aiLoading.value = false
-  }
-}
-
-// 发送自由对话
-const sendAiMessage = () => {
-  if (!aiMessage.value.trim() || aiLoading.value) return
-  
-  const message = aiMessage.value.trim()
-  aiMessage.value = ''
-  callAiStream('chat', message)
-}
-
-// 快捷操作
-const callQuickAction = (action) => {
-  callAiStream(action)
-}
-
-// 复制 AI 响应
-const copyAiResponse = (content) => {
-  navigator.clipboard.writeText(content)
-  // 简单的提示效果
-}
-
-// 插入 AI 响应到编辑器
-const insertAiResponse = (content) => {
-  insertAtEnd('\n\n' + content)
-}
-
-// 滚动到底部
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (aiResponseRef.value) {
-      aiResponseRef.value.scrollTop = aiResponseRef.value.scrollHeight
-    }
-  })
-}
-
-// 清空对话
-const clearChat = () => {
-  aiChatHistory.value = []
 }
 
 // 保存文章
@@ -475,39 +536,21 @@ const parseMarkdown = (markdown) => {
   
   let html = markdown
   
-  // 图片
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full rounded-lg my-4" />')
-  
-  // 代码块
   html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
     return `<pre class="bg-slate-800 text-slate-200 p-4 rounded-lg my-4 overflow-x-auto text-sm"><code>${code.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`
   })
-  
-  // 行内代码
   html = html.replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1.5 py-0.5 rounded text-purple-600 text-sm">$1</code>')
-  
-  // 标题
   html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-6 mb-2">$1</h3>')
   html = html.replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-3">$1</h2>')
   html = html.replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 pb-2 border-b">$1</h1>')
-  
-  // 粗体和斜体
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  
-  // 链接
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-purple-600 underline" target="_blank">$1</a>')
-  
-  // 列表
   html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li class="ml-4">$1</li>')
-  
-  // 引用
   html = html.replace(/^>\s*(.+)$/gm, '<blockquote class="border-l-4 border-purple-400 pl-4 my-4 text-slate-600 italic">$1</blockquote>')
-  
-  // 分割线
   html = html.replace(/^---$/gm, '<hr class="my-6 border-t-2 border-slate-200" />')
   
-  // 段落
   html = html.split('\n\n').map(block => {
     if (!block.trim()) return ''
     if (block.match(/^<[a-z]/i)) return block
@@ -519,29 +562,26 @@ const parseMarkdown = (markdown) => {
 
 const renderedContent = computed(() => parseMarkdown(form.value.content))
 
-// 简化的 Markdown 渲染（用于 AI 响应）
+// AI Markdown 渲染
 const renderAiMarkdown = (text) => {
   if (!text) return ''
   let html = text
   
-  // 代码块
   html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
     return `<pre class="bg-slate-800 text-slate-200 p-3 rounded-lg my-2 overflow-x-auto text-xs"><code>${code.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`
   })
-  
-  // 行内代码
-  html = html.replace(/`([^`]+)`/g, '<code class="bg-slate-200 px-1 py-0.5 rounded text-purple-700 text-xs">$1</code>')
-  
-  // 粗体
+  html = html.replace(/`([^`]+)`/g, '<code class="bg-purple-100 px-1 py-0.5 rounded text-purple-700 text-xs font-mono">$1</code>')
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  
-  // 链接
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-purple-600 underline" target="_blank">$1</a>')
-  
-  // 换行
   html = html.replace(/\n/g, '<br>')
   
   return html
+}
+
+// 获取操作标签
+const getActionLabel = (action) => {
+  const found = aiActions.find(a => a.id === action)
+  return found ? `${found.icon} ${found.label}` : action
 }
 </script>
 
@@ -586,7 +626,6 @@ const renderAiMarkdown = (text) => {
           </button>
         </div>
         
-        <!-- 保存按钮 -->
         <button
           @click="savePost(false)"
           :disabled="saving"
@@ -672,32 +711,25 @@ const renderAiMarkdown = (text) => {
             <button @click="toolbarActions.list" class="toolbar-btn" title="列表">☰</button>
             <button @click="toolbarActions.hr" class="toolbar-btn" title="分割线">―</button>
             
-            <!-- AI 助手按钮 -->
+            <!-- AI 提示 -->
             <div class="flex-grow"></div>
-            <button
-              @click="aiPanelOpen = !aiPanelOpen"
-              :class="[
-                'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
-                aiPanelOpen 
-                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30' 
-                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-              ]"
-            >
-              <span>🤖</span>
-              <span>AI 助手</span>
-              <span v-if="aiLoading" class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-            </button>
+            <div class="text-xs text-slate-400 flex items-center gap-1">
+              <span class="text-purple-500">✨</span>
+              <span>选中文字后可使用 AI 助手</span>
+            </div>
           </div>
           
           <!-- 编辑器内容区 -->
           <div class="flex" :class="viewMode === 'split' ? 'divide-x divide-slate-200' : ''">
-            <div v-if="viewMode !== 'preview'" :class="viewMode === 'split' ? 'w-1/2' : 'w-full'">
+            <div v-if="viewMode !== 'preview'" :class="viewMode === 'split' ? 'w-1/2' : 'w-full'" class="relative">
               <textarea
                 ref="editorRef"
                 v-model="form.content"
+                @mouseup="handleMouseUp"
+                @keyup="handleKeyUp"
                 placeholder="在这里写下你的技术分享...
 
-支持 Markdown 语法，可使用工具栏快速插入格式"
+支持 Markdown 语法，选中文字后可呼出 AI 助手 ✨"
                 class="w-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed"
                 :class="viewMode === 'split' ? 'h-[500px]' : 'h-[550px]'"
               ></textarea>
@@ -788,8 +820,24 @@ const renderAiMarkdown = (text) => {
           </div>
         </div>
         
+        <!-- AI 提示卡片 -->
+        <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-100 p-4">
+          <h3 class="font-bold text-purple-800 mb-2 flex items-center gap-2 text-sm">
+            <span>✨</span> AI 写作助手
+          </h3>
+          <p class="text-xs text-purple-600 leading-relaxed">
+            选中文字后，会弹出 AI 菜单，可快速：
+          </p>
+          <div class="mt-2 flex flex-wrap gap-1">
+            <span class="text-xs bg-white px-2 py-0.5 rounded-full text-purple-700">续写</span>
+            <span class="text-xs bg-white px-2 py-0.5 rounded-full text-purple-700">润色</span>
+            <span class="text-xs bg-white px-2 py-0.5 rounded-full text-purple-700">扩展</span>
+            <span class="text-xs bg-white px-2 py-0.5 rounded-full text-purple-700">摘要</span>
+          </div>
+        </div>
+        
         <!-- Markdown 速查 -->
-        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl border border-slate-200 p-4">
+        <div class="bg-slate-50 rounded-2xl border border-slate-200 p-4">
           <h3 class="font-bold text-slate-700 mb-2 flex items-center gap-2 text-sm">
             <span>⌨️</span> Markdown 速查
           </h3>
@@ -804,164 +852,116 @@ const renderAiMarkdown = (text) => {
       </div>
     </div>
     
-    <!-- AI 助手浮窗 -->
-    <Transition name="slide-panel">
-      <div 
-        v-if="aiPanelOpen"
-        ref="aiPanelRef"
-        class="fixed right-0 top-0 h-full w-96 bg-white shadow-2xl border-l border-slate-200 z-40 flex flex-col"
-      >
-        <!-- 头部 -->
-        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-purple-600 to-indigo-600">
-          <div class="flex items-center gap-2 text-white">
-            <span class="text-xl">🤖</span>
-            <span class="font-bold">AI 写作助手</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              @click="clearChat"
-              class="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-              title="清空对话"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-            <button
-              @click="aiPanelOpen = false"
-              class="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        
-        <!-- 快捷操作 -->
-        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
-          <div class="text-xs text-slate-500 mb-2">快捷操作（基于选中文本或文章末尾）</div>
-          <div class="flex flex-wrap gap-2">
+    <!-- 选中文字后的 AI 菜单 (Notion/iOS 风格) -->
+    <Teleport to="body">
+      <Transition name="menu-pop">
+        <div
+          v-if="selectionMenu.show"
+          class="ai-selection-menu fixed z-50"
+          :style="{ left: selectionMenu.x + 'px', top: selectionMenu.y + 'px' }"
+        >
+          <div class="bg-slate-900 rounded-xl shadow-2xl p-1 flex items-center gap-0.5 backdrop-blur-xl">
             <button
               v-for="action in aiActions"
               :key="action.id"
-              @click="callQuickAction(action.id)"
-              :disabled="aiLoading"
-              class="px-3 py-1.5 text-xs rounded-full bg-white border border-slate-200 text-slate-700 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              @click="handleAiAction(action.id)"
+              class="flex items-center gap-1.5 px-3 py-2 text-white/90 hover:bg-white/10 rounded-lg transition-all text-sm whitespace-nowrap group"
+              :title="action.desc"
             >
-              {{ action.label }}
+              <span class="text-base">{{ action.icon }}</span>
+              <span class="hidden sm:inline text-xs font-medium">{{ action.label }}</span>
             </button>
           </div>
+          <!-- 小三角 -->
+          <div class="absolute -top-2 left-6 w-4 h-4 bg-slate-900 transform rotate-45"></div>
         </div>
-        
-        <!-- 对话区域 -->
-        <div 
-          ref="aiResponseRef"
-          class="flex-1 overflow-auto p-4 space-y-4"
+      </Transition>
+    </Teleport>
+    
+    <!-- AI 结果浮窗 (就近显示) -->
+    <Teleport to="body">
+      <Transition name="popup-scale">
+        <div
+          v-if="aiPopup.show"
+          class="ai-result-popup fixed z-50 w-96"
+          :style="{ left: aiPopup.x + 'px', top: aiPopup.y + 'px' }"
         >
-          <!-- 欢迎消息 -->
-          <div v-if="aiChatHistory.length === 0" class="text-center py-8">
-            <div class="text-4xl mb-3">🤖</div>
-            <h3 class="font-bold text-slate-700 mb-2">AI 写作助手</h3>
-            <p class="text-sm text-slate-500 mb-4">我可以帮你续写、润色、扩展文章内容</p>
-            <p class="text-xs text-slate-400">在编辑器中选中文本，然后使用快捷操作<br/>或直接在下方输入你的问题</p>
-          </div>
-          
-          <!-- 对话历史 -->
-          <div
-            v-for="(msg, index) in aiChatHistory"
-            :key="index"
-            :class="[
-              'flex',
-              msg.role === 'user' ? 'justify-end' : 'justify-start'
-            ]"
-          >
-            <div
-              :class="[
-                'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm',
-                msg.role === 'user' 
-                  ? 'bg-purple-600 text-white rounded-br-md' 
-                  : msg.error 
-                    ? 'bg-red-50 text-red-700 border border-red-200 rounded-bl-md'
-                    : 'bg-slate-100 text-slate-700 rounded-bl-md'
-              ]"
-            >
-              <!-- 用户消息 -->
-              <div v-if="msg.role === 'user'">{{ msg.content }}</div>
-              
-              <!-- AI 消息 -->
-              <div v-else>
-                <!-- 加载动画 -->
-                <div v-if="msg.loading" class="flex items-center gap-2">
-                  <div class="flex gap-1">
-                    <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
-                    <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
-                    <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
-                  </div>
-                  <span class="text-slate-500 text-xs">思考中...</span>
-                </div>
-                
-                <!-- 内容 -->
-                <div v-else>
-                  <div class="ai-content prose-sm" v-html="renderAiMarkdown(msg.content)"></div>
-                  
-                  <!-- 操作按钮 -->
-                  <div v-if="msg.content && !msg.error" class="flex items-center gap-2 mt-3 pt-2 border-t border-slate-200">
-                    <button
-                      @click="copyAiResponse(msg.content)"
-                      class="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
-                    >
-                      📋 复制
-                    </button>
-                    <button
-                      @click="insertAiResponse(msg.content)"
-                      class="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
-                    >
-                      ✓ 插入文章
-                    </button>
-                  </div>
-                </div>
+          <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <!-- 头部 -->
+            <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">✨</span>
+                <span class="font-medium text-sm">{{ getActionLabel(aiPopup.action) }}</span>
+                <span v-if="aiPopup.loading" class="flex items-center gap-1 text-xs text-white/70">
+                  <span class="w-1.5 h-1.5 bg-white rounded-full animate-bounce"></span>
+                  <span class="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style="animation-delay: 0.1s"></span>
+                  <span class="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                </span>
+              </div>
+              <button
+                @click="closeAiPopup"
+                class="text-white/70 hover:text-white transition-colors"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <!-- 内容 -->
+            <div class="p-4 max-h-64 overflow-auto">
+              <div 
+                v-if="aiPopup.content"
+                class="text-sm text-slate-700 leading-relaxed ai-content"
+                v-html="renderAiMarkdown(aiPopup.content)"
+              ></div>
+              <div v-else-if="aiPopup.loading" class="text-sm text-slate-400 italic">
+                AI 正在思考...
+              </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div v-if="aiPopup.content && !aiPopup.loading" class="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-100">
+              <button
+                @click="applyAiResult('copy')"
+                class="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1 transition-colors"
+              >
+                📋 复制
+              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="closeAiPopup"
+                  class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  v-if="aiPopup.action === 'summarize'"
+                  @click="applyAiResult('summary')"
+                  class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  填入摘要
+                </button>
+                <button
+                  v-else-if="aiPopup.action === 'polish' || aiPopup.action === 'code_explain'"
+                  @click="applyAiResult('replace')"
+                  class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  替换
+                </button>
+                <button
+                  v-else
+                  @click="applyAiResult('insert')"
+                  class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  插入
+                </button>
               </div>
             </div>
           </div>
         </div>
-        
-        <!-- 输入区域 -->
-        <div class="p-4 border-t border-slate-200 bg-white">
-          <div class="flex gap-2">
-            <input
-              v-model="aiMessage"
-              @keyup.enter="sendAiMessage"
-              type="text"
-              placeholder="输入问题，或使用快捷操作..."
-              :disabled="aiLoading"
-              class="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-slate-50"
-            />
-            <button
-              @click="sendAiMessage"
-              :disabled="!aiMessage.trim() || aiLoading"
-              class="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          </div>
-          <p class="text-xs text-slate-400 mt-2 text-center">
-            按 Enter 发送 · 选中文本后使用快捷操作效果更佳
-          </p>
-        </div>
-      </div>
-    </Transition>
-    
-    <!-- 背景遮罩（移动端） -->
-    <Transition name="fade">
-      <div 
-        v-if="aiPanelOpen"
-        class="fixed inset-0 bg-black/20 z-30 lg:hidden"
-        @click="aiPanelOpen = false"
-      ></div>
-    </Transition>
+      </Transition>
+    </Teleport>
     
     <!-- 新建标签弹窗 -->
     <Teleport to="body">
@@ -1038,7 +1038,7 @@ const renderAiMarkdown = (text) => {
   color: #374151;
 }
 
-/* AI 响应内容样式 */
+/* AI 内容样式 */
 .ai-content {
   line-height: 1.6;
 }
@@ -1051,29 +1051,44 @@ const renderAiMarkdown = (text) => {
   font-size: 0.75rem;
 }
 
-/* 面板滑入动画 */
-.slide-panel-enter-active {
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+/* 菜单弹出动画 */
+.menu-pop-enter-active {
+  animation: menuPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.slide-panel-leave-active {
-  transition: transform 0.25s cubic-bezier(0.4, 0, 1, 1);
+.menu-pop-leave-active {
+  animation: menuPop 0.15s ease-in reverse;
 }
 
-.slide-panel-enter-from,
-.slide-panel-leave-to {
-  transform: translateX(100%);
+@keyframes menuPop {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-/* 淡入淡出 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
+/* 浮窗缩放动画 */
+.popup-scale-enter-active {
+  animation: popupScale 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.popup-scale-leave-active {
+  animation: popupScale 0.15s ease-in reverse;
+}
+
+@keyframes popupScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* 弹窗动画 */
@@ -1090,11 +1105,5 @@ const renderAiMarkdown = (text) => {
 .modal-enter-from .relative,
 .modal-leave-to .relative {
   transform: scale(0.95);
-}
-
-/* 加载动画 */
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
 }
 </style>
