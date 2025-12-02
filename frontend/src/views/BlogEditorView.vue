@@ -60,6 +60,35 @@ const aiPopup = ref({
   selectionEnd: 0
 })
 
+// 拖拽状态
+const isDragging = ref(false)
+const dragOffset = ref({ x: 0, y: 0 })
+
+// 开始拖拽
+const startDrag = (e) => {
+  isDragging.value = true
+  dragOffset.value = {
+    x: e.clientX - aiPopup.value.x,
+    y: e.clientY - aiPopup.value.y
+  }
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+}
+
+// 拖拽中
+const onDrag = (e) => {
+  if (!isDragging.value) return
+  aiPopup.value.x = Math.max(0, Math.min(e.clientX - dragOffset.value.x, window.innerWidth - 500))
+  aiPopup.value.y = Math.max(0, Math.min(e.clientY - dragOffset.value.y, window.innerHeight - 200))
+}
+
+// 停止拖拽
+const stopDrag = () => {
+  isDragging.value = false
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+}
+
 // 提问输入框
 const askModal = ref({
   show: false,
@@ -989,8 +1018,11 @@ const getActionLabel = (action) => {
           :style="{ left: aiPopup.x + 'px', top: aiPopup.y + 'px' }"
         >
           <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden resize" style="width: 480px; min-width: 320px; min-height: 200px; max-width: min(700px, 90vw); max-height: 70vh;">
-            <!-- 简约头部 -->
-            <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 cursor-move">
+            <!-- 简约头部 (可拖拽) -->
+            <div 
+              @mousedown="startDrag"
+              class="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 cursor-move select-none"
+            >
               <div class="flex items-center gap-2">
                 <span class="text-purple-600">{{ aiActions.find(a => a.id === aiPopup.action)?.icon || '✨' }}</span>
                 <span class="font-medium text-sm text-slate-700">{{ getActionLabel(aiPopup.action) }}</span>
