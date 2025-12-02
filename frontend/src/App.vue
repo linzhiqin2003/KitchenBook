@@ -11,6 +11,8 @@ const router = useRouter()
 const isChefMode = computed(() => route.path.startsWith('/chef'))
 const isLoginPage = computed(() => route.path === '/chef/login')
 const isAiLabPage = computed(() => route.path === '/ai-lab')
+// 博客页面独立布局
+const isBlogPage = computed(() => route.path === '/blog' || route.path.startsWith('/blog/'))
 
 // 移动端菜单状态
 const mobileMenuOpen = ref(false)
@@ -30,6 +32,11 @@ const handleLogout = () => {
 <template>
   <!-- AI Lab 全屏模式 -->
   <div v-if="isAiLabPage" class="min-h-screen">
+    <RouterView />
+  </div>
+  
+  <!-- 博客独立页面模式 -->
+  <div v-else-if="isBlogPage" class="min-h-screen">
     <RouterView />
   </div>
   
