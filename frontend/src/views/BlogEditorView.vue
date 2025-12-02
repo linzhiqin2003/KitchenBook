@@ -1017,11 +1017,11 @@ const getActionLabel = (action) => {
           class="ai-result-popup fixed z-50"
           :style="{ left: aiPopup.x + 'px', top: aiPopup.y + 'px' }"
         >
-          <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden resize" style="width: 480px; min-width: 320px; min-height: 200px; max-width: min(700px, 90vw); max-height: 70vh;">
+          <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden resize flex flex-col" style="width: 480px; min-width: 320px; min-height: 200px; max-width: min(700px, 90vw); max-height: 70vh;">
             <!-- 简约头部 (可拖拽) -->
             <div 
               @mousedown="startDrag"
-              class="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 cursor-move select-none"
+              class="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 cursor-move select-none flex-shrink-0"
             >
               <div class="flex items-center gap-2">
                 <span class="text-purple-600">{{ aiActions.find(a => a.id === aiPopup.action)?.icon || '✨' }}</span>
@@ -1042,8 +1042,8 @@ const getActionLabel = (action) => {
               </button>
             </div>
             
-            <!-- 内容区域 (可滚动) -->
-            <div class="p-4 overflow-auto" style="max-height: calc(80vh - 100px); min-height: 120px;">
+            <!-- 内容区域 (可滚动，flex-grow 自适应) -->
+            <div class="p-4 overflow-auto flex-grow min-h-0">
               <div 
                 v-if="aiPopup.content"
                 class="text-sm text-slate-700 leading-relaxed ai-content prose prose-sm max-w-none"
@@ -1058,8 +1058,8 @@ const getActionLabel = (action) => {
               </div>
             </div>
             
-            <!-- 底部操作栏 -->
-            <div v-if="aiPopup.content && !aiPopup.loading" class="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 bg-slate-50/50">
+            <!-- 底部操作栏 (固定不收缩) -->
+            <div v-if="aiPopup.content && !aiPopup.loading" class="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
               <button
                 @click="applyAiResult('copy')"
                 class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
@@ -1110,6 +1110,7 @@ const getActionLabel = (action) => {
         </div>
       </Transition>
     </Teleport>
+    
     
     <!-- 新建标签弹窗 -->
     <Teleport to="body">
