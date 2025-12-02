@@ -986,12 +986,9 @@ const getActionLabel = (action) => {
         <div
           v-if="aiPopup.show"
           class="ai-result-popup fixed z-50"
-          :style="{ 
-            left: Math.min(aiPopup.x, window.innerWidth - 520) + 'px', 
-            top: Math.min(aiPopup.y, window.innerHeight - 400) + 'px' 
-          }"
+          :style="{ left: aiPopup.x + 'px', top: aiPopup.y + 'px' }"
         >
-          <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden w-[480px] max-w-[90vw] resize overflow-auto" style="min-width: 320px; min-height: 200px; max-width: 700px; max-height: 80vh;">
+          <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden resize" style="width: 480px; min-width: 320px; min-height: 200px; max-width: min(700px, 90vw); max-height: 70vh;">
             <!-- 简约头部 -->
             <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 cursor-move">
               <div class="flex items-center gap-2">
