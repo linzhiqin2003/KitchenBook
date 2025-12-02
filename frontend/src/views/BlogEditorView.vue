@@ -534,7 +534,7 @@ const presetColors = [
             <!-- AI 助手开关 -->
             <div class="flex-grow"></div>
             <label class="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg transition-colors" :class="aiEnabled ? 'bg-purple-100' : 'hover:bg-slate-100'">
-              <span class="text-sm" :class="aiEnabled ? 'text-purple-700' : 'text-slate-500'">🤖 AI 助手</span>
+              <span class="text-sm" :class="aiEnabled ? 'text-purple-700' : 'text-slate-500'">✏️ AI 助手</span>
               <div 
                 class="relative w-10 h-5 rounded-full transition-colors"
                 :class="aiEnabled ? 'bg-purple-500' : 'bg-slate-300'"
