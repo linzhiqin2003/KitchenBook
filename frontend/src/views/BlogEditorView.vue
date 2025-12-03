@@ -603,8 +603,11 @@ const savePost = async (publish = false) => {
   }
 }
 
-// 配置 marked - 使用自定义 renderer 处理 HTML 转义
-const renderer = new marked.Renderer()
+// 配置 marked - 使用简单配置
+marked.setOptions({
+  breaks: true,
+  gfm: true
+})
 
 // 允许的 HTML 标签白名单
 const allowedTags = ['a', 'b', 'i', 'strong', 'em', 'u', 'strike', 's', 'del', 'ins', 'mark', 
@@ -613,25 +616,6 @@ const allowedTags = ['a', 'b', 'i', 'strong', 'em', 'u', 'strike', 's', 'del', '
   'blockquote', 'pre', 'code', 'img', 'video', 'audio', 'source', 'iframe', 'figure', 
   'figcaption', 'details', 'summary', 'abbr', 'cite', 'q', 'dfn', 'kbd', 'samp', 'var']
 
-// 重写 html 方法，转义未知标签
-renderer.html = function(html) {
-  // 检查是否是允许的标签
-  const tagMatch = html.match(/^<\/?([a-zA-Z][a-zA-Z0-9]*)/i)
-  if (tagMatch) {
-    const tagName = tagMatch[1].toLowerCase()
-    if (!allowedTags.includes(tagName)) {
-      // 转义未知标签
-      return html.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    }
-  }
-  return html
-}
-
-marked.setOptions({
-  breaks: true,
-  gfm: true,
-  renderer: renderer
-})
 
 // 简单的代码高亮函数
 const highlightCode = (code, lang) => {
@@ -649,7 +633,16 @@ const highlightCode = (code, lang) => {
 const parseMarkdown = (markdown) => {
   if (!markdown) return '<p class="text-slate-400 italic">开始输入内容，右侧实时预览...</p>'
   
-  let html = marked.parse(markdown)
+  // 预处理：转义未知的 HTML 标签（在代码块外）
+  // 使用正则匹配非标准 HTML 标签并转义
+  let processedMarkdown = markdown.replace(/<([a-zA-Z][a-zA-Z0-9]*)(?:\s[^>]*)?>(?![\s\S]*?<\/\1>)/g, (match, tagName) => {
+    if (allowedTags.includes(tagName.toLowerCase())) {
+      return match
+    }
+    return match.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  })
+  
+  let html = marked.parse(processedMarkdown)
   
   // 后处理：添加样式类
   html = html.replace(/<h1>/g, '<h1 class="text-2xl font-bold mt-8 mb-4 pb-2 border-b border-slate-200">')
