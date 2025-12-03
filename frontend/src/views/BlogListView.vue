@@ -18,6 +18,13 @@ const isDarkTheme = ref(localStorage.getItem('blog_theme') !== 'light')
 const toggleTheme = () => {
   isDarkTheme.value = !isDarkTheme.value
   localStorage.setItem('blog_theme', isDarkTheme.value ? 'dark' : 'light')
+  
+  // 主题切换后，确保所有已在视口内的 scroll-reveal 元素保持可见
+  nextTick(() => {
+    document.querySelectorAll('.scroll-reveal').forEach(el => {
+      el.classList.add('revealed')
+    })
+  })
 }
 
 // 滚动动画观察器
