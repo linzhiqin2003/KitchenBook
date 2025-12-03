@@ -603,10 +603,34 @@ const savePost = async (publish = false) => {
   }
 }
 
-// 配置 marked - 使用简单配置
+// 配置 marked - 使用自定义 renderer 处理 HTML 转义
+const renderer = new marked.Renderer()
+
+// 允许的 HTML 标签白名单
+const allowedTags = ['a', 'b', 'i', 'strong', 'em', 'u', 'strike', 's', 'del', 'ins', 'mark', 
+  'small', 'big', 'sup', 'sub', 'br', 'hr', 'p', 'div', 'span', 'ul', 'ol', 'li', 
+  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'blockquote', 'pre', 'code', 'img', 'video', 'audio', 'source', 'iframe', 'figure', 
+  'figcaption', 'details', 'summary', 'abbr', 'cite', 'q', 'dfn', 'kbd', 'samp', 'var']
+
+// 重写 html 方法，转义未知标签
+renderer.html = function(html) {
+  // 检查是否是允许的标签
+  const tagMatch = html.match(/^<\/?([a-zA-Z][a-zA-Z0-9]*)/i)
+  if (tagMatch) {
+    const tagName = tagMatch[1].toLowerCase()
+    if (!allowedTags.includes(tagName)) {
+      // 转义未知标签
+      return html.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+  }
+  return html
+}
+
 marked.setOptions({
   breaks: true,
-  gfm: true
+  gfm: true,
+  renderer: renderer
 })
 
 // 简单的代码高亮函数
@@ -710,7 +734,7 @@ const getActionLabel = (action) => {
     <!-- 顶部工具栏 -->
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-4">
-        <button
+        <button 
           @click="router.push('/chef/blog')"
           class="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors"
         >
@@ -727,7 +751,7 @@ const getActionLabel = (action) => {
       <div class="flex items-center gap-3">
         <!-- 预览模式切换 -->
         <div class="flex items-center bg-slate-100 rounded-lg p-0.5">
-          <button
+        <button
             v-for="mode in [
               { value: 'edit', icon: '📝', label: '编辑' },
               { value: 'split', icon: '📐', label: '分屏' },
@@ -735,7 +759,7 @@ const getActionLabel = (action) => {
             ]"
             :key="mode.value"
             @click="viewMode = mode.value"
-            :class="[
+          :class="[
               'px-3 py-1.5 text-xs rounded-md transition-all',
               viewMode === mode.value
                 ? 'bg-white text-purple-700 shadow-sm'
@@ -743,7 +767,7 @@ const getActionLabel = (action) => {
             ]"
           >
             {{ mode.icon }} {{ mode.label }}
-          </button>
+        </button>
         </div>
         
         <button
@@ -842,19 +866,19 @@ const getActionLabel = (action) => {
           <!-- 编辑器内容区 -->
           <div class="flex" :class="viewMode === 'split' ? 'divide-x divide-slate-200' : ''">
             <div v-if="viewMode !== 'preview'" :class="viewMode === 'split' ? 'w-1/2' : 'w-full'" class="relative">
-              <textarea
+            <textarea
                 ref="editorRef"
-                v-model="form.content"
+              v-model="form.content"
                 @mouseup="handleMouseUp"
                 @keyup="handleKeyUp"
-                placeholder="在这里写下你的技术分享...
+              placeholder="在这里写下你的技术分享...
 
 支持 Markdown 语法，选中文字后可呼出 AI 助手 ✨"
                 class="w-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed"
                 :class="viewMode === 'split' ? 'h-[500px]' : 'h-[550px]'"
-              ></textarea>
-            </div>
-            
+            ></textarea>
+          </div>
+          
             <div 
               v-if="viewMode !== 'edit'" 
               :class="viewMode === 'split' ? 'w-1/2' : 'w-full'"
