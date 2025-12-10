@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("api.urls")),
+    path("api/questiongen/", include("questions.urls")),  # QuestionGen 刷题模块
 ]
 
 if settings.DEBUG:

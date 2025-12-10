@@ -13,6 +13,7 @@ import BlogPostView from '../views/BlogPostView.vue'
 import BlogEditorView from '../views/BlogEditorView.vue'
 import BlogManagerView from '../views/BlogManagerView.vue'
 import AiLabView from '../views/AiLabView.vue'
+import QuestionGenView from '../views/QuestionGenView.vue'
 import { auth } from '../store/auth'
 
 const router = createRouter({
@@ -49,6 +50,12 @@ const router = createRouter({
       path: '/ai-lab',
       name: 'ai-lab',
       component: AiLabView
+    },
+    // QuestionGen 刷题模块
+    {
+      path: '/questiongen',
+      name: 'questiongen',
+      component: QuestionGenView
     },
     // 登录页面（不需要验证）
     {

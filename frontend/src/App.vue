@@ -13,6 +13,8 @@ const isLoginPage = computed(() => route.path === '/chef/login')
 const isAiLabPage = computed(() => route.path === '/ai-lab')
 // 博客页面独立布局
 const isBlogPage = computed(() => route.path === '/blog' || route.path.startsWith('/blog/'))
+// QuestionGen 刷题页面独立布局
+const isQuestionGenPage = computed(() => route.path === '/questiongen')
 
 // 移动端菜单状态
 const mobileMenuOpen = ref(false)
@@ -37,6 +39,11 @@ const handleLogout = () => {
   
   <!-- 博客独立页面模式 -->
   <div v-else-if="isBlogPage" class="min-h-screen">
+    <RouterView />
+  </div>
+  
+  <!-- QuestionGen 刷题独立页面模式 -->
+  <div v-else-if="isQuestionGenPage" class="min-h-screen">
     <RouterView />
   </div>
   
