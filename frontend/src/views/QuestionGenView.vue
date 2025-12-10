@@ -11,7 +11,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
               </svg>
             </router-link>
-            <h1 class="text-base sm:text-xl font-bold text-gray-900">📚 刷题</h1>
+            <h1 class="text-sm sm:text-xl font-bold text-gray-900">📚 Software Tools 刷题</h1>
           </div>
           <div class="flex items-center gap-1.5 sm:gap-3">
             <span class="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded-full">
