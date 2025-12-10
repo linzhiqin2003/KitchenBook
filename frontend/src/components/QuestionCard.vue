@@ -33,7 +33,12 @@
            >
              {{ ['A', 'B', 'C', 'D'][index] }}
            </span>
-           <span class="text-base font-medium pt-0.5">{{ option }}</span>
+           <!-- Use v-html for rendered option with code detection -->
+           <span 
+             class="text-base font-medium pt-0.5 flex-1"
+             :class="{ 'font-mono text-sm bg-gray-50 px-2 py-1 rounded': isCodeOption(option) }"
+             v-html="renderOption(option)"
+           ></span>
         </div>
       </button>
     </div>
@@ -78,7 +83,10 @@
         </div>
         
         <div class="prose prose-sm max-w-none text-gray-600">
-           <p class="mb-2"><strong class="text-gray-900">正确答案:</strong> {{ question.answer }}</p>
+           <p class="mb-2">
+             <strong class="text-gray-900">正确答案:</strong> 
+             <span v-html="renderOption(question.answer)"></span>
+           </p>
            <div v-html="renderedExplanation"></div>
         </div>
       </div>
@@ -124,6 +132,42 @@ const renderedQuestion = computed(() => {
 const renderedExplanation = computed(() => {
   return marked(props.question.explanation || '');
 });
+
+// Detect if option contains code (XML, HTML, shell commands, etc.)
+function isCodeOption(option) {
+  if (!option) return false;
+  // Check for XML/HTML tags, shell commands, file paths, etc.
+  return /<[^>]+>/.test(option) || 
+         /^\s*(git|npm|pip|curl|wget|ssh|cd|ls|cat|echo|sudo)\s/.test(option) ||
+         /^[A-D]\.\s*`/.test(option) ||
+         /\$\(/.test(option);
+}
+
+// Escape HTML and optionally wrap in code formatting
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Render option with proper escaping
+function renderOption(option) {
+  if (!option) return '';
+  
+  // Remove the "A. ", "B. ", etc. prefix for display if present in the raw text
+  let displayText = option;
+  
+  // Escape HTML entities
+  displayText = escapeHtml(displayText);
+  
+  // If it looks like code, wrap in code tag
+  if (isCodeOption(option)) {
+    // Replace the escaped text with code-formatted version
+    return `<code class="text-sm bg-gray-100 px-1 rounded">${displayText}</code>`;
+  }
+  
+  return displayText;
+}
 
 function selectOption(option) {
   if (!submitted.value) {
@@ -188,3 +232,4 @@ defineExpose({
   opacity: 0;
 }
 </style>
+

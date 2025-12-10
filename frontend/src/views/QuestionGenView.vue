@@ -145,20 +145,23 @@ import { ref, computed, onMounted, watch } from 'vue';
 import QuestionCard from '../components/QuestionCard.vue';
 import { questionApi } from '../api/questiongen';
 
-// LocalStorage key for history persistence
+// LocalStorage keys
 const HISTORY_STORAGE_KEY = 'questiongen_history';
+const SEEN_IDS_STORAGE_KEY = 'questiongen_seen_ids';
 
 // State
 const currentQuestion = ref(null);
 const prefetchedQuestion = ref(null);
 const historyQuestions = ref([]);
+const seenQuestionIds = ref([]); // Track all seen question IDs (for server-side filtering)
 const loading = ref(true);
 const prefetching = ref(false);
-const loadingMessage = ref('正在生成第一道题目...');
+const loadingMessage = ref('正在加载题目...');
 const showHistory = ref(false);
 const historyDetailItem = ref(null);
 const cardRef = ref(null);
 const error = ref(null);
+const questionSource = ref(''); // 'cached' or 'generated'
 
 const correctCount = computed(() => historyQuestions.value.filter(h => h.correct).length);
 
@@ -169,6 +172,11 @@ function loadHistoryFromStorage() {
     if (stored) {
       historyQuestions.value = JSON.parse(stored);
     }
+    // Also load seen IDs
+    const seenStored = localStorage.getItem(SEEN_IDS_STORAGE_KEY);
+    if (seenStored) {
+      seenQuestionIds.value = JSON.parse(seenStored);
+    }
   } catch (e) {
     console.error('Failed to load history from localStorage:', e);
   }
@@ -177,9 +185,12 @@ function loadHistoryFromStorage() {
 // Save history to localStorage
 function saveHistoryToStorage() {
   try {
-    // Keep only last 50 questions to avoid storage limits
-    const toSave = historyQuestions.value.slice(-50);
+    // Keep only last 100 questions to avoid storage limits
+    const toSave = historyQuestions.value.slice(-100);
     localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(toSave));
+    // Also save seen IDs (keep last 500)
+    const seenToSave = seenQuestionIds.value.slice(-500);
+    localStorage.setItem(SEEN_IDS_STORAGE_KEY, JSON.stringify(seenToSave));
   } catch (e) {
     console.error('Failed to save history to localStorage:', e);
   }
@@ -194,19 +205,31 @@ watch(historyQuestions, () => {
 function clearHistory() {
   if (confirm('确定要清空所有答题历史吗？')) {
     historyQuestions.value = [];
+    seenQuestionIds.value = [];
     localStorage.removeItem(HISTORY_STORAGE_KEY);
+    localStorage.removeItem(SEEN_IDS_STORAGE_KEY);
   }
 }
 
-// Generate a single new question
-async function generateSingleQuestion() {
+// Get next question using smart endpoint (prioritizes cached)
+async function getSmartNextQuestion() {
   try {
     error.value = null;
-    const response = await questionApi.generateQuestion();
-    return response.data;
+    const response = await questionApi.smartNext(seenQuestionIds.value, true);
+    const question = response.data;
+    
+    // Track the source (cached vs generated)
+    questionSource.value = question.source || 'unknown';
+    
+    // Add to seen IDs
+    if (question.id && !seenQuestionIds.value.includes(question.id)) {
+      seenQuestionIds.value.push(question.id);
+    }
+    
+    return question;
   } catch (err) {
-    console.error('Failed to generate question:', err);
-    error.value = err.response?.data?.error || err.message || '生成题目失败，请检查网络连接';
+    console.error('Failed to get question:', err);
+    error.value = err.response?.data?.error || err.message || '获取题目失败，请检查网络连接';
     return null;
   }
 }
@@ -214,9 +237,9 @@ async function generateSingleQuestion() {
 // Retry after error
 async function retryGenerate() {
   loading.value = true;
-  loadingMessage.value = '正在重新生成题目...';
+  loadingMessage.value = '正在重新加载题目...';
   error.value = null;
-  currentQuestion.value = await generateSingleQuestion();
+  currentQuestion.value = await getSmartNextQuestion();
   loading.value = false;
   if (currentQuestion.value) {
     prefetchNextQuestion();
@@ -229,7 +252,24 @@ async function prefetchNextQuestion() {
   
   prefetching.value = true;
   try {
-    prefetchedQuestion.value = await generateSingleQuestion();
+    // Include the current question ID in seen list for prefetch
+    const allSeenIds = [...seenQuestionIds.value];
+    if (currentQuestion.value?.id && !allSeenIds.includes(currentQuestion.value.id)) {
+      allSeenIds.push(currentQuestion.value.id);
+    }
+    
+    const response = await questionApi.smartNext(allSeenIds, true);
+    const question = response.data;
+    
+    // Add to seen IDs
+    if (question.id && !seenQuestionIds.value.includes(question.id)) {
+      seenQuestionIds.value.push(question.id);
+    }
+    
+    prefetchedQuestion.value = question;
+  } catch (err) {
+    console.error('Failed to prefetch question:', err);
+    // Don't set error - prefetch failure shouldn't block user
   } finally {
     prefetching.value = false;
   }
@@ -265,8 +305,8 @@ async function moveToNextQuestion() {
     // Start prefetching the next one
     prefetchNextQuestion();
   } else {
-    // Generate new question (shouldn't happen often if prefetch works)
-    currentQuestion.value = await generateSingleQuestion();
+    // Get new question (shouldn't happen often if prefetch works)
+    currentQuestion.value = await getSmartNextQuestion();
     loading.value = false;
     if (currentQuestion.value) {
       prefetchNextQuestion();
@@ -290,10 +330,10 @@ onMounted(async () => {
   loadHistoryFromStorage();
   
   loading.value = true;
-  loadingMessage.value = '正在生成第一道题目...';
+  loadingMessage.value = '正在加载题目...';
   
-  // Generate first question
-  currentQuestion.value = await generateSingleQuestion();
+  // Get first question (smart endpoint will return cached if available)
+  currentQuestion.value = await getSmartNextQuestion();
   loading.value = false;
   
   // Start prefetching second question
