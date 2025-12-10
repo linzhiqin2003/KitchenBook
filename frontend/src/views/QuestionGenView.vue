@@ -32,8 +32,37 @@
             </button>
           </div>
         </div>
+        
+        <!-- Topic Selector -->
+        <div class="mt-3 flex items-center gap-2 flex-wrap">
+          <span class="text-sm text-gray-500">主题:</span>
+          <button
+            @click="selectTopic('all')"
+            :class="selectedTopic === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+            class="px-3 py-1.5 text-sm font-medium rounded-full transition-colors cursor-pointer"
+          >
+            🎲 全部随机
+          </button>
+          <button
+            v-for="topic in availableTopics"
+            :key="topic"
+            @click="selectTopic(topic)"
+            :class="selectedTopic === topic ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+            class="px-3 py-1.5 text-sm font-medium rounded-full transition-colors cursor-pointer"
+          >
+            {{ formatTopicName(topic) }}
+          </button>
+          <button
+            v-if="!topicsLoaded"
+            class="px-3 py-1.5 text-sm text-gray-400 bg-gray-50 rounded-full"
+            disabled
+          >
+            加载中...
+          </button>
+        </div>
       </div>
     </header>
+
 
     <!-- Main Content -->
     <main class="max-w-2xl mx-auto px-4 pt-6 pb-12">
@@ -148,6 +177,7 @@ import { questionApi } from '../api/questiongen';
 // LocalStorage keys
 const HISTORY_STORAGE_KEY = 'questiongen_history';
 const SEEN_IDS_STORAGE_KEY = 'questiongen_seen_ids';
+const SELECTED_TOPIC_KEY = 'questiongen_selected_topic';
 
 // State
 const currentQuestion = ref(null);
@@ -163,7 +193,60 @@ const cardRef = ref(null);
 const error = ref(null);
 const questionSource = ref(''); // 'cached' or 'generated'
 
+// Topic selection state
+const selectedTopic = ref('all');
+const availableTopics = ref([]);
+const topicsLoaded = ref(false);
+
 const correctCount = computed(() => historyQuestions.value.filter(h => h.correct).length);
+
+// Format topic name for display
+function formatTopicName(topic) {
+  if (!topic) return topic;
+  // Extract meaningful part from topic names like "01-sysadmin" -> "Sysadmin"
+  const parts = topic.split('-');
+  if (parts.length > 1) {
+    return parts.slice(1).join('-').replace(/^\w/, c => c.toUpperCase());
+  }
+  return topic.replace(/^\w/, c => c.toUpperCase());
+}
+
+// Load topics from server
+async function loadTopics() {
+  try {
+    const response = await questionApi.getTopics();
+    const data = response.data;
+    // Use courseware topics as they are more organized
+    availableTopics.value = data.courseware_topics || data.topics || [];
+    topicsLoaded.value = true;
+  } catch (err) {
+    console.error('Failed to load topics:', err);
+    topicsLoaded.value = true;
+  }
+}
+
+// Select topic and reload question
+async function selectTopic(topic) {
+  if (topic === selectedTopic.value) return;
+  
+  selectedTopic.value = topic;
+  localStorage.setItem(SELECTED_TOPIC_KEY, topic);
+  
+  // Clear prefetched question as it may be for a different topic
+  prefetchedQuestion.value = null;
+  
+  // Load new question for this topic
+  loading.value = true;
+  loadingMessage.value = `正在加载 ${topic === 'all' ? '随机' : formatTopicName(topic)} 题目...`;
+  error.value = null;
+  
+  currentQuestion.value = await getSmartNextQuestion();
+  loading.value = false;
+  
+  if (currentQuestion.value) {
+    prefetchNextQuestion();
+  }
+}
 
 // Load history from localStorage on mount
 function loadHistoryFromStorage() {
@@ -176,6 +259,11 @@ function loadHistoryFromStorage() {
     const seenStored = localStorage.getItem(SEEN_IDS_STORAGE_KEY);
     if (seenStored) {
       seenQuestionIds.value = JSON.parse(seenStored);
+    }
+    // Load selected topic
+    const topicStored = localStorage.getItem(SELECTED_TOPIC_KEY);
+    if (topicStored) {
+      selectedTopic.value = topicStored;
     }
   } catch (e) {
     console.error('Failed to load history from localStorage:', e);
@@ -215,7 +303,9 @@ function clearHistory() {
 async function getSmartNextQuestion() {
   try {
     error.value = null;
-    const response = await questionApi.smartNext(seenQuestionIds.value, true);
+    // Pass topic to API (null or 'all' means random)
+    const topicParam = selectedTopic.value === 'all' ? null : selectedTopic.value;
+    const response = await questionApi.smartNext(seenQuestionIds.value, true, topicParam);
     const question = response.data;
     
     // Track the source (cached vs generated)
@@ -258,7 +348,9 @@ async function prefetchNextQuestion() {
       allSeenIds.push(currentQuestion.value.id);
     }
     
-    const response = await questionApi.smartNext(allSeenIds, true);
+    // Pass topic to API
+    const topicParam = selectedTopic.value === 'all' ? null : selectedTopic.value;
+    const response = await questionApi.smartNext(allSeenIds, true, topicParam);
     const question = response.data;
     
     // Add to seen IDs
@@ -297,15 +389,21 @@ async function moveToNextQuestion() {
   loadingMessage.value = '正在加载下一题...';
   error.value = null;
   
-  // Use prefetched question if available
-  if (prefetchedQuestion.value) {
+  // Use prefetched question if available AND matches current topic
+  const prefetchedTopic = prefetchedQuestion.value?.topic;
+  const currentTopicMatches = selectedTopic.value === 'all' || 
+    (prefetchedTopic && prefetchedTopic.toLowerCase().includes(selectedTopic.value.toLowerCase()));
+  
+  if (prefetchedQuestion.value && currentTopicMatches) {
     currentQuestion.value = prefetchedQuestion.value;
     prefetchedQuestion.value = null;
     loading.value = false;
     // Start prefetching the next one
     prefetchNextQuestion();
   } else {
-    // Get new question (shouldn't happen often if prefetch works)
+    // Clear mismatched prefetch
+    prefetchedQuestion.value = null;
+    // Get new question
     currentQuestion.value = await getSmartNextQuestion();
     loading.value = false;
     if (currentQuestion.value) {
@@ -328,6 +426,9 @@ function viewHistoryItem(item) {
 onMounted(async () => {
   // Load history from localStorage
   loadHistoryFromStorage();
+  
+  // Load available topics
+  loadTopics();
   
   loading.value = true;
   loadingMessage.value = '正在加载题目...';

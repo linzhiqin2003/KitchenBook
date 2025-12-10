@@ -19,23 +19,30 @@ export const questionApi = {
     },
 
     // Generate a new question (forces AI generation)
-    generateQuestion(seed = null) {
-        return api.post('/questions/generate/', { seed });
+    // topic: optional topic filter (e.g., 'git', 'sql', 'all' for random)
+    generateQuestion(seed = null, topic = null) {
+        return api.post('/questions/generate/', { seed, topic });
     },
 
     // Smart next: prioritizes cached questions, falls back to generation
-    // seen_ids: array of question IDs the user has already seen
-    // prefer_cached: if true, prefer cached over new AI generation
-    smartNext(seenIds = [], preferCached = true) {
+    // seenIds: array of question IDs the user has already seen
+    // preferCached: if true, prefer cached over new AI generation
+    // topic: optional topic filter (e.g., 'git', 'sql', 'all' for random)
+    smartNext(seenIds = [], preferCached = true, topic = null) {
         return api.post('/questions/smart-next/', {
             seen_ids: seenIds,
-            prefer_cached: preferCached
+            prefer_cached: preferCached,
+            topic: topic
         });
     },
 
     // Get random cached question (never generates new)
-    randomCached(seenIds = []) {
-        return api.post('/questions/random-cached/', { seen_ids: seenIds });
+    // topic: optional topic filter
+    randomCached(seenIds = [], topic = null) {
+        return api.post('/questions/random-cached/', {
+            seen_ids: seenIds,
+            topic: topic
+        });
     },
 
     // Get stats about cached questions
@@ -44,8 +51,9 @@ export const questionApi = {
     },
 
     // Batch generate questions
-    batchGenerate(limit = 5) {
-        return api.post('/questions/batch-generate/', { limit });
+    // topic: optional topic filter
+    batchGenerate(limit = 5, topic = null) {
+        return api.post('/questions/batch-generate/', { limit, topic });
     },
 
     // Get available topics
@@ -55,4 +63,5 @@ export const questionApi = {
 };
 
 export default api;
+
 

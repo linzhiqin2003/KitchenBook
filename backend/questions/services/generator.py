@@ -95,6 +95,96 @@ The question should be **inspired by** but **NOT a copy of** the Reference Quest
         return {"error": str(e)}
 
 
+def generate_question_for_topic(topic_name, context_data=None):
+    """
+    Generate a question for a specific topic directly from courseware.
+    No seed question required - creates original questions based on topic material.
+    
+    Args:
+        topic_name: The topic to generate for (e.g., 'git', 'sql', 'regex')
+        context_data: Optional pre-parsed courseware data
+    
+    Returns:
+        dict with question, options, answer, explanation
+    """
+    client = get_client()
+    if not client:
+        return {"error": "DEEPSEEK_API_KEY not configured"}
+    
+    if context_data is None:
+        context_data = parse_courseware()
+    
+    # Find matching topic (case-insensitive partial match)
+    matched_topic = None
+    for available_topic in context_data.keys():
+        if topic_name.lower() in available_topic.lower():
+            matched_topic = available_topic
+            break
+    
+    if not matched_topic:
+        # If no exact match, try to use the topic_name directly
+        matched_topic = topic_name
+        if matched_topic not in context_data:
+            return {"error": f"Topic '{topic_name}' not found in courseware"}
+    
+    # Get context for this topic
+    topic_content = context_data.get(matched_topic, "")
+    if len(topic_content) > 50000:
+        context_snippet = topic_content[:50000]
+    else:
+        context_snippet = topic_content
+    
+    if not context_snippet:
+        return {"error": f"No content available for topic '{topic_name}'"}
+    
+    prompt = f"""You are an expert university exam question designer for a "Software Tools" course.
+
+## Your Goal
+Create an **original, creative multiple-choice question** specifically about **{matched_topic}**.
+The question should test practical knowledge from the provided Course Material.
+
+## Key Requirements
+1. **Focus on {matched_topic}**: Your question MUST test a concept, command, or technique specifically related to {matched_topic} from the Course Material.
+2. **Be Creative & Practical**: 
+   - Pick a specific detail, flag, scenario, or edge case from the Course Material.
+   - Create a realistic scenario (e.g., "Alice is trying to...", "A developer wants to...").
+   - Test practical understanding, not just memorization.
+3. **Difficulty**: Undergraduate exam level - challenging but fair.
+4. **Four Options**: Provide exactly 4 plausible options (A, B, C, D). Include common misconceptions as distractors.
+5. **Detailed Explanation**: Explain why the correct answer is right AND why each wrong option is incorrect.
+
+## Output Format (JSON only)
+{{
+  "topic": "{matched_topic}",
+  "question": "A scenario-based question text about {matched_topic}...",
+  "options": ["A. Option", "B. Option", "C. Option", "D. Option"],
+  "answer": "A. The full correct option text",
+  "explanation": "Detailed explanation covering all options..."
+}}
+
+---
+## Course Material ({matched_topic}) - USE THIS TO CREATE YOUR QUESTION:
+{context_snippet}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-reasoner",
+            messages=[
+                {"role": "system", "content": f"You are an expert exam question designer specializing in {matched_topic}. Output ONLY valid JSON. Be creative and test practical knowledge."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.9
+        )
+        content = response.choices[0].message.content
+        result = json.loads(content)
+        result["seed_question"] = f"topic:{topic_name}"
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def batch_generate(limit=None):
     """
     Generate questions from all seed questions.
@@ -114,3 +204,4 @@ def batch_generate(limit=None):
             results.append(result)
     
     return results
+
