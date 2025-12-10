@@ -40,7 +40,10 @@ def generate_question(seed_question, context_data=None):
     topic = infer_topic(seed_question, topics)
     
     # Get a larger context for more material to draw from
-    context_snippet = context_data.get(topic, "")[:6000]
+    if len(context_data.get(topic, "")) > 20000:
+        context_snippet = context_data.get(topic, "")[:20000]
+    else:
+        context_snippet = context_data.get(topic, "")
     
     prompt = f"""You are an expert university exam question designer for a "Software Tools" course.
 
