@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from openai import OpenAI
 from dotenv import load_dotenv
-from .parser import parse_courseware, parse_simulation_questions, infer_topic
+from .parser import parse_courseware, parse_courseware_with_sources, parse_simulation_questions, infer_topic
 
 # Load .env from backend directory
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
@@ -27,23 +27,34 @@ def get_client():
 def generate_question(seed_question, context_data=None):
     """
     Generate a new question based on a seed question and courseware context.
-    Returns dict with question, options, answer, explanation.
+    Returns dict with question, options, answer, explanation, and source references.
     """
     client = get_client()
     if not client:
         return {"error": "DEEPSEEK_API_KEY not configured"}
     
+    # Use source-tracking version for better citations
     if context_data is None:
-        context_data = parse_courseware()
+        context_data = parse_courseware_with_sources()
     
     topics = list(context_data.keys())
     topic = infer_topic(seed_question, topics)
     
-    # Get a larger context for more material to draw from
-    if len(context_data.get(topic, "")) > 50000:
-        context_snippet = context_data.get(topic, "")[:50000]
+    # Get context with source information
+    topic_data = context_data.get(topic, {})
+    if isinstance(topic_data, dict):
+        topic_content = topic_data.get("content", "")
+        source_list = topic_data.get("source_list", "")
     else:
-        context_snippet = context_data.get(topic, "")
+        # Fallback for old format
+        topic_content = topic_data
+        source_list = ""
+    
+    # Truncate if too long
+    if len(topic_content) > 50000:
+        context_snippet = topic_content[:50000]
+    else:
+        context_snippet = topic_content
     
     prompt = f"""You are an expert university exam question designer for a "Software Tools" course.
 
@@ -59,7 +70,10 @@ The question should be **inspired by** but **NOT a copy of** the Reference Quest
    - Test practical understanding, not just memorization.
 3. **Difficulty**: Match the Reference Question's difficulty level (undergraduate exam level).
 4. **Four Options**: Provide exactly 4 plausible options (A, B, C, D). Include common misconceptions as distractors.
-5. **Detailed Explanation**: Explain why the correct answer is right AND why each wrong option is incorrect.
+5. **Detailed Explanation with Source Reference**: 
+   - Explain why the correct answer is right AND why each wrong option is incorrect.
+   - **IMPORTANT**: At the end of the explanation, add a "📚 Source" section citing which specific courseware file(s) this knowledge comes from.
+   - Look for "=== SOURCE: xxx ===" markers in the Course Material to identify file names.
 
 ## Output Format (JSON only)
 {{
@@ -67,8 +81,13 @@ The question should be **inspired by** but **NOT a copy of** the Reference Quest
   "question": "A scenario-based question text...",
   "options": ["A. Option", "B. Option", "C. Option", "D. Option"],
   "answer": "A. The full correct option text",
-  "explanation": "Detailed explanation covering all options..."
+  "explanation": "Detailed explanation covering all options...\\n\\n📚 **Source**: [filename.md] - [specific section or concept referenced]",
+  "source_files": ["list of source files used, e.g., 'slides.md', 'lab/README.md'"]
 }}
+
+---
+## Available Source Files for {topic}:
+{source_list}
 
 ---
 ## Reference Question (for difficulty/style reference ONLY, do NOT copy):
@@ -83,7 +102,7 @@ The question should be **inspired by** but **NOT a copy of** the Reference Quest
         response = client.chat.completions.create(
             model="deepseek-reasoner",
             messages=[
-                {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON. Be creative and divergent."},
+                {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON. Be creative and divergent. Always cite source files in your explanation."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
@@ -102,17 +121,18 @@ def generate_question_for_topic(topic_name, context_data=None):
     
     Args:
         topic_name: The topic to generate for (e.g., 'git', 'sql', 'regex')
-        context_data: Optional pre-parsed courseware data
+        context_data: Optional pre-parsed courseware data (with sources)
     
     Returns:
-        dict with question, options, answer, explanation
+        dict with question, options, answer, explanation, and source references
     """
     client = get_client()
     if not client:
         return {"error": "DEEPSEEK_API_KEY not configured"}
     
+    # Use source-tracking version for better citations
     if context_data is None:
-        context_data = parse_courseware()
+        context_data = parse_courseware_with_sources()
     
     # Find matching topic (case-insensitive partial match)
     matched_topic = None
@@ -127,8 +147,17 @@ def generate_question_for_topic(topic_name, context_data=None):
         if matched_topic not in context_data:
             return {"error": f"Topic '{topic_name}' not found in courseware"}
     
-    # Get context for this topic
-    topic_content = context_data.get(matched_topic, "")
+    # Get context with source information
+    topic_data = context_data.get(matched_topic, {})
+    if isinstance(topic_data, dict):
+        topic_content = topic_data.get("content", "")
+        source_list = topic_data.get("source_list", "")
+    else:
+        # Fallback for old format
+        topic_content = topic_data
+        source_list = ""
+    
+    # Truncate if too long
     if len(topic_content) > 50000:
         context_snippet = topic_content[:50000]
     else:
@@ -151,7 +180,10 @@ The question should test practical knowledge from the provided Course Material.
    - Test practical understanding, not just memorization.
 3. **Difficulty**: Undergraduate exam level - challenging but fair.
 4. **Four Options**: Provide exactly 4 plausible options (A, B, C, D). Include common misconceptions as distractors.
-5. **Detailed Explanation**: Explain why the correct answer is right AND why each wrong option is incorrect.
+5. **Detailed Explanation with Source Reference**: 
+   - Explain why the correct answer is right AND why each wrong option is incorrect.
+   - **IMPORTANT**: At the end of the explanation, add a "📚 Source" section citing which specific courseware file(s) this knowledge comes from.
+   - Look for "=== SOURCE: xxx ===" markers in the Course Material to identify file names.
 
 ## Output Format (JSON only)
 {{
@@ -159,8 +191,13 @@ The question should test practical knowledge from the provided Course Material.
   "question": "A scenario-based question text about {matched_topic}...",
   "options": ["A. Option", "B. Option", "C. Option", "D. Option"],
   "answer": "A. The full correct option text",
-  "explanation": "Detailed explanation covering all options..."
+  "explanation": "Detailed explanation covering all options...\\n\\n📚 **Source**: [filename.md] - [specific section or concept referenced]",
+  "source_files": ["list of source files used, e.g., 'slides.md', 'lab/README.md'"]
 }}
+
+---
+## Available Source Files for {matched_topic}:
+{source_list}
 
 ---
 ## Course Material ({matched_topic}) - USE THIS TO CREATE YOUR QUESTION:
@@ -171,7 +208,7 @@ The question should test practical knowledge from the provided Course Material.
         response = client.chat.completions.create(
             model="deepseek-reasoner",
             messages=[
-                {"role": "system", "content": f"You are an expert exam question designer specializing in {matched_topic}. Output ONLY valid JSON. Be creative and test practical knowledge."},
+                {"role": "system", "content": f"You are an expert exam question designer specializing in {matched_topic}. Output ONLY valid JSON. Be creative and test practical knowledge. Always cite source files in your explanation."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
@@ -183,6 +220,7 @@ The question should test practical knowledge from the provided Course Material.
         return result
     except Exception as e:
         return {"error": str(e)}
+
 
 
 def batch_generate(limit=None):

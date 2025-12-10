@@ -8,6 +8,7 @@ class Question(models.Model):
     answer = models.CharField(max_length=500)
     explanation = models.TextField()
     seed_question = models.TextField(blank=True, null=True)
+    source_files = models.JSONField(blank=True, null=True, default=list)  # List of source file paths
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -15,3 +16,4 @@ class Question(models.Model):
 
     def __str__(self):
         return f"{self.topic}: {self.question_text[:50]}..."
+

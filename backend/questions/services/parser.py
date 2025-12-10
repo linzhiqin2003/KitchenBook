@@ -26,7 +26,7 @@ def parse_simulation_questions(file_path=None):
         content = f.read()
 
     # Regex to capture Q{number}. blocks
-    question_pattern = re.compile(r'(Q\d+\..*?)(?=Q\d+\.|## 第\d+页|$)', re.DOTALL)
+    question_pattern = re.compile(r'(Q\d+\..*?)(?=Q\d+\.|\#\# 第\d+页|$)', re.DOTALL)
     matches = question_pattern.findall(content)
     
     questions = []
@@ -78,6 +78,66 @@ def parse_courseware(root_dir=None):
     return context_by_topic
 
 
+def parse_courseware_with_sources(root_dir=None):
+    """
+    Read all markdown files from courseware directory with source tracking.
+    Returns dict: {topic_name: {"content": str, "sources": [{"file": str, "content": str}]}}
+    """
+    root_dir = root_dir or COURSEWARE_DIR
+    
+    if not os.path.exists(root_dir):
+        return {}
+    
+    context_by_topic = {}
+    
+    try:
+        subdirs = [d for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))]
+    except FileNotFoundError:
+        return {}
+
+    for subdir in subdirs:
+        # Extract topic name: "01-sysadmin" -> "sysadmin"
+        topic_match = re.search(r'\d+-(.*)', subdir)
+        topic = topic_match.group(1) if topic_match else subdir
+        
+        topic_path = os.path.join(root_dir, subdir)
+        sources = []
+        combined_content = []
+        
+        md_files = glob.glob(os.path.join(topic_path, "**/*.md"), recursive=True)
+        md_files.sort()  # Ensure consistent ordering
+        
+        for md_file in md_files:
+            try:
+                with open(md_file, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+                    
+                # Get relative path for display
+                rel_path = os.path.relpath(md_file, root_dir)
+                file_name = os.path.basename(md_file)
+                
+                # Add source marker to content
+                marked_content = f"\n\n=== SOURCE: {rel_path} ===\n\n{file_content}"
+                combined_content.append(marked_content)
+                
+                sources.append({
+                    "file": rel_path,
+                    "filename": file_name,
+                    "content": file_content
+                })
+            except Exception:
+                pass
+        
+        if sources:
+            context_by_topic[topic] = {
+                "content": "\n".join(combined_content),
+                "sources": sources,
+                "source_list": ", ".join([s["file"] for s in sources])
+            }
+    
+    return context_by_topic
+
+
 def infer_topic(question_text, topics):
     """
     Simple keyword matching to guess the topic of a question.
@@ -108,3 +168,4 @@ def infer_topic(question_text, topics):
     
     best_topic = max(scores, key=scores.get) if scores else 'general'
     return best_topic if scores.get(best_topic, 0) > 0 else list(topics)[0] if topics else 'general'
+

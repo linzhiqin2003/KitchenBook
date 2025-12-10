@@ -53,7 +53,8 @@ class QuestionViewSet(viewsets.ModelViewSet):
             options=result.get('options', []),
             answer=result.get('answer', ''),
             explanation=result.get('explanation', ''),
-            seed_question=seed or f"topic:{topic}"
+            seed_question=seed or f"topic:{topic}",
+            source_files=result.get('source_files', [])
         )
         
         serializer = self.get_serializer(question)
@@ -164,7 +165,8 @@ class QuestionViewSet(viewsets.ModelViewSet):
             options=result.get('options', []),
             answer=result.get('answer', ''),
             explanation=result.get('explanation', ''),
-            seed_question=f"topic:{topic}" if topic else "random"
+            seed_question=f"topic:{topic}" if topic else "random",
+            source_files=result.get('source_files', [])
         )
         
         serializer = self.get_serializer(question)
@@ -218,7 +220,8 @@ class QuestionViewSet(viewsets.ModelViewSet):
                     options=result.get('options', []),
                     answer=result.get('answer', ''),
                     explanation=result.get('explanation', ''),
-                    seed_question=result.get('seed_question', f'topic:{topic}' if topic else '')
+                    seed_question=result.get('seed_question', f'topic:{topic}' if topic else ''),
+                    source_files=result.get('source_files', [])
                 )
                 created_questions.append(question)
         
