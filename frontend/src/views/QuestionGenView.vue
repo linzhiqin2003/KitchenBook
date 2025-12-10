@@ -88,7 +88,8 @@
                   :class="selectedTopic === topic ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'"
                   class="w-full px-4 py-3 text-left text-sm font-medium border-b border-gray-100 last:border-b-0 cursor-pointer transition-colors"
                 >
-                  {{ formatTopicName(topic) }}
+                  <span>{{ formatTopicName(topic) }}</span>
+                  <span v-if="topicStats[topic]" class="ml-2 text-xs text-gray-400">({{ topicStats[topic] }}题)</span>
                 </button>
                 <div v-if="!topicsLoaded" class="px-4 py-3 text-sm text-gray-400 text-center">
                   加载中...
@@ -97,9 +98,12 @@
             </transition>
           </div>
           
-          <!-- Current Topic Badge (random mode) -->
-          <div v-else class="flex-1 text-xs sm:text-sm text-gray-500">
-            全部主题随机出题
+          <!-- Stats Badge (random mode) -->
+          <div v-else class="flex-1 flex items-center gap-2">
+            <span class="text-xs sm:text-sm text-gray-500">全部随机</span>
+            <span v-if="totalCachedQuestions > 0" class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+              题库 {{ totalCachedQuestions }} 题
+            </span>
           </div>
         </div>
       </div>
@@ -251,7 +255,23 @@ const availableTopics = ref([]);
 const topicsLoaded = ref(false);
 const showTopicDropdown = ref(false);
 
+// Stats
+const totalCachedQuestions = ref(0);
+const topicStats = ref({}); // {topic: count}
+
 const correctCount = computed(() => historyQuestions.value.filter(h => h.correct).length);
+
+// Load stats from server
+async function loadStats() {
+  try {
+    const response = await questionApi.getStats();
+    const data = response.data;
+    totalCachedQuestions.value = data.total_cached || 0;
+    topicStats.value = data.by_topic || {};
+  } catch (err) {
+    console.error('Failed to load stats:', err);
+  }
+}
 
 // Format topic name for display
 function formatTopicName(topic) {
@@ -520,8 +540,9 @@ onMounted(async () => {
   // Load history from localStorage
   loadHistoryFromStorage();
   
-  // Load available topics
+  // Load available topics and stats
   loadTopics();
+  loadStats();
   
   loading.value = true;
   loadingMessage.value = '正在加载题目...';
