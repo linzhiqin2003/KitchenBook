@@ -40,8 +40,8 @@ def generate_question(seed_question, context_data=None):
     topic = infer_topic(seed_question, topics)
     
     # Get a larger context for more material to draw from
-    if len(context_data.get(topic, "")) > 20000:
-        context_snippet = context_data.get(topic, "")[:20000]
+    if len(context_data.get(topic, "")) > 50000:
+        context_snippet = context_data.get(topic, "")[:50000]
     else:
         context_snippet = context_data.get(topic, "")
     
