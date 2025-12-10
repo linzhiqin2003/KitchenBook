@@ -1,31 +1,33 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
     <!-- Header -->
-    <header class="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
-      <div class="max-w-2xl mx-auto px-4 py-4">
+    <header class="sticky top-0 z-10 bg-white/95 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
+      <div class="max-w-2xl mx-auto px-3 sm:px-4 py-3">
+        <!-- Top Row: Title and Actions -->
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <router-link to="/" class="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="返回首页">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <router-link to="/" class="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors" title="返回首页">
               <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
               </svg>
             </router-link>
-            <h1 class="text-xl font-bold text-gray-900">📚 Software Tools 刷题</h1>
+            <h1 class="text-base sm:text-xl font-bold text-gray-900">📚 刷题</h1>
           </div>
-          <div class="flex items-center gap-3">
-            <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {{ correctCount }} / {{ historyQuestions.length }} 正确
+          <div class="flex items-center gap-1.5 sm:gap-3">
+            <span class="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded-full">
+              {{ correctCount }}/{{ historyQuestions.length }}
             </span>
             <button
               @click="showHistory = !showHistory"
-              class="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              class="p-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              title="历史记录"
             >
-              📋 历史
+              📋
             </button>
             <button
               v-if="historyQuestions.length > 0"
               @click="clearHistory"
-              class="px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+              class="p-2 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
               title="清空历史"
             >
               🗑️
@@ -33,35 +35,83 @@
           </div>
         </div>
         
-        <!-- Topic Selector -->
-        <div class="mt-3 flex items-center gap-2 flex-wrap">
-          <span class="text-sm text-gray-500">主题:</span>
-          <button
-            @click="selectTopic('all')"
-            :class="selectedTopic === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
-            class="px-3 py-1.5 text-sm font-medium rounded-full transition-colors cursor-pointer"
-          >
-            🎲 全部随机
-          </button>
-          <button
-            v-for="topic in availableTopics"
-            :key="topic"
-            @click="selectTopic(topic)"
-            :class="selectedTopic === topic ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
-            class="px-3 py-1.5 text-sm font-medium rounded-full transition-colors cursor-pointer"
-          >
-            {{ formatTopicName(topic) }}
-          </button>
-          <button
-            v-if="!topicsLoaded"
-            class="px-3 py-1.5 text-sm text-gray-400 bg-gray-50 rounded-full"
-            disabled
-          >
-            加载中...
-          </button>
+        <!-- Mode Toggle Row -->
+        <div class="mt-3 flex items-center gap-3">
+          <!-- Mode Switch -->
+          <div class="flex items-center bg-gray-100 rounded-full p-1">
+            <button
+              @click="setMode('random')"
+              :class="practiceMode === 'random' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-700'"
+              class="px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer"
+            >
+              🎲 随机
+            </button>
+            <button
+              @click="setMode('topic')"
+              :class="practiceMode === 'topic' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-700'"
+              class="px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer"
+            >
+              📚 主题
+            </button>
+          </div>
+          
+          <!-- Topic Dropdown (only show when in topic mode) -->
+          <div v-if="practiceMode === 'topic'" class="relative flex-1">
+            <button
+              @click="showTopicDropdown = !showTopicDropdown"
+              class="w-full flex items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700 font-medium cursor-pointer hover:bg-blue-100 transition-colors"
+            >
+              <span class="truncate">{{ selectedTopic === 'all' ? '选择主题' : formatTopicName(selectedTopic) }}</span>
+              <svg 
+                class="w-4 h-4 flex-shrink-0 transition-transform" 
+                :class="showTopicDropdown ? 'rotate-180' : ''"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            
+            <!-- Dropdown Menu -->
+            <transition name="dropdown">
+              <div 
+                v-if="showTopicDropdown" 
+                class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-20 max-h-64 overflow-y-auto"
+              >
+                <button
+                  v-for="topic in availableTopics"
+                  :key="topic"
+                  @click="selectTopicFromDropdown(topic)"
+                  :class="selectedTopic === topic ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'"
+                  class="w-full px-4 py-3 text-left text-sm font-medium border-b border-gray-100 last:border-b-0 cursor-pointer transition-colors"
+                >
+                  {{ formatTopicName(topic) }}
+                </button>
+                <div v-if="!topicsLoaded" class="px-4 py-3 text-sm text-gray-400 text-center">
+                  加载中...
+                </div>
+              </div>
+            </transition>
+          </div>
+          
+          <!-- Current Topic Badge (random mode) -->
+          <div v-else class="flex-1 text-xs sm:text-sm text-gray-500">
+            全部主题随机出题
+          </div>
         </div>
       </div>
     </header>
+
+    <!-- Click outside to close dropdown -->
+    <div 
+      v-if="showTopicDropdown" 
+      class="fixed inset-0 z-[5]" 
+      @click="showTopicDropdown = false"
+    ></div>
+
 
 
     <!-- Main Content -->
@@ -178,6 +228,7 @@ import { questionApi } from '../api/questiongen';
 const HISTORY_STORAGE_KEY = 'questiongen_history';
 const SEEN_IDS_STORAGE_KEY = 'questiongen_seen_ids';
 const SELECTED_TOPIC_KEY = 'questiongen_selected_topic';
+const PRACTICE_MODE_KEY = 'questiongen_practice_mode';
 
 // State
 const currentQuestion = ref(null);
@@ -193,10 +244,12 @@ const cardRef = ref(null);
 const error = ref(null);
 const questionSource = ref(''); // 'cached' or 'generated'
 
-// Topic selection state
+// Topic/Mode selection state
+const practiceMode = ref('random'); // 'random' or 'topic'
 const selectedTopic = ref('all');
 const availableTopics = ref([]);
 const topicsLoaded = ref(false);
+const showTopicDropdown = ref(false);
 
 const correctCount = computed(() => historyQuestions.value.filter(h => h.correct).length);
 
@@ -225,9 +278,44 @@ async function loadTopics() {
   }
 }
 
+// Set practice mode (random or topic)
+async function setMode(mode) {
+  if (mode === practiceMode.value) return;
+  
+  practiceMode.value = mode;
+  localStorage.setItem(PRACTICE_MODE_KEY, mode);
+  showTopicDropdown.value = false;
+  
+  if (mode === 'random') {
+    // Switch to random mode
+    selectedTopic.value = 'all';
+    localStorage.setItem(SELECTED_TOPIC_KEY, 'all');
+    
+    // Clear prefetched question and load new random question
+    prefetchedQuestion.value = null;
+    loading.value = true;
+    loadingMessage.value = '正在加载随机题目...';
+    error.value = null;
+    
+    currentQuestion.value = await getSmartNextQuestion();
+    loading.value = false;
+    
+    if (currentQuestion.value) {
+      prefetchNextQuestion();
+    }
+  }
+  // For topic mode, wait for user to select a topic
+}
+
+// Select topic from dropdown
+async function selectTopicFromDropdown(topic) {
+  showTopicDropdown.value = false;
+  await selectTopic(topic);
+}
+
 // Select topic and reload question
 async function selectTopic(topic) {
-  if (topic === selectedTopic.value) return;
+  if (topic === selectedTopic.value && practiceMode.value === 'topic') return;
   
   selectedTopic.value = topic;
   localStorage.setItem(SELECTED_TOPIC_KEY, topic);
@@ -259,6 +347,11 @@ function loadHistoryFromStorage() {
     const seenStored = localStorage.getItem(SEEN_IDS_STORAGE_KEY);
     if (seenStored) {
       seenQuestionIds.value = JSON.parse(seenStored);
+    }
+    // Load practice mode
+    const modeStored = localStorage.getItem(PRACTICE_MODE_KEY);
+    if (modeStored) {
+      practiceMode.value = modeStored;
     }
     // Load selected topic
     const topicStored = localStorage.getItem(SELECTED_TOPIC_KEY);
@@ -461,6 +554,16 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.2s ease;
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .line-clamp-2 {
