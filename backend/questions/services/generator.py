@@ -78,7 +78,7 @@ The question should be **inspired by** but **NOT a copy of** the Reference Quest
 
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-reasoner",
             messages=[
                 {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON. Be creative and divergent."},
                 {"role": "user", "content": prompt}
