@@ -161,17 +161,30 @@ def generate_question_for_topic(topic, course_id=None, context_data=None, target
     
     # Find the best matching topic key
     matching_topic = None
+    
+    # 1. Try exact match first (case-insensitive)
     for key in context_data.keys():
-        if topic.lower() in key.lower() or key.lower() in topic.lower():
+        if topic.lower() == key.lower():
             matching_topic = key
             break
     
+    # 2. If no exact match, try if topic is a suffix of a key (e.g., "strings" matches "i-strings" but not "huffman-strings")
     if not matching_topic:
-        # Try partial match
         for key in context_data.keys():
-            if any(part in key.lower() for part in topic.lower().split('-')):
+            # Check if key ends with the topic (after a hyphen)
+            if key.lower().endswith('-' + topic.lower()) or key.lower() == topic.lower():
                 matching_topic = key
                 break
+    
+    # 3. Last resort: partial match (but prefer shorter keys)
+    if not matching_topic:
+        candidates = []
+        for key in context_data.keys():
+            if topic.lower() in key.lower() or key.lower() in topic.lower():
+                candidates.append(key)
+        if candidates:
+            # Prefer the shortest matching key (more specific)
+            matching_topic = min(candidates, key=len)
     
     if not matching_topic and context_data:
         # Fallback to first available topic
