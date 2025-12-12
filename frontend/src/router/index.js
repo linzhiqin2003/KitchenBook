@@ -1,20 +1,25 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
-import RecipeBookView from '../views/RecipeBookView.vue'
-import ChefDashboard from '../views/ChefDashboard.vue'
-import AdminLandingView from '../views/AdminLandingView.vue'
-import MyOrdersView from '../views/MyOrdersView.vue'
-import RecipeManagerView from '../views/RecipeManagerView.vue'
-import RecipeEditorView from '../views/RecipeEditorView.vue'
-import ChefLoginView from '../views/ChefLoginView.vue'
-import InventoryView from '../views/InventoryView.vue'
-import BlogListView from '../views/BlogListView.vue'
-import BlogPostView from '../views/BlogPostView.vue'
-import BlogEditorView from '../views/BlogEditorView.vue'
-import BlogManagerView from '../views/BlogManagerView.vue'
-import AiLabView from '../views/AiLabView.vue'
-import QuestionGenView from '../views/QuestionGenView.vue'
 import { auth } from '../store/auth'
+
+// 使用懒加载（动态导入）减小首屏加载体积
+// 首页直接加载，其他页面按需加载
+import HomeView from '../views/HomeView.vue'
+
+// 懒加载其他视图
+const RecipeBookView = () => import('../views/RecipeBookView.vue')
+const ChefDashboard = () => import('../views/ChefDashboard.vue')
+const AdminLandingView = () => import('../views/AdminLandingView.vue')
+const MyOrdersView = () => import('../views/MyOrdersView.vue')
+const RecipeManagerView = () => import('../views/RecipeManagerView.vue')
+const RecipeEditorView = () => import('../views/RecipeEditorView.vue')
+const ChefLoginView = () => import('../views/ChefLoginView.vue')
+const InventoryView = () => import('../views/InventoryView.vue')
+const BlogListView = () => import('../views/BlogListView.vue')
+const BlogPostView = () => import('../views/BlogPostView.vue')
+const BlogEditorView = () => import('../views/BlogEditorView.vue')
+const BlogManagerView = () => import('../views/BlogManagerView.vue')
+const AiLabView = () => import('../views/AiLabView.vue')
+const QuestionGenView = () => import('../views/QuestionGenView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

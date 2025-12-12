@@ -410,10 +410,28 @@ async function loadStats() {
 function formatTopicName(topic) {
   if (!topic) return topic;
   const parts = topic.split('-');
-  if (parts.length > 1) {
-    return parts.slice(1).join('-').replace(/^\w/, c => c.toUpperCase());
+  
+  // Only remove the first part if it's a number prefix (e.g., "01-sysadmin" -> "sysadmin")
+  let relevantParts = parts;
+  if (parts.length > 1 && /^\d+$/.test(parts[0])) {
+    relevantParts = parts.slice(1);
   }
-  return topic.replace(/^\w/, c => c.toUpperCase()).replace(/-/g, ' ');
+  
+  // Capitalize each word and join with spaces
+  return relevantParts
+    .map(part => {
+      // Handle Roman numerals (i, ii, iii, iv, v, etc.)
+      if (/^(i{1,3}|iv|v|vi{0,3})$/i.test(part)) {
+        return part.toUpperCase();
+      }
+      // Handle common abbreviations
+      if (['adts', 'sql', 'api', 'css', 'html', 'js', '1d', '2d', '3d'].includes(part.toLowerCase())) {
+        return part.toUpperCase();
+      }
+      // Normal capitalization
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(' ');
 }
 
 // Set difficulty filter
