@@ -35,6 +35,21 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
 
+# CSRF 信任域名配置 - 必须放在文件前面确保生效
+# 这是解决 Nginx 代理 + HTTPS 时 CSRF 验证失败的关键配置
+CSRF_TRUSTED_ORIGINS = [
+    'https://lzqqqkitchen.org',
+    'https://www.lzqqqkitchen.org',
+    'http://lzqqqkitchen.org',
+    'http://www.lzqqqkitchen.org',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
+
+# 确保正确处理代理后的 HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+
 
 # Application definition
 
@@ -175,13 +190,3 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = False  # Nginx 已处理 HTTPS 重定向
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-
-# CSRF 信任域名配置 - 解决通过 Nginx 代理访问时的 CSRF 验证问题
-CSRF_TRUSTED_ORIGINS = [
-    'https://lzqqkitchen.org',
-    'https://www.lzqqkitchen.org',
-    'http://lzqqkitchen.org',
-    'http://www.lzqqkitchen.org',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
-]
