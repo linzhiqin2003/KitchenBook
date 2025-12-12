@@ -175,3 +175,9 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = False  # Nginx 已处理 HTTPS 重定向
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+# CSRF 信任域名配置 - 解决通过 Nginx 代理访问时的 CSRF 验证问题
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'https://lzqqkitchen.org,https://www.lzqqkitchen.org,http://localhost:8000,http://127.0.0.1:8000'
+).split(',')
