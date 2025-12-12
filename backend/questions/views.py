@@ -1,13 +1,23 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.authentication import SessionAuthentication
 from django.db.models import Count
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from .models import Question
 from .serializers import QuestionSerializer
 from .services.generator import generate_question, generate_question_for_topic, batch_generate as batch_generate_service
 from .services.parser import parse_simulation_questions, parse_courseware, get_all_topics
 from .services.courses import get_all_courses, get_course, get_default_course
 import random
+
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    """Custom authentication class that doesn't enforce CSRF for API calls."""
+    def enforce_csrf(self, request):
+        return  # Skip CSRF check
+
 
 
 class QuestionViewSet(viewsets.ModelViewSet):
@@ -17,6 +27,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
     """
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer
+    authentication_classes = [CsrfExemptSessionAuthentication]  # 豁免 CSRF 检查
 
     def get_queryset(self):
         """Filter queryset by course_id if provided."""
