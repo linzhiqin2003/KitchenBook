@@ -310,17 +310,16 @@ defineExpose({
   word-break: break-all;
 }
 
-/* Code block styling for options - neutral dark theme */
+/* Code block styling for options - blend with normal text */
 .option-text :deep(.code-option-block) {
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  background-color: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 0.5rem;
+  padding: 0;
+  background: transparent;
+  border: none;
   overflow-x: auto;
   max-width: 100%;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
 }
 
 .option-text :deep(.code-option-block code) {
@@ -328,11 +327,11 @@ defineExpose({
   border: none;
   padding: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.8125rem;
-  color: #e0e0e0;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  color: inherit;
+  line-height: 1.6;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
 }
 </style>
 
