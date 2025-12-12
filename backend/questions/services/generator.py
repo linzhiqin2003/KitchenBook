@@ -93,6 +93,11 @@ The question should be **inspired by** but **NOT a copy of** the Reference Quest
   "explanation": "Detailed explanation covering all options..."
 }}
 
+**IMPORTANT: Code Formatting**
+If any option contains code (e.g., function definitions, shell commands, SQL queries), you MUST preserve code formatting with proper newlines (`\n`) and indentation. For example:
+- WRONG: `"A. char* foo() {{ int x = 1; return x; }}"`
+- CORRECT: `"A. char* foo() {{\n    int x = 1;\n    return x;\n}}"`
+
 ---
 ## Reference Question (for difficulty/style reference ONLY, do NOT copy):
 {seed_question}
@@ -206,6 +211,11 @@ Create an **original, creative multiple-choice question** that tests a knowledge
   "answer": "A. The full correct option text",
   "explanation": "Detailed explanation covering all options..."
 }}
+
+**IMPORTANT: Code Formatting**
+If any option contains code (e.g., function definitions, shell commands, SQL queries), you MUST preserve code formatting with proper newlines (`\n`) and indentation. For example:
+- WRONG: `"A. char* foo() {{ int x = 1; return x; }}"`
+- CORRECT: `"A. char* foo() {{\n    int x = 1;\n    return x;\n}}"`
 
 ---
 ## Course Material ({matching_topic}) - USE THIS TO CREATE YOUR QUESTION:
