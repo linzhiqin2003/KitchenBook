@@ -11,6 +11,54 @@ from .services.generator import generate_question, generate_question_for_topic, 
 from .services.parser import parse_simulation_questions, parse_courseware, get_all_topics
 from .services.courses import get_all_courses, get_course, get_default_course
 import random
+import re
+
+
+def normalize_text(text):
+    """Normalize text for comparison: lowercase, remove extra spaces, punctuation."""
+    if not text:
+        return ""
+    # Remove code blocks and special formatting
+    text = re.sub(r'```[\s\S]*?```', '', text)
+    text = re.sub(r'`[^`]+`', '', text)
+    # Remove punctuation and extra spaces
+    text = re.sub(r'[^\w\s]', ' ', text.lower())
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def is_duplicate_question(question_text, course_id, threshold=0.85):
+    """
+    Check if a similar question already exists in the database.
+    Uses simple word overlap ratio for similarity.
+    Returns the existing question if duplicate, None otherwise.
+    """
+    normalized_new = normalize_text(question_text)
+    new_words = set(normalized_new.split())
+    
+    if not new_words:
+        return None
+    
+    # Only check questions from the same course
+    existing_questions = Question.objects.filter(course_id=course_id)
+    
+    for q in existing_questions:
+        normalized_existing = normalize_text(q.question_text)
+        existing_words = set(normalized_existing.split())
+        
+        if not existing_words:
+            continue
+        
+        # Calculate Jaccard similarity
+        intersection = len(new_words & existing_words)
+        union = len(new_words | existing_words)
+        
+        if union > 0:
+            similarity = intersection / union
+            if similarity >= threshold:
+                return q  # Found duplicate
+    
+    return None
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -165,6 +213,17 @@ class QuestionViewSet(viewsets.ModelViewSet):
             if "error" in result:
                 return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
+            # Check for duplicate before saving
+            new_question_text = result.get('question', '')
+            existing = is_duplicate_question(new_question_text, course_id)
+            if existing:
+                # Return existing question instead of creating duplicate
+                serializer = self.get_serializer(existing)
+                data = serializer.data
+                data['source'] = 'cached'
+                data['deduplicated'] = True
+                return Response(data)
+            
             # Save to database
             # Use the user-selected topic if provided, otherwise use AI's inferred topic
             saved_topic = topic if topic else result.get('topic', 'general')
@@ -172,7 +231,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
                 course_id=course_id,
                 topic=saved_topic,
                 difficulty=result.get('difficulty', 'medium'),
-                question_text=result.get('question', ''),
+                question_text=new_question_text,
                 options=result.get('options', []),
                 answer=result.get('answer', ''),
                 explanation=result.get('explanation', ''),
