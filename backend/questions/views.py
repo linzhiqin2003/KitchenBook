@@ -166,9 +166,11 @@ class QuestionViewSet(viewsets.ModelViewSet):
                 return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             # Save to database
+            # Use the user-selected topic if provided, otherwise use AI's inferred topic
+            saved_topic = topic if topic else result.get('topic', 'general')
             question = Question.objects.create(
                 course_id=course_id,
-                topic=result.get('topic', 'general'),
+                topic=saved_topic,
                 difficulty=result.get('difficulty', 'medium'),
                 question_text=result.get('question', ''),
                 options=result.get('options', []),
