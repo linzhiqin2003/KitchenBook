@@ -177,7 +177,11 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
 
 # CSRF 信任域名配置 - 解决通过 Nginx 代理访问时的 CSRF 验证问题
-CSRF_TRUSTED_ORIGINS = os.environ.get(
-    'CSRF_TRUSTED_ORIGINS',
-    'https://lzqqkitchen.org,https://www.lzqqkitchen.org,http://localhost:8000,http://127.0.0.1:8000'
-).split(',')
+CSRF_TRUSTED_ORIGINS = [
+    'https://lzqqkitchen.org',
+    'https://www.lzqqkitchen.org',
+    'http://lzqqkitchen.org',
+    'http://www.lzqqkitchen.org',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
