@@ -42,3 +42,6 @@ backend/media/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Docs (local notes)
+docs/

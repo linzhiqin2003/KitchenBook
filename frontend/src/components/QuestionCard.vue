@@ -162,9 +162,15 @@ function renderOption(text, index) {
   // 2. Detect code-like content
   const isCode = /[{};=]/.test(text) && /\b(int|void|return|if|for|while|class|def)\b/.test(text);
 
-  // 3. Render
+  // 3. Render code with proper formatting (preserving newlines)
   if (isCode && !text.trim().startsWith('`')) {
-    return `<span class="font-mono text-sm bg-gray-50 px-2 py-1 rounded block w-full break-all border border-gray-100">${text}</span>`;
+    // Escape HTML special characters to prevent XSS and display correctly
+    const escapedText = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    
+    return `<pre class="code-option-block"><code>${escapedText}</code></pre>`;
   }
 
   return marked.parseInline(text);
