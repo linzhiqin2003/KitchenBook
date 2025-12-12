@@ -120,9 +120,9 @@ class QuestionViewSet(viewsets.ModelViewSet):
         if seen_ids:
             queryset = queryset.exclude(id__in=seen_ids)
         
-        # Filter by topic if provided
+        # Filter by topic if provided (exact match, case-insensitive)
         if topic:
-            queryset = queryset.filter(topic__icontains=topic)
+            queryset = queryset.filter(topic__iexact=topic)
         
         # Filter by difficulty if provided
         if difficulty and difficulty in ['easy', 'medium', 'hard']:
