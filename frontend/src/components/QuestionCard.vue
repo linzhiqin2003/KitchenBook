@@ -310,12 +310,12 @@ defineExpose({
   word-break: break-all;
 }
 
-/* Code block styling for options - the key fix for overflow */
+/* Code block styling for options - neutral dark theme */
 .option-text :deep(.code-option-block) {
   margin: 0;
   padding: 0.5rem 0.75rem;
-  background-color: #FFF5F5;
-  border: 1px solid #FEE2E2;
+  background-color: #1e1e1e;
+  border: 1px solid #333;
   border-radius: 0.5rem;
   overflow-x: auto;
   max-width: 100%;
@@ -329,7 +329,7 @@ defineExpose({
   padding: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 0.8125rem;
-  color: #DC2626;
+  color: #e0e0e0;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-all;
