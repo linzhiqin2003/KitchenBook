@@ -53,7 +53,7 @@ const handleLogout = () => {
       <div class="container mx-auto flex justify-between items-center">
         <router-link to="/" class="text-lg md:text-2xl font-bold flex items-center gap-2 md:gap-3 font-display tracking-wide hover:text-amber-100 transition-colors">
           <span class="text-2xl md:text-3xl">🍳</span> 
-          <span class="hidden xs:inline">LZQ的私人厨房</span>
+          <span class="hidden xs:inline">LZQ的技术博客</span>
           <span class="xs:hidden">私人厨房</span>
         </router-link>
         
