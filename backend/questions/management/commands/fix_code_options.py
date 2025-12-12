@@ -47,7 +47,7 @@ def needs_formatting(text):
     # If it looks like code but has no newlines and is long, it needs formatting
     has_code = is_code_option(text)
     has_no_newlines = '\n' not in text
-    is_long = len(text) > 80
+    is_long = len(text) > 30
     return has_code and has_no_newlines and is_long
 
 
