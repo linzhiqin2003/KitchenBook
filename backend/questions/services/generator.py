@@ -1,12 +1,15 @@
 """
 DeepSeek API integration for question generation.
+Supports multi-course system with standardized question generation.
 """
 import os
 import json
+import random
 from pathlib import Path
 from openai import OpenAI
 from dotenv import load_dotenv
-from .parser import parse_courseware, parse_courseware_with_sources, parse_simulation_questions, infer_topic
+from .parser import parse_courseware, parse_simulation_questions, infer_topic, get_all_topics
+from .courses import get_course, get_default_course
 
 # Load .env from backend directory
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
@@ -16,7 +19,6 @@ API_KEY = os.getenv("DEEPSEEK_API_KEY")
 BASE_URL = "https://api.deepseek.com/v1"
 
 
-
 def get_client():
     """Initialize OpenAI-compatible client for DeepSeek."""
     if not API_KEY:
@@ -24,39 +26,45 @@ def get_client():
     return OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 
-def generate_question(seed_question, context_data=None):
+def generate_question(seed_question, course_id=None, context_data=None, target_difficulty=None):
     """
     Generate a new question based on a seed question and courseware context.
-    Returns dict with question, options, answer, explanation, and source references.
+    
+    Args:
+        seed_question: A sample question to use as reference for style/difficulty
+        course_id: Course identifier (uses default if None)
+        context_data: Pre-loaded courseware context (loaded if None)
+        target_difficulty: Specific difficulty to generate ('easy', 'medium', 'hard') or None for auto
+    
+    Returns:
+        dict with question, options, answer, explanation, or error
     """
     client = get_client()
     if not client:
         return {"error": "DEEPSEEK_API_KEY not configured"}
     
-    # Use source-tracking version for better citations
+    if course_id is None:
+        course_id = get_default_course()
+    
     if context_data is None:
-        context_data = parse_courseware_with_sources()
+        context_data = parse_courseware(course_id)
+    
+    # Get course info for customized prompts
+    course_config = get_course(course_id)
+    course_name = course_config.get("name", "Course") if course_config else "Course"
     
     topics = list(context_data.keys())
-    topic = infer_topic(seed_question, topics)
+    topic = infer_topic(seed_question, topics, course_id)
     
-    # Get context with source information
-    topic_data = context_data.get(topic, {})
-    if isinstance(topic_data, dict):
-        topic_content = topic_data.get("content", "")
-        source_list = topic_data.get("source_list", "")
+    # Get a larger context for more material to draw from (randomly sampled if too large)
+    full_text = context_data.get(topic, "")
+    if len(full_text) > 50000:
+        start_idx = random.randint(0, len(full_text) - 50000)
+        context_snippet = full_text[start_idx : start_idx + 50000]
     else:
-        # Fallback for old format
-        topic_content = topic_data
-        source_list = ""
+        context_snippet = full_text
     
-    # Truncate if too long
-    if len(topic_content) > 50000:
-        context_snippet = topic_content[:50000]
-    else:
-        context_snippet = topic_content
-    
-    prompt = f"""You are an expert university exam question designer for a "Software Tools" course.
+    prompt = f"""You are an expert university exam question designer for a "{course_name}" course.
 
 ## Your Goal
 Create an **original, creative multiple-choice question** that tests a knowledge point from the provided Course Material. 
@@ -68,26 +76,22 @@ The question should be **inspired by** but **NOT a copy of** the Reference Quest
    - Pick a DIFFERENT specific detail, flag, scenario, or edge case from the Course Material.
    - Create a realistic scenario (e.g., "Alice is trying to...", "A developer wants to...").
    - Test practical understanding, not just memorization.
-3. **Difficulty**: Match the Reference Question's difficulty level (undergraduate exam level).
+3. **Difficulty**: {f'Generate a **{target_difficulty.upper()}** difficulty question.' if target_difficulty else 'Rate your question as "easy", "medium", or "hard":'}
+   - **easy**: Basic concept recall, straightforward application
+   - **medium**: Requires understanding multiple concepts or common edge cases
+   - **hard**: Complex scenarios, subtle distinctions, or advanced topics
 4. **Four Options**: Provide exactly 4 plausible options (A, B, C, D). Include common misconceptions as distractors.
-5. **Detailed Explanation with Source Reference**: 
-   - Explain why the correct answer is right AND why each wrong option is incorrect.
-   - **IMPORTANT**: At the end of the explanation, add a "📚 Source" section citing which specific courseware file(s) this knowledge comes from.
-   - Look for "=== SOURCE: xxx ===" markers in the Course Material to identify file names.
+5. **Detailed Explanation**: Explain why the correct answer is right AND why each wrong option is incorrect.
 
 ## Output Format (JSON only)
 {{
   "topic": "{topic}",
+  "difficulty": "easy" or "medium" or "hard",
   "question": "A scenario-based question text...",
   "options": ["A. Option", "B. Option", "C. Option", "D. Option"],
   "answer": "A. The full correct option text",
-  "explanation": "Detailed explanation covering all options...\\n\\n📚 **Source**: [filename.md] - [specific section or concept referenced]",
-  "source_files": ["list of source files used, e.g., 'slides.md', 'lab/README.md'"]
+  "explanation": "Detailed explanation covering all options..."
 }}
-
----
-## Available Source Files for {topic}:
-{source_list}
 
 ---
 ## Reference Question (for difficulty/style reference ONLY, do NOT copy):
@@ -100,146 +104,163 @@ The question should be **inspired by** but **NOT a copy of** the Reference Quest
 
     try:
         response = client.chat.completions.create(
-            model="deepseek-reasoner",
+            model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON. Be creative and divergent. Always cite source files in your explanation."},
+                {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON. Be creative and divergent."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
             temperature=0.9  # Higher temperature for more creativity
         )
         content = response.choices[0].message.content
-        return json.loads(content)
-    except Exception as e:
-        return {"error": str(e)}
-
-
-def generate_question_for_topic(topic_name, context_data=None):
-    """
-    Generate a question for a specific topic directly from courseware.
-    No seed question required - creates original questions based on topic material.
-    
-    Args:
-        topic_name: The topic to generate for (e.g., 'git', 'sql', 'regex')
-        context_data: Optional pre-parsed courseware data (with sources)
-    
-    Returns:
-        dict with question, options, answer, explanation, and source references
-    """
-    client = get_client()
-    if not client:
-        return {"error": "DEEPSEEK_API_KEY not configured"}
-    
-    # Use source-tracking version for better citations
-    if context_data is None:
-        context_data = parse_courseware_with_sources()
-    
-    # Find matching topic (case-insensitive partial match)
-    matched_topic = None
-    for available_topic in context_data.keys():
-        if topic_name.lower() in available_topic.lower():
-            matched_topic = available_topic
-            break
-    
-    if not matched_topic:
-        # If no exact match, try to use the topic_name directly
-        matched_topic = topic_name
-        if matched_topic not in context_data:
-            return {"error": f"Topic '{topic_name}' not found in courseware"}
-    
-    # Get context with source information
-    topic_data = context_data.get(matched_topic, {})
-    if isinstance(topic_data, dict):
-        topic_content = topic_data.get("content", "")
-        source_list = topic_data.get("source_list", "")
-    else:
-        # Fallback for old format
-        topic_content = topic_data
-        source_list = ""
-    
-    # Truncate if too long
-    if len(topic_content) > 50000:
-        context_snippet = topic_content[:50000]
-    else:
-        context_snippet = topic_content
-    
-    if not context_snippet:
-        return {"error": f"No content available for topic '{topic_name}'"}
-    
-    prompt = f"""You are an expert university exam question designer for a "Software Tools" course.
-
-## Your Goal
-Create an **original, creative multiple-choice question** specifically about **{matched_topic}**.
-The question should test practical knowledge from the provided Course Material.
-
-## Key Requirements
-1. **Focus on {matched_topic}**: Your question MUST test a concept, command, or technique specifically related to {matched_topic} from the Course Material.
-2. **Be Creative & Practical**: 
-   - Pick a specific detail, flag, scenario, or edge case from the Course Material.
-   - Create a realistic scenario (e.g., "Alice is trying to...", "A developer wants to...").
-   - Test practical understanding, not just memorization.
-3. **Difficulty**: Undergraduate exam level - challenging but fair.
-4. **Four Options**: Provide exactly 4 plausible options (A, B, C, D). Include common misconceptions as distractors.
-5. **Detailed Explanation with Source Reference**: 
-   - Explain why the correct answer is right AND why each wrong option is incorrect.
-   - **IMPORTANT**: At the end of the explanation, add a "📚 Source" section citing which specific courseware file(s) this knowledge comes from.
-   - Look for "=== SOURCE: xxx ===" markers in the Course Material to identify file names.
-
-## Output Format (JSON only)
-{{
-  "topic": "{matched_topic}",
-  "question": "A scenario-based question text about {matched_topic}...",
-  "options": ["A. Option", "B. Option", "C. Option", "D. Option"],
-  "answer": "A. The full correct option text",
-  "explanation": "Detailed explanation covering all options...\\n\\n📚 **Source**: [filename.md] - [specific section or concept referenced]",
-  "source_files": ["list of source files used, e.g., 'slides.md', 'lab/README.md'"]
-}}
-
----
-## Available Source Files for {matched_topic}:
-{source_list}
-
----
-## Course Material ({matched_topic}) - USE THIS TO CREATE YOUR QUESTION:
-{context_snippet}
-"""
-
-    try:
-        response = client.chat.completions.create(
-            model="deepseek-reasoner",
-            messages=[
-                {"role": "system", "content": f"You are an expert exam question designer specializing in {matched_topic}. Output ONLY valid JSON. Be creative and test practical knowledge. Always cite source files in your explanation."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.9
-        )
-        content = response.choices[0].message.content
         result = json.loads(content)
-        result["seed_question"] = f"topic:{topic_name}"
+        result["course_id"] = course_id
+        # Use target difficulty if specified, otherwise validate AI's choice
+        if target_difficulty and target_difficulty in ["easy", "medium", "hard"]:
+            result["difficulty"] = target_difficulty
+        elif result.get("difficulty") not in ["easy", "medium", "hard"]:
+            result["difficulty"] = "medium"  # Default to medium if invalid
         return result
     except Exception as e:
         return {"error": str(e)}
 
 
 
-def batch_generate(limit=None):
+def generate_question_for_topic(topic, course_id=None, context_data=None, target_difficulty=None):
     """
-    Generate questions from all seed questions.
-    Returns list of generated question dicts.
+    Generate a new question for a specific topic.
+    Used when user selects topic-based practice mode.
+    
+    Args:
+        topic: Topic name to generate question for
+        course_id: Course identifier (uses default if None)
+        context_data: Pre-loaded courseware context (loaded if None)
+        target_difficulty: Specific difficulty ('easy', 'medium', 'hard') or None for auto
+    
+    Returns:
+        dict with question, options, answer, explanation, or error
     """
-    seeds = parse_simulation_questions()
-    context = parse_courseware()
+    client = get_client()
+    if not client:
+        return {"error": "DEEPSEEK_API_KEY not configured"}
+    
+    if course_id is None:
+        course_id = get_default_course()
+    
+    if context_data is None:
+        context_data = parse_courseware(course_id)
+    
+    # Get course info for customized prompts
+    course_config = get_course(course_id)
+    course_name = course_config.get("name", "Course") if course_config else "Course"
+    
+    # Find the best matching topic key
+    matching_topic = None
+    for key in context_data.keys():
+        if topic.lower() in key.lower() or key.lower() in topic.lower():
+            matching_topic = key
+            break
+    
+    if not matching_topic:
+        # Try partial match
+        for key in context_data.keys():
+            if any(part in key.lower() for part in topic.lower().split('-')):
+                matching_topic = key
+                break
+    
+    if not matching_topic and context_data:
+        # Fallback to first available topic
+        matching_topic = list(context_data.keys())[0]
+    
+    full_text = context_data.get(matching_topic, "")
+    if len(full_text) > 50000:
+        start_idx = random.randint(0, len(full_text) - 50000)
+        context_snippet = full_text[start_idx : start_idx + 50000]
+    else:
+        context_snippet = full_text
+    
+    prompt = f"""You are an expert university exam question designer for a "{course_name}" course.
+
+## Your Goal
+Create an **original, creative multiple-choice question** that tests a knowledge point from the provided Course Material for the topic "{matching_topic}".
+
+## Key Requirements
+1. **Focus on the Course Material**: Your question MUST test a concept, command, or technique that appears in the Course Material below.
+2. **Be Creative & Divergent**: 
+   - Pick a specific detail, flag, scenario, or edge case from the Course Material.
+   - Create a realistic scenario (e.g., "Alice is trying to...", "A developer wants to...").
+   - Test practical understanding, not just memorization.
+3. **Difficulty**: {f"Generate a **{target_difficulty.upper()}** difficulty question." if target_difficulty else "Undergraduate exam level (medium difficulty)."}
+   - **easy**: Basic concept recall, straightforward application
+   - **medium**: Requires understanding multiple concepts or common edge cases
+   - **hard**: Complex scenarios, subtle distinctions, or advanced topics
+4. **Four Options**: Provide exactly 4 plausible options (A, B, C, D). Include common misconceptions as distractors.
+5. **Detailed Explanation**: Explain why the correct answer is right AND why each wrong option is incorrect.
+
+## Output Format (JSON only)
+{{
+  "topic": "{matching_topic}",
+  "difficulty": "easy" or "medium" or "hard",
+  "question": "A scenario-based question text...",
+  "options": ["A. Option", "B. Option", "C. Option", "D. Option"],
+  "answer": "A. The full correct option text",
+  "explanation": "Detailed explanation covering all options..."
+}}
+
+---
+## Course Material ({matching_topic}) - USE THIS TO CREATE YOUR QUESTION:
+{context_snippet}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON. Be creative and divergent."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.9  # Higher temperature for more creativity
+        )
+        content = response.choices[0].message.content
+        result = json.loads(content)
+        result["seed_question"] = f"Topic: {matching_topic}"
+        result["course_id"] = course_id
+        # Use target difficulty if specified
+        if target_difficulty and target_difficulty in ["easy", "medium", "hard"]:
+            result["difficulty"] = target_difficulty
+        elif result.get("difficulty") not in ["easy", "medium", "hard"]:
+            result["difficulty"] = "medium"
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def batch_generate(course_id=None, limit=None):
+    """
+    Generate questions from all seed questions for a course.
+    
+    Args:
+        course_id: Course identifier (uses default if None)
+        limit: Maximum number of questions to generate
+    
+    Returns:
+        list of generated question dicts
+    """
+    if course_id is None:
+        course_id = get_default_course()
+    
+    seeds = parse_simulation_questions(course_id)
+    context = parse_courseware(course_id)
     
     if limit:
         seeds = seeds[:limit]
     
     results = []
     for seed in seeds:
-        result = generate_question(seed, context)
+        result = generate_question(seed, course_id, context)
         if "error" not in result:
             result["seed_question"] = seed
             results.append(result)
     
     return results
-

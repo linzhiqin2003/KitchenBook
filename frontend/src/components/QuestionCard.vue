@@ -1,10 +1,22 @@
 <template>
-  <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8 transition-all" :class="{ 'opacity-50': loading }">
+  <div 
+    class="ios-card p-6 md:p-8 animate-slide-up" 
+    :class="[{ 'opacity-50': loading }, feedbackAnimation]"
+    ref="cardRef"
+  >
     <!-- Question Header -->
     <div class="flex items-center justify-between mb-6">
-      <span class="px-3 py-1 text-xs font-semibold tracking-wide uppercase rounded-full bg-blue-50 text-blue-600">
-        {{ question.topic || 'General' }}
-      </span>
+      <div class="flex items-center gap-2">
+        <span class="px-3 py-1 text-xs font-semibold tracking-wide uppercase rounded-full bg-blue-50 text-blue-600">
+          {{ question.topic || 'General' }}
+        </span>
+        <span 
+          class="px-2 py-0.5 text-xs font-bold rounded-full"
+          :class="difficultyClass"
+        >
+          {{ difficultyLabel }}
+        </span>
+      </div>
       <span class="text-sm font-medium text-gray-400 font-mono">
         #{{ questionNumber }}
       </span>
@@ -12,7 +24,7 @@
 
     <!-- Question Text (Markdown Rendered) -->
     <div 
-      class="prose prose-sm md:prose-base max-w-none mb-8 text-gray-800 leading-relaxed"
+      class="prose prose-sm md:prose-base max-w-none mb-8 text-gray-800 leading-relaxed font-sans"
       v-html="renderedQuestion"
     ></div>
 
@@ -24,7 +36,7 @@
         @click="selectOption(option)"
         :disabled="submitted"
         :class="getOptionClass(option)"
-        class="w-full text-left p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer disabled:cursor-default"
+        class="option-btn group relative"
       >
         <div class="flex items-start">
            <span 
@@ -33,33 +45,26 @@
            >
              {{ ['A', 'B', 'C', 'D'][index] }}
            </span>
-           <!-- Use v-html for rendered option with code detection -->
-           <span 
-             class="text-base font-medium pt-0.5 flex-1"
-             :class="{ 'font-mono text-sm bg-gray-50 px-2 py-1 rounded': isCodeOption(option) }"
-             v-html="renderOption(option)"
-           ></span>
+           <span class="text-base font-medium pt-0.5 option-text" v-html="renderOption(option, index)"></span>
         </div>
       </button>
     </div>
 
     <!-- Submit / Next Actions -->
-    <div class="flex gap-4 pt-4 border-t border-gray-100">
+    <div class="flex gap-4 pt-4 border-t border-gray-100/50">
       <button
         v-if="!submitted"
         @click="submit"
         :disabled="!selectedOption"
-        class="flex-1 py-3.5 text-lg font-semibold rounded-xl transition-all duration-200"
-        :class="selectedOption 
-          ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer' 
-          : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+        class="btn-primary flex-1 py-3.5 text-lg"
+        :class="{ 'opacity-50 cursor-not-allowed': !selectedOption }"
       >
         提交答案
       </button>
       <button
         v-else
         @click="$emit('next')"
-        class="flex-1 py-3.5 text-lg font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+        class="btn-primary flex-1 py-3.5 text-lg"
       >
         下一题 →
       </button>
@@ -69,8 +74,8 @@
     <transition name="fade">
       <div 
         v-if="submitted" 
-        class="mt-8 p-5 rounded-2xl text-left overflow-hidden relative"
-        :class="isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'"
+        class="mt-8 p-5 rounded-2xl animate-fade-in text-left overflow-hidden relative"
+        :class="isCorrect ? 'bg-green-50/50 border border-green-100' : 'bg-red-50/50 border border-red-100'"
       >
         <div class="flex items-center gap-2 mb-3">
           <div class="p-1 rounded-full" :class="isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'">
@@ -83,19 +88,26 @@
         </div>
         
         <div class="prose prose-sm max-w-none text-gray-600">
-           <p class="mb-2">
-             <strong class="text-gray-900">正确答案:</strong> 
-             <span v-html="renderOption(question.answer)"></span>
-           </p>
-           <div v-html="renderedExplanation"></div>
+           <p class="mb-2"><strong class="text-gray-900">正确答案:</strong> {{ question.answer }}</p>
+           <div class="markdown-body" v-html="renderedExplanation"></div>
         </div>
       </div>
     </transition>
+
+    <!-- Confetti Container -->
+    <div v-if="showConfetti" class="confetti-container">
+      <div 
+        v-for="i in 30" 
+        :key="i" 
+        class="confetti-particle"
+        :style="getConfettiStyle(i)"
+      ></div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount } from 'vue';
 import { marked } from 'marked';
 
 const props = defineProps({
@@ -117,6 +129,9 @@ const emit = defineEmits(['next', 'answered']);
 
 const selectedOption = ref(null);
 const submitted = ref(false);
+const feedbackAnimation = ref('');
+const showConfetti = ref(false);
+const cardRef = ref(null);
 
 const isCorrect = computed(() => {
   if (!selectedOption.value || !props.question.answer) return false;
@@ -126,48 +141,54 @@ const isCorrect = computed(() => {
 });
 
 const renderedQuestion = computed(() => {
-  return marked(props.question.question_text || '');
+  return marked.parse(props.question.question_text || '');
 });
 
 const renderedExplanation = computed(() => {
-  return marked(props.question.explanation || '');
+  return marked.parse(props.question.explanation || '');
 });
 
-// Detect if option contains code (XML, HTML, shell commands, etc.)
-function isCodeOption(option) {
-  if (!option) return false;
-  // Check for XML/HTML tags, shell commands, file paths, etc.
-  return /<[^>]+>/.test(option) || 
-         /^\s*(git|npm|pip|curl|wget|ssh|cd|ls|cat|echo|sudo)\s/.test(option) ||
-         /^[A-D]\.\s*`/.test(option) ||
-         /\$\(/.test(option);
-}
-
-// Escape HTML and optionally wrap in code formatting
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// Render option with proper escaping
-function renderOption(option) {
-  if (!option) return '';
+function renderOption(text, index) {
+  if (!text) return '';
   
-  // Remove the "A. ", "B. ", etc. prefix for display if present in the raw text
-  let displayText = option;
-  
-  // Escape HTML entities
-  displayText = escapeHtml(displayText);
-  
-  // If it looks like code, wrap in code tag
-  if (isCodeOption(option)) {
-    // Replace the escaped text with code-formatted version
-    return `<code class="text-sm bg-gray-100 px-1 rounded">${displayText}</code>`;
+  // 1. Safe Strip: Only strip the prefix if it matches the expected letter for this index
+  // e.g. If index 0 (A), only strip "A. ". If content is "B. ...", keep it.
+  if (typeof index === 'number') {
+    const expectedLetter = String.fromCharCode(65 + index); // 0->A, 1->B...
+    const prefixRegex = new RegExp(`^${expectedLetter}\\.\\s*`);
+    text = text.replace(prefixRegex, '');
   }
-  
-  return displayText;
+
+  // 2. Detect code-like content
+  const isCode = /[{};=]/.test(text) && /\b(int|void|return|if|for|while|class|def)\b/.test(text);
+
+  // 3. Render
+  if (isCode && !text.trim().startsWith('`')) {
+    return `<span class="font-mono text-sm bg-gray-50 px-2 py-1 rounded block w-full break-all border border-gray-100">${text}</span>`;
+  }
+
+  return marked.parseInline(text);
 }
+
+const difficultyLabel = computed(() => {
+  const diff = props.question.difficulty || 'medium';
+  const labels = {
+    'easy': '🟢 Easy',
+    'medium': '🟡 Medium',
+    'hard': '🔴 Hard'
+  };
+  return labels[diff] || labels['medium'];
+});
+
+const difficultyClass = computed(() => {
+  const diff = props.question.difficulty || 'medium';
+  const classes = {
+    'easy': 'bg-green-100 text-green-700',
+    'medium': 'bg-yellow-100 text-yellow-700',
+    'hard': 'bg-red-100 text-red-700'
+  };
+  return classes[diff] || classes['medium'];
+});
 
 function selectOption(option) {
   if (!submitted.value) {
@@ -178,6 +199,20 @@ function selectOption(option) {
 function submit() {
   if (selectedOption.value) {
     submitted.value = true;
+    
+    // Trigger feedback animation
+    if (isCorrect.value) {
+      feedbackAnimation.value = 'animate-celebrate';
+      triggerConfetti();
+    } else {
+      feedbackAnimation.value = 'animate-shake';
+    }
+    
+    // Clear animation class after it completes
+    setTimeout(() => {
+      feedbackAnimation.value = '';
+    }, 600);
+    
     emit('answered', {
       selected: selectedOption.value,
       correct: isCorrect.value,
@@ -185,20 +220,46 @@ function submit() {
   }
 }
 
+// Confetti effect
+function triggerConfetti() {
+  showConfetti.value = true;
+  setTimeout(() => {
+    showConfetti.value = false;
+  }, 3000);
+}
+
+function getConfettiStyle(index) {
+  const colors = ['#FF3B30', '#FF9500', '#FFCC00', '#34C759', '#007AFF', '#5856D6', '#AF52DE'];
+  const left = Math.random() * 100;
+  const delay = Math.random() * 0.5;
+  const duration = 2 + Math.random() * 2;
+  const size = 6 + Math.random() * 8;
+  
+  return {
+    left: `${left}%`,
+    width: `${size}px`,
+    height: `${size}px`,
+    backgroundColor: colors[index % colors.length],
+    animationDelay: `${delay}s`,
+    animationDuration: `${duration}s`,
+    borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+  };
+}
+
 function getOptionClass(option) {
   if (!submitted.value) {
     return selectedOption.value === option 
-      ? 'border-blue-500 bg-blue-50 shadow-sm' 
-      : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300';
+      ? 'border-blue-500 bg-blue-50/50 shadow-sm' 
+      : 'border-transparent hover:bg-white/60 hover:shadow-sm';
   }
   
   const isAnswer = option === props.question.answer || 
                    props.question.answer.includes(option) ||
                    option.includes(props.question.answer);
   
-  if (isAnswer) return 'border-green-500 bg-green-50 shadow-sm';
-  if (selectedOption.value === option && !isAnswer) return 'border-red-500 bg-red-50 shadow-sm';
-  return 'border-gray-200 opacity-60';
+  if (isAnswer) return 'border-green-500 bg-green-50/50 shadow-sm';
+  if (selectedOption.value === option && !isAnswer) return 'border-red-500 bg-red-50/50 shadow-sm';
+  return 'border-transparent opacity-60';
 }
 
 function getOptionIndicatorClass(option) {
@@ -223,13 +284,16 @@ defineExpose({
 </script>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.option-text :deep(code) {
+  background-color: #F3F4F6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875rem;
+  color: #DC2626; /* red-600 to stand out like inline code often does */
+  border: 1px solid #E5E7EB;
 }
 </style>
+
+
 

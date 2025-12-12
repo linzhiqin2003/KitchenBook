@@ -8,9 +8,15 @@ const api = axios.create({
 });
 
 export const questionApi = {
-    // Get all questions
-    getQuestions() {
-        return api.get('/questions/');
+    // Get all available courses
+    getCourses() {
+        return api.get('/questions/courses/');
+    },
+
+    // Get all questions (optionally filtered by course)
+    getQuestions(courseId = null) {
+        const params = courseId ? { course_id: courseId } : {};
+        return api.get('/questions/', { params });
     },
 
     // Get a single question
@@ -18,50 +24,76 @@ export const questionApi = {
         return api.get(`/questions/${id}/`);
     },
 
-    // Generate a new question (forces AI generation)
-    // topic: optional topic filter (e.g., 'git', 'sql', 'all' for random)
-    generateQuestion(seed = null, topic = null) {
-        return api.post('/questions/generate/', { seed, topic });
+    // Generate a new question
+    generateQuestion(seed = null, courseId = null) {
+        return api.post('/questions/generate/', {
+            seed,
+            course_id: courseId
+        });
     },
 
-    // Smart next: prioritizes cached questions, falls back to generation
-    // seenIds: array of question IDs the user has already seen
-    // preferCached: if true, prefer cached over new AI generation
-    // topic: optional topic filter (e.g., 'git', 'sql', 'all' for random)
-    smartNext(seenIds = [], preferCached = true, topic = null) {
+    // Smart next - prioritizes cached questions, filters by topic/difficulty, excludes seen
+    smartNext(seenIds = [], generateIfEmpty = true, topic = null, difficulty = null, courseId = null) {
         return api.post('/questions/smart-next/', {
             seen_ids: seenIds,
-            prefer_cached: preferCached,
-            topic: topic
+            generate_if_empty: generateIfEmpty,
+            topic: topic,
+            difficulty: difficulty,
+            course_id: courseId
         });
-    },
-
-    // Get random cached question (never generates new)
-    // topic: optional topic filter
-    randomCached(seenIds = [], topic = null) {
-        return api.post('/questions/random-cached/', {
-            seen_ids: seenIds,
-            topic: topic
-        });
-    },
-
-    // Get stats about cached questions
-    getStats() {
-        return api.get('/questions/stats/');
     },
 
     // Batch generate questions
-    // topic: optional topic filter
-    batchGenerate(limit = 5, topic = null) {
-        return api.post('/questions/batch-generate/', { limit, topic });
+    batchGenerate(limit = 5, courseId = null) {
+        return api.post('/questions/batch-generate/', {
+            limit,
+            course_id: courseId
+        });
     },
 
-    // Get available topics
-    getTopics() {
-        return api.get('/questions/topics/');
+    // Get available topics for a course
+    getTopics(courseId = null) {
+        const params = courseId ? { course_id: courseId } : {};
+        return api.get('/questions/topics/', { params });
     },
+
+    // Get statistics about cached questions
+    getStats(courseId = null) {
+        const params = courseId ? { course_id: courseId } : {};
+        return api.get('/questions/stats/', { params });
+    },
+
+    // AI Chat - Q&A or Review mode (non-streaming)
+    chat(mode, messages, currentQuestion, courseId = null) {
+        return api.post('/questions/chat/', {
+            mode,
+            messages,
+            current_question: currentQuestion,
+            course_id: courseId
+        });
+    },
+
+    // AI Chat Streaming - returns the endpoint URL and data for fetch/SSE
+    getChatStreamConfig(mode, messages, currentQuestion, courseId = null) {
+        const baseURL = api.defaults.baseURL || '';
+        return {
+            url: `${baseURL}/questions/chat-stream/`,
+            data: {
+                mode,
+                messages,
+                current_question: currentQuestion,
+                course_id: courseId
+            }
+        };
+    },
+
+    // Request to delete a question (with reasoner confirmation)
+    requestDelete(questionId, conversationHistory) {
+        return api.post(`/questions/${questionId}/request-delete/`, {
+            conversation_history: conversationHistory
+        });
+    }
 };
 
 export default api;
-
 

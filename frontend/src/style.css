@@ -49,3 +49,159 @@ html {
   .xs\:block { display: block; }
   .xs\:flex { display: flex; }
 }
+
+/* ------------------------------
+   QuestionGen UI helpers
+   ------------------------------ */
+
+:root {
+  --ios-blue: #007AFF;
+  --ios-green: #34C759;
+  --ios-red: #FF3B30;
+  --ios-gray: #8E8E93;
+  --ios-bg: #F2F2F7;
+  --ios-card: rgba(255, 255, 255, 0.85);
+  --ios-blur: 25px;
+  --ios-radius: 20px;
+  --ios-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.ios-card {
+  background: var(--ios-card);
+  backdrop-filter: blur(var(--ios-blur));
+  -webkit-backdrop-filter: blur(var(--ios-blur));
+  border-radius: var(--ios-radius);
+  box-shadow: var(--ios-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.ios-card .prose code {
+  @apply font-mono text-sm bg-gray-100 px-1.5 py-0.5 rounded text-pink-500;
+}
+
+.ios-card .prose pre {
+  @apply bg-gray-900 text-gray-100 p-4 rounded-xl overflow-x-auto text-sm my-4 shadow-inner;
+}
+
+.ios-card .prose pre code {
+  @apply bg-transparent text-gray-100 p-0;
+}
+
+.ios-card .prose p {
+  @apply mb-4;
+}
+
+.ios-card .prose ul {
+  @apply list-disc list-inside mb-4 ml-2;
+}
+
+.option-btn {
+  @apply w-full text-left px-5 py-4 rounded-2xl transition-all duration-200 ease-out;
+  background: rgba(255, 255, 255, 0.6);
+  border: 2px solid transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.option-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.option-btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  @apply px-6 py-3 rounded-2xl font-semibold text-white transition-all duration-200;
+  background: linear-gradient(135deg, #007AFF 0%, #0063CC 100%);
+  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 122, 255, 0.4);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+@keyframes celebrate {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.05); }
+  50% { transform: scale(0.98); }
+  75% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.animate-slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
+.animate-shake { animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+.animate-celebrate { animation: celebrate 0.6s ease-out; }
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100%) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.confetti-particle {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  top: -10px;
+  z-index: 9999;
+  pointer-events: none;
+  animation: confetti-fall 3s ease-out forwards;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .safe-area-top { padding-top: env(safe-area-inset-top); }
+}
+
+@media (max-width: 640px) {
+  .option-btn {
+    min-height: 52px;
+    padding: 14px 16px;
+  }
+  .btn-primary {
+    min-height: 48px;
+    padding: 14px 24px;
+  }
+}

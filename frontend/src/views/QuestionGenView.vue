@@ -1,129 +1,174 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-    <!-- Header -->
-    <header class="sticky top-0 z-10 bg-white/95 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
-      <div class="max-w-2xl mx-auto px-3 sm:px-4 py-3">
-        <!-- Top Row: Title and Actions -->
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2 sm:gap-3">
-            <router-link to="/" class="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors" title="返回首页">
-              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-              </svg>
-            </router-link>
-            <h1 class="text-sm sm:text-xl font-bold text-gray-900">📚 Software Tools 刷题</h1>
-          </div>
-          <div class="flex items-center gap-1.5 sm:gap-3">
-            <span class="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded-full">
-              {{ correctCount }}/{{ historyQuestions.length }}
-            </span>
-            <button
-              @click="showHistory = !showHistory"
-              class="p-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-              title="历史记录"
-            >
-              📋
-            </button>
-            <button
-              v-if="historyQuestions.length > 0"
-              @click="clearHistory"
-              class="p-2 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-              title="清空历史"
-            >
-              🗑️
-            </button>
-          </div>
-        </div>
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 safe-area-bottom">
+    <!-- Header: Premium Unified Command Bar -->
+    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 transition-all">
+      <div class="max-w-5xl mx-auto px-2 sm:px-4 h-16 flex items-center justify-between gap-2 sm:gap-4">
         
-        <!-- Mode Toggle Row -->
-        <div class="mt-3 flex items-center gap-3">
-          <!-- Mode Switch -->
-          <div class="flex items-center bg-gray-100 rounded-full p-1">
-            <button
-              @click="setMode('random')"
-              :class="practiceMode === 'random' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'"
-              class="px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer"
-            >
-              🎲 随机
-            </button>
-            <button
-              @click="setMode('topic')"
-              :class="practiceMode === 'topic' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'"
-              class="px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer"
-            >
-              📚 主题
-            </button>
-          </div>
-          
-          <!-- Topic Dropdown (only show when in topic mode) -->
-          <div v-if="practiceMode === 'topic'" class="relative flex-1">
-            <button
-              @click="showTopicDropdown = !showTopicDropdown"
-              class="w-full flex items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700 font-medium cursor-pointer hover:bg-blue-100 transition-colors"
-            >
-              <span class="truncate">{{ selectedTopic === 'all' ? '选择主题' : formatTopicName(selectedTopic) }}</span>
-              <svg 
-                class="w-4 h-4 flex-shrink-0 transition-transform" 
-                :class="showTopicDropdown ? 'rotate-180' : ''"
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-              </svg>
-            </button>
-            
-            <!-- Dropdown Menu -->
-            <transition name="dropdown">
-              <div 
-                v-if="showTopicDropdown" 
-                class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-20 max-h-64 overflow-y-auto"
-              >
-                <button
-                  v-for="topic in availableTopics"
-                  :key="topic"
-                  @click="selectTopicFromDropdown(topic)"
-                  :class="selectedTopic === topic ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'"
-                  class="w-full px-4 py-3 text-left text-sm font-medium border-b border-gray-100 last:border-b-0 cursor-pointer transition-colors"
-                >
-                  <span>{{ formatTopicName(topic) }}</span>
-                  <span v-if="topicStats[topic]" class="ml-2 text-xs text-gray-400">({{ topicStats[topic] }}题)</span>
-                </button>
-                <div v-if="!topicsLoaded" class="px-4 py-3 text-sm text-gray-400 text-center">
-                  加载中...
-                </div>
+        <!-- Left: Course Identity -->
+        <div class="relative shrink-0">
+          <button
+            @click="showCourseDropdown = !showCourseDropdown"
+            class="group flex items-center gap-3 hover:bg-gray-50 px-2 py-1.5 -ml-2 rounded-xl transition-all"
+          >
+            <div class="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-lg shadow-sm group-hover:shadow-md transition-all">
+              <span class="text-xl">{{ currentCourseIcon }}</span>
+            </div>
+            <div class="text-left hidden sm:block">
+              <div class="text-xs font-medium text-gray-500">Current Course</div>
+              <div class="text-sm font-bold text-gray-900 flex items-center gap-1">
+                {{ currentCourseName }}
+                <svg class="w-3 h-3 text-gray-400 group-hover:text-indigo-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
               </div>
-            </transition>
-          </div>
-          
-          <!-- Stats Badge (random mode) -->
-          <div v-else class="flex-1 flex items-center gap-2">
-            <span class="text-xs sm:text-sm text-gray-500">全部随机</span>
-            <span v-if="totalCachedQuestions > 0" class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-              题库 {{ totalCachedQuestions }} 题
-            </span>
+            </div>
+          </button>
+
+          <!-- Course Dropdown -->
+          <div v-if="showCourseDropdown" class="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-xl ring-1 ring-black/5 p-2 z-50 w-72 origin-top-left flex flex-col gap-1">
+            <button
+              v-for="(course, id) in availableCourses"
+              :key="id"
+              @click="selectCourse(id)"
+              :class="currentCourseId === id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'"
+              class="w-full px-3 py-3 text-left rounded-xl flex items-center gap-3 transition-all"
+            >
+              <span class="text-xl bg-white p-2 rounded-lg shadow-sm border border-gray-100">{{ course.icon }}</span>
+              <div>
+                <div class="font-bold text-sm">{{ course.name }}</div>
+                <div class="text-xs opacity-70 mt-0.5 font-medium">{{ course.description }}</div>
+              </div>
+              <div v-if="currentCourseId === id" class="ml-auto text-indigo-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              </div>
+            </button>
           </div>
         </div>
+
+        <!-- Center: Unified Control Pill -->
+        <div class="flex-1 flex justify-center max-w-2xl">
+          <div class="flex items-center bg-gray-100/80 p-1 sm:p-1.5 rounded-2xl border border-gray-200/50 shadow-inner gap-1 sm:gap-2">
+            
+            <!-- Mode Segment -->
+            <div class="flex bg-white rounded-xl shadow-sm border border-gray-100 divide-x divide-gray-100 overflow-hidden">
+              <button
+                @click="setMode('random')"
+                :class="practiceMode === 'random' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-gray-500 hover:bg-gray-50 font-medium'"
+                class="px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition-all flex items-center gap-2"
+              >
+                <span>🎲</span>
+                <span class="hidden sm:inline">随机</span>
+              </button>
+              <button
+                @click="setMode('topic')"
+                :class="practiceMode === 'topic' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-gray-500 hover:bg-gray-50 font-medium'"
+                class="px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition-all flex items-center gap-2"
+              >
+                <span>📚</span>
+                <span class="hidden sm:inline">主题</span>
+              </button>
+            </div>
+
+            <!-- VS Separator (Visual Only) -->
+            <div class="w-px h-5 bg-gray-300 hidden sm:block"></div>
+
+            <!-- Topic Selector (Conditional) -->
+            <div v-if="practiceMode === 'topic'" class="relative">
+              <button
+                @click="showTopicDropdown = !showTopicDropdown"
+                class="px-2 sm:px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs sm:text-sm font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center gap-2 min-w-[100px] sm:min-w-[120px] justify-between shadow-sm"
+              >
+                <span class="truncate max-w-[100px] sm:max-w-[150px]">{{ selectedTopic === 'all' ? '选择主题' : formatTopicName(selectedTopic) }}</span>
+                <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+               
+               <!-- Topic Menu -->
+               <div v-if="showTopicDropdown" class="absolute top-full left-0 mt-2 w-64 max-h-[300px] overflow-y-auto bg-white rounded-xl shadow-xl ring-1 ring-black/5 p-1 z-50">
+                 <button
+                   v-for="topic in availableTopics"
+                   :key="topic"
+                   @click="selectTopicFromDropdown(topic)"
+                   :class="selectedTopic === topic ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'"
+                   class="w-full px-3 py-2 text-left text-sm rounded-lg flex justify-between items-center transition-colors mb-0.5"
+                 >
+                   <span class="truncate">{{ formatTopicName(topic) }}</span>
+                   <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{{ topicStats[topic] || 0 }}</span>
+                 </button>
+               </div>
+            </div>
+            
+            <!-- Default Text when Random -->
+            <div v-else class="hidden sm:flex items-center px-3 text-xs text-gray-400 font-medium select-none">
+              全库随机 · {{ totalCachedQuestions }}题
+            </div>
+
+            <!-- VS Separator -->
+            <div class="w-px h-5 bg-gray-300 hidden sm:block"></div>
+
+            <!-- Difficulty Traffic Lights -->
+            <div class="flex items-center gap-1 pl-1">
+              <button
+                 v-for="diff in difficultyOptions"
+                 :key="diff.value"
+                 @click="setDifficulty(diff.value)"
+                 class="group relative w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                 :title="diff.label"
+              >
+                <div 
+                  class="w-3 h-3 rounded-full transition-all duration-300"
+                  :class="[
+                     selectedDifficulty === diff.value ? 'scale-125 ring-2 ring-offset-1 ring-gray-200 opacity-100' : 'opacity-20 group-hover:opacity-100',
+                     diff.value === 'easy' ? 'bg-green-500' : diff.value === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
+                  ]"
+                ></div>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right: Meta Actions -->
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="hidden sm:flex flex-col items-end mr-2">
+            <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Session</span>
+            <div class="text-sm font-bold text-gray-700 font-mono">{{ correctCount }}<span class="text-gray-300">/</span>{{ historyQuestions.length }}</div>
+          </div>
+          
+          <button 
+             @click="showHistory = !showHistory" 
+             class="w-10 h-10 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-md transition-all relative overflow-hidden group"
+             title="历史记录"
+          >
+             <span class="relative z-10">📋</span>
+             <div class="absolute inset-0 bg-indigo-50 transform scale-0 group-hover:scale-100 transition-transform origin-center rounded-full"></div>
+          </button>
+          
+          <button 
+             v-if="historyQuestions.length > 0" 
+             @click="clearHistory" 
+             class="w-10 h-10 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-100 hover:shadow-md transition-all group relative overflow-hidden"
+             title="清空"
+          >
+             <span class="relative z-10">🗑️</span>
+             <div class="absolute inset-0 bg-red-50 transform scale-0 group-hover:scale-100 transition-transform origin-center rounded-full"></div>
+          </button>
+        </div>
+
       </div>
     </header>
 
-    <!-- Click outside to close dropdown -->
+    <!-- Click outside overlay - Must be BELOW header z-index but above main content -->
     <div 
-      v-if="showTopicDropdown" 
-      class="fixed inset-0 z-[5]" 
-      @click="showTopicDropdown = false"
+      v-if="showCourseDropdown || showTopicDropdown" 
+      class="fixed inset-0"
+      style="z-index: 35;"
+      @click="showCourseDropdown = false; showTopicDropdown = false"
     ></div>
-
-
 
     <!-- Main Content -->
     <main class="max-w-2xl mx-auto px-4 pt-6 pb-12">
-      <!-- Loading State (Initial or Generating) -->
-      <div v-if="loading" class="flex flex-col items-center justify-center py-20">
-        <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-        <p class="mt-4 text-gray-500">{{ loadingMessage }}</p>
+      <!-- Loading State - Skeleton -->
+      <div v-if="loading">
+        <QuestionSkeleton />
+        <p class="mt-4 text-center text-sm text-gray-400">{{ loadingMessage }}</p>
       </div>
 
       <!-- Error State -->
@@ -220,36 +265,57 @@
         </div>
       </div>
     </transition>
+
+    <!-- AI Chat Window -->
+    <AIChatWindow
+      :current-question="currentQuestion"
+      :course-id="currentCourseId"
+      :question-answered="questionAnswered"
+      :user-answer="userAnswer"
+      @question-deleted="handleQuestionDeleted"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import QuestionCard from '../components/QuestionCard.vue';
-import { questionApi } from '../api/questiongen';
+import QuestionSkeleton from '../components/QuestionSkeleton.vue';
+import AIChatWindow from '../components/AIChatWindow.vue';
+import { questionApi } from '../api';
 
 // LocalStorage keys
 const HISTORY_STORAGE_KEY = 'questiongen_history';
 const SEEN_IDS_STORAGE_KEY = 'questiongen_seen_ids';
 const SELECTED_TOPIC_KEY = 'questiongen_selected_topic';
 const PRACTICE_MODE_KEY = 'questiongen_practice_mode';
+const CURRENT_COURSE_KEY = 'questiongen_current_course';
 
 // State
 const currentQuestion = ref(null);
 const prefetchedQuestion = ref(null);
 const historyQuestions = ref([]);
-const seenQuestionIds = ref([]); // Track all seen question IDs (for server-side filtering)
+const seenQuestionIds = ref([]); // Answered/Completed questions (Persisted)
+const sessionSeenIds = ref([]);  // Temporary seen in this session
 const loading = ref(true);
+const isMobileMenuOpen = ref(false);
 const prefetching = ref(false);
 const loadingMessage = ref('正在加载题目...');
 const showHistory = ref(false);
 const historyDetailItem = ref(null);
 const cardRef = ref(null);
 const error = ref(null);
-const questionSource = ref(''); // 'cached' or 'generated'
+const questionSource = ref('');
+const questionAnswered = ref(false);
+const userAnswer = ref(null);  // { selected: 'A. xxx', correct: true/false }
+
+// Course selection state
+const currentCourseId = ref(null);
+const availableCourses = ref({});
+const showCourseDropdown = ref(false);
 
 // Topic/Mode selection state
-const practiceMode = ref('random'); // 'random' or 'topic'
+const practiceMode = ref('random');
 const selectedTopic = ref('all');
 const availableTopics = ref([]);
 const topicsLoaded = ref(false);
@@ -257,14 +323,81 @@ const showTopicDropdown = ref(false);
 
 // Stats
 const totalCachedQuestions = ref(0);
-const topicStats = ref({}); // {topic: count}
+const topicStats = ref({});
 
+// Difficulty filter
+const selectedDifficulty = ref(null);  // null = all, 'easy', 'medium', 'hard'
+const difficultyOptions = [
+  { value: 'easy', label: 'Easy', activeClass: 'bg-green-500 text-white shadow-sm' },
+  { value: 'medium', label: 'Medium', activeClass: 'bg-yellow-500 text-white shadow-sm' },
+  { value: 'hard', label: 'Hard', activeClass: 'bg-red-500 text-white shadow-sm' }
+];
+
+// Computed
 const correctCount = computed(() => historyQuestions.value.filter(h => h.correct).length);
+
+const currentCourse = computed(() => availableCourses.value[currentCourseId.value] || {});
+const currentCourseName = computed(() => currentCourse.value.name || '选择课程');
+const currentCourseDisplayName = computed(() => currentCourse.value.display_name || currentCourse.value.name || '刷题');
+const currentCourseIcon = computed(() => currentCourse.value.icon || '📚');
+
+// Load available courses
+async function loadCourses() {
+  try {
+    const response = await questionApi.getCourses();
+    const data = response.data;
+    availableCourses.value = data.courses || {};
+    
+    // Set default course
+    const storedCourse = localStorage.getItem(CURRENT_COURSE_KEY);
+    if (storedCourse && availableCourses.value[storedCourse]) {
+      currentCourseId.value = storedCourse;
+    } else if (data.default) {
+      currentCourseId.value = data.default;
+    } else {
+      currentCourseId.value = Object.keys(availableCourses.value)[0];
+    }
+  } catch (err) {
+    console.error('Failed to load courses:', err);
+  }
+}
+
+// Select course
+async function selectCourse(courseId) {
+  if (courseId === currentCourseId.value) {
+    showCourseDropdown.value = false;
+    return;
+  }
+  
+  showCourseDropdown.value = false;
+  currentCourseId.value = courseId;
+  localStorage.setItem(CURRENT_COURSE_KEY, courseId);
+  
+  // Clear current state
+  prefetchedQuestion.value = null;
+  seenQuestionIds.value = [];
+  selectedTopic.value = 'all';
+  
+  // Reload topics and questions for new course
+  await loadTopics();
+  await loadStats();
+  
+  loading.value = true;
+  loadingMessage.value = `正在加载 ${currentCourseName.value} 题目...`;
+  error.value = null;
+  
+  currentQuestion.value = await getSmartNextQuestion();
+  loading.value = false;
+  
+  if (currentQuestion.value) {
+    prefetchNextQuestion();
+  }
+}
 
 // Load stats from server
 async function loadStats() {
   try {
-    const response = await questionApi.getStats();
+    const response = await questionApi.getStats(currentCourseId.value);
     const data = response.data;
     totalCachedQuestions.value = data.total_cached || 0;
     topicStats.value = data.by_topic || {};
@@ -276,20 +409,37 @@ async function loadStats() {
 // Format topic name for display
 function formatTopicName(topic) {
   if (!topic) return topic;
-  // Extract meaningful part from topic names like "01-sysadmin" -> "Sysadmin"
   const parts = topic.split('-');
   if (parts.length > 1) {
     return parts.slice(1).join('-').replace(/^\w/, c => c.toUpperCase());
   }
-  return topic.replace(/^\w/, c => c.toUpperCase());
+  return topic.replace(/^\w/, c => c.toUpperCase()).replace(/-/g, ' ');
+}
+
+// Set difficulty filter
+async function setDifficulty(difficulty) {
+  // Toggle logic: if clicking the same difficulty, deselect it (set to null)
+  if (selectedDifficulty.value === difficulty) {
+    selectedDifficulty.value = null;
+  } else {
+    selectedDifficulty.value = difficulty;
+  }
+  // Reload question with new difficulty filter
+  loading.value = true;
+  loadingMessage.value = '切换难度中...';
+  prefetchedQuestion.value = null;
+  currentQuestion.value = await getSmartNextQuestion();
+  loading.value = false;
+  if (currentQuestion.value) {
+    prefetchNextQuestion();
+  }
 }
 
 // Load topics from server
 async function loadTopics() {
   try {
-    const response = await questionApi.getTopics();
+    const response = await questionApi.getTopics(currentCourseId.value);
     const data = response.data;
-    // Use courseware topics as they are more organized
     availableTopics.value = data.courseware_topics || data.topics || [];
     topicsLoaded.value = true;
   } catch (err) {
@@ -298,33 +448,43 @@ async function loadTopics() {
   }
 }
 
-// Set practice mode (random or topic)
+// Set practice mode
 async function setMode(mode) {
   if (mode === practiceMode.value) return;
   
   practiceMode.value = mode;
   localStorage.setItem(PRACTICE_MODE_KEY, mode);
   showTopicDropdown.value = false;
+  isMobileMenuOpen.value = false;
+  
+  // Clear prefetched question
+  prefetchedQuestion.value = null;
+  loading.value = true;
+  error.value = null;
   
   if (mode === 'random') {
-    // Switch to random mode
     selectedTopic.value = 'all';
     localStorage.setItem(SELECTED_TOPIC_KEY, 'all');
-    
-    // Clear prefetched question and load new random question
-    prefetchedQuestion.value = null;
-    loading.value = true;
     loadingMessage.value = '正在加载随机题目...';
-    error.value = null;
-    
-    currentQuestion.value = await getSmartNextQuestion();
-    loading.value = false;
-    
-    if (currentQuestion.value) {
-      prefetchNextQuestion();
+  } else if (mode === 'topic') {
+    // Load topics if not loaded
+    if (!topicsLoaded.value) {
+      await loadTopics();
     }
+    // Keep current topic or use first available
+    if (selectedTopic.value === 'all' && availableTopics.value.length > 0) {
+      selectedTopic.value = availableTopics.value[0];
+      localStorage.setItem(SELECTED_TOPIC_KEY, selectedTopic.value);
+    }
+    loadingMessage.value = `正在加载 ${formatTopicName(selectedTopic.value)} 题目...`;
   }
-  // For topic mode, wait for user to select a topic
+  
+  currentQuestion.value = await getSmartNextQuestion();
+  loading.value = false;
+  
+  if (currentQuestion.value) {
+    prefetchNextQuestion();
+  }
 }
 
 // Select topic from dropdown
@@ -340,10 +500,8 @@ async function selectTopic(topic) {
   selectedTopic.value = topic;
   localStorage.setItem(SELECTED_TOPIC_KEY, topic);
   
-  // Clear prefetched question as it may be for a different topic
   prefetchedQuestion.value = null;
   
-  // Load new question for this topic
   loading.value = true;
   loadingMessage.value = `正在加载 ${topic === 'all' ? '随机' : formatTopicName(topic)} 题目...`;
   error.value = null;
@@ -356,24 +514,21 @@ async function selectTopic(topic) {
   }
 }
 
-// Load history from localStorage on mount
+// Load history from localStorage
 function loadHistoryFromStorage() {
   try {
     const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
     if (stored) {
       historyQuestions.value = JSON.parse(stored);
     }
-    // Also load seen IDs
     const seenStored = localStorage.getItem(SEEN_IDS_STORAGE_KEY);
     if (seenStored) {
       seenQuestionIds.value = JSON.parse(seenStored);
     }
-    // Load practice mode
     const modeStored = localStorage.getItem(PRACTICE_MODE_KEY);
     if (modeStored) {
       practiceMode.value = modeStored;
     }
-    // Load selected topic
     const topicStored = localStorage.getItem(SELECTED_TOPIC_KEY);
     if (topicStored) {
       selectedTopic.value = topicStored;
@@ -386,10 +541,8 @@ function loadHistoryFromStorage() {
 // Save history to localStorage
 function saveHistoryToStorage() {
   try {
-    // Keep only last 100 questions to avoid storage limits
     const toSave = historyQuestions.value.slice(-100);
     localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(toSave));
-    // Also save seen IDs (keep last 500)
     const seenToSave = seenQuestionIds.value.slice(-500);
     localStorage.setItem(SEEN_IDS_STORAGE_KEY, JSON.stringify(seenToSave));
   } catch (e) {
@@ -397,7 +550,6 @@ function saveHistoryToStorage() {
   }
 }
 
-// Watch history changes and persist
 watch(historyQuestions, () => {
   saveHistoryToStorage();
 }, { deep: true });
@@ -412,21 +564,43 @@ function clearHistory() {
   }
 }
 
-// Get next question using smart endpoint (prioritizes cached)
+// Get next question
 async function getSmartNextQuestion() {
   try {
     error.value = null;
-    // Pass topic to API (null or 'all' means random)
+    // Cycle Logic: If we've viewed all available cached questions in this session, reset session history
+    const currentPoolSize = selectedTopic.value === 'all' 
+      ? totalCachedQuestions.value 
+      : (topicStats.value[selectedTopic.value] || 0);
+      
+    const effectiveSessionSeenCount = sessionSeenIds.value.filter(id => !seenQuestionIds.value.includes(id)).length;
+    
+    // If we've seen (but not answered) nearly all cached questions, relax the session filter
+    if (currentPoolSize > 0 && effectiveSessionSeenCount >= currentPoolSize) {
+      // Keep only the most recent one to prevent immediate back-to-back, but allow cycling
+      sessionSeenIds.value = sessionSeenIds.value.slice(-1);
+    }
+
+    // Combine persistent seen IDs (answered) and session seen IDs (viewed)
+    const combinedSeenIds = [...new Set([...seenQuestionIds.value, ...sessionSeenIds.value])];
+
     const topicParam = selectedTopic.value === 'all' ? null : selectedTopic.value;
-    const response = await questionApi.smartNext(seenQuestionIds.value, true, topicParam);
+    const difficultyParam = selectedDifficulty.value;
+    
+    const response = await questionApi.smartNext(
+      combinedSeenIds, 
+      true, 
+      topicParam, 
+      difficultyParam,
+      currentCourseId.value
+    );
     const question = response.data;
     
-    // Track the source (cached vs generated)
     questionSource.value = question.source || 'unknown';
     
-    // Add to seen IDs
-    if (question.id && !seenQuestionIds.value.includes(question.id)) {
-      seenQuestionIds.value.push(question.id);
+    // Mark as seen in this session (so we don't immediately repeat it if we skip)
+    if (question.id && !sessionSeenIds.value.includes(question.id)) {
+      sessionSeenIds.value.push(question.id);
     }
     
     return question;
@@ -449,42 +623,69 @@ async function retryGenerate() {
   }
 }
 
-// Prefetch next question in background
+
+
+// Prefetch next question
 async function prefetchNextQuestion() {
   if (prefetching.value || prefetchedQuestion.value) return;
   
   prefetching.value = true;
   try {
-    // Include the current question ID in seen list for prefetch
-    const allSeenIds = [...seenQuestionIds.value];
-    if (currentQuestion.value?.id && !allSeenIds.includes(currentQuestion.value.id)) {
-      allSeenIds.push(currentQuestion.value.id);
+    // Cycle Logic for prefetch
+    const currentPoolSize = selectedTopic.value === 'all' 
+      ? totalCachedQuestions.value 
+      : (topicStats.value[selectedTopic.value] || 0);
+      
+    const effectiveSessionSeenCount = sessionSeenIds.value.filter(id => !seenQuestionIds.value.includes(id)).length;
+    
+    // Combine persistent and session seen IDs
+    let idsToExclude = [...seenQuestionIds.value];
+    
+    // Only exclude session seen IDs if we haven't seen the whole pool yet
+    if (currentPoolSize === 0 || effectiveSessionSeenCount < currentPoolSize) {
+       idsToExclude = [...idsToExclude, ...sessionSeenIds.value];
     }
     
-    // Pass topic to API
+    const combinedSeenIds = [...new Set(idsToExclude)];
+    
+    // Also tentatively mark current question as seen for the purpose of prefetching next
+    if (currentQuestion.value?.id && !combinedSeenIds.includes(currentQuestion.value.id)) {
+      combinedSeenIds.push(currentQuestion.value.id);
+    }
+    
     const topicParam = selectedTopic.value === 'all' ? null : selectedTopic.value;
-    const response = await questionApi.smartNext(allSeenIds, true, topicParam);
+    // Fix: pass null for difficulty (4th arg) so courseId (5th arg) is correct
+    const response = await questionApi.smartNext(combinedSeenIds, true, topicParam, null, currentCourseId.value);
     const question = response.data;
     
-    // Add to seen IDs
-    if (question.id && !seenQuestionIds.value.includes(question.id)) {
-      seenQuestionIds.value.push(question.id);
+    // Add to session seen (not persistent yet)
+    if (question.id && !sessionSeenIds.value.includes(question.id)) {
+      sessionSeenIds.value.push(question.id);
     }
     
     prefetchedQuestion.value = question;
   } catch (err) {
     console.error('Failed to prefetch question:', err);
-    // Don't set error - prefetch failure shouldn't block user
   } finally {
     prefetching.value = false;
   }
 }
 
-// Called when user submits answer
-function onAnswered({ correct }) {
+// Record answer in history
+function onAnswered({ selected, correct }) {
   if (!currentQuestion.value) return;
   
-  // Add to history
+  // Mark question as answered for chat window
+  questionAnswered.value = true;
+  
+  // Save user's answer for AI context
+  userAnswer.value = { selected, correct };
+  
+  // Mark as permanently seen/completed
+  if (currentQuestion.value?.id && !seenQuestionIds.value.includes(currentQuestion.value.id)) {
+    seenQuestionIds.value.push(currentQuestion.value.id);
+  }
+  
   historyQuestions.value.push({
     id: currentQuestion.value.id || Date.now(),
     question: currentQuestion.value,
@@ -492,7 +693,6 @@ function onAnswered({ correct }) {
     answeredAt: new Date().toISOString()
   });
   
-  // Start prefetching if not already
   prefetchNextQuestion();
 }
 
@@ -501,8 +701,9 @@ async function moveToNextQuestion() {
   loading.value = true;
   loadingMessage.value = '正在加载下一题...';
   error.value = null;
+  questionAnswered.value = false;
+  userAnswer.value = null;  // Reset user answer for new question
   
-  // Use prefetched question if available AND matches current topic
   const prefetchedTopic = prefetchedQuestion.value?.topic;
   const currentTopicMatches = selectedTopic.value === 'all' || 
     (prefetchedTopic && prefetchedTopic.toLowerCase().includes(selectedTopic.value.toLowerCase()));
@@ -511,12 +712,9 @@ async function moveToNextQuestion() {
     currentQuestion.value = prefetchedQuestion.value;
     prefetchedQuestion.value = null;
     loading.value = false;
-    // Start prefetching the next one
     prefetchNextQuestion();
   } else {
-    // Clear mismatched prefetch
     prefetchedQuestion.value = null;
-    // Get new question
     currentQuestion.value = await getSmartNextQuestion();
     loading.value = false;
     if (currentQuestion.value) {
@@ -535,23 +733,52 @@ function viewHistoryItem(item) {
   };
 }
 
+// Handle question deleted from AI chat
+async function handleQuestionDeleted(questionId) {
+  console.log('Question deleted:', questionId);
+  
+  // Reset answer state - this will trigger AI chat to close
+  questionAnswered.value = false;
+  userAnswer.value = null;
+  
+  // Clear prefetched if it was the deleted question
+  if (prefetchedQuestion.value?.id === questionId) {
+    prefetchedQuestion.value = null;
+  }
+  
+  // If current question was deleted, load next one
+  if (currentQuestion.value?.id === questionId) {
+    loading.value = true;
+    loadingMessage.value = '题目已删除，正在加载下一题...';
+    currentQuestion.value = await getSmartNextQuestion();
+    loading.value = false;
+    
+    if (currentQuestion.value) {
+      prefetchNextQuestion();
+    }
+  }
+  
+  // Update stats
+  await loadStats();
+}
+
 // Initial load
 onMounted(async () => {
-  // Load history from localStorage
   loadHistoryFromStorage();
   
-  // Load available topics and stats
-  loadTopics();
-  loadStats();
+  // Load courses first
+  await loadCourses();
+  
+  // Then load topics and stats for the current course
+  await loadTopics();
+  await loadStats();
   
   loading.value = true;
   loadingMessage.value = '正在加载题目...';
   
-  // Get first question (smart endpoint will return cached if available)
   currentQuestion.value = await getSmartNextQuestion();
   loading.value = false;
   
-  // Start prefetching second question
   if (currentQuestion.value) {
     prefetchNextQuestion();
   }
@@ -590,6 +817,7 @@ onMounted(async () => {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
