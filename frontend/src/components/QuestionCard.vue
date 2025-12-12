@@ -290,6 +290,15 @@ defineExpose({
 </script>
 
 <style scoped>
+/* Option text container - ensure content is constrained */
+.option-text {
+  overflow: hidden;
+  max-width: 100%;
+  flex: 1;
+  min-width: 0; /* Allow flex item to shrink below content size */
+}
+
+/* Inline code styling */
 .option-text :deep(code) {
   background-color: #F3F4F6;
   padding: 0.125rem 0.375rem;
@@ -298,6 +307,32 @@ defineExpose({
   font-size: 0.875rem;
   color: #DC2626; /* red-600 to stand out like inline code often does */
   border: 1px solid #E5E7EB;
+  word-break: break-all;
+}
+
+/* Code block styling for options - the key fix for overflow */
+.option-text :deep(.code-option-block) {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background-color: #FFF5F5;
+  border: 1px solid #FEE2E2;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.option-text :deep(.code-option-block code) {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8125rem;
+  color: #DC2626;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 </style>
 
