@@ -1,0 +1,58 @@
+{
+    "name": "Computer Architecture",
+    "display_name": "计算机体系结构 刷题",
+    "description": "Hack ISA、微架构、汇编语言、虚拟机、编译器",
+    "icon": "🖥️",
+    "topic_keywords": {
+        "chapter-5-the-hack-architecture-and-assembly": [
+            "hack",
+            "assembly",
+            "asm",
+            "a-instruction",
+            "c-instruction",
+            "machine code",
+            "opcode"
+        ],
+        "chapter-7-computer-architecture": [
+            "ISA",
+            "microarchitecture",
+            "harvard",
+            "von neumann",
+            "RISC",
+            "CISC",
+            "registers",
+            "addressing"
+        ],
+        "chapter-8-compiler-concepts-and-assembler": [
+            "compiler",
+            "assembler",
+            "grammar",
+            "BNF",
+            "parse tree",
+            "tokenizer",
+            "lexer"
+        ],
+        "chapter-9-virtual-machines-and-hack-vm-translator": [
+            "VM",
+            "virtual machine",
+            "stack",
+            "push",
+            "pop",
+            "translator"
+        ],
+        "chapter-10-function-calls-and-heap-memory-allocation": [
+            "function",
+            "heap",
+            "malloc",
+            "free",
+            "stack overflow",
+            "memory allocation"
+        ],
+        "chapter-11-the-jack-language-and-compiler": [
+            "Jack",
+            "compiler",
+            "high-level",
+            "object-oriented"
+        ]
+    }
+}
