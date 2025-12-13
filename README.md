@@ -1,49 +1,62 @@
-# 📖 KitchenBook - 厨房书
+# 📖 KitchenBook - 个人网站
 
-一个现代化的在线菜谱与点餐管理系统，具有拟物化的翻书效果。
+我的个人网站项目，一个集博客、AI 工具、学习笔记于一体的多功能平台。
 
-## ✨ 特性
+> 🌐 **在线访问**: [your-domain.com](https://your-domain.com)
 
-- 🎨 **精美UI**: 采用 Tailwind CSS，具有纸张质感和优雅的动画效果
-- 📚 **翻书效果**: 使用 page-flip 库实现逼真的书页翻动体验
-- 🛒 **点餐系统**: 顾客可以浏览菜单、下单并追踪订单状态
-- 👨‍🍳 **厨师后台**: 完善的订单管理、菜谱编辑和库存管理功能
-- 📦 **库存管理**: 实时追踪食材库存，自动生成采购清单
-- 📱 **响应式设计**: 完美适配桌面和移动设备
+## ✨ 核心功能
+
+### 📝 技术博客
+分享我的技术探索与学习心得，支持 Markdown 写作、标签分类、暗色主题切换，以及精选文章展示。
+
+### 🤖 AI 实验室
+基于 DeepSeek API 构建的 AI 对话工具，集成了以下能力：
+- **思维链推理**: 展示 AI 的推理过程，支持折叠/展开
+- **多模态输入**: 支持图片上传与 OCR 识别
+- **语音交互**: 语音录制转文字
+- **数学公式渲染**: 使用 MathJax 支持 LaTeX 公式
+- **Markdown 渲染**: 完整的 Markdown 语法支持
+
+### 📚 智能刷题 (QuestionGen)
+AI 驱动的智能学习工具，帮助我巩固课程知识：
+- **智能出题**: 基于课程材料自动生成练习题
+- **多课程支持**: 灵活切换不同学习课程
+- **主题筛选**: 按知识点专项练习
+- **难度分级**: 支持简单/中等/困难三级难度
+- **答案解析**: 详细的答案解释与来源引用
+
+### 🍳 菜谱书
+私人菜谱收藏，具有拟物化的翻书效果，记录我喜欢的美食制作方法。
 
 ## 🛠️ 技术栈
 
 **前端:**
 - Vue 3 + Vite
 - Tailwind CSS
-- Vue Router
-- Pinia (状态管理)
+- Vue Router + Pinia
 - page-flip (翻书效果)
-- Axios
+- MathJax (数学公式)
 
 **后端:**
-- Django 5.2
-- Django REST Framework
-- PostgreSQL (生产环境) / SQLite (开发环境)
+- Django 5.2 + Django REST Framework
+- DeepSeek API (AI 能力)
+- PostgreSQL / SQLite
 - Pillow (图片处理)
 
 **部署:**
-- Nginx
-- Gunicorn
+- Nginx + Gunicorn
 - Let's Encrypt (SSL)
 
-## 🚀 快速开始
+## 🚀 本地开发
 
-### 开发环境
-
-**1. 克隆项目**
+### 1. 克隆项目
 
 ```bash
-git clone https://github.com/yourusername/KitchenBook.git
+git clone https://github.com/linzhiqin2003/KitchenBook.git
 cd KitchenBook
 ```
 
-**2. 启动后端**
+### 2. 启动后端
 
 ```bash
 # 创建虚拟环境
@@ -54,20 +67,18 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 cd backend
 pip install -r requirements.txt
 
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，配置 SECRET_KEY 和 DEEPSEEK_API_KEY
+
 # 数据库迁移
 python manage.py migrate
-
-# 创建管理员账号
-python manage.py createsuperuser
-
-# 填充示例数据（可选）
-python manage.py seed_data
 
 # 启动开发服务器
 python manage.py runserver
 ```
 
-**3. 启动前端**
+### 3. 启动前端
 
 ```bash
 # 新开一个终端
@@ -76,109 +87,39 @@ npm install
 npm run dev
 ```
 
-访问 `http://localhost:5173` 查看网站。
-
-### 生产环境部署
-
-查看详细的部署教程：
-
-- 📘 [完整部署教程](DEPLOYMENT.md) - 详细的分步指南
-- ⚡ [快速部署指南](deploy/quick-start.md) - 5分钟快速上线
+访问 `http://localhost:5173` 即可预览。
 
 ## 📂 项目结构
 
 ```
 KitchenBook/
 ├── backend/                 # Django 后端
-│   ├── api/                # API 应用
-│   │   ├── models.py       # 数据模型
-│   │   ├── views.py        # API 视图
-│   │   ├── serializers.py  # DRF 序列化器
-│   │   └── admin.py        # Django Admin 配置
-│   ├── config/             # Django 配置
-│   │   ├── settings.py     # 设置文件
-│   │   └── urls.py         # URL 路由
-│   ├── media/              # 用户上传的文件
-│   ├── staticfiles/        # 收集的静态文件
-│   └── manage.py
+│   ├── api/                # 核心 API (菜谱、博客等)
+│   ├── questions/          # 智能刷题模块
+│   ├── questiongen-data/   # 课程材料数据
+│   └── config/             # Django 配置
 ├── frontend/               # Vue 前端
-│   ├── src/
-│   │   ├── views/          # 页面组件
-│   │   ├── components/     # 可复用组件
-│   │   ├── router/         # 路由配置
-│   │   ├── store/          # 状态管理
-│   │   └── App.vue         # 根组件
-│   ├── public/             # 静态资源
-│   └── package.json
-├── deploy/                 # 部署配置文件
-│   ├── nginx.conf          # Nginx 配置模板
-│   ├── gunicorn.service    # Systemd 服务配置
-│   ├── deploy.sh           # 一键部署脚本
-│   └── quick-start.md      # 快速部署指南
-├── DEPLOYMENT.md           # 完整部署教程
-└── README.md               # 项目说明
+│   ├── src/views/          # 页面组件
+│   │   ├── AiLabView.vue        # AI 实验室
+│   │   ├── QuestionGenView.vue  # 智能刷题
+│   │   ├── BlogListView.vue     # 博客列表
+│   │   └── ...
+│   ├── src/components/     # 可复用组件
+│   └── src/router/         # 路由配置
+├── deploy/                 # 部署配置
+├── DEPLOYMENT.md           # 部署文档
+└── README.md
 ```
 
-## 🎯 功能模块
+## 📖 更多文档
 
-### 顾客端
-- 浏览公开菜谱
-- 添加菜品到购物车
-- 提交订单
-- 追踪订单状态
+- [完整部署教程](DEPLOYMENT.md) - 服务器部署指南
+- [更新指南](UPDATE_GUIDE.md) - 网站更新流程
 
-### 厨师端
-- 订单管理（查看、处理订单）
-- 菜谱管理（创建、编辑、删除）
-- 库存管理（实时追踪食材）
-- 自动生成采购清单
-- 私密备注（仅厨师可见的烹饪技巧）
-
-## 📸 截图
-
-（可以添加项目截图）
-
-## 🔧 配置说明
-
-### 环境变量
-
-复制 `backend/.env.example` 为 `backend/.env`，并根据需要修改：
-
-```env
-SECRET_KEY=your-secret-key
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-DB_ENGINE=django.db.backends.sqlite3
-```
-
-### 前端 API 地址
-
-开发环境会自动代理到 `http://127.0.0.1:8000`。
-
-生产环境需要在 `frontend/.env.production` 中配置：
-
-```env
-VITE_API_URL=https://your_domain.com
-```
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可
+## 📜 许可
 
 MIT License
 
-## 👨‍💻 作者
-
-一个热爱烹饪的程序员 👨‍🍳
-
-## 🙏 致谢
-
-- Django 和 Vue.js 社区
-- page-flip 翻书效果库
-- Tailwind CSS
-
 ---
 
-**享受烹饪的乐趣！🍳**
+*持续学习，不断进步。* 🚀
