@@ -70,8 +70,26 @@ def generate_question(seed_question, course_id=None, context_data=None, target_d
 Create an **original, creative multiple-choice question** that tests a knowledge point from the provided Course Material. 
 The question should be **inspired by** but **NOT a copy of** the Reference Question.
 
+## CRITICAL: Closed-Book Exam
+**This is a CLOSED-BOOK exam. Students will NOT have access to any materials, slides, or references.**
+
+Therefore, your question MUST:
+- Be **completely self-contained** - include ALL necessary information in the question itself
+- NEVER reference external materials (e.g., "According to the slides...", "As shown in the diagram...", "Based on the lecture notes...")
+- NEVER assume the student can look up information
+- If code or data is needed, include it directly in the question
+
+**BAD examples** (DO NOT do this):
+- "According to the lecture material, which of the following..."
+- "As discussed in class, what is..."
+- "Referring to the provided diagram..."
+
+**GOOD examples**:
+- "Given the following code snippet: [code], what will be the output?"
+- "A developer is implementing a hash table. Which collision resolution strategy..."
+
 ## Key Requirements
-1. **Focus on the Course Material**: Your question MUST test a concept, command, or technique that appears in the Course Material below. Do NOT just rephrase the Reference Question.
+1. **Focus on the Course Material**: Your question MUST test a concept from the Course Material below. Do NOT just rephrase the Reference Question.
 2. **Be Creative & Divergent**: 
    - Pick a DIFFERENT specific detail, flag, scenario, or edge case from the Course Material.
    - Create a realistic scenario (e.g., "Alice is trying to...", "A developer wants to...").
@@ -202,8 +220,26 @@ def generate_question_for_topic(topic, course_id=None, context_data=None, target
 ## Your Goal
 Create an **original, creative multiple-choice question** that tests a knowledge point from the provided Course Material for the topic "{matching_topic}".
 
+## CRITICAL: Closed-Book Exam
+**This is a CLOSED-BOOK exam. Students will NOT have access to any materials, slides, or references.**
+
+Therefore, your question MUST:
+- Be **completely self-contained** - include ALL necessary information in the question itself
+- NEVER reference external materials (e.g., "According to the slides...", "As shown in the diagram...", "Based on the lecture notes...")
+- NEVER assume the student can look up information
+- If code or data is needed, include it directly in the question
+
+**BAD examples** (DO NOT do this):
+- "According to the lecture material, which of the following..."
+- "As discussed in class, what is..."
+- "Referring to the provided diagram..."
+
+**GOOD examples**:
+- "Given the following code snippet: [code], what will be the output?"
+- "A developer is implementing a hash table. Which collision resolution strategy..."
+
 ## Key Requirements
-1. **Focus on the Course Material**: Your question MUST test a concept, command, or technique that appears in the Course Material below.
+1. **Focus on the Course Material**: Your question MUST test a concept from the Course Material below.
 2. **Be Creative & Divergent**: 
    - Pick a specific detail, flag, scenario, or edge case from the Course Material.
    - Create a realistic scenario (e.g., "Alice is trying to...", "A developer wants to...").
