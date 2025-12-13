@@ -67,10 +67,15 @@ def generate_question(seed_question, course_id=None, context_data=None, target_d
     prompt = f"""You are an expert university exam question designer for a "{course_name}" course.
 
 ## Your Goal
-Create an **original multiple-choice question** following these principles:
+Create an **original MULTIPLE-CHOICE question** following these principles:
 1. **Knowledge**: Test a concept/knowledge point from the **Course Material** provided below
-2. **Style**: Follow the format and style of the **Reference Question** provided below
+2. **Style**: Learn from the Reference Question's topic/difficulty, but ALWAYS output a multiple-choice format
 3. **Originality**: Create a NEW question, not a copy of the reference
+
+## IMPORTANT: Always Multiple-Choice Format
+**Regardless of the Reference Question's format (fill-in-the-blank, short answer, etc.), you MUST output a multiple-choice question with exactly 4 options (A, B, C, D).**
+
+If the Reference Question is fill-in-the-blank, convert the concept into a multiple-choice format.
 
 ## CRITICAL: Self-Contained Questions for Closed-Book Exam
 **This is a CLOSED-BOOK exam. The question must be completely self-contained.**
@@ -91,8 +96,7 @@ Create an **original multiple-choice question** following these principles:
 
 ## Key Requirements
 1. **Knowledge Source**: Extract a specific concept, rule, or technique from the Course Material below. The question MUST accurately test this knowledge.
-2. **Question Style**: Mimic the Reference Question's format - if it uses scenarios, use scenarios; if it tests code behavior, test code behavior.
-   - Test practical understanding, not just memorization.
+2. **Four Options (A, B, C, D)**: ALWAYS provide exactly 4 plausible options. Include common misconceptions as distractors.
 3. **Difficulty**: {f'Generate a **{target_difficulty.upper()}** difficulty question.' if target_difficulty else 'Rate your question as "easy", "medium", or "hard":'}
    - **easy**: Basic concept recall, straightforward application
    - **medium**: Requires understanding multiple concepts or common edge cases
