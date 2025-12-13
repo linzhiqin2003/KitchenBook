@@ -72,10 +72,10 @@ Create an **original MULTIPLE-CHOICE question** following these principles:
 2. **Style**: Learn from the Reference Question's topic/difficulty, but ALWAYS output a multiple-choice format
 3. **Originality**: Create a NEW question, not a copy of the reference
 
-## IMPORTANT: Always Multiple-Choice Format
-**Regardless of the Reference Question's format (fill-in-the-blank, short answer, etc.), you MUST output a multiple-choice question with exactly 4 options (A, B, C, D).**
+## IMPORTANT: Output Format is Strictly Multiple-Choice
+**The Reference Question may be in ANY format (fill-in-the-blank, short answer, etc.), but YOUR output MUST be a multiple-choice question with exactly 4 options (A, B, C, D).**
 
-If the Reference Question is fill-in-the-blank, convert the concept into a multiple-choice format.
+The Reference Question is only for understanding the topic and difficulty level. Create an entirely new multiple-choice question based on the Course Material.
 
 ## CRITICAL: Self-Contained Questions for Closed-Book Exam
 **This is a CLOSED-BOOK exam. The question must be completely self-contained.**
