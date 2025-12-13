@@ -67,32 +67,31 @@ def generate_question(seed_question, course_id=None, context_data=None, target_d
     prompt = f"""You are an expert university exam question designer for a "{course_name}" course.
 
 ## Your Goal
-Create an **original, creative multiple-choice question** that tests a knowledge point from the provided Course Material. 
-The question should be **inspired by** but **NOT a copy of** the Reference Question.
+Create an **original multiple-choice question** following these principles:
+1. **Knowledge**: Test a concept/knowledge point from the **Course Material** provided below
+2. **Style**: Follow the format and style of the **Reference Question** provided below
+3. **Originality**: Create a NEW question, not a copy of the reference
 
-## CRITICAL: Closed-Book Exam
-**This is a CLOSED-BOOK exam. Students will NOT have access to any materials, slides, or references.**
+## CRITICAL: Self-Contained Questions for Closed-Book Exam
+**This is a CLOSED-BOOK exam. The question must be completely self-contained.**
 
-Therefore, your question MUST:
-- Be **completely self-contained** - include ALL necessary information in the question itself
-- NEVER reference external materials (e.g., "According to the slides...", "As shown in the diagram...", "Based on the lecture notes...")
-- NEVER assume the student can look up information
-- If code or data is needed, include it directly in the question
+- The **knowledge tested** MUST come from the Course Material
+- But the **question text** must NOT reference external materials
+- Include ALL necessary information (code, data, context) directly in the question
 
-**BAD examples** (DO NOT do this):
-- "According to the lecture material, which of the following..."
-- "As discussed in class, what is..."
-- "Referring to the provided diagram..."
+**DO NOT write**:
+- "According to the lecture material..."
+- "As shown in the slides..."
+- "Referring to the course notes..."
 
-**GOOD examples**:
-- "Given the following code snippet: [code], what will be the output?"
-- "A developer is implementing a hash table. Which collision resolution strategy..."
+**INSTEAD write**:
+- "Given the following code: [code], what is the output?"
+- "Consider a hash table that uses linear probing..."
+- "A developer is debugging a program that..."
 
 ## Key Requirements
-1. **Focus on the Course Material**: Your question MUST test a concept from the Course Material below. Do NOT just rephrase the Reference Question.
-2. **Be Creative & Divergent**: 
-   - Pick a DIFFERENT specific detail, flag, scenario, or edge case from the Course Material.
-   - Create a realistic scenario (e.g., "Alice is trying to...", "A developer wants to...").
+1. **Knowledge Source**: Extract a specific concept, rule, or technique from the Course Material below. The question MUST accurately test this knowledge.
+2. **Question Style**: Mimic the Reference Question's format - if it uses scenarios, use scenarios; if it tests code behavior, test code behavior.
    - Test practical understanding, not just memorization.
 3. **Difficulty**: {f'Generate a **{target_difficulty.upper()}** difficulty question.' if target_difficulty else 'Rate your question as "easy", "medium", or "hard":'}
    - **easy**: Basic concept recall, straightforward application
@@ -218,30 +217,30 @@ def generate_question_for_topic(topic, course_id=None, context_data=None, target
     prompt = f"""You are an expert university exam question designer for a "{course_name}" course.
 
 ## Your Goal
-Create an **original, creative multiple-choice question** that tests a knowledge point from the provided Course Material for the topic "{matching_topic}".
+Create an **original multiple-choice question** for the topic "{matching_topic}" following these principles:
+1. **Knowledge**: Test a concept/knowledge point from the **Course Material** provided below
+2. **Originality**: Create a NEW, creative question - not a copy of any existing question
 
-## CRITICAL: Closed-Book Exam
-**This is a CLOSED-BOOK exam. Students will NOT have access to any materials, slides, or references.**
+## CRITICAL: Self-Contained Questions for Closed-Book Exam
+**This is a CLOSED-BOOK exam. The question must be completely self-contained.**
 
-Therefore, your question MUST:
-- Be **completely self-contained** - include ALL necessary information in the question itself
-- NEVER reference external materials (e.g., "According to the slides...", "As shown in the diagram...", "Based on the lecture notes...")
-- NEVER assume the student can look up information
-- If code or data is needed, include it directly in the question
+- The **knowledge tested** MUST come from the Course Material
+- But the **question text** must NOT reference external materials
+- Include ALL necessary information (code, data, context) directly in the question
 
-**BAD examples** (DO NOT do this):
-- "According to the lecture material, which of the following..."
-- "As discussed in class, what is..."
-- "Referring to the provided diagram..."
+**DO NOT write**:
+- "According to the lecture material..."
+- "As shown in the slides..."
+- "Referring to the course notes..."
 
-**GOOD examples**:
-- "Given the following code snippet: [code], what will be the output?"
-- "A developer is implementing a hash table. Which collision resolution strategy..."
+**INSTEAD write**:
+- "Given the following code: [code], what is the output?"
+- "Consider a hash table that uses linear probing..."
+- "A developer is debugging a program that..."
 
 ## Key Requirements
-1. **Focus on the Course Material**: Your question MUST test a concept from the Course Material below.
-2. **Be Creative & Divergent**: 
-   - Pick a specific detail, flag, scenario, or edge case from the Course Material.
+1. **Knowledge Source**: Extract a specific concept, rule, or technique from the Course Material below. The question MUST accurately test this knowledge.
+2. **Be Creative**: 
    - Create a realistic scenario (e.g., "Alice is trying to...", "A developer wants to...").
    - Test practical understanding, not just memorization.
 3. **Difficulty**: {f"Generate a **{target_difficulty.upper()}** difficulty question." if target_difficulty else "Undergraduate exam level (medium difficulty)."}
