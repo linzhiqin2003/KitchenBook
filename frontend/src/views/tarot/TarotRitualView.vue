@@ -80,22 +80,22 @@
                             </span>
                         </div>
                         
-                        <!-- Horizontal Card Deck - Tightly Stacked -->
-                        <div class="absolute bottom-16 left-0 right-0 flex justify-center">
-                            <div class="relative" style="width: 700px; height: 120px;">
+                        <!-- Horizontal Card Deck - Full 78 Cards Fan -->
+                        <div class="absolute bottom-12 left-0 right-0 flex justify-center overflow-visible">
+                            <div class="relative" style="width: 900px; height: 140px;">
                                 <div 
-                                    v-for="(card, index) in shuffledDeck.slice(0, 30)" 
+                                    v-for="(card, index) in shuffledDeck" 
                                     :key="card.id"
                                     @click="pickCard(index)"
-                                    class="absolute w-16 h-24 md:w-20 md:h-28 cursor-pointer transition-all duration-300 hover:-translate-y-6 hover:scale-110 hover:z-[100]"
+                                    class="deck-card absolute w-14 h-20 md:w-16 md:h-24 cursor-pointer transition-all duration-300 hover:-translate-y-8 hover:scale-125 hover:z-[100]"
                                     :class="[
-                                        pickedIndices.has(index) ? 'opacity-10 pointer-events-none scale-90' : '',
+                                        pickedIndices.has(index) ? 'card-fly-out pointer-events-none' : '',
                                         cardsRevealed ? 'card-slide-in' : 'opacity-0'
                                     ]"
                                     :style="getHorizontalStyle(index)"
                                 >
                                     <div class="w-full h-full bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-2 border-mystic-gold rounded-lg shadow-2xl hover:border-white hover:shadow-mystic-gold/80 transition-all duration-200">
-                                        <div class="absolute inset-0 flex items-center justify-center text-xl text-mystic-gold opacity-60">✧</div>
+                                        <div class="absolute inset-0 flex items-center justify-center text-lg text-mystic-gold opacity-60">✧</div>
                                     </div>
                                 </div>
                             </div>
@@ -103,21 +103,26 @@
                     </div>
                     
                     <!-- Selected Cards Preview -->
-                    <div v-if="drawnCards.length > 0" class="flex justify-center gap-6 mt-6">
+                    <transition-group 
+                        name="selected-card" 
+                        tag="div" 
+                        class="flex justify-center gap-6 mt-6"
+                        v-if="drawnCards.length > 0"
+                    >
                         <div 
                             v-for="(readingCard, index) in drawnCards" 
-                            :key="index"
+                            :key="readingCard.deckIndex"
                             @click="undoCardSelection(index)"
-                            class="text-center animate-fade-in-up cursor-pointer group"
+                            class="text-center cursor-pointer group"
                         >
-                            <span class="text-gray-400 text-xs block mb-1">{{ selectedSpread?.positions[index] }}</span>
-                            <div class="w-14 h-20 bg-mystic-dark border-2 border-mystic-gold rounded-lg flex items-center justify-center text-mystic-gold transition-all duration-200 group-hover:border-red-500 group-hover:text-red-500 group-hover:scale-105">
-                                <span class="group-hover:hidden">✓</span>
-                                <span class="hidden group-hover:block text-lg">✕</span>
+                            <span class="text-mystic-purple text-xs block mb-2 font-medium">{{ selectedSpread?.positions[index] }}</span>
+                            <div class="w-16 h-24 bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-2 border-mystic-gold rounded-lg flex items-center justify-center text-mystic-gold transition-all duration-300 group-hover:border-red-500 group-hover:scale-110 group-hover:rotate-3 shadow-lg group-hover:shadow-red-500/30">
+                                <span class="text-2xl group-hover:hidden">✧</span>
+                                <span class="hidden group-hover:block text-xl">✕</span>
                             </div>
-                            <span class="text-gray-500 text-xs mt-1 opacity-0 group-hover:opacity-100 transition-opacity">点击撤销</span>
+                            <span class="text-gray-500 text-xs mt-2 block opacity-0 group-hover:opacity-100 transition-opacity">点击撤销</span>
                         </div>
-                    </div>
+                    </transition-group>
                 </div>
                 
                 <!-- Step 4: Reveal -->
@@ -320,16 +325,24 @@ function getShuffleStyle(index) {
 }
 
 function getHorizontalStyle(index) {
-    const total = 30;
-    const overlap = 20; // Pixels visible per card (tight stacking)
-    const cardWidth = 80; // Base card width (md:w-20 = 80px)
+    const total = shuffledDeck.value.length || 78;
+    const overlap = 10; // Tighter stacking for more cards
+    const cardWidth = 64; // Base card width (w-16 = 64px)
     const totalWidth = (total - 1) * overlap + cardWidth;
-    const centerOffset = (700 - totalWidth) / 2; // Center within 700px container
+    const containerWidth = 900;
+    const centerOffset = (containerWidth - totalWidth) / 2;
     const xPos = centerOffset + index * overlap;
-    const startDelay = index * 0.02; // Staggered animation
+    const startDelay = index * 0.008; // Faster staggered animation
+    
+    // Slight arc effect for realism
+    const centerIndex = total / 2;
+    const distFromCenter = Math.abs(index - centerIndex);
+    const arcHeight = Math.pow(distFromCenter, 1.5) * 0.15;
+    const rotation = (index - centerIndex) * 0.3;
     
     return {
         left: `${xPos}px`,
+        transform: `translateY(${arcHeight}px) rotate(${rotation}deg)`,
         zIndex: index,
         animationDelay: `${startDelay}s`
     };
@@ -683,5 +696,68 @@ Generated by Tarot Sanctum
 /* Vignette overlay for soft feathered edges */
 .vignette-overlay {
     background: radial-gradient(ellipse at center, transparent 30%, rgba(13, 13, 31, 0.6) 70%, rgba(13, 13, 31, 0.95) 100%);
+}
+
+/* Card fly out animation when selected */
+.card-fly-out {
+    animation: flyOut 0.5s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes flyOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: translateY(-100px) scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-200px) scale(0.5);
+    }
+}
+
+/* Selected card transition group animations */
+.selected-card-enter-active {
+    animation: cardAppear 0.4s ease-out;
+}
+.selected-card-leave-active {
+    animation: cardDisappear 0.3s ease-in;
+}
+.selected-card-move {
+    transition: transform 0.3s ease;
+}
+
+@keyframes cardAppear {
+    0% {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.5);
+    }
+    60% {
+        opacity: 1;
+        transform: translateY(10px) scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes cardDisappear {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1) rotate(0deg);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(50px) scale(0.5) rotate(15deg);
+    }
+}
+
+/* Deck card hover glow effect */
+.deck-card:hover {
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.6));
 }
 </style>
