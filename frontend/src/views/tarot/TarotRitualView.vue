@@ -467,14 +467,15 @@ async function exportAsImage() {
             </div>
             
             <div style="background: rgba(0,0,0,0.3); border: 1px solid #333; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-                <h3 style="color: #a855f7; font-size: 14px; margin-bottom: 10px;">牌阵 / Spread: ${escapeHtml(selectedSpread.value?.name)}</h3>
-                <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center;">
+                <h3 style="color: #a855f7; font-size: 14px; margin-bottom: 15px;">牌阵 / Spread: ${escapeHtml(selectedSpread.value?.name_cn || selectedSpread.value?.name)}</h3>
+                <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
                     ${drawnCards.value.map((rc, i) => `
-                        <div style="text-align: center;">
-                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">${escapeHtml(selectedSpread.value?.positions[i])}</div>
-                            <div style="background: linear-gradient(135deg, #4c1d95, #7c3aed); padding: 15px 20px; border-radius: 8px; border: 2px solid #ffd700;">
-                                <span style="color: #ffd700; font-size: 14px;">${escapeHtml(rc.card.name)}</span>
+                        <div style="text-align: center; width: 120px;">
+                            <div style="color: #888; font-size: 11px; margin-bottom: 8px; height: 30px; display: flex; align-items: center; justify-content: center;">${escapeHtml(selectedSpread.value?.positions[i])}</div>
+                            <div style="width: 100px; height: 150px; margin: 0 auto 8px; border-radius: 8px; overflow: hidden; border: 2px solid #ffd700; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                                <img src="${window.location.origin}/cards/${rc.card.img}" style="width: 100%; height: 100%; object-fit: cover;" crossorigin="anonymous" />
                             </div>
+                            <div style="color: #ffd700; font-size: 12px; font-weight: bold;">${escapeHtml(rc.card.name)}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -499,8 +500,22 @@ async function exportAsImage() {
         
         document.body.appendChild(exportDiv);
         
-        // Wait for fonts to load and rendering to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait for images and fonts to load
+        const images = exportDiv.querySelectorAll('img');
+        await Promise.all([
+            // Wait for all images to load
+            ...Array.from(images).map(img => 
+                new Promise(resolve => {
+                    if (img.complete) resolve();
+                    else {
+                        img.onload = resolve;
+                        img.onerror = resolve; // Continue even if image fails
+                    }
+                })
+            ),
+            // Wait for rendering to complete
+            new Promise(resolve => setTimeout(resolve, 1000))
+        ]);
         
         const canvas = await html2canvas(exportDiv, {
             backgroundColor: '#0a0a12',
