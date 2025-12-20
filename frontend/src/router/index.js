@@ -20,6 +20,7 @@ const BlogEditorView = () => import('../views/BlogEditorView.vue')
 const BlogManagerView = () => import('../views/BlogManagerView.vue')
 const AiLabView = () => import('../views/AiLabView.vue')
 const QuestionGenView = () => import('../views/QuestionGenView.vue')
+const PortfolioHomeView = () => import('../views/PortfolioHomeView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -136,11 +137,12 @@ const router = createRouter({
     },
 
     // ========================================
-    // 根路径重定向
+    // 根路径 - 个人网站首页
     // ========================================
     {
       path: '/',
-      redirect: '/kitchen'
+      name: 'home',
+      component: PortfolioHomeView
     }
   ]
 })

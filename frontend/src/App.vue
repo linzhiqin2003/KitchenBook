@@ -8,6 +8,8 @@ import { auth } from './store/auth'
 
 const route = useRoute()
 const router = useRouter()
+// 个人首页独立布局
+const isPortfolioHome = computed(() => route.path === '/')
 // 更新为新的 /kitchen 路径结构
 const isChefMode = computed(() => route.path.startsWith('/kitchen/chef'))
 const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
@@ -35,8 +37,13 @@ const handleLogout = () => {
 </script>
 
 <template>
+  <!-- 个人网站首页独立模式 -->
+  <div v-if="isPortfolioHome" class="min-h-screen">
+    <RouterView />
+  </div>
+
   <!-- AI Lab 全屏模式 -->
-  <div v-if="isAiLabPage" class="min-h-screen">
+  <div v-else-if="isAiLabPage" class="min-h-screen">
     <RouterView />
   </div>
   
