@@ -64,8 +64,8 @@
 
                 <!-- Step 3: Pick Cards - Horizontal Deck on Table -->
                 <div v-else-if="step === 'pick'" key="pick" class="w-full flex flex-col items-center">
-                    <!-- Tarot Table Scene -->
-                    <div class="relative w-full max-w-5xl h-[450px] rounded-3xl overflow-hidden">
+                    <!-- Tarot Table Scene - Responsive -->
+                    <div class="relative w-full h-[320px] sm:h-[380px] md:h-[450px] rounded-2xl md:rounded-3xl overflow-hidden">
                         <!-- Table Background with feathered edges -->
                         <img src="/tarot-table-bg.png" alt="" class="absolute inset-0 w-full h-full object-cover" />
                         <!-- Vignette overlay for soft edges -->
@@ -74,39 +74,40 @@
                         <div class="absolute inset-0 bg-gradient-to-r from-mystic-dark/60 via-transparent to-mystic-dark/60"></div>
                         
                         <!-- Instruction -->
-                        <div class="absolute top-6 left-0 right-0 text-center z-20">
-                            <span class="text-mystic-gold text-xl drop-shadow-lg bg-black/50 px-6 py-2 rounded-full">
+                        <div class="absolute top-4 sm:top-6 left-0 right-0 text-center z-20">
+                            <span class="text-mystic-gold text-base sm:text-xl drop-shadow-lg bg-black/50 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full">
                                 Select {{ remainingPicks }} card{{ remainingPicks > 1 ? 's' : '' }}
                             </span>
                         </div>
                         
-                        <!-- Horizontal Card Deck - Full 78 Cards Fan -->
-                        <div class="absolute bottom-12 left-0 right-0 flex justify-center overflow-visible">
-                            <div class="relative" style="width: 900px; height: 140px;">
+                        <!-- Horizontal Card Deck - Responsive -->
+                        <div class="absolute bottom-8 sm:bottom-12 left-0 right-0 flex justify-center overflow-visible px-2">
+                            <div class="relative w-full" :style="{ maxWidth: containerWidth + 'px', height: isMobile ? '100px' : '140px' }">
                                 <div 
-                                    v-for="(card, index) in shuffledDeck" 
+                                    v-for="(card, index) in shuffledDeck.slice(0, displayCardCount)" 
                                     :key="card.id"
                                     @click="pickCard(index)"
-                                    class="deck-card absolute w-14 h-20 md:w-16 md:h-24 cursor-pointer transition-all duration-300 hover:-translate-y-8 hover:scale-125 hover:z-[100]"
+                                    class="deck-card absolute cursor-pointer transition-all duration-300 hover:z-[100]"
                                     :class="[
+                                        isMobile ? 'w-10 h-14 hover:-translate-y-4 hover:scale-115' : 'w-14 h-20 md:w-16 md:h-24 hover:-translate-y-8 hover:scale-125',
                                         pickedIndices.has(index) ? 'card-fly-out pointer-events-none' : '',
                                         cardsRevealed ? 'card-slide-in' : 'opacity-0'
                                     ]"
                                     :style="getHorizontalStyle(index)"
                                 >
-                                    <div class="w-full h-full bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-2 border-mystic-gold rounded-lg shadow-2xl hover:border-white hover:shadow-mystic-gold/80 transition-all duration-200">
-                                        <div class="absolute inset-0 flex items-center justify-center text-lg text-mystic-gold opacity-60">✧</div>
+                                    <div class="w-full h-full bg-gradient-to-br from-indigo-950 via-purple-900 to-black border border-mystic-gold md:border-2 rounded-md md:rounded-lg shadow-xl md:shadow-2xl hover:border-white hover:shadow-mystic-gold/80 transition-all duration-200">
+                                        <div class="absolute inset-0 flex items-center justify-center text-sm md:text-lg text-mystic-gold opacity-60">✧</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Selected Cards Preview -->
+                    <!-- Selected Cards Preview - Responsive -->
                     <transition-group 
                         name="selected-card" 
                         tag="div" 
-                        class="flex justify-center gap-6 mt-6"
+                        class="flex justify-center flex-wrap gap-3 sm:gap-6 mt-4 sm:mt-6 px-2"
                         v-if="drawnCards.length > 0"
                     >
                         <div 
@@ -115,12 +116,12 @@
                             @click="undoCardSelection(index)"
                             class="text-center cursor-pointer group"
                         >
-                            <span class="text-mystic-purple text-xs block mb-2 font-medium">{{ selectedSpread?.positions[index] }}</span>
-                            <div class="w-16 h-24 bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-2 border-mystic-gold rounded-lg flex items-center justify-center text-mystic-gold transition-all duration-300 group-hover:border-red-500 group-hover:scale-110 group-hover:rotate-3 shadow-lg group-hover:shadow-red-500/30">
-                                <span class="text-2xl group-hover:hidden">✧</span>
-                                <span class="hidden group-hover:block text-xl">✕</span>
+                            <span class="text-mystic-purple text-xs block mb-1 sm:mb-2 font-medium truncate max-w-[60px] sm:max-w-none">{{ selectedSpread?.positions[index] }}</span>
+                            <div class="w-12 h-18 sm:w-16 sm:h-24 bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-2 border-mystic-gold rounded-lg flex items-center justify-center text-mystic-gold transition-all duration-300 group-hover:border-red-500 group-hover:scale-110 group-hover:rotate-3 shadow-lg group-hover:shadow-red-500/30">
+                                <span class="text-lg sm:text-2xl group-hover:hidden">✧</span>
+                                <span class="hidden group-hover:block text-base sm:text-xl">✕</span>
                             </div>
-                            <span class="text-gray-500 text-xs mt-2 block opacity-0 group-hover:opacity-100 transition-opacity">点击撤销</span>
+                            <span class="text-gray-500 text-xs mt-1 sm:mt-2 block opacity-0 group-hover:opacity-100 transition-opacity">撤销</span>
                         </div>
                     </transition-group>
                 </div>
@@ -231,7 +232,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import html2canvas from 'html2canvas';
 import FileSaver from 'file-saver';
 import api from '../../api/tarot';
@@ -255,6 +256,44 @@ const showCardDetails = ref(false);
 const exporting = ref(false); // For export loading state
 const isComposing = ref(false); // For IME input handling
 const cardsRevealed = ref(false); // For spread animation
+
+// Responsive layout detection
+const isMobile = ref(false);
+const containerWidth = ref(900);
+
+const updateLayout = () => {
+    const width = window.innerWidth;
+    isMobile.value = width < 768;
+    // Container width: min 320px, max 900px, with padding
+    containerWidth.value = Math.min(900, Math.max(300, width - 32));
+};
+
+onMounted(async () => {
+    updateLayout();
+    window.addEventListener('resize', updateLayout);
+    
+    try {
+        const [cardsRes, spreadsRes] = await Promise.all([
+            api.getCards(),
+            api.getSpreads()
+        ]);
+        deck.value = cardsRes.data;
+        spreads.value = spreadsRes.data;
+    } catch (e) {
+        console.error("Failed to load data", e);
+    }
+});
+
+onUnmounted(() => {
+    window.removeEventListener('resize', updateLayout);
+});
+
+// How many cards to display based on screen size
+const displayCardCount = computed(() => {
+    if (containerWidth.value < 400) return 30;
+    if (containerWidth.value < 600) return 45;
+    return shuffledDeck.value.length; // All 78 on large screens
+});
 
 const stepHint = computed(() => {
     switch(step.value) {
@@ -280,19 +319,6 @@ const gridClass = computed(() => {
     if (count === 6) return 'grid grid-cols-2 md:grid-cols-3';
     if (count >= 10) return 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5';
     return 'grid grid-cols-3';
-});
-
-onMounted(async () => {
-    try {
-        const [cardsRes, spreadsRes] = await Promise.all([
-            api.getCards(),
-            api.getSpreads()
-        ]);
-        deck.value = cardsRes.data;
-        spreads.value = spreadsRes.data;
-    } catch (e) {
-        console.error("Failed to load data", e);
-    }
 });
 
 function selectSpread(spread) {
@@ -325,20 +351,24 @@ function getShuffleStyle(index) {
 }
 
 function getHorizontalStyle(index) {
-    const total = shuffledDeck.value.length || 78;
-    const overlap = 10; // Tighter stacking for more cards
-    const cardWidth = 64; // Base card width (w-16 = 64px)
+    const total = displayCardCount.value;
+    const mobile = isMobile.value;
+    
+    // Card size and spacing based on screen
+    const cardWidth = mobile ? 40 : 64; // w-10 or w-16
+    const overlap = mobile ? 8 : 10;
+    
     const totalWidth = (total - 1) * overlap + cardWidth;
-    const containerWidth = 900;
-    const centerOffset = (containerWidth - totalWidth) / 2;
+    const cWidth = containerWidth.value;
+    const centerOffset = Math.max(0, (cWidth - totalWidth) / 2);
     const xPos = centerOffset + index * overlap;
-    const startDelay = index * 0.008; // Faster staggered animation
+    const startDelay = index * 0.008;
     
     // Slight arc effect for realism
     const centerIndex = total / 2;
     const distFromCenter = Math.abs(index - centerIndex);
-    const arcHeight = Math.pow(distFromCenter, 1.5) * 0.15;
-    const rotation = (index - centerIndex) * 0.3;
+    const arcHeight = Math.pow(distFromCenter, 1.5) * (mobile ? 0.08 : 0.15);
+    const rotation = (index - centerIndex) * (mobile ? 0.2 : 0.3);
     
     return {
         left: `${xPos}px`,
