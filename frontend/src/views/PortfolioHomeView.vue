@@ -92,15 +92,28 @@ const socialLinks = [
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
-    <!-- iOS风格动态背景 -->
+    <!-- 动态背景 -->
     <div class="fixed inset-0 pointer-events-none overflow-hidden">
-      <!-- 渐变光球 -->
-      <div class="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-purple-500/20 rounded-full blur-[120px] animate-pulse-slow"></div>
-      <div class="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-cyan-500/20 rounded-full blur-[100px] animate-pulse-slow animation-delay-2000"></div>
-      <div class="absolute top-[40%] left-[60%] w-[400px] h-[400px] bg-amber-500/10 rounded-full blur-[80px] animate-pulse-slow animation-delay-4000"></div>
+      <!-- 主渐变光球 - 缓慢移动 -->
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+      <div class="orb orb-4"></div>
+      
+      <!-- 小光点粒子 -->
+      <div class="particle particle-1"></div>
+      <div class="particle particle-2"></div>
+      <div class="particle particle-3"></div>
+      <div class="particle particle-4"></div>
+      <div class="particle particle-5"></div>
+      <div class="particle particle-6"></div>
       
       <!-- 细微网格纹理 -->
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
+      
+      <!-- 顶部和底部渐变遮罩 -->
+      <div class="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-slate-900/50 to-transparent"></div>
+      <div class="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-slate-900/50 to-transparent"></div>
     </div>
     
     <div class="relative min-h-screen flex flex-col">
@@ -234,30 +247,213 @@ const socialLinks = [
 </template>
 
 <style scoped>
-/* 动画 */
-@keyframes pulse-slow {
-  0%, 100% { 
-    opacity: 0.2; 
-    transform: scale(1); 
+/* ========== 动态背景光球 ========== */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+  will-change: transform;
+}
+
+.orb-1 {
+  width: 600px;
+  height: 600px;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 50%, #4f46e5 100%);
+  top: -15%;
+  left: -10%;
+  animation: float-1 20s ease-in-out infinite;
+}
+
+.orb-2 {
+  width: 500px;
+  height: 500px;
+  background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 50%, #3b82f6 100%);
+  bottom: -15%;
+  right: -10%;
+  animation: float-2 25s ease-in-out infinite;
+}
+
+.orb-3 {
+  width: 400px;
+  height: 400px;
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #ef4444 100%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: float-3 18s ease-in-out infinite;
+  opacity: 0.25;
+}
+
+.orb-4 {
+  width: 350px;
+  height: 350px;
+  background: linear-gradient(135deg, #10b981 0%, #14b8a6 50%, #06b6d4 100%);
+  top: 20%;
+  right: 20%;
+  animation: float-4 22s ease-in-out infinite;
+  opacity: 0.3;
+}
+
+/* 光球浮动动画 */
+@keyframes float-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
   }
-  50% { 
-    opacity: 0.3; 
-    transform: scale(1.05); 
+  25% {
+    transform: translate(50px, 30px) scale(1.05);
+  }
+  50% {
+    transform: translate(20px, 60px) scale(0.95);
+  }
+  75% {
+    transform: translate(-30px, 20px) scale(1.02);
   }
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 8s ease-in-out infinite;
+@keyframes float-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(-40px, -30px) scale(1.03);
+  }
+  50% {
+    transform: translate(-70px, 20px) scale(0.97);
+  }
+  75% {
+    transform: translate(20px, -40px) scale(1.05);
+  }
 }
 
-.animation-delay-2000 {
-  animation-delay: 2s;
+@keyframes float-3 {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate(-45%, -55%) scale(1.1) rotate(5deg);
+  }
+  66% {
+    transform: translate(-55%, -45%) scale(0.9) rotate(-5deg);
+  }
 }
 
-.animation-delay-4000 {
-  animation-delay: 4s;
+@keyframes float-4 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-60px, 40px) scale(1.08);
+  }
 }
 
+/* ========== 小光点粒子 ========== */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: white;
+  opacity: 0.4;
+  will-change: transform, opacity;
+}
+
+.particle-1 {
+  width: 4px;
+  height: 4px;
+  top: 20%;
+  left: 30%;
+  animation: twinkle 3s ease-in-out infinite, drift-1 15s ease-in-out infinite;
+}
+
+.particle-2 {
+  width: 3px;
+  height: 3px;
+  top: 60%;
+  left: 15%;
+  animation: twinkle 4s ease-in-out infinite 0.5s, drift-2 18s ease-in-out infinite;
+}
+
+.particle-3 {
+  width: 5px;
+  height: 5px;
+  top: 35%;
+  right: 25%;
+  animation: twinkle 3.5s ease-in-out infinite 1s, drift-3 20s ease-in-out infinite;
+}
+
+.particle-4 {
+  width: 3px;
+  height: 3px;
+  top: 75%;
+  right: 35%;
+  animation: twinkle 4.5s ease-in-out infinite 1.5s, drift-1 16s ease-in-out infinite reverse;
+}
+
+.particle-5 {
+  width: 4px;
+  height: 4px;
+  top: 45%;
+  left: 70%;
+  animation: twinkle 3s ease-in-out infinite 2s, drift-2 22s ease-in-out infinite;
+}
+
+.particle-6 {
+  width: 2px;
+  height: 2px;
+  top: 85%;
+  left: 50%;
+  animation: twinkle 5s ease-in-out infinite 0.8s, drift-3 17s ease-in-out infinite;
+}
+
+/* 闪烁动画 */
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+/* 漂移动画 */
+@keyframes drift-1 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(30px, -20px);
+  }
+  50% {
+    transform: translate(60px, 10px);
+  }
+  75% {
+    transform: translate(20px, 30px);
+  }
+}
+
+@keyframes drift-2 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(-40px, 25px);
+  }
+  66% {
+    transform: translate(20px, -35px);
+  }
+}
+
+@keyframes drift-3 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-50px, -30px);
+  }
+}
+
+/* ========== 其他样式 ========== */
 /* iOS 安全区域 */
 .pt-safe {
   padding-top: max(1rem, env(safe-area-inset-top));
@@ -269,5 +465,12 @@ const socialLinks = [
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 减少动画对性能的影响 */
+@media (prefers-reduced-motion: reduce) {
+  .orb, .particle {
+    animation: none !important;
+  }
 }
 </style>
