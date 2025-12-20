@@ -161,7 +161,23 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
     ]">
       <div class="container mx-auto px-4 md:px-6">
         <div class="flex items-center justify-between h-16 md:h-20">
-          <!-- Logo -->
+          <!-- Left: Back Button + Logo -->
+          <div class="flex items-center gap-3">
+            <!-- 返回主页 -->
+            <router-link 
+              to="/" 
+              :class="[
+                'w-9 h-9 rounded-lg flex items-center justify-center transition-all group',
+                isDarkTheme ? 'bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-violet-600'
+              ]"
+              title="返回首页"
+            >
+              <svg class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+              </svg>
+            </router-link>
+            
+            <!-- Logo -->
           <router-link to="/blog" class="flex items-center gap-3 group">
             <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-500/25 group-hover:shadow-violet-500/40 transition-shadow">
               L
@@ -171,6 +187,7 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
               <p :class="['text-xs hidden sm:block', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">技术沉淀 · 持续进化</p>
             </div>
           </router-link>
+          </div>
           
           <!-- 导航链接 -->
           <nav class="flex items-center gap-2 md:gap-4">

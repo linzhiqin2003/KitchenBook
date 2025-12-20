@@ -56,6 +56,17 @@ const getCategoryIcon = (cat) => categoryIcons[cat] || '🍴'
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] flex flex-col">
+    <!-- 返回主页悬浮按钮 -->
+    <router-link 
+      to="/" 
+      class="fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:text-emerald-600 hover:border-emerald-300 hover:shadow-xl transition-all group"
+      title="返回首页"
+    >
+      <svg class="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+    </router-link>
+
     <!-- View Switcher & Title -->
     <div class="container mx-auto px-2 md:px-4 py-4 md:py-6" v-if="recipes.length > 0">
       <!-- 标题行：标题和开关在同一行 -->

@@ -9,10 +9,10 @@
           <!-- Back to Home -->
           <router-link 
             to="/" 
-            class="w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+            class="w-9 h-9 rounded-lg bg-gray-100 hover:bg-indigo-100 flex items-center justify-center transition-all group"
             title="返回首页"
           >
-            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 text-gray-500 group-hover:text-indigo-600 group-hover:-translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
             </svg>
           </router-link>
