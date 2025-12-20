@@ -4,8 +4,21 @@
     <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 transition-all">
       <div class="max-w-5xl mx-auto px-2 sm:px-4 h-16 flex items-center justify-between gap-2 sm:gap-4">
         
-        <!-- Left: Course Identity -->
-        <div class="relative shrink-0">
+        <!-- Left: Back Button + Course Identity -->
+        <div class="flex items-center gap-2 shrink-0">
+          <!-- Back to Home -->
+          <router-link 
+            to="/" 
+            class="w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+            title="返回首页"
+          >
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+          </router-link>
+          
+          <!-- Course Identity -->
+          <div class="relative">
           <button
             @click="showCourseDropdown = !showCourseDropdown"
             class="group flex items-center gap-3 hover:bg-gray-50 px-2 py-1.5 -ml-2 rounded-xl transition-all"
@@ -41,6 +54,7 @@
               </div>
             </button>
           </div>
+        </div>
         </div>
 
         <!-- Center: Unified Control Pill -->
