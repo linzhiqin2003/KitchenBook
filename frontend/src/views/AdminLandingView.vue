@@ -32,7 +32,7 @@ onMounted(() => {
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
       
       <!-- Live Service Card -->
-      <router-link to="/chef/orders" class="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-stone-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+      <router-link to="/kitchen/chef/orders" class="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-stone-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
         <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <span class="text-9xl">🛎️</span>
         </div>
@@ -52,7 +52,7 @@ onMounted(() => {
       </router-link>
 
       <!-- Inventory Management Card -->
-      <router-link to="/chef/inventory" class="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-stone-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+      <router-link to="/kitchen/chef/inventory" class="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-stone-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
         <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <span class="text-9xl">📦</span>
         </div>
@@ -72,7 +72,7 @@ onMounted(() => {
       </router-link>
 
       <!-- Recipe Management Card -->
-      <router-link to="/chef/recipes" class="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-stone-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+      <router-link to="/kitchen/chef/recipes" class="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-stone-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
         <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <span class="text-9xl">📖</span>
         </div>
@@ -95,7 +95,7 @@ onMounted(() => {
 
     <!-- 技术博客管理 -->
     <div class="mt-8">
-      <router-link to="/chef/blog" class="group relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl shadow-sm border border-purple-500/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block">
+      <router-link to="/kitchen/chef/blog" class="group relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl shadow-sm border border-purple-500/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block">
         <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
         <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-30 transition-opacity">
             <span class="text-9xl">✍️</span>
@@ -136,7 +136,7 @@ onMounted(() => {
                 <p class="text-xs text-emerald-700">及时更新库存状态</p>
             </div>
         </div>
-        <router-link to="/" class="bg-white rounded-xl p-6 border border-stone-200 flex items-center gap-4 hover:border-emerald-300 transition-colors group">
+        <router-link to="/kitchen" class="bg-white rounded-xl p-6 border border-stone-200 flex items-center gap-4 hover:border-emerald-300 transition-colors group">
              <div class="bg-stone-100 p-3 rounded-full shadow-sm text-stone-600 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">🏠</div>
              <div>
                 <h4 class="font-bold text-stone-800">返回前台</h4>

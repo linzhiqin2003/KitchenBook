@@ -89,7 +89,7 @@ onMounted(fetchMyOrders)
     <div v-else-if="myOrders.length === 0" class="py-12 text-center bg-white rounded-xl shadow-sm border border-stone-100">
         <span class="text-4xl block mb-4">🍽️</span>
         <p class="text-lg text-stone-600 mb-4">您还没有点过餐哦</p>
-        <router-link to="/" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-full hover:bg-emerald-700 transition-colors">
+        <router-link to="/kitchen" class="inline-block bg-emerald-600 text-white px-6 py-2 rounded-full hover:bg-emerald-700 transition-colors">
             去点餐
         </router-link>
     </div>

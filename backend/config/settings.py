@@ -38,10 +38,17 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').s
 # CSRF 信任域名配置 - 必须放在文件前面确保生效
 # 这是解决 Nginx 代理 + HTTPS 时 CSRF 验证失败的关键配置
 CSRF_TRUSTED_ORIGINS = [
+    # 新域名 - lzqqq.org
+    'https://lzqqq.org',
+    'https://www.lzqqq.org',
+    'http://lzqqq.org',
+    'http://www.lzqqq.org',
+    # 旧域名 - lzqqqkitchen.org (迁移期间保留)
     'https://lzqqqkitchen.org',
     'https://www.lzqqqkitchen.org',
     'http://lzqqqkitchen.org',
     'http://www.lzqqqkitchen.org',
+    # 本地开发
     'http://localhost:8000',
     'http://127.0.0.1:8000',
 ]

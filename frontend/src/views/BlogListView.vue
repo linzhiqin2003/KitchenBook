@@ -194,7 +194,7 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
             </button>
             
             <router-link 
-              to="/" 
+              to="/kitchen" 
               :class="[
                 'hidden md:flex items-center gap-2 text-sm transition-colors px-3 py-2 rounded-lg',
                 isDarkTheme ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-violet-600 hover:bg-violet-50'
@@ -206,7 +206,7 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
               私人厨房
             </router-link>
             <router-link 
-              to="/ai-lab" 
+              to="/kitchen/ai-lab" 
               :class="[
                 'flex items-center gap-2 text-sm transition-colors px-3 py-2 rounded-lg',
                 isDarkTheme ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-violet-600 hover:bg-violet-50'

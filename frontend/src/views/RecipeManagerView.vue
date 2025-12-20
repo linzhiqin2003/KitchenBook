@@ -38,7 +38,7 @@ onMounted(fetchRecipes)
             <h1 class="text-3xl font-bold text-stone-800 font-display">食谱管理</h1>
             <p class="text-stone-500 mt-1">管理您的私房菜单</p>
         </div>
-        <router-link to="/chef/recipes/new" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 font-bold shadow-sm">
+        <router-link to="/kitchen/chef/recipes/new" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 font-bold shadow-sm">
             <span>+</span> 新增菜谱
         </router-link>
     </div>
@@ -66,7 +66,7 @@ onMounted(fetchRecipes)
                     <span class="text-xs text-stone-400">修改于 {{ new Date().toLocaleDateString() }}</span>
                     <div class="flex gap-2">
                         <!-- We'll implement edit later, just linking for now -->
-                         <router-link :to="`/chef/recipes/${recipe.id}/edit`" class="text-stone-500 hover:text-emerald-600 p-1">
+                         <router-link :to="`/kitchen/chef/recipes/${recipe.id}/edit`" class="text-stone-500 hover:text-emerald-600 p-1">
                             ✏️
                         </router-link>
                         <button @click="deleteRecipe(recipe.id)" class="text-stone-500 hover:text-red-600 p-1">

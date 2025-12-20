@@ -81,7 +81,7 @@ onMounted(async () => {
             }
         } catch (e) {
             alert('加载失败')
-            router.push('/chef/recipes')
+            router.push('/kitchen/chef/recipes')
         } finally {
             loading.value = false
         }
@@ -240,7 +240,7 @@ const submit = async () => {
             { recipe_id: currentRecipeId, ingredients: ingredientsData }
         )
 
-        router.push('/chef/recipes')
+        router.push('/kitchen/chef/recipes')
     } catch (e) {
         console.error(e)
         alert('保存失败: ' + (e.response?.data?.detail || e.response?.data?.error || e.message))
@@ -264,7 +264,7 @@ const submit = async () => {
       <!-- Header -->
       <div class="flex items-center justify-between mb-8">
         <div class="flex items-center gap-4">
-          <router-link to="/chef/recipes" class="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 transition-colors shadow-sm">
+          <router-link to="/kitchen/chef/recipes" class="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 transition-colors shadow-sm">
             ←
           </router-link>
           <div>
@@ -273,7 +273,7 @@ const submit = async () => {
           </div>
         </div>
         <div class="flex gap-3">
-          <button @click="router.push('/chef/recipes')" class="px-4 py-2 rounded-lg text-stone-600 font-bold hover:bg-stone-100 transition-colors">
+          <button @click="router.push('/kitchen/chef/recipes')" class="px-4 py-2 rounded-lg text-stone-600 font-bold hover:bg-stone-100 transition-colors">
             取消
           </button>
           <button 

@@ -38,7 +38,7 @@ const handleLogin = async () => {
             
             // 稍微延迟后跳转，让用户看到成功提示
             setTimeout(() => {
-                router.push('/chef')
+                router.push('/kitchen/chef')
             }, 500)
         }
     } catch (err) {
@@ -141,7 +141,7 @@ const handleLogin = async () => {
       
       <!-- 返回首页 -->
       <div class="text-center mt-6">
-        <router-link to="/" class="text-stone-500 hover:text-emerald-600 text-sm flex items-center justify-center gap-1 transition-colors">
+        <router-link to="/kitchen" class="text-stone-500 hover:text-emerald-600 text-sm flex items-center justify-center gap-1 transition-colors">
           <span>←</span> 返回餐厅首页
         </router-link>
       </div>

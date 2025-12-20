@@ -594,7 +594,7 @@ const savePost = async (publish = false) => {
       await axios.post(`${API_BASE_URL}/api/blog/posts/`, formData, config)
     }
     
-    router.push('/chef/blog')
+    router.push('/kitchen/chef/blog')
   } catch (error) {
     console.error('Failed to save post', error)
     alert('保存失败：' + (error.response?.data?.detail || '未知错误'))
@@ -728,7 +728,7 @@ const getActionLabel = (action) => {
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-4">
         <button 
-          @click="router.push('/chef/blog')"
+          @click="router.push('/kitchen/chef/blog')"
           class="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

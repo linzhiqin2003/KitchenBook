@@ -8,13 +8,16 @@ import { auth } from './store/auth'
 
 const route = useRoute()
 const router = useRouter()
-const isChefMode = computed(() => route.path.startsWith('/chef'))
-const isLoginPage = computed(() => route.path === '/chef/login')
-const isAiLabPage = computed(() => route.path === '/ai-lab')
-// 博客页面独立布局
+// 更新为新的 /kitchen 路径结构
+const isChefMode = computed(() => route.path.startsWith('/kitchen/chef'))
+const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
+const isAiLabPage = computed(() => route.path === '/kitchen/ai-lab')
+// 博客页面独立布局 (/blog)
 const isBlogPage = computed(() => route.path === '/blog' || route.path.startsWith('/blog/'))
-// QuestionGen 刷题页面独立布局
+// QuestionGen 刷题页面独立布局 (/questiongen)
 const isQuestionGenPage = computed(() => route.path === '/questiongen')
+// Kitchen 首页模式 - 排除chef和ai-lab
+const isKitchenPage = computed(() => route.path.startsWith('/kitchen') && !isChefMode.value && !isAiLabPage.value)
 
 // 移动端菜单状态
 const mobileMenuOpen = ref(false)
@@ -27,7 +30,7 @@ watch(() => route.path, () => {
 // 登出
 const handleLogout = () => {
   auth.logout()
-  router.push('/chef/login')
+  router.push('/kitchen/chef/login')
 }
 </script>
 
@@ -51,7 +54,7 @@ const handleLogout = () => {
   <div v-else class="min-h-screen bg-[#fcfaf5] text-stone-800 font-serif bg-texture flex flex-col">
     <header v-if="!isLoginPage" class="bg-emerald-800 text-white p-3 md:p-4 shadow-lg sticky top-0 z-30 border-b-4 border-amber-200/50">
       <div class="container mx-auto flex justify-between items-center">
-        <router-link to="/" class="text-lg md:text-2xl font-bold flex items-center gap-2 md:gap-3 font-display tracking-wide hover:text-amber-100 transition-colors">
+        <router-link to="/kitchen" class="text-lg md:text-2xl font-bold flex items-center gap-2 md:gap-3 font-display tracking-wide hover:text-amber-100 transition-colors">
           <span class="text-2xl md:text-3xl">🍳</span> 
           <span class="hidden xs:inline">LZQ的私人厨房</span>
           <span class="xs:hidden">私人厨房</span>
@@ -59,10 +62,10 @@ const handleLogout = () => {
         
         <!-- 桌面端导航 - 客人模式 -->
         <nav v-if="!isChefMode" class="hidden md:flex items-center gap-6 text-sm font-medium">
-           <router-link to="/" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+           <router-link to="/kitchen" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>🍽️</span> 首页
            </router-link>
-           <router-link to="/my-orders" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+           <router-link to="/kitchen/my-orders" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>🧾</span> 我的订单
            </router-link>
            <button @click="cart.isOpen = true" class="relative bg-emerald-900/50 px-3 py-1.5 rounded-full hover:bg-emerald-900 transition-colors border border-emerald-600 cursor-pointer">
@@ -75,19 +78,19 @@ const handleLogout = () => {
 
         <!-- 桌面端导航 - 主厨模式 -->
         <nav v-if="isChefMode" class="hidden md:flex items-center gap-6 text-sm font-medium">
-           <router-link to="/chef" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+           <router-link to="/kitchen/chef" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>👨‍🍳</span> 控制台
            </router-link>
-           <router-link to="/chef/orders" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+           <router-link to="/kitchen/chef/orders" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>🛎️</span> 订单
            </router-link>
-           <router-link to="/chef/inventory" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+           <router-link to="/kitchen/chef/inventory" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>📦</span> 库存
            </router-link>
-           <router-link to="/chef/recipes" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+           <router-link to="/kitchen/chef/recipes" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>📖</span> 食谱
            </router-link>
-           <router-link to="/chef/blog" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+           <router-link to="/kitchen/chef/blog" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>✍️</span> 博客
            </router-link>
            <button @click="handleLogout" class="bg-red-900/50 px-3 py-1.5 rounded-full hover:bg-red-900 transition-colors border border-red-600 flex items-center gap-1 cursor-pointer">
@@ -122,10 +125,10 @@ const handleLogout = () => {
         <div v-if="mobileMenuOpen" class="md:hidden mt-3 pt-3 border-t border-emerald-700/50">
           <!-- 客人模式菜单 -->
           <nav v-if="!isChefMode" class="flex flex-col gap-2">
-            <router-link to="/" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+            <router-link to="/kitchen" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>🍽️</span> 首页
             </router-link>
-            <router-link to="/my-orders" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+            <router-link to="/kitchen/my-orders" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>🧾</span> 我的订单
             </router-link>
             <button @click="cart.isOpen = true; mobileMenuOpen = false" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2 text-left w-full">
@@ -138,19 +141,19 @@ const handleLogout = () => {
           
           <!-- 主厨模式菜单 -->
           <nav v-else class="flex flex-col gap-2">
-            <router-link to="/chef" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+            <router-link to="/kitchen/chef" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>👨‍🍳</span> 控制台
             </router-link>
-            <router-link to="/chef/orders" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+            <router-link to="/kitchen/chef/orders" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>🛎️</span> 订单
             </router-link>
-            <router-link to="/chef/inventory" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+            <router-link to="/kitchen/chef/inventory" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>📦</span> 库存
             </router-link>
-            <router-link to="/chef/recipes" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+            <router-link to="/kitchen/chef/recipes" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>📖</span> 食谱
             </router-link>
-            <router-link to="/chef/blog" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+            <router-link to="/kitchen/chef/blog" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>✍️</span> 博客
             </router-link>
             <button @click="handleLogout" class="bg-red-900/50 px-3 py-2 rounded-lg hover:bg-red-900 transition-colors border border-red-600 flex items-center gap-2 mt-2 w-full cursor-pointer">
@@ -189,7 +192,7 @@ const handleLogout = () => {
             </div>
             <div class="flex items-center gap-1">
               <span>或者体验</span>
-              <router-link to="/ai-lab" class="text-stone-600 hover:text-pink-600 transition-colors font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-pink-400">
+              <router-link to="/kitchen/ai-lab" class="text-stone-600 hover:text-pink-600 transition-colors font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-pink-400">
                 更强大的AI开源模型
               </router-link>
               <span>？</span>

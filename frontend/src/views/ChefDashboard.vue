@@ -63,7 +63,7 @@ const aggregatedShoppingList = computed(() => {
             <p class="text-stone-500 mt-1 text-sm md:text-base">实时订单与采购管理</p>
         </div>
         <div class="flex gap-2 md:gap-3 w-full sm:w-auto">
-            <router-link to="/chef/inventory" class="flex-1 sm:flex-none bg-amber-100 text-amber-800 px-3 md:px-4 py-2 rounded-lg font-bold hover:bg-amber-200 transition-colors flex items-center justify-center gap-1 md:gap-2 text-sm md:text-base">
+            <router-link to="/kitchen/chef/inventory" class="flex-1 sm:flex-none bg-amber-100 text-amber-800 px-3 md:px-4 py-2 rounded-lg font-bold hover:bg-amber-200 transition-colors flex items-center justify-center gap-1 md:gap-2 text-sm md:text-base">
                 <span>📦</span> <span class="hidden xs:inline">管理</span>库存
             </router-link>
             <button @click="fetchOrders" class="bg-stone-200 hover:bg-stone-300 px-3 md:px-4 py-2 rounded-lg text-stone-700 font-bold transition-colors text-sm md:text-base">

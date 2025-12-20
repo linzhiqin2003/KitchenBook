@@ -171,7 +171,7 @@ const deleteTag = async (tag) => {
       </div>
       
       <router-link 
-        to="/chef/blog/new"
+        to="/kitchen/chef/blog/new"
         class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors shadow-lg shadow-purple-500/30"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -307,7 +307,7 @@ const deleteTag = async (tag) => {
                 </div>
                 
                 <!-- 标题 -->
-                <h3 class="text-lg font-bold text-slate-800 mb-1 hover:text-purple-600 cursor-pointer" @click="router.push(`/chef/blog/${post.id}/edit`)">
+                <h3 class="text-lg font-bold text-slate-800 mb-1 hover:text-purple-600 cursor-pointer" @click="router.push(`/kitchen/chef/blog/${post.id}/edit`)">
                   {{ post.title }}
                 </h3>
                 
@@ -361,7 +361,7 @@ const deleteTag = async (tag) => {
                   {{ post.is_published ? '📢' : '📝' }}
                 </button>
                 <router-link
-                  :to="`/chef/blog/${post.id}/edit`"
+                  :to="`/kitchen/chef/blog/${post.id}/edit`"
                   class="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition-colors"
                   title="编辑"
                 >
@@ -401,7 +401,7 @@ const deleteTag = async (tag) => {
       </p>
       <router-link 
         v-if="!searchQuery && !filterTag && filterStatus === 'all'"
-        to="/chef/blog/new"
+        to="/kitchen/chef/blog/new"
         class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

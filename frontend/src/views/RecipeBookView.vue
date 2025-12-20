@@ -211,7 +211,7 @@ const goToSection = (idx) => {
             </button>
             <button 
               v-else
-              @click="router.push('/chef/orders')"
+              @click="router.push('/kitchen/chef/orders')"
               class="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-amber-500/25 active:scale-95"
             >
               完成阅读 ✓

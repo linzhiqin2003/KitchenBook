@@ -24,22 +24,97 @@ const QuestionGenView = () => import('../views/QuestionGenView.vue')
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // ========================================
+    // Kitchen 模块 - /kitchen 路径下
+    // ========================================
     {
-      path: '/',
-      name: 'home',
+      path: '/kitchen',
+      name: 'kitchen-home',
       component: HomeView
     },
     {
-      path: '/my-orders',
+      path: '/kitchen/my-orders',
       name: 'my-orders',
       component: MyOrdersView
     },
     {
-      path: '/recipe/:id',
+      path: '/kitchen/recipe/:id',
       name: 'recipe-book',
       component: RecipeBookView
     },
-    // 技术博客路由（公开访问）
+    // AI 实验室 - DeepSeek V3.2 Speciale 思考模型
+    {
+      path: '/kitchen/ai-lab',
+      name: 'ai-lab',
+      component: AiLabView
+    },
+    // 登录页面（不需要验证）
+    {
+      path: '/kitchen/chef/login',
+      name: 'chef-login',
+      component: ChefLoginView,
+      meta: { requiresAuth: false }
+    },
+    // 以下路由需要登录验证
+    {
+      path: '/kitchen/chef',
+      name: 'chef-landing',
+      component: AdminLandingView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/kitchen/chef/orders',
+      name: 'chef-orders',
+      component: ChefDashboard,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/kitchen/chef/recipes',
+      name: 'chef-recipes',
+      component: RecipeManagerView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/kitchen/chef/recipes/new',
+      name: 'chef-recipe-new',
+      component: RecipeEditorView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/kitchen/chef/recipes/:id/edit',
+      name: 'chef-recipe-edit',
+      component: RecipeEditorView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/kitchen/chef/inventory',
+      name: 'chef-inventory',
+      component: InventoryView,
+      meta: { requiresAuth: true }
+    },
+    // 博客管理路由（需要登录）
+    {
+      path: '/kitchen/chef/blog',
+      name: 'chef-blog',
+      component: BlogManagerView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/kitchen/chef/blog/new',
+      name: 'chef-blog-new',
+      component: BlogEditorView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/kitchen/chef/blog/:id/edit',
+      name: 'chef-blog-edit',
+      component: BlogEditorView,
+      meta: { requiresAuth: true }
+    },
+
+    // ========================================
+    // Blog 模块 - /blog 路径下
+    // ========================================
     {
       path: '/blog',
       name: 'blog',
@@ -50,80 +125,22 @@ const router = createRouter({
       name: 'blog-post',
       component: BlogPostView
     },
-    // AI 实验室 - DeepSeek V3.2 Speciale 思考模型
-    {
-      path: '/ai-lab',
-      name: 'ai-lab',
-      component: AiLabView
-    },
-    // QuestionGen 刷题模块
+
+    // ========================================
+    // QuestionGen 模块 - /questiongen 路径下
+    // ========================================
     {
       path: '/questiongen',
       name: 'questiongen',
       component: QuestionGenView
     },
-    // 登录页面（不需要验证）
+
+    // ========================================
+    // 根路径重定向
+    // ========================================
     {
-      path: '/chef/login',
-      name: 'chef-login',
-      component: ChefLoginView,
-      meta: { requiresAuth: false }
-    },
-    // 以下路由需要登录验证
-    {
-      path: '/chef',
-      name: 'chef-landing',
-      component: AdminLandingView,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/chef/orders',
-      name: 'chef-orders',
-      component: ChefDashboard,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/chef/recipes',
-      name: 'chef-recipes',
-      component: RecipeManagerView,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/chef/recipes/new',
-      name: 'chef-recipe-new',
-      component: RecipeEditorView,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/chef/recipes/:id/edit',
-      name: 'chef-recipe-edit',
-      component: RecipeEditorView,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/chef/inventory',
-      name: 'chef-inventory',
-      component: InventoryView,
-      meta: { requiresAuth: true }
-    },
-    // 博客管理路由（需要登录）
-    {
-      path: '/chef/blog',
-      name: 'chef-blog',
-      component: BlogManagerView,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/chef/blog/new',
-      name: 'chef-blog-new',
-      component: BlogEditorView,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/chef/blog/:id/edit',
-      name: 'chef-blog-edit',
-      component: BlogEditorView,
-      meta: { requiresAuth: true }
+      path: '/',
+      redirect: '/kitchen'
     }
   ]
 })
@@ -135,7 +152,7 @@ router.beforeEach((to, from, next) => {
     if (auth.checkAuth()) {
       next() // 已登录，允许访问
     } else {
-      next('/chef/login') // 未登录，跳转到登录页
+      next('/kitchen/chef/login') // 未登录，跳转到登录页
     }
   } else {
     next() // 不需要认证，直接访问

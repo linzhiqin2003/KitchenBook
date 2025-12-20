@@ -733,7 +733,7 @@ const transcribeAudio = async (audioBlob, duration = 0) => {
     <!-- 顶部导航栏 -->
     <header class="shrink-0 h-12 sm:h-14 bg-white border-b border-gray-200 flex items-center px-3 sm:px-4 gap-2 sm:gap-4 shadow-sm safe-area-top">
       <router-link 
-        to="/" 
+        to="/kitchen" 
         class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
         title="返回首页"
       >
