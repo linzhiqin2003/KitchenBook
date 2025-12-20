@@ -13,7 +13,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Path to the JS file
-        js_path = Path(__file__).resolve().parents[3] / 'data' / 'cardRoutes.js'
+        js_path = Path(__file__).resolve().parents[2] / 'data' / 'cardRoutes.js'
 
         if not js_path.exists():
             self.stdout.write(self.style.ERROR(f'Card data file not found: {js_path}'))
