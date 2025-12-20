@@ -288,11 +288,9 @@ onUnmounted(() => {
     window.removeEventListener('resize', updateLayout);
 });
 
-// How many cards to display based on screen size
+// Always show all cards, adjust spacing to fit
 const displayCardCount = computed(() => {
-    if (containerWidth.value < 400) return 30;
-    if (containerWidth.value < 600) return 45;
-    return shuffledDeck.value.length; // All 78 on large screens
+    return shuffledDeck.value.length; // Always show all 78 cards
 });
 
 const stepHint = computed(() => {
@@ -314,11 +312,11 @@ const remainingPicks = computed(() => {
 const gridClass = computed(() => {
     const count = selectedSpread.value?.card_count || 3;
     if (count === 1) return 'flex justify-center';
-    if (count === 3) return 'grid grid-cols-1 md:grid-cols-3';
-    if (count === 5) return 'grid grid-cols-3 grid-rows-3 place-items-center';
-    if (count === 6) return 'grid grid-cols-2 md:grid-cols-3';
-    if (count >= 10) return 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5';
-    return 'grid grid-cols-3';
+    if (count === 3) return 'flex flex-row justify-center flex-wrap'; // Always horizontal for 3 cards
+    if (count === 5) return 'grid grid-cols-3 sm:grid-cols-5 place-items-center';
+    if (count === 6) return 'grid grid-cols-3 place-items-center';
+    if (count >= 10) return 'grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5';
+    return 'flex flex-row justify-center flex-wrap';
 });
 
 function selectSpread(spread) {
@@ -351,24 +349,31 @@ function getShuffleStyle(index) {
 }
 
 function getHorizontalStyle(index) {
-    const total = displayCardCount.value;
+    const total = displayCardCount.value || 78;
     const mobile = isMobile.value;
+    const cWidth = containerWidth.value;
     
-    // Card size and spacing based on screen
+    // Card size based on screen
     const cardWidth = mobile ? 40 : 64; // w-10 or w-16
-    const overlap = mobile ? 8 : 10;
+    
+    // Calculate overlap to fit all cards in container
+    // Formula: containerWidth = (total - 1) * overlap + cardWidth
+    // So: overlap = (containerWidth - cardWidth) / (total - 1)
+    const maxOverlap = mobile ? 8 : 12;
+    const minOverlap = 3; // Minimum visible per card
+    const calculatedOverlap = (cWidth - cardWidth - 20) / (total - 1); // 20px padding
+    const overlap = Math.max(minOverlap, Math.min(maxOverlap, calculatedOverlap));
     
     const totalWidth = (total - 1) * overlap + cardWidth;
-    const cWidth = containerWidth.value;
-    const centerOffset = Math.max(0, (cWidth - totalWidth) / 2);
+    const centerOffset = Math.max(10, (cWidth - totalWidth) / 2);
     const xPos = centerOffset + index * overlap;
-    const startDelay = index * 0.008;
+    const startDelay = index * 0.006;
     
-    // Slight arc effect for realism
+    // Slight arc effect for realism (reduced for tighter stacking)
     const centerIndex = total / 2;
     const distFromCenter = Math.abs(index - centerIndex);
-    const arcHeight = Math.pow(distFromCenter, 1.5) * (mobile ? 0.08 : 0.15);
-    const rotation = (index - centerIndex) * (mobile ? 0.2 : 0.3);
+    const arcHeight = Math.pow(distFromCenter, 1.3) * (mobile ? 0.05 : 0.1);
+    const rotation = (index - centerIndex) * (mobile ? 0.15 : 0.25);
     
     return {
         left: `${xPos}px`,
