@@ -71,7 +71,7 @@ const navBlocks = [
     id: 'ai-lab',
     title: 'AI 实验室',
     subtitle: 'AI Lab',
-    description: 'DeepSeek V3 思考模型对话',
+    description: 'DeepSeek Reasoner 思考模型对话',
     icon: '🧠',
     path: '/kitchen/ai-lab',
     gradient: 'from-emerald-400 via-teal-500 to-cyan-500',

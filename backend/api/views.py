@@ -1011,10 +1011,10 @@ class AiAgentView(APIView):
         return response
 
 
-# ==================== DeepSeek V3.2 Speciale 思考模型 ====================
+# ==================== DeepSeek Reasoner 思考模型 ====================
 
 class DeepSeekSpecialeView(APIView):
-    """DeepSeek V3.2 Speciale 思考模型 - 流式输出思维链"""
+    """DeepSeek Reasoner 思考模型 - 流式输出思维链"""
     authentication_classes = []
     permission_classes = []
     
@@ -1025,10 +1025,11 @@ class DeepSeekSpecialeView(APIView):
         if not messages:
             return Response({'error': '消息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
         
-        deepseek_speciale_api_key = getattr(settings, 'DEEPSEEK_SPECIALE_API_KEY', None) or settings.DEEPSEEK_API_KEY
-        deepseek_speciale_base_url = getattr(settings, 'DEEPSEEK_SPECIALE_BASE_URL', None) or 'https://api.deepseek.com/v3.2_speciale_expires_on_20251215'
+        # 使用标准 DeepSeek API
+        deepseek_api_key = settings.DEEPSEEK_API_KEY
+        deepseek_base_url = settings.DEEPSEEK_BASE_URL
         
-        if not deepseek_speciale_api_key:
+        if not deepseek_api_key:
             return Response({
                 'error': 'AI 服务未配置，请联系管理员'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -1041,13 +1042,13 @@ class DeepSeekSpecialeView(APIView):
             from openai import OpenAI
             
             client = OpenAI(
-                api_key=deepseek_speciale_api_key,
-                base_url=deepseek_speciale_base_url
+                api_key=deepseek_api_key,
+                base_url=deepseek_base_url
             )
             
             try:
                 # 发送初始状态
-                yield f"data: {json.dumps({'type': 'status', 'content': '正在连接 DeepSeek V3.2 Speciale...'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'content': '正在连接 DeepSeek Reasoner...'}, ensure_ascii=False)}\n\n"
                 
                 # 调用 DeepSeek V3.2 Speciale (思考模型，流式)
                 response = client.chat.completions.create(

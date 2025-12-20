@@ -186,7 +186,7 @@ const renderMath = async () => {
 // 初始欢迎消息
 const welcomeMessage = {
   role: 'assistant',
-  content: '你好！我是 **DeepSeek V3.2 Speciale** 🧠\n\n我是一个强大的思考模型，擅长复杂推理和深度分析。你可以问我：\n\n- 数学推理和证明\n- 代码分析和算法设计\n- 逻辑推理和问题解决\n- 深度分析和创意写作\n\n我的思考过程会完整展示给你，让你看到 AI 是如何一步步推理的。',
+  content: '你好！我是 **DeepSeek Reasoner** 🧠\n\n我是一个强大的思考模型，擅长复杂推理和深度分析。你可以问我：\n\n- 数学推理和证明\n- 代码分析和算法设计\n- 逻辑推理和问题解决\n- 深度分析和创意写作\n\n我的思考过程会完整展示给你，让你看到 AI 是如何一步步推理的。',
   reasoning: null,
   type: 'text'
 }
@@ -747,7 +747,7 @@ const transcribeAudio = async (audioBlob, duration = 0) => {
           <span class="text-base sm:text-lg">🧠</span>
         </div>
         <div class="min-w-0">
-          <h1 class="text-sm sm:text-base font-semibold text-gray-800 leading-tight truncate">DeepSeek V3.2 Speciale</h1>
+          <h1 class="text-sm sm:text-base font-semibold text-gray-800 leading-tight truncate">DeepSeek Reasoner</h1>
           <p class="text-[10px] sm:text-xs text-gray-400 hidden xs:block">思考模型 · 可见推理链</p>
         </div>
       </div>
@@ -1022,7 +1022,7 @@ const transcribeAudio = async (audioBlob, duration = 0) => {
           </div>
         </div>
         <div class="text-center mt-1 text-[10px] sm:text-xs text-gray-400">
-          DeepSeek V3.2 Speciale · 图片OCR · 语音输入
+          DeepSeek Reasoner · 图片OCR · 语音输入
         </div>
       </div>
     </div>
