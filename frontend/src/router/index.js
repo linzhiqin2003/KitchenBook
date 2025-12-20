@@ -21,6 +21,8 @@ const BlogManagerView = () => import('../views/BlogManagerView.vue')
 const AiLabView = () => import('../views/AiLabView.vue')
 const QuestionGenView = () => import('../views/QuestionGenView.vue')
 const PortfolioHomeView = () => import('../views/PortfolioHomeView.vue')
+const TarotSanctumView = () => import('../views/tarot/TarotSanctumView.vue')
+const TarotRitualView = () => import('../views/tarot/TarotRitualView.vue')
 
 // 默认站点标题
 const DEFAULT_TITLE = 'LZQ的个人空间'
@@ -147,6 +149,22 @@ const router = createRouter({
     },
 
     // ========================================
+    // Tarot 模块 - /tarot 路径下
+    // ========================================
+    {
+      path: '/tarot',
+      name: 'tarot',
+      component: TarotSanctumView,
+      meta: { title: 'Tarot Sanctum | LZQ' }
+    },
+    {
+      path: '/tarot/ritual',
+      name: 'tarot-ritual',
+      component: TarotRitualView,
+      meta: { title: 'Tarot Ritual | LZQ' }
+    },
+
+    // ========================================
     // 根路径 - 个人网站首页
     // ========================================
     {
@@ -176,4 +194,3 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
-

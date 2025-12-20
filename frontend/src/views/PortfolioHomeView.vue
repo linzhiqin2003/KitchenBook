@@ -68,6 +68,17 @@ const navBlocks = [
     features: ['AI出题', '知识巩固', '自适应学习']
   },
   {
+    id: 'tarot',
+    title: '塔罗秘仪',
+    subtitle: 'Tarot Sanctum',
+    description: '沉浸式占卜与神秘解读体验',
+    icon: '🃏',
+    path: '/tarot',
+    gradient: 'from-indigo-500 via-slate-700 to-slate-900',
+    shadowColor: 'shadow-indigo-500/30',
+    features: ['互动牌阵', 'AI解读', '仪式体验']
+  },
+  {
     id: 'ai-lab',
     title: 'AI 实验室',
     subtitle: 'AI Lab',

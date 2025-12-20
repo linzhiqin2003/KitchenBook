@@ -4,5 +4,6 @@ django-cors-headers==4.6.0
 Pillow==11.0.0
 python-dotenv==1.2.1
 openai==1.58.1
+requests==2.32.3
 gunicorn==21.2.0
 gevent==24.2.1

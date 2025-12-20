@@ -205,3 +205,54 @@ html {
     padding: 14px 24px;
   }
 }
+
+/* ------------------------------
+   Tarot theme helpers
+   ------------------------------ */
+
+.font-mystic {
+  font-family: 'Cinzel', serif;
+}
+
+.bg-mystic-dark {
+  background-color: #0a0a12;
+}
+
+.text-mystic-gold {
+  color: #ffd700;
+}
+
+.text-mystic-purple {
+  color: #a855f7;
+}
+
+.border-mystic-gold {
+  border-color: #ffd700;
+}
+
+.bg-mystic-purple {
+  background-color: #4c1d95;
+}
+
+.bg-pattern-mystic {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 215, 0, 0.12) 0, rgba(255, 215, 0, 0.12) 1px, transparent 2px),
+    radial-gradient(circle at 80% 30%, rgba(168, 85, 247, 0.12) 0, rgba(168, 85, 247, 0.12) 1px, transparent 2px),
+    radial-gradient(circle at 40% 75%, rgba(255, 255, 255, 0.08) 0, rgba(255, 255, 255, 0.08) 1px, transparent 2px);
+  background-size: 120px 120px;
+}
+
+.font-chinese-title {
+  font-family: 'ZCOOL XiaoWei', 'Noto Serif SC', serif;
+}
+
+.font-chinese-body {
+  font-family: 'Noto Serif SC', 'PingFang SC', 'Microsoft YaHei', serif;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

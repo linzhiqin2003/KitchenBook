@@ -70,6 +70,9 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "api",
+    "cards",
+    "readings",
+    "oracle",
     "questions",  # QuestionGen 刷题模块
 ]
 
