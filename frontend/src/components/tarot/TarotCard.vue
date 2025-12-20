@@ -1,6 +1,6 @@
 <template>
   <div 
-    class="relative w-48 h-80 perspective-1000 cursor-pointer group"
+    class="relative w-24 h-36 sm:w-32 sm:h-52 md:w-48 md:h-80 perspective-1000 cursor-pointer group"
     @click="flip"
   >
     <div 
@@ -20,8 +20,8 @@
           :alt="card.name" 
           class="w-full h-full object-cover"
         />
-        <div class="absolute bottom-0 w-full bg-black bg-opacity-70 text-center py-2">
-            <span class="text-mystic-gold font-mystic text-sm">{{ card.name }}</span>
+        <div class="absolute bottom-0 w-full bg-black bg-opacity-70 text-center py-1 sm:py-2">
+            <span class="text-mystic-gold font-mystic text-xs sm:text-sm">{{ card.name }}</span>
         </div>
       </div>
     </div>
