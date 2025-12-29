@@ -711,20 +711,20 @@ onUnmounted(() => {
           <div v-show="currentView === 'interpretation'" class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
             
             <!-- Left: Control Center -->
-            <section class="lg:col-span-4 flex flex-col gap-5 h-full overflow-hidden">
-              <!-- Main Card with scroll -->
-              <div class="ios-glass flex-1 p-4 rounded-[24px] flex flex-col items-center shadow-2xl ring-1 ring-white/10 group hover:ring-white/20 transition-all duration-500 overflow-y-auto custom-scrollbar">
+            <section class="lg:col-span-4 h-full overflow-hidden">
+              <!-- Single scrollable card -->
+              <div class="ios-glass h-full p-5 rounded-[24px] flex flex-col shadow-2xl ring-1 ring-white/10 overflow-y-auto custom-scrollbar">
                 
-                <!-- Timer -->
-                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="flex flex-col items-center mt-4 space-y-1">
-                  <span class="text-[10px] font-bold text-white/40 uppercase tracking-[0.15em]">Session Time</span>
-                  <div class="text-5xl font-light tabular-nums tracking-tighter text-white/90 drop-shadow-xl font-display">
+                <!-- Timer Section (compact) -->
+                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="flex flex-col items-center py-3 border-b border-white/5">
+                  <span class="text-[10px] font-bold text-white/40 uppercase tracking-[0.15em] mb-1">Session Time</span>
+                  <div class="text-4xl font-light tabular-nums tracking-tighter text-white/90 font-display">
                     {{ formatTime(recordingTime) }}
                   </div>
                 </div>
 
-                <!-- Main Recording Action -->
-                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="flex flex-col items-center gap-4 my-6">
+                <!-- Recording Button Section -->
+                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="flex flex-col items-center py-4 border-b border-white/5">
                   <div class="relative group">
                     <div class="absolute inset-0 bg-ios-red/30 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-0 group-hover:opacity-100" :class="{ 'opacity-100 animate-pulse-slow': isRecording }"></div>
                     <RecordButton 
@@ -735,9 +735,9 @@ onUnmounted(() => {
                   </div>
                   
                   <!-- Status Text -->
-                  <div class="h-5 flex items-center justify-center">
+                  <div class="h-5 flex items-center justify-center mt-3">
                      <span 
-                       class="px-3 py-0.5 rounded-full text-[12px] font-medium transition-all duration-300 border"
+                       class="px-3 py-0.5 rounded-full text-[11px] font-medium transition-all duration-300 border"
                        :class="speechStatus === 'speaking' 
                          ? 'bg-green-500/10 border-green-500/20 text-green-400' 
                          : (isRecording ? 'bg-white/5 border-white/10 text-white/60' : 'bg-transparent border-transparent text-white/30')"
@@ -745,61 +745,60 @@ onUnmounted(() => {
                        {{ speechStatus === 'speaking' ? 'Detected Speech' : (isRecording ? 'Listening...' : 'Ready') }}
                      </span>
                   </div>
+                  
+                  <!-- Visualizer -->
+                  <div class="w-full h-10 flex items-end justify-center mt-2 opacity-60 mix-blend-screen">
+                     <AudioVisualizer 
+                        :is-active="isRecording"
+                        :analyser="analyserNode"
+                      />
+                  </div>
                 </div>
 
                 <!-- File Upload UI (Visible in File ASR/Translation Mode) -->
-                <div v-else class="flex flex-col items-center justify-center flex-1 w-full px-6 py-4">
+                <div v-if="interpretationMode === 'file_asr' || interpretationMode === 'file_translation'" class="flex flex-col items-center py-6 border-b border-white/5">
                      <input type="file" ref="fileASRInput" accept="audio/*,video/*" class="hidden" @change="handleASRFileSelect">
                      
                      <div 
                         @click="triggerASRFileSelect"
-                        class="w-full aspect-square max-w-[240px] rounded-[32px] border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/10 hover:border-ios-blue/30 transition-all group relative overflow-hidden"
+                        class="w-full aspect-square max-w-[180px] rounded-[24px] border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/10 hover:border-ios-blue/30 transition-all group relative overflow-hidden"
                      >
                         <!-- Loading Overlay -->
                         <div v-if="fileASRState.status === 'uploading' || fileASRState.status === 'processing'" class="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-20">
-                            <div class="w-10 h-10 border-3 border-ios-blue border-t-transparent rounded-full animate-spin mb-3"></div>
-                            <span class="text-xs font-medium tracking-wider uppercase opacity-80">{{ fileASRState.status === 'uploading' ? 'Uploading...' : 'Processing...' }}</span>
+                            <div class="w-8 h-8 border-2 border-ios-blue border-t-transparent rounded-full animate-spin mb-2"></div>
+                            <span class="text-[10px] font-medium tracking-wider uppercase opacity-80">{{ fileASRState.status === 'uploading' ? 'Uploading...' : 'Processing...' }}</span>
                         </div>
 
-                        <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center transition-all duration-300">
-                            <span class="text-4xl text-white/60">{{ interpretationMode === 'file_translation' ? '🌐' : '📂' }}</span>
+                        <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                            <span class="text-2xl text-white/60">{{ interpretationMode === 'file_translation' ? '🌐' : '📂' }}</span>
                         </div>
-                        <div class="text-center space-y-1">
-                            <div class="text-sm font-medium text-white/90">
+                        <div class="text-center space-y-0.5">
+                            <div class="text-xs font-medium text-white/90">
                               {{ interpretationMode === 'file_translation' ? '上传音频翻译' : '上传音频转译' }}
                             </div>
-                            <div class="text-[10px] text-white/40">
+                            <div class="text-[9px] text-white/40">
                               {{ interpretationMode === 'file_translation' ? '翻译为英文 (Groq)' : '转写为原语言 (Groq)' }}
                             </div>
                         </div>
                      </div>
                      
                      <!-- Status / Filename -->
-                     <div v-if="fileASRState.fileName" class="mt-6 flex flex-col items-center gap-2">
-                        <div class="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10">
-                           <span class="text-lg">🎵</span>
-                           <span class="text-xs font-medium text-white/80 max-w-[150px] truncate">{{ fileASRState.fileName }}</span>
+                     <div v-if="fileASRState.fileName" class="mt-4 flex flex-col items-center gap-1">
+                        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+                           <span class="text-sm">🎵</span>
+                           <span class="text-[10px] font-medium text-white/80 max-w-[120px] truncate">{{ fileASRState.fileName }}</span>
                         </div>
-                        <span v-if="fileASRState.status === 'success'" class="text-green-400 text-[10px] font-bold uppercase tracking-wider">Completed</span>
-                        <span v-else-if="fileASRState.status === 'error'" class="text-red-400 text-[10px] font-bold uppercase tracking-wider">Error</span>
+                        <span v-if="fileASRState.status === 'success'" class="text-green-400 text-[9px] font-bold uppercase tracking-wider">Completed</span>
+                        <span v-else-if="fileASRState.status === 'error'" class="text-red-400 text-[9px] font-bold uppercase tracking-wider">Error</span>
                      </div>
                      
-                     <div v-if="fileASRState.error" class="mt-4 text-xs text-red-400 px-4 text-center max-w-[280px]">
+                     <div v-if="fileASRState.error" class="mt-3 text-[10px] text-red-400 px-3 text-center max-w-[220px]">
                         {{ fileASRState.error }}
                      </div>
                 </div>
 
-                <!-- Visualizer -->
-                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="w-full h-12 flex items-end justify-center pb-1 opacity-60 mix-blend-screen">
-                   <AudioVisualizer 
-                      :is-active="isRecording"
-                      :analyser="analyserNode"
-                    />
-                </div>
-              </div>
-              
-              <!-- Settings Compact Panel -->
-              <div class="ios-glass p-5 rounded-[24px] space-y-4 shadow-xl ring-1 ring-white/10">
+                <!-- Settings Section -->
+                <div class="flex-1 pt-4 space-y-4">
                   <!-- Languages -->
                   <div class="flex items-center gap-3">
                     <div class="flex-1">
@@ -958,6 +957,7 @@ onUnmounted(() => {
                       </div>
                     </div>
                   </div>
+                </div>
               </div>
             </section>
 
