@@ -19,6 +19,7 @@ const BlogPostView = () => import('../views/BlogPostView.vue')
 const BlogEditorView = () => import('../views/BlogEditorView.vue')
 const BlogManagerView = () => import('../views/BlogManagerView.vue')
 const AiLabView = () => import('../views/AiLabView.vue')
+const AiLabStudioView = () => import('../views/AiLabStudioView.vue')
 const QuestionGenView = () => import('../views/QuestionGenView.vue')
 const PortfolioHomeView = () => import('../views/PortfolioHomeView.vue')
 const TarotSanctumView = () => import('../views/tarot/TarotSanctumView.vue')
@@ -57,6 +58,12 @@ const router = createRouter({
       name: 'ai-lab',
       component: AiLabView,
       meta: { title: 'AI Lab | DeepSeek Reasoner' }
+    },
+    {
+      path: '/kitchen/ai-lab/studio',
+      name: 'ai-lab-studio',
+      component: AiLabStudioView,
+      meta: { title: 'AI Studio | LZQ' }
     },
     // 登录页面（不需要验证）
     {

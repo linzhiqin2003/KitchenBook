@@ -752,6 +752,15 @@ const transcribeAudio = async (audioBlob, duration = 0) => {
         </div>
       </div>
       
+      <router-link
+        to="/kitchen/ai-lab/studio"
+        class="h-8 sm:h-9 px-2 sm:px-3 text-xs text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
+        title="打开 AI Studio"
+      >
+        <span class="text-sm">🎙️</span>
+        <span class="hidden sm:inline">AI Studio</span>
+      </router-link>
+
       <button 
         @click="clearChat" 
         class="h-8 sm:h-9 px-2 sm:px-3 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
