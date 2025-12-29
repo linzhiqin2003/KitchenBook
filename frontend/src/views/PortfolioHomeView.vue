@@ -73,7 +73,7 @@ const navBlocks = [
     subtitle: 'AI Lab',
     description: 'DeepSeek Reasoner 思考模型对话',
     icon: '🧠',
-    path: '/kitchen/ai-lab',
+    path: '/ai-lab',
     gradient: 'from-emerald-400 via-teal-500 to-cyan-500',
     shadowColor: 'shadow-teal-500/30',
     features: ['思维链推理', '语音输入', '图片OCR']

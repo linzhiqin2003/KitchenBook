@@ -650,7 +650,7 @@ onUnmounted(() => {
         <!-- Left: Status & Identity -->
         <div class="flex items-center gap-3 w-[200px]">
           <router-link
-            to="/kitchen/ai-lab"
+            to="/ai-lab"
             class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center transition-colors"
             title="返回 AI Lab"
           >
