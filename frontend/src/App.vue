@@ -13,7 +13,7 @@ const isPortfolioHome = computed(() => route.path === '/')
 // 更新为新的 /kitchen 路径结构
 const isChefMode = computed(() => route.path.startsWith('/kitchen/chef'))
 const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
-const isAiLabPage = computed(() => route.path === '/kitchen/ai-lab')
+const isAiLabPage = computed(() => route.path.startsWith('/kitchen/ai-lab'))
 // 博客页面独立布局 (/blog)
 const isBlogPage = computed(() => route.path === '/blog' || route.path.startsWith('/blog/'))
 // QuestionGen 刷题页面独立布局 (/questiongen)
