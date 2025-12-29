@@ -1,11 +1,12 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import API_BASE_URL from '../config/api'
 import { auth } from '../store/auth'
 
 const router = useRouter()
+const route = useRoute()
 
 const username = ref('')
 const password = ref('')
@@ -36,9 +37,12 @@ const handleLogin = async () => {
             // 显示成功提示
             success.value = true
             
+            // 获取重定向目标，默认跳转到 chef 后台
+            const redirectPath = route.query.redirect || '/kitchen/chef'
+            
             // 稍微延迟后跳转，让用户看到成功提示
             setTimeout(() => {
-                router.push('/kitchen/chef')
+                router.push(redirectPath)
             }, 500)
         }
     } catch (err) {

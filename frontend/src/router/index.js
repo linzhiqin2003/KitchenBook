@@ -52,18 +52,18 @@ const router = createRouter({
       component: RecipeBookView,
       meta: { title: '菜谱详情 | 私房厨房' }
     },
-    // AI 实验室 - DeepSeek Reasoner 思考模型
+    // AI 实验室 - DeepSeek Reasoner 思考模型 (需要登录)
     {
       path: '/kitchen/ai-lab',
       name: 'ai-lab',
       component: AiLabView,
-      meta: { title: 'AI Lab | DeepSeek Reasoner' }
+      meta: { requiresAuth: true, title: 'AI Lab | DeepSeek Reasoner' }
     },
     {
       path: '/kitchen/ai-lab/studio',
       name: 'ai-lab-studio',
       component: AiLabStudioView,
-      meta: { title: 'AI Studio | LZQ' }
+      meta: { requiresAuth: true, title: 'AI Studio | LZQ' }
     },
     // 登录页面（不需要验证）
     {
@@ -193,7 +193,11 @@ router.beforeEach((to, from, next) => {
     if (auth.checkAuth()) {
       next() // 已登录，允许访问
     } else {
-      next('/kitchen/chef/login') // 未登录，跳转到登录页
+      // 未登录，跳转到登录页，并带上目标URL用于登录后跳转
+      next({
+        path: '/kitchen/chef/login',
+        query: { redirect: to.fullPath }
+      })
     }
   } else {
     next() // 不需要认证，直接访问
