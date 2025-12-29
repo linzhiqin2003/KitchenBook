@@ -11,6 +11,7 @@ const props = defineProps({
 const emit = defineEmits(['clear', 'copy', 'download'])
 
 const containerRef = ref(null)
+const showClearConfirm = ref(false)
 
 // Auto-scroll to bottom
 watch(() => props.history.length, () => {
@@ -20,6 +21,19 @@ watch(() => props.history.length, () => {
     }
   })
 })
+
+function handleClearClick() {
+  showClearConfirm.value = true
+}
+
+function confirmClear() {
+  showClearConfirm.value = false
+  emit('clear')
+}
+
+function cancelClear() {
+  showClearConfirm.value = false
+}
 </script>
 
 <template>
@@ -51,7 +65,7 @@ watch(() => props.history.length, () => {
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </button>
         <button
-          @click="emit('clear')"
+          @click="handleClearClick"
           class="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-white/60 hover:bg-red-500/20 hover:text-red-400 transition-all duration-200"
           title="清空"
         >
@@ -146,5 +160,48 @@ watch(() => props.history.length, () => {
         </div>
       </div>
     </div>
+    
+    <!-- Custom Clear Confirmation Modal -->
+    <Transition name="fade">
+      <div v-if="showClearConfirm" class="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-[32px]">
+        <div class="bg-[#1c1c1e] rounded-2xl p-6 shadow-2xl border border-white/10 max-w-[280px] mx-4">
+          <div class="text-center mb-5">
+            <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
+              <svg class="w-6 h-6 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </div>
+            <h3 class="text-white font-semibold text-[17px] mb-1">清空记录</h3>
+            <p class="text-white/50 text-[14px]">确定要清空所有翻译记录吗？此操作无法撤销。</p>
+          </div>
+          <div class="flex gap-3">
+            <button
+              @click="cancelClear"
+              class="flex-1 py-2.5 px-4 rounded-xl bg-white/10 text-white font-medium text-[15px] hover:bg-white/20 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              @click="confirmClear"
+              class="flex-1 py-2.5 px-4 rounded-xl bg-red-500 text-white font-medium text-[15px] hover:bg-red-600 transition-colors"
+            >
+              清空
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

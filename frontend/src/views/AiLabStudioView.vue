@@ -525,9 +525,7 @@ function addToHistory(original, translated) {
 }
 
 function clearHistory() {
-  if (confirm('确定要清空所有记录吗？')) {
-    transcriptionHistory.value = []
-  }
+  transcriptionHistory.value = []
 }
 
 function copyAll() {
