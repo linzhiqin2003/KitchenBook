@@ -20,6 +20,7 @@ const BlogEditorView = () => import('../views/BlogEditorView.vue')
 const BlogManagerView = () => import('../views/BlogManagerView.vue')
 const AiLabView = () => import('../views/AiLabView.vue')
 const AiLabStudioView = () => import('../views/AiLabStudioView.vue')
+const AiLabLoginView = () => import('../views/AiLabLoginView.vue')
 const QuestionGenView = () => import('../views/QuestionGenView.vue')
 const PortfolioHomeView = () => import('../views/PortfolioHomeView.vue')
 const TarotSanctumView = () => import('../views/tarot/TarotSanctumView.vue')
@@ -52,19 +53,7 @@ const router = createRouter({
       component: RecipeBookView,
       meta: { title: '菜谱详情 | 私房厨房' }
     },
-    // AI 实验室 - DeepSeek Reasoner 思考模型 (需要登录)
-    {
-      path: '/kitchen/ai-lab',
-      name: 'ai-lab',
-      component: AiLabView,
-      meta: { requiresAuth: true, title: 'AI Lab | DeepSeek Reasoner' }
-    },
-    {
-      path: '/kitchen/ai-lab/studio',
-      name: 'ai-lab-studio',
-      component: AiLabStudioView,
-      meta: { requiresAuth: true, title: 'AI Studio | LZQ' }
-    },
+
     // 登录页面（不需要验证）
     {
       path: '/kitchen/chef/login',
@@ -172,6 +161,28 @@ const router = createRouter({
     },
 
     // ========================================
+    // AI Lab 模块 - /ai-lab 路径下 (需要登录)
+    // ========================================
+    {
+      path: '/ai-lab/login',
+      name: 'ai-lab-login',
+      component: AiLabLoginView,
+      meta: { title: 'AI Lab 登录 | LZQ' }
+    },
+    {
+      path: '/ai-lab',
+      name: 'ai-lab',
+      component: AiLabView,
+      meta: { requiresAuth: true, authType: 'ai-lab', title: 'AI Lab | DeepSeek Reasoner' }
+    },
+    {
+      path: '/ai-lab/studio',
+      name: 'ai-lab-studio',
+      component: AiLabStudioView,
+      meta: { requiresAuth: true, authType: 'ai-lab', title: 'AI Studio | LZQ' }
+    },
+
+    // ========================================
     // 根路径 - 个人网站首页
     // ========================================
     {
@@ -193,9 +204,10 @@ router.beforeEach((to, from, next) => {
     if (auth.checkAuth()) {
       next() // 已登录，允许访问
     } else {
-      // 未登录，跳转到登录页，并带上目标URL用于登录后跳转
+      // 根据 authType 决定跳转到哪个登录页
+      const loginPath = to.meta.authType === 'ai-lab' ? '/ai-lab/login' : '/kitchen/chef/login'
       next({
-        path: '/kitchen/chef/login',
+        path: loginPath,
         query: { redirect: to.fullPath }
       })
     }
