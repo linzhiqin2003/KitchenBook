@@ -713,19 +713,18 @@ onUnmounted(() => {
             <!-- Left: Control Center -->
             <section class="lg:col-span-4 flex flex-col gap-5 h-full overflow-hidden">
               <!-- Main Card with scroll -->
-              <div class="ios-glass flex-1 p-6 rounded-[32px] flex flex-col items-center shadow-2xl ring-1 ring-white/10 group hover:ring-white/20 transition-all duration-500 overflow-y-auto custom-scrollbar">
+              <div class="ios-glass flex-1 p-4 rounded-[24px] flex flex-col items-center shadow-2xl ring-1 ring-white/10 group hover:ring-white/20 transition-all duration-500 overflow-y-auto custom-scrollbar">
                 
                 <!-- Timer -->
-                <!-- Timer -->
-                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="flex flex-col items-center mt-6 space-y-2">
-                  <span class="text-[12px] font-bold text-white/30 uppercase tracking-[0.2em]">Session Time</span>
-                  <div class="text-7xl font-light tabular-nums tracking-tighter text-white drop-shadow-xl font-display">
+                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="flex flex-col items-center mt-4 space-y-1">
+                  <span class="text-[10px] font-bold text-white/40 uppercase tracking-[0.15em]">Session Time</span>
+                  <div class="text-5xl font-light tabular-nums tracking-tighter text-white/90 drop-shadow-xl font-display">
                     {{ formatTime(recordingTime) }}
                   </div>
                 </div>
 
                 <!-- Main Recording Action -->
-                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="flex flex-col items-center gap-8 my-10">
+                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="flex flex-col items-center gap-4 my-6">
                   <div class="relative group">
                     <div class="absolute inset-0 bg-ios-red/30 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-0 group-hover:opacity-100" :class="{ 'opacity-100 animate-pulse-slow': isRecording }"></div>
                     <RecordButton 
@@ -736,14 +735,14 @@ onUnmounted(() => {
                   </div>
                   
                   <!-- Status Text -->
-                  <div class="h-6 flex items-center justify-center">
+                  <div class="h-5 flex items-center justify-center">
                      <span 
-                       class="px-3 py-1 rounded-full text-[13px] font-medium transition-all duration-300 border"
+                       class="px-3 py-0.5 rounded-full text-[12px] font-medium transition-all duration-300 border"
                        :class="speechStatus === 'speaking' 
                          ? 'bg-green-500/10 border-green-500/20 text-green-400' 
-                         : (isRecording ? 'bg-white/5 border-white/10 text-white/60' : 'bg-transparent border-transparent text-white/20')"
+                         : (isRecording ? 'bg-white/5 border-white/10 text-white/60' : 'bg-transparent border-transparent text-white/30')"
                      >
-                       {{ speechStatus === 'speaking' ? 'Detected Speech' : (isRecording ? 'Listening...' : 'Ready to Start') }}
+                       {{ speechStatus === 'speaking' ? 'Detected Speech' : (isRecording ? 'Listening...' : 'Ready') }}
                      </span>
                   </div>
                 </div>
@@ -791,7 +790,7 @@ onUnmounted(() => {
                 </div>
 
                 <!-- Visualizer -->
-                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="w-full h-16 flex items-end justify-center pb-2 opacity-60 mix-blend-screen">
+                <div v-if="interpretationMode !== 'file_asr' && interpretationMode !== 'file_translation'" class="w-full h-12 flex items-end justify-center pb-1 opacity-60 mix-blend-screen">
                    <AudioVisualizer 
                       :is-active="isRecording"
                       :analyser="analyserNode"
