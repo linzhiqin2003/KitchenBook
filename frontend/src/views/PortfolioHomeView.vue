@@ -232,14 +232,7 @@ const socialLinks = [
                     {{ feature }}
                   </span>
                 </div>
-                
-                <!-- 箭头指示器 -->
-                <div class="absolute bottom-6 right-6 sm:bottom-8 sm:right-8 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-500">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                  </svg>
                 </div>
-              </div>
             </button>
           </div>
         </div>
