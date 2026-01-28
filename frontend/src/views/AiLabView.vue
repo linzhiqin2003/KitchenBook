@@ -786,8 +786,9 @@ onMounted(async () => {
         @change="handleFileSelect"
       />
 
-      <!-- 输入区域 -->
+      <!-- 输入区域（有消息时显示） -->
       <AiLabInput
+        v-if="hasMessages"
         v-model="inputMessage"
         :is-loading="isLoading"
         :is-recording="isRecording"
