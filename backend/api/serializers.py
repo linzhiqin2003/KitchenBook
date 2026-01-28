@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Recipe, RecipeStep, Ingredient, RecipeIngredient, Order, OrderItem, BlogPost, Tag
+from .models import Recipe, RecipeStep, Ingredient, RecipeIngredient, Order, OrderItem, BlogPost, Tag, AiLabConversation, AiLabMessage
 
 class RecipeStepSerializer(serializers.ModelSerializer):
     class Meta:
@@ -156,3 +156,47 @@ class BlogPostDetailSerializer(serializers.ModelSerializer):
         if tags is not None:
             instance.tags.set(tags)
         return instance
+
+
+# ==================== AI Lab 序列化器 ====================
+
+class AiLabMessageSerializer(serializers.ModelSerializer):
+    """AI Lab 消息序列化器"""
+    class Meta:
+        model = AiLabMessage
+        fields = ['id', 'conversation', 'role', 'content', 'reasoning', 'created_at']
+        read_only_fields = ['id', 'created_at']
+        extra_kwargs = {
+            'conversation': {'required': False}
+        }
+
+
+class AiLabConversationListSerializer(serializers.ModelSerializer):
+    """AI Lab 会话列表序列化器"""
+    message_count = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AiLabConversation
+        fields = ['id', 'title', 'created_at', 'updated_at', 'message_count', 'last_message']
+
+    def get_message_count(self, obj):
+        return obj.messages.count()
+
+    def get_last_message(self, obj):
+        last_msg = obj.messages.last()
+        if last_msg:
+            return {
+                'role': last_msg.role,
+                'content': last_msg.content[:100] + '...' if len(last_msg.content) > 100 else last_msg.content
+            }
+        return None
+
+
+class AiLabConversationDetailSerializer(serializers.ModelSerializer):
+    """AI Lab 会话详情序列化器（含消息）"""
+    messages = AiLabMessageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = AiLabConversation
+        fields = ['id', 'title', 'created_at', 'updated_at', 'messages']

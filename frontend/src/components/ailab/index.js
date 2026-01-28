@@ -1,0 +1,5 @@
+export { default as AiLabSidebar } from './AiLabSidebar.vue'
+export { default as AiLabWelcome } from './AiLabWelcome.vue'
+export { default as AiLabInput } from './AiLabInput.vue'
+export { default as AiLabMessageItem } from './AiLabMessageItem.vue'
+export { default as AiLabChatArea } from './AiLabChatArea.vue'

@@ -107,6 +107,47 @@ class Tag(models.Model):
         return self.name
 
 
+# ==================== AI Lab 会话模块 ====================
+
+class AiLabConversation(models.Model):
+    """AI Lab 会话"""
+    title = models.CharField(max_length=200, default="新对话")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return self.title
+
+
+class AiLabMessage(models.Model):
+    """AI Lab 消息"""
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('assistant', 'Assistant'),
+    ]
+
+    conversation = models.ForeignKey(
+        AiLabConversation,
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    reasoning = models.TextField(blank=True, null=True, help_text="AI 思维链内容")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.role}: {self.content[:50]}..."
+
+
+# ==================== 技术博客模块 ====================
+
 class BlogPost(models.Model):
     """技术博客文章"""
     title = models.CharField(max_length=200)

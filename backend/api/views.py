@@ -1359,3 +1359,82 @@ class WhisperTranscribeView(APIView):
             return Response({
                 'error': f'语音转录失败: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ==================== AI Lab 会话管理 ====================
+
+from .models import AiLabConversation, AiLabMessage
+from .serializers import (
+    AiLabConversationListSerializer, AiLabConversationDetailSerializer, AiLabMessageSerializer
+)
+
+
+class AiLabConversationViewSet(viewsets.ModelViewSet):
+    """AI Lab 会话管理"""
+    queryset = AiLabConversation.objects.all()
+    authentication_classes = []
+    permission_classes = []
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return AiLabConversationListSerializer
+        return AiLabConversationDetailSerializer
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    @action(detail=True, methods=['post'], url_path='messages')
+    def add_message(self, request, pk=None):
+        """向会话添加消息"""
+        conversation = self.get_object()
+        serializer = AiLabMessageSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(conversation=conversation)
+            # 更新会话时间
+            conversation.save()  # 触发 auto_now
+
+            # 如果是用户消息且会话标题是默认的，则自动更新标题
+            if serializer.validated_data.get('role') == 'user' and conversation.title == '新对话':
+                content = serializer.validated_data.get('content', '')
+                # 取前30个字符作为标题
+                new_title = content[:30] + ('...' if len(content) > 30 else '')
+                conversation.title = new_title
+                conversation.save()
+
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AiLabMessageViewSet(viewsets.ModelViewSet):
+    """AI Lab 消息管理"""
+    queryset = AiLabMessage.objects.all()
+    serializer_class = AiLabMessageSerializer
+    authentication_classes = []
+    permission_classes = []
+
+    def destroy(self, request, *args, **kwargs):
+        """删除消息及其后续所有消息"""
+        message = self.get_object()
+        conversation = message.conversation
+
+        # 删除该消息及其后的所有消息
+        AiLabMessage.objects.filter(
+            conversation=conversation,
+            created_at__gte=message.created_at
+        ).delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def update(self, request, *args, **kwargs):
+        """编辑消息，同时删除后续消息"""
+        message = self.get_object()
+        conversation = message.conversation
+
+        # 删除该消息后的所有消息（不包括自己）
+        AiLabMessage.objects.filter(
+            conversation=conversation,
+            created_at__gt=message.created_at
+        ).delete()
+
+        # 更新消息内容
+        return super().update(request, *args, **kwargs)
