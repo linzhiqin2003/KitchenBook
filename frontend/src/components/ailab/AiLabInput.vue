@@ -52,6 +52,8 @@ watch(localValue, (val) => {
 })
 
 const handleKeydown = (e) => {
+  // 如果是 IME 输入法正在组合，不发送
+  if (e.isComposing || e.keyCode === 229) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     emit('send')
@@ -70,19 +72,19 @@ const formatDuration = (seconds) => {
 </script>
 
 <template>
-  <div class="bg-white border-t border-gray-200 px-4 py-3 safe-area-bottom">
-    <div class="max-w-4xl mx-auto">
-      <div class="flex items-end gap-2 p-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-100 transition-all">
+  <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-10 pb-6 px-4">
+    <div class="max-w-3xl mx-auto relative">
+      <div class="relative bg-gray-50 border border-gray-200 rounded-full shadow-sm transition-all hover:border-gray-300 hover:shadow-md">
         <!-- 左侧按钮组 -->
-        <div class="flex items-center gap-1 pb-1">
+        <div class="absolute bottom-2.5 left-3 flex items-center gap-1">
           <!-- 图片按钮 -->
           <button
             @click="emit('image-click')"
             :disabled="isLoading || isOcrProcessing || isRecording"
             :class="[
-              'w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer',
+              'p-2 rounded-full transition-all cursor-pointer',
               hasImage
-                ? 'bg-violet-100 text-violet-600'
+                ? 'bg-purple-100 text-purple-600'
                 : 'hover:bg-gray-200 text-gray-400 hover:text-gray-600',
               (isLoading || isOcrProcessing || isRecording) && 'opacity-50 cursor-not-allowed'
             ]"
@@ -98,7 +100,7 @@ const formatDuration = (seconds) => {
             @click="emit('voice-click')"
             :disabled="isLoading || isOcrProcessing || isTranscribing"
             :class="[
-              'w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer',
+              'p-2 rounded-full transition-all cursor-pointer',
               isRecording
                 ? 'bg-red-500 text-white animate-pulse'
                 : 'hover:bg-gray-200 text-gray-400 hover:text-gray-600',
@@ -119,7 +121,7 @@ const formatDuration = (seconds) => {
           </button>
 
           <!-- 录音时长 -->
-          <span v-if="isRecording" class="text-xs text-red-500 font-mono min-w-[40px] pb-0.5">
+          <span v-if="isRecording" class="text-xs text-red-500 font-mono min-w-[40px]">
             {{ formatDuration(recordingDuration) }}
           </span>
         </div>
@@ -130,44 +132,27 @@ const formatDuration = (seconds) => {
           @keydown="handleKeydown"
           @paste="handlePaste"
           :disabled="isLoading || isRecording"
-          :placeholder="isRecording ? '录音中...' : '输入消息...'"
+          :placeholder="isRecording ? '录音中...' : '继续对话...'"
+          class="w-full bg-transparent text-gray-800 placeholder-gray-400 py-3 pl-24 pr-14 min-h-[48px] max-h-32 resize-none scrollbar-hide outline-none border-none focus:ring-0 focus:outline-none"
           rows="1"
-          class="flex-1 resize-none bg-transparent border-0 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-0 max-h-32 min-h-[36px] py-2 text-sm leading-relaxed"
-          style="field-sizing: content;"
         ></textarea>
 
         <!-- 发送/停止按钮 -->
-        <div class="pb-1">
-          <button
-            v-if="!isLoading"
-            @click="emit('send')"
-            :disabled="!localValue.trim() && !hasImage"
-            :class="[
-              'w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer',
-              localValue.trim() || hasImage
-                ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-500/20 hover:shadow-lg hover:shadow-violet-500/30'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            ]"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-            </svg>
-          </button>
-
-          <button
-            v-else
-            @click="emit('stop')"
-            class="w-9 h-9 rounded-xl bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors cursor-pointer"
-            title="停止生成"
-          >
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <div class="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+          <button v-if="isLoading" @click="emit('stop')" class="p-2 bg-gray-200 hover:bg-gray-300 rounded-full text-gray-600 transition-colors cursor-pointer">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
               <rect x="6" y="6" width="12" height="12" rx="1"/>
             </svg>
           </button>
+          <button v-else @click="emit('send')" :disabled="!localValue.trim() && !hasImage"
+             class="p-2 disabled:opacity-40 disabled:cursor-not-allowed rounded-full text-white transition-all shadow-lg cursor-pointer"
+             style="background: var(--theme-gradient-btn); box-shadow: 0 4px 14px var(--theme-shadow);">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+             </svg>
+          </button>
         </div>
       </div>
-
-      <!-- 底部提示 -->
       <div class="text-center mt-2 text-xs text-gray-400">
         DeepSeek Reasoner · 按 Enter 发送，Shift+Enter 换行
       </div>
@@ -176,7 +161,13 @@ const formatDuration = (seconds) => {
 </template>
 
 <style scoped>
-.safe-area-bottom {
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
+/* 隐藏滚动条但保持功能 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 </style>

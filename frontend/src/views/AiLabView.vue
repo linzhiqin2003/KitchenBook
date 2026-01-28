@@ -815,6 +815,21 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* 主题变量 */
+:root {
+  --theme-50: #f5f3ff;
+  --theme-100: #ede9fe;
+  --theme-200: #ddd6fe;
+  --theme-300: #c4b5fd;
+  --theme-400: #a78bfa;
+  --theme-500: #8b5cf6;
+  --theme-600: #7c3aed;
+  --theme-700: #6d28d9;
+  --theme-gradient: linear-gradient(135deg, #8b5cf6, #d946ef);
+  --theme-gradient-btn: linear-gradient(to right, #8b5cf6, #9333ea);
+  --theme-shadow: rgba(139, 92, 246, 0.2);
+}
+
 /* 动态视口高度兼容 */
 .h-dvh {
   height: 100vh;
@@ -829,5 +844,34 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* 全局滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* 隐藏滚动条但保持功能 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 </style>
