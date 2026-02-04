@@ -91,9 +91,9 @@
     @discard="discard"
   />
 
-  <!-- 已确认收据：归属调整面板（独立于上方可编辑表格） -->
+  <!-- 已确认收据：商品账目归属面板（独立于上方可编辑表格） -->
   <div v-if="receipt && isOwner && receipt.status === 'confirmed' && orgStore.orgs.length" class="panel" style="margin-top: 20px;">
-    <h2>归属调整</h2>
+    <h2>商品账目归属</h2>
     <p class="move-hint">将某条明细移动到其他组织的收据中，税费和折扣将按比例自动分摊。</p>
     <div class="item-table-wrapper">
       <table class="table">
