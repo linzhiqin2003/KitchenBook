@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from "vue";
+import { reactive, watch, watchEffect } from "vue";
 import { Trash2 } from "lucide-vue-next";
 import type { ReceiptItemPayload } from "../api/receipts";
 
@@ -120,6 +120,17 @@ const emitUpdate = () => {
   skipNextSync = true;
   emit("update:items", localItems.map((item, index) => ({ ...item, line_index: index })));
 };
+
+// Deep watch: 任何字段编辑都同步到父组件（节流 300ms）
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  localItems,
+  () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(emitUpdate, 300);
+  },
+  { deep: true }
+);
 
 const getItems = () => localItems.map((item, index) => ({ ...item, line_index: index }));
 
