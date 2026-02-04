@@ -48,10 +48,10 @@
               </div>
             </div>
             <div class="form-field">
-              <label>昵称 <span class="optional">可选</span></label>
+              <label>昵称</label>
               <div class="input-wrapper">
                 <UserIcon :size="16" class="input-icon" />
-                <input class="input has-icon" v-model="nickname" placeholder="显示名称" />
+                <input class="input has-icon" v-model="nickname" required placeholder="显示名称" />
               </div>
             </div>
             <div class="form-field">
@@ -105,6 +105,10 @@ async function handleRegister() {
   error.value = "";
   success.value = "";
 
+  if (!nickname.value.trim()) {
+    error.value = "请输入昵称";
+    return;
+  }
   if (password.value !== password2.value) {
     error.value = "两次输入的密码不一致";
     return;
@@ -123,6 +127,8 @@ async function handleRegister() {
       const data = err.response.data;
       if (data?.email) {
         error.value = Array.isArray(data.email) ? data.email[0] : data.email;
+      } else if (data?.nickname) {
+        error.value = Array.isArray(data.nickname) ? data.nickname[0] : data.nickname;
       } else if (data?.password) {
         error.value = Array.isArray(data.password) ? data.password[0] : data.password;
       } else {
@@ -319,12 +325,6 @@ async function handleRegister() {
   color: var(--text, #1c1c1e);
   font-size: 13px;
   font-weight: 600;
-}
-
-.optional {
-  font-weight: 400;
-  color: var(--muted, #8e8e93);
-  font-size: 12px;
 }
 
 .input-wrapper {
