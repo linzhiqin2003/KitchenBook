@@ -123,7 +123,6 @@
               >
                 移动
               </button>
-              <span v-else class="move-current-label">当前</span>
             </td>
           </tr>
         </tbody>
