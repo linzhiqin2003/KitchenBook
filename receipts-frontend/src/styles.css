@@ -179,6 +179,10 @@ a {
   height: 100vh;
 }
 
+.main-content > * {
+  flex-shrink: 0;
+}
+
 /* ─── Topbar ─── */
 
 .topbar {
@@ -272,7 +276,6 @@ a {
   padding: 24px;
   box-shadow: var(--shadow);
   animation: fadeIn 0.4s ease;
-  overflow: hidden;
 }
 
 .panel h2 {

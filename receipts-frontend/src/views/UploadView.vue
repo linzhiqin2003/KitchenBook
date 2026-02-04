@@ -310,12 +310,7 @@ const save = async (itemsData?: any[]) => {
   message.value = "已保存。";
 };
 
-const confirmAndReset = async (itemsData?: any[]) => {
-  if (!receipt.value) return;
-  const itemsList = itemsData || items.value;
-  await save(itemsList);
-
-  // Check if any item targets a different org → split confirm
+const doConfirm = async (itemsList: any[], force = false) => {
   const currentOrg = authStore.activeOrgId || "";
   const hasOrgDiff = itemsList.some((it: any) => {
     const target = it.target_org_id ?? currentOrg;
@@ -327,9 +322,34 @@ const confirmAndReset = async (itemsData?: any[]) => {
     itemsList.forEach((it: any, idx: number) => {
       itemOrgs[String(idx)] = it.target_org_id ?? currentOrg;
     });
-    await confirmReceiptWithSplit(receipt.value.id, itemOrgs);
+    await confirmReceiptWithSplit(receipt.value.id, itemOrgs, force);
   } else {
-    await confirmReceipt(receipt.value.id);
+    await confirmReceipt(receipt.value.id, force);
+  }
+};
+
+const confirmAndReset = async (itemsData?: any[]) => {
+  if (!receipt.value) return;
+  const itemsList = itemsData || items.value;
+  await save(itemsList);
+
+  try {
+    await doConfirm(itemsList);
+  } catch (err: any) {
+    if (err?.response?.status === 409) {
+      const dup = err.response.data?.duplicate;
+      const dupDate = dup?.date ? new Date(dup.date).toLocaleDateString() : "未知日期";
+      const ok = window.confirm(
+        `检测到重复收据：${dup?.merchant || "未知"} / ${dupDate} / ${dup?.total || "?"}\n是否仍要入库？`
+      );
+      if (ok) {
+        await doConfirm(itemsList, true);
+      } else {
+        return;
+      }
+    } else {
+      throw err;
+    }
   }
 
   message.value = null;

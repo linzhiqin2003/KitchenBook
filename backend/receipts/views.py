@@ -293,6 +293,41 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         receipt = self.get_object()
         self._check_owner(receipt)
 
+        # 重复收据检测
+        if (
+            receipt.merchant
+            and receipt.purchased_at
+            and receipt.total is not None
+            and not request.data.get("force")
+        ):
+            dup_qs = Receipt.objects.filter(
+                user=receipt.user,
+                status=Receipt.STATUS_CONFIRMED,
+                merchant__iexact=receipt.merchant,
+                purchased_at__date=receipt.purchased_at.date(),
+                total=receipt.total,
+            ).exclude(id=receipt.id)
+
+            if receipt.organization:
+                dup_qs = dup_qs.filter(organization=receipt.organization)
+            else:
+                dup_qs = dup_qs.filter(organization__isnull=True)
+
+            dup = dup_qs.first()
+            if dup:
+                return Response(
+                    {
+                        "detail": "检测到重复收据",
+                        "duplicate": {
+                            "id": str(dup.id),
+                            "merchant": dup.merchant,
+                            "date": dup.purchased_at.isoformat() if dup.purchased_at else None,
+                            "total": str(dup.total),
+                        },
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
         item_orgs = request.data.get("item_orgs")
         if not item_orgs:
             # Simple confirm — no split

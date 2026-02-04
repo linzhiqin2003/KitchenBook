@@ -267,6 +267,24 @@ const discard = async () => {
   router.push("/receipts");
 };
 
+const doConfirm = async (itemsList: any[], force = false) => {
+  const currentOrg = authStore.activeOrgId || "";
+  const hasOrgDiff = itemsList.some((it: any) => {
+    const target = it.target_org_id ?? currentOrg;
+    return target !== currentOrg;
+  });
+
+  if (hasOrgDiff) {
+    const itemOrgs: Record<string, string> = {};
+    itemsList.forEach((it: any, idx: number) => {
+      itemOrgs[String(idx)] = it.target_org_id ?? currentOrg;
+    });
+    await confirmReceiptWithSplit(receipt.value.id, itemOrgs, force);
+  } else {
+    await confirmReceipt(receipt.value.id, force);
+  }
+};
+
 const confirmAndBack = async (itemsData?: any[]) => {
   if (!receipt.value) return;
   message.value = null;
@@ -287,22 +305,25 @@ const confirmAndBack = async (itemsData?: any[]) => {
     };
     await updateReceipt(receipt.value.id, payload);
 
-    // Check if any item targets a different org → split confirm
-    const currentOrg = authStore.activeOrgId || "";
-    const hasOrgDiff = itemsList.some((it: any) => {
-      const target = it.target_org_id ?? currentOrg;
-      return target !== currentOrg;
-    });
-
-    if (hasOrgDiff) {
-      const itemOrgs: Record<string, string> = {};
-      itemsList.forEach((it: any, idx: number) => {
-        itemOrgs[String(idx)] = it.target_org_id ?? currentOrg;
-      });
-      await confirmReceiptWithSplit(receipt.value.id, itemOrgs);
-    } else {
-      await confirmReceipt(receipt.value.id);
+    try {
+      await doConfirm(itemsList);
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        const dup = err.response.data?.duplicate;
+        const dupDate = dup?.date ? new Date(dup.date).toLocaleDateString() : "未知日期";
+        const ok = window.confirm(
+          `检测到重复收据：${dup?.merchant || "未知"} / ${dupDate} / ${dup?.total || "?"}\n是否仍要入库？`
+        );
+        if (ok) {
+          await doConfirm(itemsList, true);
+        } else {
+          return;
+        }
+      } else {
+        throw err;
+      }
     }
+
     router.push("/receipts");
   } catch (err: any) {
     message.value = "操作失败：" + (err?.response?.data?.detail || err?.message || "请稍后重试");

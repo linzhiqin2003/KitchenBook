@@ -135,16 +135,19 @@ export async function updateReceipt(id: string, payload: ReceiptPayload) {
   return data;
 }
 
-export async function confirmReceipt(id: string) {
-  const { data } = await api.post(`/receipts/${id}/confirm/`);
+export async function confirmReceipt(id: string, force = false) {
+  const { data } = await api.post(`/receipts/${id}/confirm/`, force ? { force: true } : {});
   return data;
 }
 
 export async function confirmReceiptWithSplit(
   id: string,
   itemOrgs: Record<string, string>,
+  force = false,
 ) {
-  const { data } = await api.post(`/receipts/${id}/confirm/`, { item_orgs: itemOrgs });
+  const payload: Record<string, any> = { item_orgs: itemOrgs };
+  if (force) payload.force = true;
+  const { data } = await api.post(`/receipts/${id}/confirm/`, payload);
   return data;
 }
 
