@@ -1,0 +1,29 @@
+{
+  "name": "receipt-dashboard",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@date-fns/tz": "^1.4.1",
+    "@floating-ui/vue": "^1.1.10",
+    "@vuepic/vue-datepicker": "^12.1.0",
+    "@vueuse/core": "^14.2.0",
+    "axios": "^1.6.7",
+    "date-fns": "^4.1.0",
+    "echarts": "^5.5.0",
+    "lucide-vue-next": "^0.563.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.21",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "typescript": "^5.4.2",
+    "vite": "^5.2.0"
+  }
+}

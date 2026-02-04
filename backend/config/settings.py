@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -78,6 +79,8 @@ INSTALLED_APPS = [
     "questions",  # QuestionGen 刷题模块
     "apps.interpretation",
     "apps.emoji_generator",
+    "accounts",
+    "receipts",
 ]
 
 MIDDLEWARE = [
@@ -199,6 +202,16 @@ MEDIA_ROOT = BASE_DIR / "media"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+DEFAULT_CURRENCY = os.environ.get("DEFAULT_CURRENCY", "GBP")
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": False,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
 
 # 厨师登录凭证（从环境变量读取，默认值仅用于开发）
 CHEF_USERNAME = os.environ.get('CHEF_USERNAME', 'chef')

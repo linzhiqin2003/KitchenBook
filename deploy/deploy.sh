@@ -37,6 +37,11 @@ cd ~/KitchenBook/frontend
 npm install --silent
 npm run build
 
+echo -e "${YELLOW}🧾 6.1 构建 Receipts 前端...${NC}"
+cd ~/KitchenBook/receipts-frontend
+npm install --silent
+npm run build
+
 echo -e "${YELLOW}🔄 7. 重启服务...${NC}"
 sudo systemctl restart gunicorn
 sleep 2

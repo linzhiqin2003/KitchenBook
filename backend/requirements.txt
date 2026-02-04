@@ -13,3 +13,5 @@ openai==1.58.1
 requests==2.32.3
 gunicorn==21.2.0
 gevent==24.2.1
+djangorestframework-simplejwt>=5.3,<6
+pydantic>=2.6,<3

@@ -386,3 +386,48 @@ VITE_API_URL=https://your_domain.com
 - 深色主题 + 紫色/品红色渐变，营造科技感
 - 保留与厨房项目、AI 实验室的互相导航
 
+
+### 2025-01-28: AI Lab UI 专业化改造
+
+**需求**：将 AI Lab 页面升级为专业的 AI 对话界面，支持多会话管理。
+
+**实现方案**：
+
+1. **后端 - 会话管理 API**
+   - 新增 `AiLabConversation` 和 `AiLabMessage` 模型
+   - `/api/ai/conversations/` - 会话 CRUD
+   - `/api/ai/conversations/{id}/messages/` - 添加消息
+   - `/api/ai/messages/{id}/` - 删除/编辑消息（及后续消息）
+   - 迁移文件：`0007_ailabconversation_ailabmessage.py`
+
+2. **前端组件拆分** (`frontend/src/components/ailab/`)
+   - `AiLabSidebar.vue` - 侧边栏（会话列表，按日期分组）
+   - `AiLabWelcome.vue` - 欢迎屏（快捷问题入口）
+   - `AiLabInput.vue` - 输入区域（图片/语音/发送按钮）
+   - `AiLabMessageItem.vue` - 消息项（支持编辑/复制/重新生成）
+   - `AiLabChatArea.vue` - 聊天区域（消息列表容器）
+
+3. **核心功能**
+   - 🗂️ **会话管理**：侧边栏显示历史对话，按今天/昨天/更早分组
+   - ✏️ **消息编辑**：用户消息可编辑重发，自动删除后续消息
+   - 🔄 **重新生成**：AI 回复可重新生成
+   - 💾 **数据持久化**：所有对话保存到数据库
+   - 📱 **响应式设计**：移动端侧边栏浮动显示
+
+4. **主题系统**
+   - 紫色渐变主题（violet-500 到 purple-600）
+   - 代码块使用深紫渐变背景
+   - 引用块使用紫色左边框
+
+**API 端点**：
+```
+GET    /api/ai/conversations/           # 会话列表
+POST   /api/ai/conversations/           # 新建会话
+GET    /api/ai/conversations/{id}/      # 会话详情（含消息）
+DELETE /api/ai/conversations/{id}/      # 删除会话
+PATCH  /api/ai/conversations/{id}/      # 更新标题
+POST   /api/ai/conversations/{id}/messages/  # 添加消息
+DELETE /api/ai/messages/{id}/           # 删除消息（及后续）
+PUT    /api/ai/messages/{id}/           # 编辑消息
+```
+
