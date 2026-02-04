@@ -42,9 +42,9 @@
         </tbody>
       </table>
     </div>
-    <div v-if="!hideActions" class="item-actions">
+    <div class="item-actions">
       <button class="button ghost" @click="addRow">新增行</button>
-      <div class="item-actions__right">
+      <div v-if="!hideActions" class="item-actions__right">
         <button v-if="showDiscard" class="button ghost danger-text" @click="emit('discard')">退出不保存</button>
         <button class="button" @click="onSave">保存修改</button>
         <button v-if="showConfirm" class="button secondary" @click="onConfirm">确认入库</button>
@@ -95,21 +95,29 @@ const sync = (items: ReceiptItemPayload[]) => {
   })));
 };
 
+let skipNextSync = false;
+
 watch(
   () => props.items,
-  (value) => sync(value || []),
+  (value) => {
+    if (skipNextSync) { skipNextSync = false; return; }
+    sync(value || []);
+  },
   { immediate: true }
 );
 
 const addRow = () => {
   localItems.push({ name: "", quantity: 1, main_category: "", sub_category: "", target_org_id: props.currentOrgId });
+  emitUpdate();
 };
 
 const removeRow = (index: number) => {
   localItems.splice(index, 1);
+  emitUpdate();
 };
 
 const emitUpdate = () => {
+  skipNextSync = true;
   emit("update:items", localItems.map((item, index) => ({ ...item, line_index: index })));
 };
 

@@ -171,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-vue-next";
 import { confirmReceipt, confirmReceiptWithSplit, deleteReceipt, getReceipt, moveReceiptItems, updateReceipt } from "../api/receipts";
@@ -312,12 +312,23 @@ const confirmAndBack = async (itemsData?: any[]) => {
   }
 };
 
-const initMoveTargets = () => {
+const syncMoveTargets = () => {
   const orgId = authStore.activeOrgId || "";
   items.value.forEach((_: any, idx: number) => {
-    moveTargets[idx] = orgId;
+    if (!(idx in moveTargets)) {
+      moveTargets[idx] = orgId;
+    }
+  });
+  // 清除多余的 key（删除行后）
+  Object.keys(moveTargets).forEach((k) => {
+    if (Number(k) >= items.value.length) {
+      delete moveTargets[Number(k)];
+    }
   });
 };
+
+// items 变化时（增删行）自动同步归属表
+watch(items, syncMoveTargets, { deep: false });
 
 const moveItem = async (item: any, index: number) => {
   if (!receipt.value || !item.id) return;
@@ -333,7 +344,7 @@ const moveItem = async (item: any, index: number) => {
     }
     // Reload receipt data
     await load();
-    initMoveTargets();
+    syncMoveTargets();
     const orgName = targetOrgId
       ? orgStore.orgs.find(o => o.id === targetOrgId)?.name || "目标组织"
       : "个人空间";
@@ -345,7 +356,7 @@ const moveItem = async (item: any, index: number) => {
 
 onMounted(async () => {
   await load();
-  initMoveTargets();
+  syncMoveTargets();
   if (authStore.isLoggedIn) {
     try { await orgStore.fetchOrgs(); } catch { /* ignore */ }
   }
