@@ -23,6 +23,7 @@ def _get_or_create_categories(main_name: str | None, sub_name: str | None) -> tu
 class ReceiptItemSerializer(serializers.ModelSerializer):
     main_category = serializers.CharField(required=False, allow_blank=True)
     sub_category = serializers.CharField(required=False, allow_blank=True)
+    target_org_id = serializers.CharField(required=False, allow_blank=True, default="")
 
     class Meta:
         model = ReceiptItem
@@ -39,24 +40,30 @@ class ReceiptItemSerializer(serializers.ModelSerializer):
             "line_index",
             "main_category",
             "sub_category",
+            "target_org_id",
         ]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["main_category"] = instance.category_main.name if instance.category_main else ""
         data["sub_category"] = instance.category_sub.name if instance.category_sub else ""
+        data.pop("target_org_id", None)
         return data
 
 
 class ReceiptSerializer(serializers.ModelSerializer):
     items = ReceiptItemSerializer(many=True, required=False)
     uploader_name = serializers.SerializerMethodField()
+    organization_id = serializers.UUIDField(source="organization.id", read_only=True, default=None)
+    organization_name = serializers.CharField(source="organization.name", read_only=True, default="")
 
     class Meta:
         model = Receipt
         fields = [
             "id",
             "user_id",
+            "organization_id",
+            "organization_name",
             "merchant",
             "address",
             "purchased_at",
@@ -93,6 +100,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
         if items_data is not None:
             instance.items.all().delete()
             for index, item in enumerate(items_data):
+                item.pop("target_org_id", None)
                 main_name = item.pop("main_category", "")
                 sub_name = item.pop("sub_category", "")
                 line_index = item.pop("line_index", index)

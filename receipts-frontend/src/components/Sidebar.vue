@@ -27,7 +27,69 @@
         <span class="nav-icon"><Building2 :size="15" /></span>
         <span class="nav-label">组织</span>
       </RouterLink>
+      <!-- Mobile-only: user tab as 5th nav item -->
+      <button v-if="authStore.isLoggedIn" class="mobile-user-tab" @click="mobileSheetOpen = true">
+        <span class="nav-icon">
+          <div class="mobile-user-avatar">
+            <img v-if="authStore.user?.avatar_display" :src="authStore.user.avatar_display" class="avatar-img" />
+            <span v-else>{{ avatarLetter }}</span>
+          </div>
+        </span>
+        <span class="nav-label">我的</span>
+      </button>
     </nav>
+
+    <!-- Mobile bottom sheet (teleported to body) -->
+    <Teleport to="body">
+      <Transition name="sheet">
+        <div v-if="mobileSheetOpen" class="sheet-backdrop" @click="mobileSheetOpen = false">
+          <div class="sheet-container" @click.stop>
+            <div class="sheet-handle"></div>
+            <!-- User info -->
+            <div class="sheet-user">
+              <div class="sheet-avatar">
+                <img v-if="authStore.user?.avatar_display" :src="authStore.user.avatar_display" class="avatar-img" />
+                <span v-else>{{ avatarLetter }}</span>
+              </div>
+              <div class="sheet-user-detail">
+                <div class="sheet-user-name">{{ authStore.displayName }}</div>
+                <div class="sheet-user-email">{{ authStore.user?.email }}</div>
+              </div>
+            </div>
+            <div class="sheet-divider"></div>
+            <!-- Org switcher -->
+            <div class="sheet-section-label">切换空间</div>
+            <button
+              class="sheet-item"
+              :class="{ active: !authStore.activeOrgId }"
+              @click="selectOrgMobile('')"
+            >
+              <User :size="18" />
+              <span>个人模式</span>
+              <Check v-if="!authStore.activeOrgId" :size="16" class="sheet-check" />
+            </button>
+            <template v-if="orgStore.orgs.length">
+              <button
+                v-for="org in orgStore.orgs"
+                :key="org.id"
+                class="sheet-item"
+                :class="{ active: authStore.activeOrgId === org.id }"
+                @click="selectOrgMobile(org.id)"
+              >
+                <Building2 :size="18" />
+                <span>{{ org.name }}</span>
+                <Check v-if="authStore.activeOrgId === org.id" :size="16" class="sheet-check" />
+              </button>
+            </template>
+            <div class="sheet-divider"></div>
+            <button class="sheet-item sheet-item--danger" @click="handleLogoutMobile">
+              <LogOut :size="18" />
+              <span>登出</span>
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- User info + Org switcher (bottom) -->
     <div v-if="authStore.isLoggedIn && !collapsed" class="user-block">
@@ -122,6 +184,7 @@ const router = useRouter();
 const authStore = useAuthStore();
 const orgStore = useOrgStore();
 const dropdownOpen = ref(false);
+const mobileSheetOpen = ref(false);
 const avatarInput = ref<HTMLInputElement | null>(null);
 const avatarInputCollapsed = ref<HTMLInputElement | null>(null);
 
@@ -167,6 +230,19 @@ function selectOrg(orgId: string) {
 
 function handleLogout() {
   dropdownOpen.value = false;
+  authStore.logout();
+  router.push("/login");
+}
+
+function selectOrgMobile(orgId: string) {
+  mobileSheetOpen.value = false;
+  if (orgId === authStore.activeOrgId) return;
+  authStore.switchOrg(orgId);
+  window.location.reload();
+}
+
+function handleLogoutMobile() {
+  mobileSheetOpen.value = false;
   authStore.logout();
   router.push("/login");
 }
@@ -494,5 +570,227 @@ onMounted(async () => {
   .collapsed .brand {
     display: none !important;
   }
+}
+
+/* ── Mobile User Tab (5th nav item) ── */
+
+.mobile-user-tab {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mobile-user-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 6px 4px;
+    color: var(--muted, #8e8e93);
+    font-size: 11px;
+    font-weight: 500;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-user-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent, #007aff), #5ac8fa);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 11px;
+    overflow: hidden;
+  }
+
+  .mobile-user-avatar .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+/* ── Bottom Sheet ── */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-container {
+  width: 100%;
+  max-width: 500px;
+  background: var(--panel-solid, #fff);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 20px calc(env(safe-area-inset-bottom, 16px) + 16px);
+  max-height: 70vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+
+.sheet-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0 12px;
+}
+
+.sheet-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent, #007aff), #5ac8fa);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 17px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sheet-avatar .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sheet-user-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet-user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text, #1c1c1e);
+  line-height: 1.3;
+}
+
+.sheet-user-email {
+  font-size: 13px;
+  color: var(--muted, #8e8e93);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-divider {
+  height: 1px;
+  background: var(--border, rgba(0, 0, 0, 0.08));
+  margin: 8px 0;
+}
+
+.sheet-section-label {
+  padding: 8px 4px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #8e8e93);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 4px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text, #1c1c1e);
+  font-size: 15px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-item svg:first-child {
+  color: var(--muted, #8e8e93);
+  flex-shrink: 0;
+}
+
+.sheet-item span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-item:active {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.sheet-item.active {
+  color: var(--accent, #007aff);
+  font-weight: 600;
+}
+
+.sheet-item.active svg:first-child {
+  color: var(--accent, #007aff);
+}
+
+.sheet-check {
+  color: var(--accent, #007aff);
+  flex-shrink: 0;
+}
+
+.sheet-item--danger {
+  color: var(--danger, #ff3b30);
+}
+
+.sheet-item--danger svg:first-child {
+  color: var(--danger, #ff3b30) !important;
+}
+
+/* Sheet transitions */
+.sheet-enter-active {
+  transition: opacity 0.25s ease;
+}
+.sheet-enter-active .sheet-container {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sheet-leave-active {
+  transition: opacity 0.2s ease;
+}
+.sheet-leave-active .sheet-container {
+  transition: transform 0.2s ease;
+}
+
+.sheet-enter-from,
+.sheet-leave-to {
+  opacity: 0;
+}
+.sheet-enter-from .sheet-container,
+.sheet-leave-to .sheet-container {
+  transform: translateY(100%);
 }
 </style>

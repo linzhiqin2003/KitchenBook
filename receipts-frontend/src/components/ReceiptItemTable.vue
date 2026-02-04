@@ -13,6 +13,7 @@
             <th>单位</th>
             <th>单价</th>
             <th>总价</th>
+            <th v-if="showOrgSelector">归属</th>
             <th></th>
           </tr>
         </thead>
@@ -26,6 +27,12 @@
             <td data-label="单位"><input class="input" v-model="item.unit" /></td>
             <td data-label="单价"><input class="input" v-model="item.unit_price" /></td>
             <td data-label="总价"><input class="input" v-model="item.total_price" /></td>
+            <td v-if="showOrgSelector" data-label="归属">
+              <select class="input org-select" v-model="item.target_org_id">
+                <option value="">个人</option>
+                <option v-for="org in orgs" :key="org.id" :value="org.id">{{ org.name }}</option>
+              </select>
+            </td>
             <td class="row-actions">
               <button class="btn-delete" @click="removeRow(index)" title="删除此行">
                 <Trash2 :size="15" />
@@ -51,13 +58,24 @@ import { reactive, watch } from "vue";
 import { Trash2 } from "lucide-vue-next";
 import type { ReceiptItemPayload } from "../api/receipts";
 
+interface OrgOption {
+  id: string;
+  name: string;
+}
+
 const props = withDefaults(defineProps<{
   items: ReceiptItemPayload[];
   showDiscard?: boolean;
   showConfirm?: boolean;
+  orgs?: OrgOption[];
+  currentOrgId?: string;
+  showOrgSelector?: boolean;
 }>(), {
   showDiscard: false,
   showConfirm: false,
+  orgs: () => [],
+  currentOrgId: "",
+  showOrgSelector: false,
 });
 const emit = defineEmits<{
   (e: "update:items", value: ReceiptItemPayload[]): void;
@@ -69,7 +87,10 @@ const emit = defineEmits<{
 const localItems = reactive<ReceiptItemPayload[]>([]);
 
 const sync = (items: ReceiptItemPayload[]) => {
-  localItems.splice(0, localItems.length, ...items.map((item) => ({ ...item })));
+  localItems.splice(0, localItems.length, ...items.map((item) => ({
+    ...item,
+    target_org_id: item.target_org_id ?? props.currentOrgId,
+  })));
 };
 
 watch(
@@ -79,7 +100,7 @@ watch(
 );
 
 const addRow = () => {
-  localItems.push({ name: "", quantity: 1, main_category: "", sub_category: "" });
+  localItems.push({ name: "", quantity: 1, main_category: "", sub_category: "", target_org_id: props.currentOrgId });
 };
 
 const removeRow = (index: number) => {
@@ -147,6 +168,11 @@ const onConfirm = () => {
 
 .danger-text {
   color: var(--danger) !important;
+}
+
+.org-select {
+  min-width: 80px;
+  padding-right: 24px;
 }
 
 @media (max-width: 640px) {

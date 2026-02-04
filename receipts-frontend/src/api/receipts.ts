@@ -13,6 +13,7 @@ export interface ReceiptItemPayload {
   line_index?: number;
   main_category?: string;
   sub_category?: string;
+  target_org_id?: string | null;
 }
 
 export interface ReceiptPayload {
@@ -136,6 +137,22 @@ export async function updateReceipt(id: string, payload: ReceiptPayload) {
 
 export async function confirmReceipt(id: string) {
   const { data } = await api.post(`/receipts/${id}/confirm/`);
+  return data;
+}
+
+export async function confirmReceiptWithSplit(
+  id: string,
+  itemOrgs: Record<string, string>,
+) {
+  const { data } = await api.post(`/receipts/${id}/confirm/`, { item_orgs: itemOrgs });
+  return data;
+}
+
+export async function moveReceiptItems(
+  id: string,
+  moves: Array<{ item_id: string | number; target_org_id: string }>,
+) {
+  const { data } = await api.post(`/receipts/${id}/move-items/`, { moves });
   return data;
 }
 

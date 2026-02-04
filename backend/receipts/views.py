@@ -64,6 +64,28 @@ MERCHANT_ALIASES = {
     "朗御": "LANGYU",
 }
 
+_Q2 = Decimal("0.01")
+
+
+def _prorate_decimal(value, ratio):
+    """按比例分摊一个 Decimal 值，保留 2 位小数。None 保持 None。"""
+    if value is None:
+        return None
+    return (Decimal(str(value)) * ratio).quantize(_Q2)
+
+
+def _calc_total(subtotal, tax, discount):
+    """total = subtotal + tax - discount（None 视作 0）。"""
+    return (subtotal or Decimal("0")) + (tax or Decimal("0")) - (discount or Decimal("0"))
+
+
+def _apply_prorated_financials(receipt_obj, subtotal, tax, discount):
+    """将分摊后的 subtotal/tax/discount 写入 receipt 并计算 total。"""
+    receipt_obj.subtotal = subtotal
+    receipt_obj.tax = tax
+    receipt_obj.discount = discount
+    receipt_obj.total = _calc_total(subtotal, tax, discount)
+
 
 @transaction.atomic
 def _apply_parsed_result(receipt: Receipt, parsed, raw_text: str, raw_json: dict):
@@ -270,13 +292,229 @@ class ReceiptViewSet(viewsets.ModelViewSet):
     def confirm(self, request, pk=None):
         receipt = self.get_object()
         self._check_owner(receipt)
-        receipt.status = Receipt.STATUS_CONFIRMED
 
-        # 归档重命名图片: {日期}_{店名}_{金额}.ext
-        if receipt.image:
-            self._archive_image(receipt)
+        item_orgs = request.data.get("item_orgs")
+        if not item_orgs:
+            # Simple confirm — no split
+            receipt.status = Receipt.STATUS_CONFIRMED
+            if receipt.image:
+                self._archive_image(receipt)
+            receipt.save(update_fields=["status", "image"])
+            return Response(ReceiptSerializer(receipt).data)
 
-        receipt.save(update_fields=["status", "image"])
+        # --- Split confirm: group items by target org ---
+        all_items = list(receipt.items.all().order_by("line_index"))
+
+        # Validate membership for all target orgs
+        target_org_ids = set()
+        for idx_str, org_id in item_orgs.items():
+            if org_id:
+                target_org_ids.add(org_id)
+        for org_id in target_org_ids:
+            if not OrganizationMember.objects.filter(org_id=org_id, user=request.user).exists():
+                return Response({"detail": f"您不是组织 {org_id} 的成员"}, status=status.HTTP_403_FORBIDDEN)
+
+        current_org_id = str(receipt.organization_id) if receipt.organization_id else ""
+
+        # Snapshot original financials for proportional split
+        orig_item_sum = sum((it.total_price or Decimal("0")) for it in all_items)
+        orig_subtotal = receipt.subtotal or orig_item_sum
+        orig_tax = receipt.tax
+        orig_discount = receipt.discount
+
+        # Group items by target org
+        groups = {}  # org_id_str -> [item]
+        for idx, item in enumerate(all_items):
+            target = item_orgs.get(str(idx), current_org_id)
+            if target is None:
+                target = ""
+            groups.setdefault(target, []).append(item)
+
+        with transaction.atomic():
+            created_receipts = []
+            # Track allocated amounts; remainder goes to current-org group
+            allocated_subtotal = Decimal("0")
+            allocated_tax = Decimal("0")
+            allocated_discount = Decimal("0")
+
+            for org_key, group_items in groups.items():
+                if org_key == current_org_id:
+                    continue  # handle last
+
+                group_item_sum = sum((it.total_price or Decimal("0")) for it in group_items)
+                ratio = (group_item_sum / orig_item_sum) if orig_item_sum else Decimal("0")
+
+                g_subtotal = _prorate_decimal(orig_subtotal, ratio) or Decimal("0")
+                g_tax = _prorate_decimal(orig_tax, ratio)
+                g_discount = _prorate_decimal(orig_discount, ratio)
+
+                allocated_subtotal += g_subtotal
+                allocated_tax += g_tax or Decimal("0")
+                allocated_discount += g_discount or Decimal("0")
+
+                new_receipt = Receipt.objects.create(
+                    user=receipt.user,
+                    organization_id=org_key if org_key else None,
+                    merchant=receipt.merchant,
+                    address=receipt.address,
+                    purchased_at=receipt.purchased_at,
+                    currency=receipt.currency,
+                    payer=receipt.payer,
+                    notes=receipt.notes,
+                    status=Receipt.STATUS_CONFIRMED,
+                )
+                for new_idx, item in enumerate(group_items):
+                    item.receipt = new_receipt
+                    item.line_index = new_idx
+                    item.save(update_fields=["receipt_id", "line_index"])
+
+                _apply_prorated_financials(new_receipt, g_subtotal, g_tax, g_discount)
+                new_receipt.save(update_fields=["subtotal", "tax", "discount", "total"])
+                created_receipts.append(new_receipt)
+
+            # Current-org group gets the remainder (avoids rounding drift)
+            remaining = groups.get(current_org_id, [])
+            if remaining:
+                for new_idx, item in enumerate(remaining):
+                    if item.line_index != new_idx:
+                        item.line_index = new_idx
+                        item.save(update_fields=["line_index"])
+
+                r_subtotal = orig_subtotal - allocated_subtotal
+                r_tax = (orig_tax - allocated_tax) if orig_tax is not None else None
+                r_discount = (orig_discount - allocated_discount) if orig_discount is not None else None
+                _apply_prorated_financials(receipt, r_subtotal, r_tax, r_discount)
+
+                receipt.status = Receipt.STATUS_CONFIRMED
+                if receipt.image:
+                    self._archive_image(receipt)
+                receipt.save(update_fields=["status", "image", "subtotal", "tax", "discount", "total"])
+            else:
+                receipt.delete()
+                if created_receipts:
+                    return Response(ReceiptSerializer(created_receipts[0]).data)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response(ReceiptSerializer(receipt).data)
+
+    @action(detail=True, methods=["post"], url_path="move-items")
+    def move_items(self, request, pk=None):
+        """Move items between receipts after confirmation, with proportional financials."""
+        receipt = self.get_object()
+        self._check_owner(receipt)
+
+        moves = request.data.get("moves", [])
+        if not moves:
+            return Response({"detail": "moves 参数为空"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate membership
+        target_org_ids = set()
+        for m in moves:
+            org_id = m.get("target_org_id")
+            if org_id:
+                target_org_ids.add(org_id)
+        for org_id in target_org_ids:
+            if not OrganizationMember.objects.filter(org_id=org_id, user=request.user).exists():
+                return Response({"detail": f"您不是组织 {org_id} 的成员"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Snapshot source financials BEFORE any moves
+        orig_source_item_sum = receipt.items.aggregate(t=models.Sum("total_price"))["t"] or Decimal("0")
+        orig_source_subtotal = receipt.subtotal or orig_source_item_sum
+        orig_source_tax = receipt.tax
+        orig_source_discount = receipt.discount
+
+        with transaction.atomic():
+            # Track: target_receipt_id -> sum of moved items' total_price
+            moved_sums_per_target = {}
+            affected_receipts = {}  # id -> receipt obj
+
+            for m in moves:
+                item_id = m.get("item_id")
+                target_org_id = m.get("target_org_id")  # "" or None → personal
+
+                try:
+                    item = ReceiptItem.objects.get(id=item_id, receipt=receipt)
+                except ReceiptItem.DoesNotExist:
+                    continue
+
+                target_org = target_org_id if target_org_id else None
+                target_receipt = Receipt.objects.filter(
+                    user=receipt.user,
+                    organization_id=target_org,
+                    merchant=receipt.merchant,
+                    purchased_at=receipt.purchased_at,
+                    status=Receipt.STATUS_CONFIRMED,
+                ).first()
+
+                if not target_receipt:
+                    target_receipt = Receipt.objects.create(
+                        user=receipt.user,
+                        organization_id=target_org,
+                        merchant=receipt.merchant,
+                        address=receipt.address,
+                        purchased_at=receipt.purchased_at,
+                        currency=receipt.currency,
+                        payer=receipt.payer,
+                        notes=receipt.notes,
+                        status=Receipt.STATUS_CONFIRMED,
+                        subtotal=Decimal("0"),
+                        total=Decimal("0"),
+                    )
+
+                item_price = item.total_price or Decimal("0")
+                max_idx = target_receipt.items.aggregate(m=models.Max("line_index"))["m"]
+                item.receipt = target_receipt
+                item.line_index = (max_idx or -1) + 1
+                item.save(update_fields=["receipt_id", "line_index"])
+
+                tid = target_receipt.id
+                moved_sums_per_target[tid] = moved_sums_per_target.get(tid, Decimal("0")) + item_price
+                affected_receipts[tid] = target_receipt
+
+            # Proportionally distribute tax/discount to each target
+            total_allocated_subtotal = Decimal("0")
+            total_allocated_tax = Decimal("0")
+            total_allocated_discount = Decimal("0")
+
+            for tid, moved_sum in moved_sums_per_target.items():
+                target_r = affected_receipts[tid]
+                target_r.refresh_from_db()
+
+                if orig_source_item_sum and orig_source_item_sum > 0:
+                    ratio = moved_sum / orig_source_item_sum
+                    moved_subtotal = _prorate_decimal(orig_source_subtotal, ratio) or Decimal("0")
+                    moved_tax = _prorate_decimal(orig_source_tax, ratio)
+                    moved_discount = _prorate_decimal(orig_source_discount, ratio)
+                else:
+                    moved_subtotal = moved_sum
+                    moved_tax = None
+                    moved_discount = None
+
+                total_allocated_subtotal += moved_subtotal
+                total_allocated_tax += moved_tax or Decimal("0")
+                total_allocated_discount += moved_discount or Decimal("0")
+
+                # Add to target's existing financials
+                target_r.subtotal = (target_r.subtotal or Decimal("0")) + moved_subtotal
+                target_r.tax = (target_r.tax or Decimal("0")) + moved_tax if moved_tax is not None else target_r.tax
+                target_r.discount = (target_r.discount or Decimal("0")) + moved_discount if moved_discount is not None else target_r.discount
+                target_r.total = _calc_total(target_r.subtotal, target_r.tax, target_r.discount)
+                target_r.save(update_fields=["subtotal", "tax", "discount", "total"])
+
+            # Source receipt: subtract moved portion (remainder stays)
+            remaining_count = receipt.items.count()
+            if remaining_count == 0:
+                receipt_id = receipt.id
+                receipt.delete()
+                return Response({"detail": "原收据已清空并删除", "deleted": True, "id": str(receipt_id)})
+            else:
+                receipt.subtotal = orig_source_subtotal - total_allocated_subtotal
+                receipt.tax = (orig_source_tax - total_allocated_tax) if orig_source_tax is not None else None
+                receipt.discount = (orig_source_discount - total_allocated_discount) if orig_source_discount is not None else None
+                receipt.total = _calc_total(receipt.subtotal, receipt.tax, receipt.discount)
+                receipt.save(update_fields=["subtotal", "tax", "discount", "total"])
+
+        receipt.refresh_from_db()
         return Response(ReceiptSerializer(receipt).data)
 
     @staticmethod

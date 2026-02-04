@@ -78,15 +78,69 @@
   </div>
 
   <ReceiptItemTable
-    v-if="receipt && isOwner"
+    v-if="receipt && isOwner && receipt.status !== 'confirmed'"
     :items="items"
     :showDiscard="true"
     :showConfirm="receipt.status === 'ready'"
+    :orgs="orgStore.orgs"
+    :currentOrgId="authStore.activeOrgId"
+    :showOrgSelector="orgStore.orgs.length > 0"
     @update:items="items = $event"
     @save="saveAndBack"
     @confirm="confirmAndBack"
     @discard="discard"
   />
+
+  <!-- 已确认收据：可编辑明细表 + 归属调整 -->
+  <div v-if="receipt && isOwner && receipt.status === 'confirmed'" class="panel">
+    <h2>商品明细</h2>
+    <div class="item-table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>主类</th>
+            <th>子类</th>
+            <th>商品</th>
+            <th>品牌</th>
+            <th>数量</th>
+            <th>单位</th>
+            <th>单价</th>
+            <th>总价</th>
+            <th v-if="orgStore.orgs.length">归属调整</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, index) in items" :key="index" class="item-row">
+            <td data-label="主类">{{ item.main_category || '-' }}</td>
+            <td data-label="子类">{{ item.sub_category || '-' }}</td>
+            <td data-label="商品">{{ item.name || '-' }}</td>
+            <td data-label="品牌">{{ item.brand || '-' }}</td>
+            <td data-label="数量">{{ item.quantity }}</td>
+            <td data-label="单位">{{ item.unit || '-' }}</td>
+            <td data-label="单价">{{ item.unit_price ?? '-' }}</td>
+            <td data-label="总价">{{ item.total_price ?? '-' }}</td>
+            <td v-if="orgStore.orgs.length" data-label="归属调整" class="move-cell">
+              <div class="move-row">
+                <select class="input move-select" v-model="moveTargets[index]">
+                  <option value="">个人</option>
+                  <option v-for="org in orgStore.orgs" :key="org.id" :value="org.id">{{ org.name }}</option>
+                </select>
+                <button
+                  class="button ghost move-btn"
+                  :disabled="moveTargets[index] === currentOrgIdStr"
+                  @click="moveItem(item, index)"
+                  title="移动到选定组织"
+                >
+                  移动
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="moveMessage" class="alert success" style="margin-top: 12px;">{{ moveMessage }}</div>
+  </div>
 
   <!-- 非所有者：只读商品列表 -->
   <div v-if="receipt && !isOwner && items.length" class="panel">
@@ -123,25 +177,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-vue-next";
-import { confirmReceipt, deleteReceipt, getReceipt, updateReceipt } from "../api/receipts";
+import { confirmReceipt, confirmReceiptWithSplit, deleteReceipt, getReceipt, moveReceiptItems, updateReceipt } from "../api/receipts";
 import ReceiptItemTable from "../components/ReceiptItemTable.vue";
 import { useAuthStore } from "../stores/auth";
+import { useOrgStore } from "../stores/org";
 
 const MEDIA_BASE = (import.meta.env.VITE_MEDIA_BASE || "/media").replace(/\/$/, "");
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const orgStore = useOrgStore();
 const receipt = ref<any>(null);
 const items = ref<any[]>([]);
 const message = ref<string | null>(null);
+const moveMessage = ref<string | null>(null);
 const showImage = ref(false);
 const fullscreen = ref(false);
 const isEmptyOnLoad = ref(false);
 const isOwner = computed(() => receipt.value?.user_id === authStore.user?.id);
+const moveTargets = reactive<Record<number, string>>({});
+const currentOrgIdStr = computed(() => authStore.activeOrgId || "");
 
 const imageUrl = computed(() => {
   if (!receipt.value?.image) return "";
@@ -221,6 +280,7 @@ const confirmAndBack = async (itemsData?: any[]) => {
   if (!receipt.value) return;
   message.value = null;
   try {
+    const itemsList = itemsData || items.value;
     const payload = {
       merchant: receipt.value.merchant,
       address: receipt.value.address,
@@ -232,17 +292,70 @@ const confirmAndBack = async (itemsData?: any[]) => {
       total: receipt.value.total,
       notes: receipt.value.notes,
       payer: receipt.value.payer,
-      items: itemsData || items.value
+      items: itemsList,
     };
     await updateReceipt(receipt.value.id, payload);
-    await confirmReceipt(receipt.value.id);
+
+    // Check if any item targets a different org → split confirm
+    const currentOrg = authStore.activeOrgId || "";
+    const hasOrgDiff = itemsList.some((it: any) => {
+      const target = it.target_org_id ?? currentOrg;
+      return target !== currentOrg;
+    });
+
+    if (hasOrgDiff) {
+      const itemOrgs: Record<string, string> = {};
+      itemsList.forEach((it: any, idx: number) => {
+        itemOrgs[String(idx)] = it.target_org_id ?? currentOrg;
+      });
+      await confirmReceiptWithSplit(receipt.value.id, itemOrgs);
+    } else {
+      await confirmReceipt(receipt.value.id);
+    }
     router.push("/receipts");
   } catch (err: any) {
     message.value = "操作失败：" + (err?.response?.data?.detail || err?.message || "请稍后重试");
   }
 };
 
-onMounted(load);
+const initMoveTargets = () => {
+  const orgId = authStore.activeOrgId || "";
+  items.value.forEach((_: any, idx: number) => {
+    moveTargets[idx] = orgId;
+  });
+};
+
+const moveItem = async (item: any, index: number) => {
+  if (!receipt.value || !item.id) return;
+  moveMessage.value = null;
+  const targetOrgId = moveTargets[index] ?? "";
+  try {
+    const result = await moveReceiptItems(receipt.value.id, [
+      { item_id: item.id, target_org_id: targetOrgId },
+    ]);
+    if (result.deleted) {
+      router.push("/receipts");
+      return;
+    }
+    // Reload receipt data
+    await load();
+    initMoveTargets();
+    const orgName = targetOrgId
+      ? orgStore.orgs.find(o => o.id === targetOrgId)?.name || "目标组织"
+      : "个人空间";
+    moveMessage.value = `已移动「${item.name}」到 ${orgName}`;
+  } catch (err: any) {
+    moveMessage.value = "移动失败：" + (err?.response?.data?.detail || err?.message || "请重试");
+  }
+};
+
+onMounted(async () => {
+  await load();
+  initMoveTargets();
+  if (authStore.isLoggedIn) {
+    try { await orgStore.fetchOrgs(); } catch { /* ignore */ }
+  }
+});
 </script>
 
 <style scoped>
@@ -348,6 +461,30 @@ onMounted(load);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
+}
+
+/* Move cell */
+.move-cell {
+  min-width: 180px;
+}
+
+.move-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.move-select {
+  flex: 1;
+  min-width: 80px;
+  font-size: 13px;
+}
+
+.move-btn {
+  white-space: nowrap;
+  padding: 4px 10px !important;
+  min-height: auto !important;
+  font-size: 12px !important;
 }
 
 /* Image viewer */
