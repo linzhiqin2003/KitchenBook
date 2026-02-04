@@ -10,21 +10,23 @@
     <table v-if="receipts.length" class="table">
       <thead>
         <tr>
-          <th>日期</th>
+          <th>购买日期</th>
           <th>商店</th>
           <th>付款人</th>
           <th>金额</th>
           <th>状态</th>
+          <th>创建时间</th>
           <th>操作</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="receipt in receipts" :key="receipt.id" class="receipt-row">
-          <td data-label="日期">{{ formatDate(receipt.purchased_at) }}</td>
+          <td data-label="购买日期">{{ formatDate(receipt.purchased_at) }}</td>
           <td data-label="商店">{{ receipt.merchant || "-" }}</td>
           <td data-label="付款人">{{ receipt.payer || "-" }}</td>
           <td data-label="金额">{{ formatGBP(receipt.total) }}</td>
           <td data-label="状态">{{ receipt.status === 'confirmed' ? '已确认' : receipt.status === 'ready' ? '待确认' : receipt.status }}</td>
+          <td data-label="创建时间">{{ formatDateTime(receipt.created_at) }}</td>
           <td data-label="操作" class="receipt-action">
             <RouterLink class="button ghost" :to="`/receipts/${receipt.id}`">{{ isOwner(receipt) ? '编辑' : '查看' }}</RouterLink>
             <button v-if="isOwner(receipt)" class="button danger" @click="remove(receipt)">删除</button>
@@ -83,6 +85,14 @@ const formatDate = (value: string | null) => {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}/${m}/${day}`;
+};
+
+const formatDateTime = (value: string | null) => {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 const remove = async (receipt: any) => {
