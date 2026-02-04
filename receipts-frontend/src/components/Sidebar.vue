@@ -19,6 +19,11 @@
         <span class="nav-icon"><Upload :size="18" /></span>
         <span class="nav-label">上传</span>
       </RouterLink>
+      <!-- Mobile-only: user tab in center position -->
+      <button v-if="authStore.isLoggedIn" class="mobile-user-tab" @click="mobileSheetOpen = true">
+        <span class="nav-icon"><CircleUserRound :size="18" /></span>
+        <span class="nav-label">我的</span>
+      </button>
       <RouterLink to="/receipts">
         <span class="nav-icon"><FileText :size="18" /></span>
         <span class="nav-label">历史收据</span>
@@ -27,16 +32,6 @@
         <span class="nav-icon"><Building2 :size="15" /></span>
         <span class="nav-label">组织</span>
       </RouterLink>
-      <!-- Mobile-only: user tab as 5th nav item -->
-      <button v-if="authStore.isLoggedIn" class="mobile-user-tab" @click="mobileSheetOpen = true">
-        <span class="nav-icon">
-          <div class="mobile-user-avatar">
-            <img v-if="authStore.user?.avatar_display" :src="authStore.user.avatar_display" class="avatar-img" />
-            <span v-else>{{ avatarLetter }}</span>
-          </div>
-        </span>
-        <span class="nav-label">我的</span>
-      </button>
     </nav>
 
     <!-- Mobile bottom sheet (teleported to body) -->
@@ -171,7 +166,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import {
   BookOpenText, LayoutDashboard, Upload, FileText, Building2,
-  LogOut, PanelLeftClose, PanelLeftOpen, ChevronsUpDown, Check, User
+  LogOut, PanelLeftClose, PanelLeftOpen, ChevronsUpDown, Check, User, CircleUserRound
 } from "lucide-vue-next";
 import { useAuthStore } from "../stores/auth";
 import { useOrgStore } from "../stores/org";
