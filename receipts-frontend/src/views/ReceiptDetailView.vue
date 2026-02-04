@@ -82,6 +82,7 @@
     :items="items"
     :showDiscard="true"
     :showConfirm="receipt.status === 'ready'"
+    :hideActions="receipt.status === 'confirmed' && orgStore.orgs.length > 0"
     :orgs="orgStore.orgs"
     :currentOrgId="authStore.activeOrgId"
     :showOrgSelector="receipt.status !== 'confirmed' && orgStore.orgs.length > 0"
@@ -129,6 +130,10 @@
       </table>
     </div>
     <div v-if="moveMessage" class="alert success" style="margin-top: 12px;">{{ moveMessage }}</div>
+    <div class="move-bottom-actions">
+      <button class="button ghost danger-text" @click="discard">退出不保存</button>
+      <button class="button" @click="saveAndBack()">保存修改</button>
+    </div>
   </div>
 
   <!-- 非所有者：只读商品列表 -->
@@ -490,6 +495,24 @@ onMounted(async () => {
   font-size: 13px;
   color: var(--muted, #8e8e93);
   margin: -4px 0 14px;
+}
+
+.move-bottom-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .move-bottom-actions {
+    flex-direction: column;
+  }
+  .move-bottom-actions .button {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
 }
 
 /* Image viewer */

@@ -42,7 +42,7 @@
         </tbody>
       </table>
     </div>
-    <div class="item-actions">
+    <div v-if="!hideActions" class="item-actions">
       <button class="button ghost" @click="addRow">新增行</button>
       <div class="item-actions__right">
         <button v-if="showDiscard" class="button ghost danger-text" @click="emit('discard')">退出不保存</button>
@@ -67,12 +67,14 @@ const props = withDefaults(defineProps<{
   items: ReceiptItemPayload[];
   showDiscard?: boolean;
   showConfirm?: boolean;
+  hideActions?: boolean;
   orgs?: OrgOption[];
   currentOrgId?: string;
   showOrgSelector?: boolean;
 }>(), {
   showDiscard: false,
   showConfirm: false,
+  hideActions: false,
   orgs: () => [],
   currentOrgId: "",
   showOrgSelector: false,
