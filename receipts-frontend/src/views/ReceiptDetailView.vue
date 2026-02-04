@@ -95,7 +95,7 @@
   <!-- 已确认收据：商品账目归属面板（独立于上方可编辑表格） -->
   <div v-if="receipt && isOwner && receipt.status === 'confirmed' && orgStore.orgs.length" class="panel" style="margin-top: 20px;">
     <h2>商品账目归属</h2>
-    <p class="move-hint">将某条明细移动到其他组织的收据中，税费和折扣将按比例自动分摊。</p>
+    <p class="move-hint">调整明细归属后点击「提交归属调整」，系统将自动在目标组织中生成对应收据，税费和折扣按比例分摊。</p>
     <div class="item-table-wrapper">
       <table class="table">
         <thead>
@@ -103,7 +103,6 @@
             <th>商品</th>
             <th>总价</th>
             <th>目标空间</th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -116,23 +115,21 @@
                 <option v-for="org in orgStore.orgs" :key="org.id" :value="org.id">{{ org.name }}</option>
               </select>
             </td>
-            <td>
-              <button
-                v-if="moveTargets[index] !== currentOrgIdStr"
-                class="button move-btn"
-                @click="moveItem(item, index)"
-              >
-                移动
-              </button>
-            </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div v-if="moveMessage" class="alert success" style="margin-top: 12px;">{{ moveMessage }}</div>
+    <div v-if="moveMessage" class="alert" :class="moveMessage.startsWith('失败') ? 'error' : 'success'" style="margin-top: 12px;">{{ moveMessage }}</div>
     <div class="move-bottom-actions">
       <button class="button ghost danger-text" @click="discard">退出不保存</button>
       <button class="button" @click="saveAndBack()">保存修改</button>
+      <button
+        v-if="hasOrgChanges"
+        class="button secondary"
+        @click="batchMoveItems"
+      >
+        提交归属调整
+      </button>
     </div>
   </div>
 
@@ -330,27 +327,35 @@ const syncMoveTargets = () => {
 // items 变化时（增删行）自动同步归属表
 watch(items, syncMoveTargets, { deep: false });
 
-const moveItem = async (item: any, index: number) => {
-  if (!receipt.value || !item.id) return;
+// 是否有归属变动（任何 item 的目标 org 与当前 org 不同）
+const hasOrgChanges = computed(() => {
+  const cur = currentOrgIdStr.value;
+  return items.value.some((_: any, idx: number) => (moveTargets[idx] ?? cur) !== cur);
+});
+
+const batchMoveItems = async () => {
+  if (!receipt.value) return;
   moveMessage.value = null;
-  const targetOrgId = moveTargets[index] ?? "";
+  const cur = currentOrgIdStr.value;
+  const moves: Array<{ item_id: string | number; target_org_id: string }> = [];
+  items.value.forEach((item: any, idx: number) => {
+    const target = moveTargets[idx] ?? cur;
+    if (target !== cur && item.id) {
+      moves.push({ item_id: item.id, target_org_id: target });
+    }
+  });
+  if (!moves.length) return;
   try {
-    const result = await moveReceiptItems(receipt.value.id, [
-      { item_id: item.id, target_org_id: targetOrgId },
-    ]);
+    const result = await moveReceiptItems(receipt.value.id, moves);
     if (result.deleted) {
       router.push("/receipts");
       return;
     }
-    // Reload receipt data
     await load();
     syncMoveTargets();
-    const orgName = targetOrgId
-      ? orgStore.orgs.find(o => o.id === targetOrgId)?.name || "目标组织"
-      : "个人空间";
-    moveMessage.value = `已移动「${item.name}」到 ${orgName}`;
+    moveMessage.value = `已成功调整 ${moves.length} 条明细的归属`;
   } catch (err: any) {
-    moveMessage.value = "移动失败：" + (err?.response?.data?.detail || err?.message || "请重试");
+    moveMessage.value = "失败：" + (err?.response?.data?.detail || err?.message || "请重试");
   }
 };
 
@@ -483,23 +488,6 @@ onMounted(async () => {
   flex: 1;
   min-width: 80px;
   font-size: 13px;
-}
-
-.move-btn {
-  white-space: nowrap;
-  padding: 4px 12px !important;
-  min-height: auto !important;
-  font-size: 12px !important;
-  border-radius: 6px !important;
-  background: var(--accent, #007aff) !important;
-  color: #fff !important;
-}
-
-.move-current-label {
-  font-size: 11px;
-  color: var(--muted, #8e8e93);
-  white-space: nowrap;
-  padding: 4px 6px;
 }
 
 .move-hint {
