@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import Sidebar from "./components/Sidebar.vue";
 import Topbar from "./components/Topbar.vue";
@@ -28,9 +28,21 @@ const collapsed = ref(false);
 const authStore = useAuthStore();
 const appReady = ref(false);
 
+function onResize() {
+  if (window.innerWidth <= 640) {
+    collapsed.value = false;
+  }
+}
+
 onMounted(async () => {
   await authStore.init();
   appReady.value = true;
+  window.addEventListener("resize", onResize);
+  onResize();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", onResize);
 });
 </script>
 

@@ -457,21 +457,42 @@ onMounted(async () => {
 /* ── Mobile ── */
 
 @media (max-width: 640px) {
-  .nav-label {
-    font-size: 11px;
-  }
-
   .collapse-btn {
-    display: none;
+    display: none !important;
   }
 
   .sidebar-bottom {
-    display: none;
+    display: none !important;
   }
 
   .user-block,
   .user-block-collapsed {
-    display: none;
+    display: none !important;
+  }
+
+  /* Override collapsed styles on mobile — always show labels */
+  .collapsed .brand-text,
+  .collapsed .nav-label,
+  .collapsed .footer {
+    opacity: 1;
+    width: auto;
+    pointer-events: auto;
+  }
+
+  .nav-label {
+    font-size: 11px !important;
+    opacity: 1 !important;
+    width: auto !important;
+    pointer-events: auto !important;
+  }
+
+  .collapsed .nav a {
+    justify-content: center;
+    padding: 6px 4px;
+  }
+
+  .collapsed .brand {
+    display: none !important;
   }
 }
 </style>

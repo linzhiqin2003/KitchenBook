@@ -80,7 +80,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(item, idx) in filteredItems" :key="idx" class="recent-row">
+        <tr v-for="(item, idx) in paginatedItems" :key="idx" class="recent-row">
           <td data-label="商品">{{ item.name }}</td>
           <td data-label="品牌">{{ item.brand || "-" }}</td>
           <td data-label="数量">{{ formatQuantity(item.total_quantity) }}</td>
@@ -94,11 +94,28 @@
       <Inbox :size="40" class="empty-state__icon" />
       <div class="empty-state__text">{{ (selectedCategory || selectedMerchant) ? '该筛选条件下暂无记录' : '暂无购买记录' }}</div>
     </div>
+    <div v-if="totalPages > 1" class="pagination">
+      <span class="pagination__info">共 {{ filteredItems.length }} 条，第 {{ currentPage }}/{{ totalPages }} 页</span>
+      <div class="pagination__controls">
+        <button :disabled="currentPage <= 1" @click="currentPage = 1" title="首页">&laquo;</button>
+        <button :disabled="currentPage <= 1" @click="currentPage--" title="上一页">&lsaquo;</button>
+        <button v-for="p in visiblePages" :key="p"
+                :class="{ active: p === currentPage }"
+                @click="currentPage = p">{{ p }}</button>
+        <button :disabled="currentPage >= totalPages" @click="currentPage++" title="下一页">&rsaquo;</button>
+        <button :disabled="currentPage >= totalPages" @click="currentPage = totalPages" title="末页">&raquo;</button>
+      </div>
+      <select v-model.number="pageSize" class="pagination__size">
+        <option :value="10">10 条/页</option>
+        <option :value="20">20 条/页</option>
+        <option :value="50">50 条/页</option>
+      </select>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { Wallet, Receipt, FolderOpen, Inbox } from "lucide-vue-next";
 import ChartCard from "../components/ChartCard.vue";
 import StatCard from "../components/StatCard.vue";
@@ -138,6 +155,10 @@ const selectedMerchant = ref<string | null>(null);
 const selectedPeriod = ref<{ type: "day" | "month"; label: string } | null>(null);
 const sortKey = ref<"total_spent" | "last_purchased">("last_purchased");
 const sortDir = ref<"asc" | "desc">("desc");
+
+// ── 分页 ──
+const currentPage = ref(1);
+const pageSize = ref(10);
 
 function toggleSort(key: "total_spent" | "last_purchased") {
   if (sortKey.value === key) {
@@ -277,6 +298,29 @@ const filteredItems = computed(() => {
     arr.sort((a, b) => ((a.last_purchased || "").localeCompare(b.last_purchased || "")) * dir);
   }
   return arr;
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / pageSize.value)));
+
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredItems.value.slice(start, start + pageSize.value);
+});
+
+const visiblePages = computed(() => {
+  const total = totalPages.value;
+  const cur = currentPage.value;
+  const pages: number[] = [];
+  let start = Math.max(1, cur - 2);
+  let end = Math.min(total, start + 4);
+  start = Math.max(1, end - 4);
+  for (let i = start; i <= end; i++) pages.push(i);
+  return pages;
+});
+
+// 筛选/排序/每页条数变化时回到第一页
+watch([selectedCategory, selectedMerchant, selectedPeriod, sortKey, sortDir, pageSize], () => {
+  currentPage.value = 1;
 });
 
 const onCategoryClick = (params: any) => {
@@ -706,7 +750,90 @@ onMounted(() => {
   opacity: 1;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.pagination__info {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pagination__controls {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.pagination__controls button {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination__controls button:hover:not(:disabled):not(.active) {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pagination__controls button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.pagination__controls button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pagination__size {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+
 @media (max-width: 640px) {
+  .date-range-bar {
+    gap: 8px;
+  }
+
+  .range-presets {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .range-presets button {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .recent-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
   .table thead {
     display: none;
   }
@@ -733,6 +860,23 @@ onMounted(() => {
     font-size: 11px;
     font-weight: 600;
     color: var(--muted);
+  }
+
+  .pagination {
+    gap: 8px;
+  }
+
+  .pagination__controls button {
+    min-width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .pagination__info {
+    font-size: 11px;
+    width: 100%;
+    text-align: center;
+    order: -1;
   }
 }
 </style>

@@ -81,5 +81,23 @@ const currentOrgName = computed(() => {
   .topbar-icon {
     display: none;
   }
+
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .topbar h1 {
+    font-size: 20px;
+  }
+
+  .topbar-right {
+    gap: 6px;
+  }
+
+  .org-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
 }
 </style>
