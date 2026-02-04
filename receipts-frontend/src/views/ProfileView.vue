@@ -1,7 +1,13 @@
 <template>
   <div class="profile-page">
     <div class="profile-card">
-      <h2 class="profile-title">个人资料</h2>
+      <div class="profile-header">
+        <h2 class="profile-title">个人资料</h2>
+        <button class="btn-back" @click="router.back()">
+          <ArrowLeft :size="16" />
+          <span>返回</span>
+        </button>
+      </div>
 
       <!-- Avatar -->
       <div class="avatar-section">
@@ -46,10 +52,12 @@
 
 <script setup lang="ts">
 import { computed, ref, watchEffect } from "vue";
-import { Camera, Loader2 } from "lucide-vue-next";
+import { ArrowLeft, Camera, Loader2 } from "lucide-vue-next";
+import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import api from "../api/client";
 
+const router = useRouter();
 const authStore = useAuthStore();
 const avatarInput = ref<HTMLInputElement | null>(null);
 const nickname = ref("");
@@ -138,11 +146,39 @@ async function saveNickname() {
   padding: 32px 28px;
 }
 
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
 .profile-title {
   font-size: 20px;
   font-weight: 700;
   color: var(--text, #1c1c1e);
-  margin: 0 0 28px;
+  margin: 0;
+}
+
+.btn-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted, #8e8e93);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-back:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text, #1c1c1e);
 }
 
 /* Avatar */
