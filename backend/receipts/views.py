@@ -605,7 +605,7 @@ class StatsOverviewView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     def get(self, request):
-        receipts = Receipt.objects.exclude(status=Receipt.STATUS_FAILED)
+        receipts = Receipt.objects.filter(status=Receipt.STATUS_CONFIRMED)
 
         # Data scoping
         if request.user and request.user.is_authenticated:
