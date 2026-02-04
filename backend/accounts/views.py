@@ -44,9 +44,17 @@ class UserProfileView(APIView):
             user=request.user,
             defaults={"nickname": request.user.email.split("@")[0] if request.user.email else request.user.username},
         )
+        old_nickname = profile.nickname
         serializer = UserProfileSerializer(profile, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
+        # Sync payer field on receipts when nickname changes
+        new_nickname = profile.nickname
+        if new_nickname and new_nickname != old_nickname and old_nickname:
+            from receipts.models import Receipt
+            Receipt.objects.filter(user=request.user, payer=old_nickname).update(payer=new_nickname)
+
         return Response(serializer.data)
 
 
