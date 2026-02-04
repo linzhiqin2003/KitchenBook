@@ -78,62 +78,52 @@
   </div>
 
   <ReceiptItemTable
-    v-if="receipt && isOwner && receipt.status !== 'confirmed'"
+    v-if="receipt && isOwner"
     :items="items"
     :showDiscard="true"
     :showConfirm="receipt.status === 'ready'"
     :orgs="orgStore.orgs"
     :currentOrgId="authStore.activeOrgId"
-    :showOrgSelector="orgStore.orgs.length > 0"
+    :showOrgSelector="receipt.status !== 'confirmed' && orgStore.orgs.length > 0"
     @update:items="items = $event"
     @save="saveAndBack"
     @confirm="confirmAndBack"
     @discard="discard"
   />
 
-  <!-- 已确认收据：可编辑明细表 + 归属调整 -->
-  <div v-if="receipt && isOwner && receipt.status === 'confirmed'" class="panel">
-    <h2>商品明细</h2>
+  <!-- 已确认收据：归属调整面板（独立于上方可编辑表格） -->
+  <div v-if="receipt && isOwner && receipt.status === 'confirmed' && orgStore.orgs.length" class="panel" style="margin-top: 20px;">
+    <h2>归属调整</h2>
+    <p class="move-hint">将某条明细移动到其他组织的收据中，税费和折扣将按比例自动分摊。</p>
     <div class="item-table-wrapper">
       <table class="table">
         <thead>
           <tr>
-            <th>主类</th>
-            <th>子类</th>
             <th>商品</th>
-            <th>品牌</th>
-            <th>数量</th>
-            <th>单位</th>
-            <th>单价</th>
             <th>总价</th>
-            <th v-if="orgStore.orgs.length">归属调整</th>
+            <th>目标空间</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(item, index) in items" :key="index" class="item-row">
-            <td data-label="主类">{{ item.main_category || '-' }}</td>
-            <td data-label="子类">{{ item.sub_category || '-' }}</td>
             <td data-label="商品">{{ item.name || '-' }}</td>
-            <td data-label="品牌">{{ item.brand || '-' }}</td>
-            <td data-label="数量">{{ item.quantity }}</td>
-            <td data-label="单位">{{ item.unit || '-' }}</td>
-            <td data-label="单价">{{ item.unit_price ?? '-' }}</td>
             <td data-label="总价">{{ item.total_price ?? '-' }}</td>
-            <td v-if="orgStore.orgs.length" data-label="归属调整" class="move-cell">
-              <div class="move-row">
-                <select class="input move-select" v-model="moveTargets[index]">
-                  <option value="">个人</option>
-                  <option v-for="org in orgStore.orgs" :key="org.id" :value="org.id">{{ org.name }}</option>
-                </select>
-                <button
-                  v-if="moveTargets[index] !== currentOrgIdStr"
-                  class="button move-btn"
-                  @click="moveItem(item, index)"
-                >
-                  移动
-                </button>
-                <span v-else class="move-current-label">当前</span>
-              </div>
+            <td data-label="目标" class="move-cell">
+              <select class="input move-select" v-model="moveTargets[index]">
+                <option value="">个人</option>
+                <option v-for="org in orgStore.orgs" :key="org.id" :value="org.id">{{ org.name }}</option>
+              </select>
+            </td>
+            <td>
+              <button
+                v-if="moveTargets[index] !== currentOrgIdStr"
+                class="button move-btn"
+                @click="moveItem(item, index)"
+              >
+                移动
+              </button>
+              <span v-else class="move-current-label">当前</span>
             </td>
           </tr>
         </tbody>
@@ -495,6 +485,12 @@ onMounted(async () => {
   color: var(--muted, #8e8e93);
   white-space: nowrap;
   padding: 4px 6px;
+}
+
+.move-hint {
+  font-size: 13px;
+  color: var(--muted, #8e8e93);
+  margin: -4px 0 14px;
 }
 
 /* Image viewer */
