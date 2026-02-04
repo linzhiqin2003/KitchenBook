@@ -325,6 +325,12 @@ onMounted(async () => {
     gap: 10px;
   }
 
+  /* 日期输入框各占一整行，避免 iOS 原生控件溢出 */
+  .filter-field:nth-child(3),
+  .filter-field:nth-child(4) {
+    grid-column: 1 / -1;
+  }
+
   .table thead {
     display: none;
   }
