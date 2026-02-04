@@ -7,6 +7,7 @@ import LoginView from "../views/LoginView.vue";
 import RegisterView from "../views/RegisterView.vue";
 import InviteAcceptView from "../views/InviteAcceptView.vue";
 import OrgSettingsView from "../views/OrgSettingsView.vue";
+import ProfileView from "../views/ProfileView.vue";
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
@@ -20,6 +21,7 @@ const router = createRouter({
     { path: "/register", name: "register", component: RegisterView, meta: { public: true } },
     { path: "/invite/:id", name: "invite-accept", component: InviteAcceptView, meta: { public: true } },
     { path: "/org-settings", name: "org-settings", component: OrgSettingsView },
+    { path: "/profile", name: "profile", component: ProfileView },
   ]
 });
 

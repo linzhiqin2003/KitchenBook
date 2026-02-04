@@ -82,6 +82,10 @@
               <Building2 :size="18" />
               <span>组织管理</span>
             </button>
+            <button class="sheet-item" @click="goToProfileMobile">
+              <UserCog :size="18" />
+              <span>个人资料</span>
+            </button>
             <button class="sheet-item sheet-item--danger" @click="handleLogoutMobile">
               <LogOut :size="18" />
               <span>登出</span>
@@ -138,6 +142,10 @@
             </button>
           </template>
           <div class="dropdown-divider"></div>
+          <button class="dropdown-item" @click="goToProfile">
+            <UserCog :size="15" />
+            <span>个人资料</span>
+          </button>
           <button class="dropdown-item dropdown-item--danger" @click="handleLogout">
             <LogOut :size="15" />
             <span>登出</span>
@@ -171,7 +179,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import {
   BookOpenText, LayoutDashboard, Upload, FileText, Building2,
-  LogOut, PanelLeftClose, PanelLeftOpen, ChevronsUpDown, Check, User, CircleUserRound
+  LogOut, PanelLeftClose, PanelLeftOpen, ChevronsUpDown, Check, User, CircleUserRound, UserCog
 } from "lucide-vue-next";
 import { useAuthStore } from "../stores/auth";
 import { useOrgStore } from "../stores/org";
@@ -244,6 +252,16 @@ function selectOrgMobile(orgId: string) {
 function goToOrgSettings() {
   mobileSheetOpen.value = false;
   router.push("/org-settings");
+}
+
+function goToProfile() {
+  dropdownOpen.value = false;
+  router.push("/profile");
+}
+
+function goToProfileMobile() {
+  mobileSheetOpen.value = false;
+  router.push("/profile");
 }
 
 function handleLogoutMobile() {
