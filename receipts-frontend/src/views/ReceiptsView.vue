@@ -7,7 +7,45 @@
         {{ creating ? '创建中...' : '手动记账' }}
       </button>
     </div>
-    <table v-if="receipts.length" class="table">
+
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-row">
+        <div class="filter-field">
+          <label>商店</label>
+          <select class="input" v-model="filterMerchant">
+            <option value="">全部</option>
+            <option v-for="m in merchantOptions" :key="m" :value="m">{{ m }}</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>付款人</label>
+          <select class="input" v-model="filterPayer">
+            <option value="">全部</option>
+            <option v-for="p in payerOptions" :key="p" :value="p">{{ p }}</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>开始日期</label>
+          <input class="input" type="date" v-model="filterDateFrom" />
+        </div>
+        <div class="filter-field">
+          <label>结束日期</label>
+          <input class="input" type="date" v-model="filterDateTo" />
+        </div>
+        <div class="filter-field filter-actions">
+          <button v-if="hasActiveFilter" class="button ghost" @click="clearFilters">
+            <X :size="14" />
+            清除
+          </button>
+        </div>
+      </div>
+      <div v-if="hasActiveFilter" class="filter-summary">
+        共 {{ filteredReceipts.length }} / {{ receipts.length }} 条
+      </div>
+    </div>
+
+    <table v-if="filteredReceipts.length" class="table">
       <thead>
         <tr>
           <th>购买日期</th>
@@ -20,7 +58,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="receipt in receipts" :key="receipt.id" class="receipt-row">
+        <tr v-for="receipt in filteredReceipts" :key="receipt.id" class="receipt-row">
           <td data-label="购买日期">{{ formatDate(receipt.purchased_at) }}</td>
           <td data-label="商店">{{ receipt.merchant || "-" }}</td>
           <td data-label="付款人">{{ receipt.payer || "-" }}</td>
@@ -34,6 +72,12 @@
         </tr>
       </tbody>
     </table>
+    <div v-else-if="receipts.length" class="empty-state">
+      <Search :size="48" class="empty-state__icon" />
+      <div class="empty-state__title">无匹配结果</div>
+      <div class="empty-state__text">尝试调整筛选条件</div>
+      <button class="button ghost" style="margin-top: 12px;" @click="clearFilters">清除筛选</button>
+    </div>
     <div v-else class="empty-state">
       <FileText :size="48" class="empty-state__icon" />
       <div class="empty-state__title">暂无账单</div>
@@ -47,9 +91,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { FileText, PenLine, Upload } from "lucide-vue-next";
+import { FileText, PenLine, Search, Upload, X } from "lucide-vue-next";
 import { createReceipt, deleteReceipt, listReceipts } from "../api/receipts";
 import { useAuthStore } from "../stores/auth";
 
@@ -57,6 +101,60 @@ const router = useRouter();
 const authStore = useAuthStore();
 const receipts = ref<any[]>([]);
 const creating = ref(false);
+
+// Filters
+const filterMerchant = ref("");
+const filterPayer = ref("");
+const filterDateFrom = ref("");
+const filterDateTo = ref("");
+
+const merchantOptions = computed(() => {
+  const set = new Set<string>();
+  receipts.value.forEach(r => { if (r.merchant) set.add(r.merchant); });
+  return [...set].sort();
+});
+
+const payerOptions = computed(() => {
+  const set = new Set<string>();
+  receipts.value.forEach(r => { if (r.payer) set.add(r.payer); });
+  return [...set].sort();
+});
+
+const hasActiveFilter = computed(() =>
+  !!(filterMerchant.value || filterPayer.value || filterDateFrom.value || filterDateTo.value)
+);
+
+const filteredReceipts = computed(() => {
+  let list = receipts.value;
+  if (filterMerchant.value) {
+    list = list.filter(r => r.merchant === filterMerchant.value);
+  }
+  if (filterPayer.value) {
+    list = list.filter(r => r.payer === filterPayer.value);
+  }
+  if (filterDateFrom.value) {
+    const from = new Date(filterDateFrom.value);
+    list = list.filter(r => {
+      if (!r.purchased_at) return false;
+      return new Date(r.purchased_at) >= from;
+    });
+  }
+  if (filterDateTo.value) {
+    const to = new Date(filterDateTo.value + "T23:59:59");
+    list = list.filter(r => {
+      if (!r.purchased_at) return false;
+      return new Date(r.purchased_at) <= to;
+    });
+  }
+  return list;
+});
+
+const clearFilters = () => {
+  filterMerchant.value = "";
+  filterPayer.value = "";
+  filterDateFrom.value = "";
+  filterDateTo.value = "";
+};
 
 const isOwner = (receipt: any) => receipt.user_id === authStore.user?.id;
 
@@ -129,6 +227,64 @@ onMounted(async () => {
   gap: 6px;
 }
 
+/* ── Filter Bar ── */
+
+.filter-bar {
+  margin-bottom: 16px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.filter-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted, #8e8e93);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-field .input {
+  font-size: 13px;
+  padding: 7px 10px;
+  min-height: 36px;
+}
+
+.filter-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.filter-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  padding: 7px 12px;
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.filter-summary {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted, #8e8e93);
+}
+
+/* ── Empty State ── */
+
 .empty-state {
   text-align: center;
   padding: 48px 0;
@@ -151,6 +307,8 @@ onMounted(async () => {
   font-size: 14px;
 }
 
+/* ── Actions ── */
+
 .receipt-action {
   display: flex;
   gap: 8px;
@@ -162,7 +320,27 @@ onMounted(async () => {
   font-size: 13px;
 }
 
+/* ── Mobile ── */
+
 @media (max-width: 640px) {
+  .filter-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .filter-field {
+    width: 100%;
+  }
+
+  .filter-actions {
+    align-items: stretch;
+  }
+
+  .filter-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+
   .table thead {
     display: none;
   }
