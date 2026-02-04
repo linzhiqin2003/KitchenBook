@@ -435,6 +435,8 @@ a {
 .select,
 .textarea {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
