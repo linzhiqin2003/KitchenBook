@@ -184,11 +184,24 @@ const onConfirm = () => {
   }
 
   .item-actions {
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .item-actions .button {
-    flex: 1;
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .item-actions__right {
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .item-actions__right .button {
+    width: 100%;
   }
 }
 </style>
