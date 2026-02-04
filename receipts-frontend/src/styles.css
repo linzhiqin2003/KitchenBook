@@ -648,7 +648,8 @@ a {
     gap: 0;
   }
 
-  .sidebar .nav a {
+  .sidebar .nav a,
+  .sidebar .nav .mobile-user-tab {
     flex-direction: column;
     align-items: center;
     justify-content: center;
