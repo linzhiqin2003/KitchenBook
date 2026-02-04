@@ -1,5 +1,5 @@
 <template>
-  <div class="topbar">
+  <div v-if="route.name !== 'profile'" class="topbar">
     <h1>
       <component :is="iconComponent" :size="24" class="topbar-icon" />
       {{ title }}

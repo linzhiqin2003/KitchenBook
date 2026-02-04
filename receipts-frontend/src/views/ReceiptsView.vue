@@ -46,12 +46,22 @@
     <table v-if="filteredReceipts.length" class="table">
       <thead>
         <tr>
-          <th>购买日期</th>
+          <th class="sortable" @click="toggleSort('purchased_at')">
+            购买日期
+            <ArrowUpDown v-if="sortField !== 'purchased_at'" :size="13" class="sort-icon idle" />
+            <ArrowUp v-else-if="sortDir === 'asc'" :size="13" class="sort-icon" />
+            <ArrowDown v-else :size="13" class="sort-icon" />
+          </th>
           <th>商店</th>
           <th>付款人</th>
           <th>金额</th>
           <th>状态</th>
-          <th>创建时间</th>
+          <th class="sortable" @click="toggleSort('created_at')">
+            创建时间
+            <ArrowUpDown v-if="sortField !== 'created_at'" :size="13" class="sort-icon idle" />
+            <ArrowUp v-else-if="sortDir === 'asc'" :size="13" class="sort-icon" />
+            <ArrowDown v-else :size="13" class="sort-icon" />
+          </th>
           <th>操作</th>
         </tr>
       </thead>
@@ -91,7 +101,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { FileText, PenLine, Search, Upload, X } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, ArrowUpDown, FileText, PenLine, Search, Upload, X } from "lucide-vue-next";
 import { createReceipt, deleteReceipt, listReceipts } from "../api/receipts";
 import { useAuthStore } from "../stores/auth";
 
@@ -105,6 +115,20 @@ const filterMerchant = ref("");
 const filterPayer = ref("");
 const filterDateFrom = ref("");
 const filterDateTo = ref("");
+
+// Sort
+const sortField = ref<"purchased_at" | "created_at" | "">("");
+const sortDir = ref<"asc" | "desc">("desc");
+
+function toggleSort(field: "purchased_at" | "created_at") {
+  if (sortField.value === field) {
+    if (sortDir.value === "desc") sortDir.value = "asc";
+    else { sortField.value = ""; sortDir.value = "desc"; }
+  } else {
+    sortField.value = field;
+    sortDir.value = "desc";
+  }
+}
 
 const merchantOptions = computed(() => {
   const set = new Set<string>();
@@ -142,6 +166,15 @@ const filteredReceipts = computed(() => {
     list = list.filter(r => {
       if (!r.purchased_at) return false;
       return new Date(r.purchased_at) <= to;
+    });
+  }
+  if (sortField.value) {
+    const field = sortField.value;
+    const dir = sortDir.value === "asc" ? 1 : -1;
+    list = [...list].sort((a, b) => {
+      const ta = new Date(a[field] || 0).getTime();
+      const tb = new Date(b[field] || 0).getTime();
+      return (ta - tb) * dir;
     });
   }
   return list;
@@ -283,6 +316,31 @@ onMounted(async () => {
 .filter-summary {
   font-size: 12px;
   color: var(--muted, #8e8e93);
+}
+
+/* ── Sortable Headers ── */
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sortable:hover {
+  color: var(--accent, #007aff);
+}
+
+.sort-icon {
+  vertical-align: middle;
+  margin-left: 2px;
+}
+
+.sort-icon.idle {
+  opacity: 0.3;
+}
+
+.sortable:hover .sort-icon.idle {
+  opacity: 0.6;
 }
 
 /* ── Empty State ── */
