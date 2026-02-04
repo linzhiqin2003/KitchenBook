@@ -19,19 +19,20 @@
         <span class="nav-icon"><Upload :size="18" /></span>
         <span class="nav-label">上传</span>
       </RouterLink>
-      <!-- Mobile-only: user tab in center position -->
+      <RouterLink to="/receipts">
+        <span class="nav-icon"><FileText :size="18" /></span>
+        <span class="nav-label desktop-label">历史收据</span>
+        <span class="nav-label mobile-label">收据</span>
+      </RouterLink>
+      <RouterLink to="/org-settings" class="desktop-nav-only">
+        <span class="nav-icon"><Building2 :size="15" /></span>
+        <span class="nav-label">组织</span>
+      </RouterLink>
+      <!-- Mobile-only: user tab (last position) -->
       <button v-if="authStore.isLoggedIn" class="mobile-user-tab" @click="mobileSheetOpen = true">
         <span class="nav-icon"><CircleUserRound :size="18" /></span>
         <span class="nav-label">我的</span>
       </button>
-      <RouterLink to="/receipts">
-        <span class="nav-icon"><FileText :size="18" /></span>
-        <span class="nav-label">历史收据</span>
-      </RouterLink>
-      <RouterLink to="/org-settings">
-        <span class="nav-icon"><Building2 :size="15" /></span>
-        <span class="nav-label">组织</span>
-      </RouterLink>
     </nav>
 
     <!-- Mobile bottom sheet (teleported to body) -->
@@ -77,6 +78,10 @@
               </button>
             </template>
             <div class="sheet-divider"></div>
+            <button class="sheet-item" @click="goToOrgSettings">
+              <Building2 :size="18" />
+              <span>组织管理</span>
+            </button>
             <button class="sheet-item sheet-item--danger" @click="handleLogoutMobile">
               <LogOut :size="18" />
               <span>登出</span>
@@ -234,6 +239,11 @@ function selectOrgMobile(orgId: string) {
   if (orgId === authStore.activeOrgId) return;
   authStore.switchOrg(orgId);
   window.location.reload();
+}
+
+function goToOrgSettings() {
+  mobileSheetOpen.value = false;
+  router.push("/org-settings");
 }
 
 function handleLogoutMobile() {
@@ -567,7 +577,25 @@ onMounted(async () => {
   }
 }
 
-/* ── Mobile User Tab (5th nav item) ── */
+/* ── Mobile/Desktop label switching ── */
+
+.mobile-label {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .desktop-label {
+    display: none !important;
+  }
+  .mobile-label {
+    display: inline !important;
+  }
+  .desktop-nav-only {
+    display: none !important;
+  }
+}
+
+/* ── Mobile User Tab ── */
 
 .mobile-user-tab {
   display: none;
