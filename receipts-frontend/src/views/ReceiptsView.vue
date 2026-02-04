@@ -235,6 +235,8 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .filter-field {
@@ -256,6 +258,9 @@ onMounted(async () => {
   font-size: 13px;
   padding: 7px 10px;
   min-height: 36px;
+  max-width: 100%;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .filter-footer {
