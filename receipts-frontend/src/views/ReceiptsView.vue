@@ -10,7 +10,7 @@
 
     <!-- 筛选栏 -->
     <div class="filter-bar">
-      <div class="filter-row">
+      <div class="filter-grid">
         <div class="filter-field">
           <label>商店</label>
           <select class="input" v-model="filterMerchant">
@@ -33,15 +33,13 @@
           <label>结束日期</label>
           <input class="input" type="date" v-model="filterDateTo" />
         </div>
-        <div class="filter-field filter-actions">
-          <button v-if="hasActiveFilter" class="button ghost" @click="clearFilters">
-            <X :size="14" />
-            清除
-          </button>
-        </div>
       </div>
-      <div v-if="hasActiveFilter" class="filter-summary">
-        共 {{ filteredReceipts.length }} / {{ receipts.length }} 条
+      <div v-if="hasActiveFilter" class="filter-footer">
+        <span class="filter-summary">共 {{ filteredReceipts.length }} / {{ receipts.length }} 条</span>
+        <button class="button ghost" @click="clearFilters">
+          <X :size="14" />
+          清除筛选
+        </button>
       </div>
     </div>
 
@@ -233,11 +231,10 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-.filter-row {
-  display: flex;
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
 }
 
 .filter-field {
@@ -245,7 +242,6 @@ onMounted(async () => {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  flex: 1;
 }
 
 .filter-field label {
@@ -262,23 +258,24 @@ onMounted(async () => {
   min-height: 36px;
 }
 
-.filter-actions {
-  flex: 0 0 auto;
-  justify-content: flex-end;
+.filter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
 }
 
-.filter-actions .button {
+.filter-footer .button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 13px;
-  padding: 7px 12px;
-  min-height: 36px;
+  padding: 6px 12px;
+  min-height: 34px;
   white-space: nowrap;
 }
 
 .filter-summary {
-  margin-top: 8px;
   font-size: 12px;
   color: var(--muted, #8e8e93);
 }
@@ -323,22 +320,9 @@ onMounted(async () => {
 /* ── Mobile ── */
 
 @media (max-width: 640px) {
-  .filter-row {
-    flex-direction: column;
+  .filter-grid {
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
-  }
-
-  .filter-field {
-    width: 100%;
-  }
-
-  .filter-actions {
-    align-items: stretch;
-  }
-
-  .filter-actions .button {
-    width: 100%;
-    justify-content: center;
   }
 
   .table thead {
