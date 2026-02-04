@@ -126,13 +126,13 @@
                   <option v-for="org in orgStore.orgs" :key="org.id" :value="org.id">{{ org.name }}</option>
                 </select>
                 <button
-                  class="button ghost move-btn"
-                  :disabled="moveTargets[index] === currentOrgIdStr"
+                  v-if="moveTargets[index] !== currentOrgIdStr"
+                  class="button move-btn"
                   @click="moveItem(item, index)"
-                  title="移动到选定组织"
                 >
                   移动
                 </button>
+                <span v-else class="move-current-label">当前</span>
               </div>
             </td>
           </tr>
@@ -482,9 +482,19 @@ onMounted(async () => {
 
 .move-btn {
   white-space: nowrap;
-  padding: 4px 10px !important;
+  padding: 4px 12px !important;
   min-height: auto !important;
   font-size: 12px !important;
+  border-radius: 6px !important;
+  background: var(--accent, #007aff) !important;
+  color: #fff !important;
+}
+
+.move-current-label {
+  font-size: 11px;
+  color: var(--muted, #8e8e93);
+  white-space: nowrap;
+  padding: 4px 6px;
 }
 
 /* Image viewer */
