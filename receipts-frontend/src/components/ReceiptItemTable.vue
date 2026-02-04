@@ -230,6 +230,17 @@ const onConfirm = () => {
     grid-column: 1 / -1;
   }
 
+  .item-table-wrapper :deep(.item-row .row-actions) {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0;
+  }
+
+  .item-table-wrapper :deep(.item-row .row-actions)::before {
+    display: none;
+  }
+
   .item-actions {
     flex-direction: column;
     gap: 10px;

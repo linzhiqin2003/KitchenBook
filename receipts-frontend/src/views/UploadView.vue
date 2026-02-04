@@ -134,18 +134,31 @@
     </div>
 
     <!-- 商品明细 -->
-    <ReceiptItemTable :items="items" :show-discard="true" :show-confirm="true" @update:items="items = $event" @save="save" @confirm="confirmAndReset" @discard="resetPage(true)" />
+    <ReceiptItemTable
+      :items="items"
+      :show-discard="true"
+      :show-confirm="true"
+      :orgs="orgStore.orgs"
+      :currentOrgId="authStore.activeOrgId"
+      :showOrgSelector="orgStore.orgs.length > 0"
+      @update:items="items = $event"
+      @save="save"
+      @confirm="confirmAndReset"
+      @discard="resetPage(true)"
+    />
   </template>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { ChevronDown, ChevronUp, X, ImagePlus, Loader2, CheckCircle2 } from "lucide-vue-next";
-import { uploadReceiptStream, updateReceipt, confirmReceipt, deleteReceipt } from "../api/receipts";
+import { uploadReceiptStream, updateReceipt, confirmReceipt, confirmReceiptWithSplit, deleteReceipt } from "../api/receipts";
 import ReceiptItemTable from "../components/ReceiptItemTable.vue";
 import { useAuthStore } from "../stores/auth";
+import { useOrgStore } from "../stores/org";
 
 const authStore = useAuthStore();
+const orgStore = useOrgStore();
 
 const MEDIA_BASE = (import.meta.env.VITE_MEDIA_BASE || "/media").replace(/\/$/, "");
 
@@ -299,11 +312,35 @@ const save = async (itemsData?: any[]) => {
 
 const confirmAndReset = async (itemsData?: any[]) => {
   if (!receipt.value) return;
-  await save(itemsData);
-  await confirmReceipt(receipt.value.id);
+  const itemsList = itemsData || items.value;
+  await save(itemsList);
+
+  // Check if any item targets a different org → split confirm
+  const currentOrg = authStore.activeOrgId || "";
+  const hasOrgDiff = itemsList.some((it: any) => {
+    const target = it.target_org_id ?? currentOrg;
+    return target !== currentOrg;
+  });
+
+  if (hasOrgDiff) {
+    const itemOrgs: Record<string, string> = {};
+    itemsList.forEach((it: any, idx: number) => {
+      itemOrgs[String(idx)] = it.target_org_id ?? currentOrg;
+    });
+    await confirmReceiptWithSplit(receipt.value.id, itemOrgs);
+  } else {
+    await confirmReceipt(receipt.value.id);
+  }
+
   message.value = null;
   resetPage();
 };
+
+onMounted(async () => {
+  if (authStore.isLoggedIn) {
+    try { await orgStore.fetchOrgs(); } catch { /* ignore */ }
+  }
+});
 
 </script>
 
