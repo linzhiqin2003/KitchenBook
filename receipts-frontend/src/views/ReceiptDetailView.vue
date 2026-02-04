@@ -351,6 +351,8 @@ const batchMoveItems = async () => {
       router.push("/receipts");
       return;
     }
+    // 清空旧的 index→org 映射，避免残留值污染重新加载后的列表
+    Object.keys(moveTargets).forEach(k => delete moveTargets[Number(k)]);
     await load();
     syncMoveTargets();
     moveMessage.value = `已成功调整 ${moves.length} 条明细的归属`;
