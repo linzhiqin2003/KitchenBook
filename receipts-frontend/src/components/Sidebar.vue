@@ -96,7 +96,7 @@
     </Teleport>
 
     <!-- User info + Org switcher (bottom) -->
-    <div v-if="authStore.isLoggedIn && !collapsed" class="user-block">
+    <div v-if="authStore.isLoggedIn && !collapsed" ref="userBlockRef" class="user-block">
       <input
         ref="avatarInput"
         type="file"
@@ -170,12 +170,10 @@
     </div>
   </aside>
 
-  <!-- Click-away overlay -->
-  <div v-if="dropdownOpen" class="dropdown-backdrop" @click="dropdownOpen = false"></div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import {
   BookOpenText, LayoutDashboard, Upload, FileText, Building2,
@@ -195,6 +193,13 @@ const dropdownOpen = ref(false);
 const mobileSheetOpen = ref(false);
 const avatarInput = ref<HTMLInputElement | null>(null);
 const avatarInputCollapsed = ref<HTMLInputElement | null>(null);
+const userBlockRef = ref<HTMLElement | null>(null);
+
+function onDocClick(e: MouseEvent) {
+  if (dropdownOpen.value && userBlockRef.value && !userBlockRef.value.contains(e.target as Node)) {
+    dropdownOpen.value = false;
+  }
+}
 
 async function handleAvatarUpload(e: Event) {
   const input = e.target as HTMLInputElement;
@@ -271,11 +276,16 @@ function handleLogoutMobile() {
 }
 
 onMounted(async () => {
+  document.addEventListener("click", onDocClick, true);
   if (authStore.isLoggedIn) {
     try {
       await orgStore.fetchOrgs();
     } catch { /* ignore */ }
   }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", onDocClick, true);
 });
 </script>
 
@@ -375,12 +385,6 @@ onMounted(async () => {
 }
 
 /* ── Dropdown ── */
-
-.dropdown-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-}
 
 .dropdown-menu {
   position: absolute;
