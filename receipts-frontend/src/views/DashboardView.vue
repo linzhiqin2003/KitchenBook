@@ -16,7 +16,7 @@
   </div>
 
   <div class="card-grid">
-    <StatCard label="总支出" :value="formatGBP(stats.total_spend)" :subtitle="rangeLabel">
+    <StatCard label="总支出" :value="formatGBP(stats.total_spend)" :secondary-value="convertCNY(stats.total_spend)" :subtitle="rangeLabel">
       <template #icon><Wallet :size="20" /></template>
     </StatCard>
     <StatCard label="收据数量" :value="stats.receipt_count" :subtitle="rangeLabel">
@@ -85,7 +85,10 @@
           <td data-label="品牌">{{ item.brand || "-" }}</td>
           <td data-label="数量">{{ formatQuantity(item.total_quantity) }}</td>
           <td data-label="单位">{{ item.unit || "-" }}</td>
-          <td data-label="总花费">{{ formatGBP(item.total_spent) }}</td>
+          <td data-label="总花费">
+            {{ formatGBP(item.total_spent) }}
+            <span v-if="convertCNY(item.total_spent)" class="cny-hint">{{ convertCNY(item.total_spent) }}</span>
+          </td>
           <td data-label="购买日期">{{ formatDate(item.last_purchased) }}</td>
         </tr>
       </tbody>
@@ -119,10 +122,19 @@ import { computed, onMounted, ref, watch } from "vue";
 import { Wallet, Receipt, FolderOpen, Inbox } from "lucide-vue-next";
 import ChartCard from "../components/ChartCard.vue";
 import StatCard from "../components/StatCard.vue";
-import { fetchStats } from "../api/receipts";
+import { fetchStats, getExchangeRate } from "../api/receipts";
 import { useAuthStore } from "../stores/auth";
 
 const authStore = useAuthStore();
+
+const exchangeRate = ref<number | null>(null);
+
+const convertCNY = (value: number | string | null): string => {
+  const num = Number(value || 0);
+  if (!exchangeRate.value || num === 0) return "";
+  const cny = num * exchangeRate.value;
+  return `≈ ¥${cny.toFixed(2)}`;
+};
 
 const stats = ref({
   total_spend: 0,
@@ -380,7 +392,8 @@ const categoryChart = computed(() => {
       textStyle: { color: "#1c1c1e" },
       formatter: (info: any) => {
         const val = Number(info.value || 0);
-        return `<b>${info.name}</b><br/>£${val.toFixed(2)}`;
+        const cny = convertCNY(val);
+        return `<b>${info.name}</b><br/>£${val.toFixed(2)}${cny ? `（${cny}）` : ''}`;
       }
     },
     series: [
@@ -478,7 +491,8 @@ const merchantChart = computed(() => {
       textStyle: { color: "#1c1c1e" },
       formatter: (info: any) => {
         const val = Number(info.value || 0);
-        return `<b>${info.name}</b><br/>£${val.toFixed(2)}`;
+        const cny = convertCNY(val);
+        return `<b>${info.name}</b><br/>£${val.toFixed(2)}${cny ? `（${cny}）` : ''}`;
       },
     },
     grid: { top: 36, right: 60, bottom: 8, left: 140 },
@@ -520,7 +534,8 @@ const payerChart = computed(() => {
       textStyle: { color: "#1c1c1e" },
       formatter: (info: any) => {
         const val = Number(info.value || 0);
-        return `<b>${info.name}</b><br/>£${val.toFixed(2)}`;
+        const cny = convertCNY(val);
+        return `<b>${info.name}</b><br/>£${val.toFixed(2)}${cny ? `（${cny}）` : ''}`;
       },
     },
     grid: { top: 36, right: 16, bottom: 28, left: 48 },
@@ -555,10 +570,19 @@ const payerChart = computed(() => {
 onMounted(() => {
   dateRange.value = calcPresetRange("30d");
   loadStats();
+  getExchangeRate()
+    .then((res) => { if (res.rate) exchangeRate.value = res.rate; })
+    .catch(() => {});
 });
 </script>
 
 <style scoped>
+.cny-hint {
+  color: var(--muted);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
 .date-range-bar {
   display: flex;
   align-items: center;

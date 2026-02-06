@@ -7,6 +7,7 @@
       </div>
     </div>
     <div class="value">{{ value }}</div>
+    <div v-if="secondaryValue" class="secondary-value">{{ secondaryValue }}</div>
     <div v-if="subtitle" class="subtitle">{{ subtitle }}</div>
   </div>
 </template>
@@ -15,11 +16,18 @@
 defineProps<{
   label: string;
   value: string | number;
+  secondaryValue?: string;
   subtitle?: string;
 }>();
 </script>
 
 <style scoped>
+.secondary-value {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 .subtitle {
   color: var(--muted);
   font-size: 12px;
