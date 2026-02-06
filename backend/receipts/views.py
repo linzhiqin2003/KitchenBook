@@ -783,5 +783,16 @@ class StatsOverviewView(APIView):
                 .order_by("-total")
             )
             data["by_payer"] = list(by_payer)
+            members = OrganizationMember.objects.filter(
+                organization_id=org_id
+            ).select_related("user__profile")
+            data["member_count"] = members.count()
+            names = []
+            for m in members:
+                try:
+                    names.append(m.user.profile.nickname or m.user.username)
+                except Exception:
+                    names.append(m.user.username)
+            data["member_names"] = names
 
         return Response(data)

@@ -26,7 +26,7 @@
       <template #icon><Receipt :size="20" /></template>
     </StatCard>
     <!-- 组织模式：结算指引 -->
-    <div v-if="authStore.isOrgMode && stats.by_payer?.length >= 2" class="stat-card settlement-card">
+    <div v-if="authStore.isOrgMode && memberCount >= 2" class="stat-card settlement-card">
       <div class="stat-header">
         <div class="label">结算指引</div>
         <div class="stat-icon"><ArrowRightLeft :size="20" /></div>
@@ -424,21 +424,33 @@ const topCategory = computed(() => {
 });
 
 // ── 组织模式：结算指引 ──
+const memberCount = computed(() => stats.value.member_count || 0);
+
 const fairShare = computed(() => {
-  const payers = stats.value.by_payer || [];
-  if (payers.length < 2) return 0;
-  return Number(stats.value.total_spend || 0) / payers.length;
+  if (memberCount.value < 2) return 0;
+  return Number(stats.value.total_spend || 0) / memberCount.value;
 });
 
 const settlements = computed(() => {
   const payers = stats.value.by_payer || [];
-  if (payers.length < 2) return [];
+  if (memberCount.value < 2) return [];
 
   const share = fairShare.value;
-  const balances = payers.map((p: any) => ({
-    name: p.payer_name || "未指定",
-    balance: Number(p.total || 0) - share,
-  }));
+  // 有付款记录的成员
+  const paidNames = new Set<string>();
+  const balances: { name: string; balance: number }[] = [];
+  for (const p of payers) {
+    const name = p.payer_name || "未指定";
+    paidNames.add(name);
+    balances.push({ name, balance: Number(p.total || 0) - share });
+  }
+  // 未付款的成员：从后端 member_names 取真实姓名
+  const allNames: string[] = stats.value.member_names || [];
+  for (const name of allNames) {
+    if (!paidNames.has(name)) {
+      balances.push({ name, balance: -share });
+    }
+  }
 
   const creditors = balances
     .filter((b: any) => b.balance > 0.01)
