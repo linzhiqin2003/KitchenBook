@@ -7,11 +7,11 @@ const router = useRouter()
 const playableGames = [
   {
     id: "gomoku",
-    title: "GOMOKU",
-    subtitle: "联机五子棋",
+    title: "五子棋",
+    subtitle: "实时联机对弈",
     description: "双人实时对弈，支持房间号邀请好友。",
     path: "/games/gomoku",
-    features: ["WEBSOCKET", "15x15", "AUTO JUDGE"],
+    features: ["实时同步", "15x15 棋盘", "自动判定"],
     // pixel art colors for the gomoku icon
     iconType: "gomoku",
   },
@@ -20,14 +20,14 @@ const playableGames = [
 const upcomingGames = [
   {
     id: "tic-tac-toe",
-    title: "TIC-TAC-TOE",
-    subtitle: "井字棋",
+    title: "井字棋",
+    subtitle: "经典三连珠",
     iconType: "tictactoe",
   },
   {
     id: "battleship",
-    title: "BATTLESHIP",
-    subtitle: "海战棋",
+    title: "海战棋",
+    subtitle: "策略猜位对战",
     iconType: "battleship",
   },
 ]
@@ -83,17 +83,17 @@ onBeforeUnmount(() => {
       <header class="arcade-header">
         <div class="header-top">
           <router-link to="/" class="pixel-btn pixel-btn-ghost">
-            <span class="pixel-btn-text">&lt; HOME</span>
+            <span class="pixel-btn-text">&lt; 主页</span>
           </router-link>
         </div>
 
         <div class="title-block">
-          <p class="subtitle-tag">INSERT COIN TO PLAY</p>
+          <p class="subtitle-tag">投币开始</p>
           <h1 class="arcade-title">
-            <span class="title-glow">ARCADE</span>
+            <span class="title-glow">游戏厅</span>
             <span class="cursor-block" :class="{ 'cursor-on': cursorVisible }"></span>
           </h1>
-          <p class="subtitle-desc">SELECT YOUR GAME</p>
+          <p class="subtitle-desc">选择你的游戏</p>
         </div>
 
         <div class="pixel-divider"></div>
@@ -103,7 +103,7 @@ onBeforeUnmount(() => {
       <section class="games-section">
         <h2 class="section-label">
           <span class="label-dot"></span>
-          READY TO PLAY
+          可以游玩
         </h2>
         <div class="games-grid">
           <button
@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
       <section class="games-section">
         <h2 class="section-label">
           <span class="label-dot label-dot-yellow"></span>
-          COMING SOON
+          即将推出
         </h2>
         <div class="upcoming-grid">
           <div
@@ -183,7 +183,7 @@ onBeforeUnmount(() => {
               <h3 class="card-title card-title-locked">{{ game.title }}</h3>
               <p class="card-subtitle">{{ game.subtitle }}</p>
             </div>
-            <div class="lock-badge">LOCKED</div>
+            <div class="lock-badge">未开放</div>
           </div>
         </div>
       </section>
@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
       <!-- Footer decoration -->
       <footer class="arcade-footer">
         <div class="pixel-divider"></div>
-        <p class="footer-text">PRESS START TO CONTINUE</p>
+        <p class="footer-text">按下开始键继续</p>
       </footer>
     </div>
   </div>

@@ -96,12 +96,12 @@ const winnerLabel = computed(() => {
 const turnLabel = computed(() => (turn.value === "black" ? "黑子" : "白子"))
 
 const statusText = computed(() => {
-  if (!connected.value && connecting.value) return "CONNECTING..."
-  if (!connected.value) return "NOT CONNECTED"
-  if (status.value === "waiting") return isSpectator.value ? "SPECTATING - WAITING" : "WAITING FOR OPPONENT"
-  if (status.value === "finished") return `GAME OVER: ${winnerLabel.value}`
-  if (isSpectator.value) return `SPECTATING: ${turnLabel.value}`
-  return `YOUR TURN: ${turnLabel.value}`
+  if (!connected.value && connecting.value) return "连接中..."
+  if (!connected.value) return "未连接"
+  if (status.value === "waiting") return isSpectator.value ? "观战中 - 等待玩家" : "等待对手加入"
+  if (status.value === "finished") return `对局结束: ${winnerLabel.value}`
+  if (isSpectator.value) return `观战中: ${turnLabel.value}回合`
+  return `${turnLabel.value}回合`
 })
 
 const canPlaceStone = computed(
@@ -341,17 +341,17 @@ onBeforeUnmount(() => {
       <!-- Header -->
       <header class="gomoku-header">
         <div class="header-left">
-          <p class="header-tag">GOMOKU ONLINE</p>
+          <p class="header-tag">五子棋联机</p>
           <h1 class="header-title">
             <span class="title-glow">五子棋</span>
           </h1>
         </div>
         <div class="header-nav">
           <router-link to="/games" class="pixel-btn">
-            &lt; ARCADE
+            &lt; 游戏厅
           </router-link>
           <router-link to="/" class="pixel-btn">
-            HOME
+            主页
           </router-link>
         </div>
       </header>
@@ -392,31 +392,31 @@ onBeforeUnmount(() => {
             <div v-if="!connected" class="board-overlay">
               <div class="overlay-content">
                 <div class="overlay-title">
-                  <span class="ov-text">INSERT COIN</span>
+                  <span class="ov-text">投币开始</span>
                   <span class="ov-cursor" :class="{ 'cursor-on': cursorVisible }"></span>
                 </div>
                 <p class="overlay-sub">输入信息加入对局</p>
 
                 <div class="overlay-form">
                   <label class="field-label">
-                    NICKNAME
+                    昵称
                     <input
                       v-model="nickname"
                       type="text"
                       maxlength="20"
-                      placeholder="YOUR NAME"
+                      placeholder="输入昵称"
                       class="pixel-input"
                       @keyup.enter="connectRoom"
                     />
                   </label>
 
                   <label class="field-label">
-                    ROOM ID
+                    房间号
                     <input
                       v-model="roomInput"
                       type="text"
                       maxlength="20"
-                      placeholder="e.g. A1B2C3"
+                      placeholder="例如 A1B2C3"
                       class="pixel-input uppercase"
                       @keyup.enter="connectRoom"
                     />
@@ -428,14 +428,14 @@ onBeforeUnmount(() => {
                       :disabled="connecting"
                       class="pixel-btn pixel-btn-primary"
                     >
-                      {{ connecting ? "CONNECTING..." : "JOIN ROOM" }}
+                      {{ connecting ? "连接中..." : "加入房间" }}
                     </button>
                     <button
                       @click="randomRoomAndConnect"
                       :disabled="connecting"
                       class="pixel-btn pixel-btn-cyan"
                     >
-                      RANDOM
+                      随机房间
                     </button>
                   </div>
 
@@ -456,20 +456,20 @@ onBeforeUnmount(() => {
           <!-- Room & identity -->
           <div class="panel">
             <h3 class="panel-title">
-              ROOM: {{ roomId }}
-              <span class="panel-badge">{{ isSpectator ? "SPECTATOR" : playerColorLabel }}</span>
+              房间: {{ roomId }}
+              <span class="panel-badge">{{ isSpectator ? "观战者" : playerColorLabel }}</span>
             </h3>
             <div class="panel-body">
               <div class="btn-row">
                 <button @click="leaveRoom" class="pixel-btn pixel-btn-small">
-                  LEAVE
+                  离开
                 </button>
                 <button
                   @click="copyShareLink"
                   :disabled="!shareLink"
                   class="pixel-btn pixel-btn-small"
                 >
-                  INVITE
+                  邀请
                 </button>
               </div>
             </div>
@@ -477,19 +477,19 @@ onBeforeUnmount(() => {
 
           <!-- Players -->
           <div class="panel">
-            <h3 class="panel-title">PLAYERS</h3>
+            <h3 class="panel-title">玩家</h3>
             <div class="panel-body info-list">
               <p>
                 <span class="stone-indicator stone-indicator-b"></span>
                 <span :class="{ 'player-turn': turn === 'black' && status === 'playing' }">
-                  {{ players.black?.nickname || "WAITING..." }}
+                  {{ players.black?.nickname || "等待中..." }}
                 </span>
                 <span v-if="turn === 'black' && status === 'playing'" class="turn-arrow">&lt;</span>
               </p>
               <p>
                 <span class="stone-indicator stone-indicator-w"></span>
                 <span :class="{ 'player-turn': turn === 'white' && status === 'playing' }">
-                  {{ players.white?.nickname || "WAITING..." }}
+                  {{ players.white?.nickname || "等待中..." }}
                 </span>
                 <span v-if="turn === 'white' && status === 'playing'" class="turn-arrow">&lt;</span>
               </p>
@@ -500,7 +500,7 @@ onBeforeUnmount(() => {
                 class="pixel-btn pixel-btn-green pixel-btn-small mt-2"
                 :class="{ 'pixel-btn-disabled': !canRestart }"
               >
-                RESTART
+                重开一局
               </button>
             </div>
           </div>
@@ -508,20 +508,20 @@ onBeforeUnmount(() => {
           <!-- Online + Spectators combined -->
           <div class="panel">
             <h3 class="panel-title">
-              ONLINE
+              在线
               <span class="panel-count">{{ online.room.total }}</span>
             </h3>
             <div class="panel-body info-list">
               <p>
-                <span class="info-key">ROOM:</span>
-                P:{{ online.room.players }} / S:{{ online.room.spectators }}
+                <span class="info-key">房间:</span>
+                玩家 {{ online.room.players }} / 观战 {{ online.room.spectators }}
               </p>
               <p>
-                <span class="info-key">GLOBAL:</span>
-                {{ online.global.totalConnections }} ({{ online.global.rooms }} rooms)
+                <span class="info-key">全局:</span>
+                {{ online.global.totalConnections }} 人 ({{ online.global.rooms }} 个房间)
               </p>
               <div v-if="spectators.length > 0" class="spectator-section">
-                <p class="spectator-label">SPECTATORS:</p>
+                <p class="spectator-label">观战列表:</p>
                 <span
                   v-for="(item, index) in spectators"
                   :key="`${item.nickname}-${index}`"
