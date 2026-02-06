@@ -23,17 +23,18 @@ MyWeb/
 │   ├── oracle/              #   塔罗占卜
 │   ├── questions/           #   AI 出题模块
 │   ├── apps/
+│   │   ├── games/           #   在线游戏：五子棋（WebSocket 实时对战）
 │   │   ├── interpretation/  #   同声传译：ASR + 翻译 + TTS
 │   │   └── emoji_generator/ #   表情包视频生成（DashScope）
 │   ├── common/              #   共享配置：多 LLM 提供商管理
 │   └── media/               #   用户上传文件
-├── frontend/                # 主前端（厨房/博客/AI Lab/塔罗/出题）
+├── frontend/                # 主前端（厨房/博客/AI Lab/塔罗/出题/游戏）
 │   └── src/
 │       ├── views/           #   页面组件
 │       ├── components/      #   可复用组件（含 ailab/ tarot/ 子目录）
 │       ├── api/             #   API 客户端模块
 │       ├── store/           #   状态管理 (auth.js, cart.js)
-│       ├── config/          #   配置文件 (api.js, aiLab.js)
+│       ├── config/          #   配置文件 (api.js, aiLab.js, ws.js)
 │       └── router/          #   路由配置
 ├── receipts-frontend/       # 记账前端（独立应用，JWT 认证）
 ├── deploy/                  # 部署脚本与配置
@@ -49,6 +50,7 @@ MyWeb/
 | `/api/interpretation/` | apps.interpretation | 同声传译服务 |
 | `/api/emoji/` | apps.emoji_generator | 表情包视频生成 |
 | `/receipts/api/` | receipts + accounts | 记账系统 + 用户认证 |
+| `ws/games/gomoku/<room_id>/` | apps.games | 五子棋 WebSocket（通过 Daphne） |
 
 ## 前端路由模块 (frontend/src/router/index.js)
 
@@ -60,6 +62,7 @@ MyWeb/
 | AI Lab | `/ai-lab/` | AI 对话/翻译工作室/表情包生成 |
 | 出题 | `/questiongen` | AI 出题系统 |
 | 塔罗 | `/tarot/` | 塔罗占卜 |
+| 游戏 | `/games/` | 游戏大厅 + 五子棋实时对战 |
 
 厨师后台路由需 `meta: { requiresAuth: true, authType: 'chef' }`。
 
