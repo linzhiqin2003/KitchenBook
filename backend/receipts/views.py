@@ -784,7 +784,7 @@ class StatsOverviewView(APIView):
             )
             data["by_payer"] = list(by_payer)
             members = OrganizationMember.objects.filter(
-                organization_id=org_id
+                org_id=org_id
             ).select_related("user__profile")
             data["member_count"] = members.count()
             names = []
