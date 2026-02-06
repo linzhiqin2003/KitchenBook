@@ -87,6 +87,15 @@ def _apply_prorated_financials(receipt_obj, subtotal, tax, discount):
     receipt_obj.total = _calc_total(subtotal, tax, discount)
 
 
+def _recalc_from_items(receipt_obj):
+    """从 items 重新计算 subtotal 和 total，保留 tax/discount。"""
+    item_sum = receipt_obj.items.aggregate(
+        s=Coalesce(models.Sum("total_price"), Decimal("0"))
+    )["s"]
+    receipt_obj.subtotal = item_sum
+    receipt_obj.total = _calc_total(item_sum, receipt_obj.tax, receipt_obj.discount)
+
+
 @transaction.atomic
 def _apply_parsed_result(receipt: Receipt, parsed, raw_text: str, raw_json: dict):
     payload = parsed.receipt
@@ -403,7 +412,9 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                     item.line_index = new_idx
                     item.save(update_fields=["receipt_id", "line_index"])
 
-                _apply_prorated_financials(new_receipt, g_subtotal, g_tax, g_discount)
+                new_receipt.tax = g_tax
+                new_receipt.discount = g_discount
+                _recalc_from_items(new_receipt)
                 new_receipt.save(update_fields=["subtotal", "tax", "discount", "total"])
                 created_receipts.append(new_receipt)
 
@@ -415,10 +426,11 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                         item.line_index = new_idx
                         item.save(update_fields=["line_index"])
 
-                r_subtotal = orig_subtotal - allocated_subtotal
                 r_tax = (orig_tax - allocated_tax) if orig_tax is not None else None
                 r_discount = (orig_discount - allocated_discount) if orig_discount is not None else None
-                _apply_prorated_financials(receipt, r_subtotal, r_tax, r_discount)
+                receipt.tax = r_tax
+                receipt.discount = r_discount
+                _recalc_from_items(receipt)
 
                 receipt.status = Receipt.STATUS_CONFIRMED
                 if receipt.image:
@@ -507,7 +519,6 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                 affected_receipts[tid] = target_receipt
 
             # Proportionally distribute tax/discount to each target
-            total_allocated_subtotal = Decimal("0")
             total_allocated_tax = Decimal("0")
             total_allocated_discount = Decimal("0")
 
@@ -517,23 +528,20 @@ class ReceiptViewSet(viewsets.ModelViewSet):
 
                 if orig_source_item_sum and orig_source_item_sum > 0:
                     ratio = moved_sum / orig_source_item_sum
-                    moved_subtotal = _prorate_decimal(orig_source_subtotal, ratio) or Decimal("0")
                     moved_tax = _prorate_decimal(orig_source_tax, ratio)
                     moved_discount = _prorate_decimal(orig_source_discount, ratio)
                 else:
-                    moved_subtotal = moved_sum
                     moved_tax = None
                     moved_discount = None
 
-                total_allocated_subtotal += moved_subtotal
                 total_allocated_tax += moved_tax or Decimal("0")
                 total_allocated_discount += moved_discount or Decimal("0")
 
-                # Add to target's existing financials
-                target_r.subtotal = (target_r.subtotal or Decimal("0")) + moved_subtotal
+                # Tax/discount: add prorated portion to target
                 target_r.tax = (target_r.tax or Decimal("0")) + moved_tax if moved_tax is not None else target_r.tax
                 target_r.discount = (target_r.discount or Decimal("0")) + moved_discount if moved_discount is not None else target_r.discount
-                target_r.total = _calc_total(target_r.subtotal, target_r.tax, target_r.discount)
+                # Subtotal/total: recalculate from actual items
+                _recalc_from_items(target_r)
                 target_r.save(update_fields=["subtotal", "tax", "discount", "total"])
 
             # Source receipt: subtract moved portion (remainder stays)
@@ -543,10 +551,9 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                 receipt.delete()
                 return Response({"detail": "原收据已清空并删除", "deleted": True, "id": str(receipt_id)})
             else:
-                receipt.subtotal = orig_source_subtotal - total_allocated_subtotal
                 receipt.tax = (orig_source_tax - total_allocated_tax) if orig_source_tax is not None else None
                 receipt.discount = (orig_source_discount - total_allocated_discount) if orig_source_discount is not None else None
-                receipt.total = _calc_total(receipt.subtotal, receipt.tax, receipt.discount)
+                _recalc_from_items(receipt)
                 receipt.save(update_fields=["subtotal", "tax", "discount", "total"])
 
         receipt.refresh_from_db()
