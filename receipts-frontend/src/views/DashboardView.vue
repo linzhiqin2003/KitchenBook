@@ -13,6 +13,9 @@
       <span class="date-sep">至</span>
       <input type="date" :value="dateRange.end" @change="onCustomEnd" />
     </div>
+    <div v-if="exchangeRate" class="exchange-rate-badge">
+      £1 = ¥{{ exchangeRate.toFixed(2) }}
+    </div>
   </div>
 
   <div class="card-grid">
@@ -589,6 +592,17 @@ onMounted(() => {
   gap: 12px;
   margin-bottom: 12px;
   flex-wrap: wrap;
+}
+
+.exchange-rate-badge {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.03);
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 .range-presets {
