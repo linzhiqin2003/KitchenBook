@@ -14,7 +14,7 @@
       <input type="date" :value="dateRange.end" @change="onCustomEnd" />
     </div>
     <div v-if="exchangeRate" class="exchange-rate-badge">
-      £1 = ¥{{ exchangeRate.toFixed(2) }}
+      实时汇率：£1 = ¥{{ exchangeRate.toFixed(2) }}
     </div>
   </div>
 
