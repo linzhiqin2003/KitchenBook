@@ -190,7 +190,7 @@ const trendMode = ref<"month" | "day">("day");
 const selectedCategory = ref<string | null>(null);
 const selectedMerchant = ref<string | null>(null);
 const selectedPayer = ref<string | null>(null);
-const selectedPeriod = ref<{ type: "day" | "month"; label: string } | null>(null);
+const selectedPeriod = ref<{ type: "day" | "month"; label: string; start: string; end: string } | null>(null);
 const sortKey = ref<"total_spent" | "last_purchased">("last_purchased");
 const sortDir = ref<"asc" | "desc">("desc");
 
@@ -256,7 +256,12 @@ const rangeLabel = computed(() => {
 
 async function loadStats() {
   try {
-    const { start, end } = dateRange.value;
+    let { start, end } = dateRange.value;
+    // 趋势图点击筛选：覆盖日期范围
+    if (selectedPeriod.value) {
+      start = selectedPeriod.value.start;
+      end = selectedPeriod.value.end;
+    }
     const filters: { category?: string; merchant?: string; payer?: string } = {};
     if (selectedCategory.value) filters.category = selectedCategory.value;
     if (selectedMerchant.value) filters.merchant = selectedMerchant.value;
@@ -286,28 +291,10 @@ function onCustomEnd(e: Event) {
 }
 
 const filteredItems = computed(() => {
-  const items = stats.value.recent_items || [];
+  // All filtering (category/merchant/payer/period) done by backend
+  const filtered = stats.value.recent_items || [];
 
-  // 1. Filter (category/merchant/payer already filtered by backend)
-  const filtered = items.filter((item: any) => {
-    if (selectedPeriod.value && item.purchased_at) {
-      const d = new Date(item.purchased_at);
-      if (isNaN(d.getTime())) return false;
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      const yyyy = d.getFullYear();
-      if (selectedPeriod.value.type === "day") {
-        if (`${mm}-${dd}` !== selectedPeriod.value.label) return false;
-      } else {
-        if (`${yyyy}-${mm}` !== selectedPeriod.value.label) return false;
-      }
-    } else if (selectedPeriod.value && !item.purchased_at) {
-      return false;
-    }
-    return true;
-  });
-
-  // 2. Aggregate by name+brand+unit
+  // Aggregate by name+brand+unit
   const map = new Map<string, any>();
   for (const item of filtered) {
     const key = `${item.name}||${item.brand}||${item.unit}`;
@@ -358,15 +345,14 @@ const visiblePages = computed(() => {
   return pages;
 });
 
-// 筛选/排序/每页条数变化时回到第一页
-// 维度筛选变化 → 重新请求后端数据
-watch([selectedCategory, selectedMerchant, selectedPayer], () => {
+// 维度/时间段筛选变化 → 重新请求后端数据
+watch([selectedCategory, selectedMerchant, selectedPayer, selectedPeriod], () => {
   currentPage.value = 1;
   loadStats();
 });
 
-// 排序/分页/时间段筛选 → 仅前端重置页码
-watch([selectedPeriod, sortKey, sortDir, pageSize], () => {
+// 排序/分页 → 仅前端重置页码
+watch([sortKey, sortDir, pageSize], () => {
   currentPage.value = 1;
 });
 
@@ -385,10 +371,26 @@ const onMerchantClick = (params: any) => {
 const onTrendClick = (params: any) => {
   if (!params.name) return;
   const type = trendMode.value;
-  if (selectedPeriod.value?.type === type && selectedPeriod.value?.label === params.name) {
+  const label = params.name;
+  // 切换：再次点击相同项取消筛选
+  if (selectedPeriod.value?.type === type && selectedPeriod.value?.label === label) {
     selectedPeriod.value = null;
+    return;
+  }
+  // 从原始数据反查完整日期
+  if (type === "day") {
+    const match = (stats.value.by_day || []).find(
+      (d: any) => d.day && d.day.slice(5, 10) === label
+    );
+    const fullDate = match?.day?.slice(0, 10) || "";
+    selectedPeriod.value = { type, label, start: fullDate, end: fullDate };
   } else {
-    selectedPeriod.value = { type, label: params.name };
+    // month: label = "YYYY-MM"
+    const y = parseInt(label.slice(0, 4), 10);
+    const m = parseInt(label.slice(5, 7), 10);
+    const firstDay = `${label}-01`;
+    const lastDay = `${label}-${new Date(y, m, 0).getDate().toString().padStart(2, "0")}`;
+    selectedPeriod.value = { type, label, start: firstDay, end: lastDay };
   }
 };
 
