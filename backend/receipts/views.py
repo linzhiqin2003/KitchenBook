@@ -651,12 +651,43 @@ class StatsOverviewView(APIView):
         if date_filter:
             receipts = receipts.filter(**date_filter)
 
-        totals = receipts.aggregate(
-            total_spend=Coalesce(models.Sum("total"), Decimal("0")),
-            receipt_count=Coalesce(models.Count("id"), 0),
-        )
+        # 维度筛选参数
+        filter_category = request.query_params.get("category")
+        filter_merchant = request.query_params.get("merchant")
+        filter_payer = request.query_params.get("payer")
 
-        items_qs = ReceiptItem.objects.filter(receipt__in=receipts)
+        if filter_merchant:
+            if filter_merchant == "未知店铺":
+                receipts = receipts.filter(models.Q(merchant="") | models.Q(merchant__isnull=True))
+            else:
+                receipts = receipts.filter(merchant=filter_merchant)
+        if filter_payer:
+            if filter_payer == "未指定":
+                receipts = receipts.filter(models.Q(payer="") | models.Q(payer__isnull=True))
+            else:
+                receipts = receipts.filter(payer=filter_payer)
+
+        items_qs_pre = ReceiptItem.objects.filter(receipt__in=receipts)
+        if filter_category:
+            if filter_category == "未分类":
+                items_qs_pre = items_qs_pre.filter(category_main__isnull=True)
+            else:
+                items_qs_pre = items_qs_pre.filter(category_main__name=filter_category)
+
+        if filter_category:
+            totals = {
+                "total_spend": items_qs_pre.aggregate(
+                    s=Coalesce(models.Sum("total_price"), Decimal("0"))
+                )["s"],
+                "receipt_count": items_qs_pre.values("receipt").distinct().count(),
+            }
+        else:
+            totals = receipts.aggregate(
+                total_spend=Coalesce(models.Sum("total"), Decimal("0")),
+                receipt_count=Coalesce(models.Count("id"), 0),
+            )
+
+        items_qs = items_qs_pre
 
         by_category = (
             items_qs.select_related("category_main")

@@ -238,7 +238,11 @@ const rangeLabel = computed(() => {
 async function loadStats() {
   try {
     const { start, end } = dateRange.value;
-    stats.value = await fetchStats(start || undefined, end || undefined);
+    const filters: { category?: string; merchant?: string; payer?: string } = {};
+    if (selectedCategory.value) filters.category = selectedCategory.value;
+    if (selectedMerchant.value) filters.merchant = selectedMerchant.value;
+    if (selectedPayer.value) filters.payer = selectedPayer.value;
+    stats.value = await fetchStats(start || undefined, end || undefined, filters);
   } catch (err: any) {
     if (err?.response?.status === 401) return;
     console.error("Failed to load stats:", err);
@@ -265,11 +269,8 @@ function onCustomEnd(e: Event) {
 const filteredItems = computed(() => {
   const items = stats.value.recent_items || [];
 
-  // 1. Filter
+  // 1. Filter (category/merchant/payer already filtered by backend)
   const filtered = items.filter((item: any) => {
-    if (selectedCategory.value && (item.category_main__name || "未分类") !== selectedCategory.value) return false;
-    if (selectedMerchant.value && (item.merchant || "未知店铺") !== selectedMerchant.value) return false;
-    if (selectedPayer.value && (item.payer || "未指定") !== selectedPayer.value) return false;
     if (selectedPeriod.value && item.purchased_at) {
       const d = new Date(item.purchased_at);
       if (isNaN(d.getTime())) return false;
@@ -339,7 +340,14 @@ const visiblePages = computed(() => {
 });
 
 // 筛选/排序/每页条数变化时回到第一页
-watch([selectedCategory, selectedMerchant, selectedPayer, selectedPeriod, sortKey, sortDir, pageSize], () => {
+// 维度筛选变化 → 重新请求后端数据
+watch([selectedCategory, selectedMerchant, selectedPayer], () => {
+  currentPage.value = 1;
+  loadStats();
+});
+
+// 排序/分页/时间段筛选 → 仅前端重置页码
+watch([selectedPeriod, sortKey, sortDir, pageSize], () => {
   currentPage.value = 1;
 });
 

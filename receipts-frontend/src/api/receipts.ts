@@ -30,10 +30,17 @@ export interface ReceiptPayload {
   items?: ReceiptItemPayload[];
 }
 
-export async function fetchStats(startDate?: string, endDate?: string) {
+export async function fetchStats(
+  startDate?: string,
+  endDate?: string,
+  filters?: { category?: string; merchant?: string; payer?: string },
+) {
   const params = new URLSearchParams();
   if (startDate) params.set("start_date", startDate);
   if (endDate) params.set("end_date", endDate);
+  if (filters?.category) params.set("category", filters.category);
+  if (filters?.merchant) params.set("merchant", filters.merchant);
+  if (filters?.payer) params.set("payer", filters.payer);
   const qs = params.toString();
   const { data } = await api.get(`/stats/overview/${qs ? `?${qs}` : ""}`);
   return data;
