@@ -705,10 +705,11 @@ class StatsOverviewView(APIView):
             .annotate(
                 purchased_at=models.F("receipt__purchased_at"),
                 merchant=models.F("receipt__merchant"),
+                payer=models.F("receipt__payer"),
             )
             .order_by("-purchased_at")
             .values("name", "brand", "unit", "category_main__name",
-                    "quantity", "total_price", "purchased_at", "merchant")
+                    "quantity", "total_price", "purchased_at", "merchant", "payer")
             [:100]
         )
 

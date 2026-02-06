@@ -46,7 +46,7 @@
 
   <div v-if="authStore.isOrgMode && stats.by_payer?.length" class="card-grid" style="margin-top: 8px;">
     <ChartCard :options="merchantChart" @chart-click="onMerchantClick" />
-    <ChartCard :options="payerChart" />
+    <ChartCard :options="payerChart" @chart-click="onPayerClick" />
   </div>
   <div v-else class="card-grid card-grid--single" style="margin-top: 8px;">
     <ChartCard :options="merchantChart" @chart-click="onMerchantClick" />
@@ -63,6 +63,9 @@
       </button>
       <button v-if="selectedPeriod" class="filter-tag" @click="selectedPeriod = null">
         {{ selectedPeriod.label }} <span class="filter-tag__x">&times;</span>
+      </button>
+      <button v-if="selectedPayer" class="filter-tag" @click="selectedPayer = null">
+        {{ selectedPayer }} <span class="filter-tag__x">&times;</span>
       </button>
     </div>
     <table class="table">
@@ -167,6 +170,7 @@ const palette = [
 const trendMode = ref<"month" | "day">("day");
 const selectedCategory = ref<string | null>(null);
 const selectedMerchant = ref<string | null>(null);
+const selectedPayer = ref<string | null>(null);
 const selectedPeriod = ref<{ type: "day" | "month"; label: string } | null>(null);
 const sortKey = ref<"total_spent" | "last_purchased">("last_purchased");
 const sortDir = ref<"asc" | "desc">("desc");
@@ -265,6 +269,7 @@ const filteredItems = computed(() => {
   const filtered = items.filter((item: any) => {
     if (selectedCategory.value && (item.category_main__name || "未分类") !== selectedCategory.value) return false;
     if (selectedMerchant.value && (item.merchant || "未知店铺") !== selectedMerchant.value) return false;
+    if (selectedPayer.value && (item.payer || "未指定") !== selectedPayer.value) return false;
     if (selectedPeriod.value && item.purchased_at) {
       const d = new Date(item.purchased_at);
       if (isNaN(d.getTime())) return false;
@@ -334,7 +339,7 @@ const visiblePages = computed(() => {
 });
 
 // 筛选/排序/每页条数变化时回到第一页
-watch([selectedCategory, selectedMerchant, selectedPeriod, sortKey, sortDir, pageSize], () => {
+watch([selectedCategory, selectedMerchant, selectedPayer, selectedPeriod, sortKey, sortDir, pageSize], () => {
   currentPage.value = 1;
 });
 
@@ -357,6 +362,12 @@ const onTrendClick = (params: any) => {
     selectedPeriod.value = null;
   } else {
     selectedPeriod.value = { type, label: params.name };
+  }
+};
+
+const onPayerClick = (params: any) => {
+  if (params.name && params.seriesType === "bar") {
+    selectedPayer.value = selectedPayer.value === params.name ? null : params.name;
   }
 };
 
