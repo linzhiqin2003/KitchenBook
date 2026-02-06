@@ -96,12 +96,12 @@ const winnerLabel = computed(() => {
 const turnLabel = computed(() => (turn.value === "black" ? "黑子" : "白子"))
 
 const statusText = computed(() => {
-  if (!connected.value && connecting.value) return "正在建立连接..."
-  if (!connected.value) return "未连接房间"
-  if (status.value === "waiting") return isSpectator.value ? "观战中：等待玩家到齐" : "等待另一位玩家加入"
-  if (status.value === "finished") return `对局结束：${winnerLabel.value}`
-  if (isSpectator.value) return `观战中：${turnLabel.value}落子`
-  return `进行中：${turnLabel.value}落子`
+  if (!connected.value && connecting.value) return "CONNECTING..."
+  if (!connected.value) return "NOT CONNECTED"
+  if (status.value === "waiting") return isSpectator.value ? "SPECTATING - WAITING" : "WAITING FOR OPPONENT"
+  if (status.value === "finished") return `GAME OVER: ${winnerLabel.value}`
+  if (isSpectator.value) return `SPECTATING: ${turnLabel.value}`
+  return `YOUR TURN: ${turnLabel.value}`
 })
 
 const canPlaceStone = computed(
@@ -325,31 +325,39 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-stone-950 via-slate-900 to-amber-950 text-white">
-    <div class="max-w-7xl mx-auto px-4 py-8">
-      <header class="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="text-amber-300/80 text-sm tracking-[0.2em] uppercase">Gomoku Online</p>
-          <h1 class="text-3xl sm:text-4xl font-black mt-2">五子棋联机对弈</h1>
+  <div class="gomoku-root">
+    <!-- Scanlines -->
+    <div class="scanlines"></div>
+
+    <div class="gomoku-content">
+      <!-- Header -->
+      <header class="gomoku-header">
+        <div class="header-left">
+          <p class="header-tag">GOMOKU ONLINE</p>
+          <h1 class="header-title">
+            <span class="title-glow">五子棋</span>
+          </h1>
         </div>
-        <div class="flex items-center gap-2">
-          <router-link
-            to="/games"
-            class="px-4 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition-colors"
-          >
-            返回游戏集合
+        <div class="header-nav">
+          <router-link to="/games" class="pixel-btn">
+            &lt; ARCADE
           </router-link>
-          <router-link
-            to="/"
-            class="px-4 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition-colors"
-          >
-            回到主页
+          <router-link to="/" class="pixel-btn">
+            HOME
           </router-link>
         </div>
       </header>
 
-      <section class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
-        <div class="rounded-3xl bg-black/20 border border-white/10 p-4 sm:p-6">
+      <!-- Status bar -->
+      <div class="status-bar">
+        <span class="status-dot" :class="connected ? 'dot-on' : 'dot-off'"></span>
+        <span class="status-text">{{ statusText }}</span>
+      </div>
+
+      <!-- Main layout -->
+      <section class="main-layout">
+        <!-- Board -->
+        <div class="board-wrapper">
           <div class="gomoku-board">
             <button
               v-for="cell in flatCells"
@@ -370,127 +378,141 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <aside class="rounded-3xl bg-black/20 border border-white/10 p-5 sm:p-6 space-y-5">
-          <div class="space-y-3">
-            <label class="block text-sm text-slate-300">
-              昵称
-              <input
-                v-model="nickname"
-                type="text"
-                maxlength="20"
-                placeholder="输入昵称"
-                class="mt-1 w-full rounded-xl bg-white/10 border border-white/20 px-3 py-2 outline-none focus:border-amber-400"
-              />
-            </label>
+        <!-- Sidebar -->
+        <aside class="sidebar">
+          <!-- Connection panel -->
+          <div class="panel">
+            <h3 class="panel-title">CONNECTION</h3>
+            <div class="panel-body">
+              <label class="field-label">
+                NICKNAME
+                <input
+                  v-model="nickname"
+                  type="text"
+                  maxlength="20"
+                  placeholder="YOUR NAME"
+                  class="pixel-input"
+                />
+              </label>
 
-            <label class="block text-sm text-slate-300">
-              房间号
-              <input
-                v-model="roomInput"
-                type="text"
-                maxlength="20"
-                placeholder="例如 A1B2C3"
-                class="mt-1 w-full rounded-xl bg-white/10 border border-white/20 px-3 py-2 outline-none focus:border-amber-400 uppercase"
-              />
-            </label>
+              <label class="field-label">
+                ROOM ID
+                <input
+                  v-model="roomInput"
+                  type="text"
+                  maxlength="20"
+                  placeholder="e.g. A1B2C3"
+                  class="pixel-input uppercase"
+                />
+              </label>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div class="btn-row">
+                <button
+                  @click="connectRoom"
+                  :disabled="connecting"
+                  class="pixel-btn pixel-btn-primary"
+                >
+                  {{ connecting ? "..." : "JOIN" }}
+                </button>
+                <button
+                  @click="randomRoomAndConnect"
+                  :disabled="connecting"
+                  class="pixel-btn pixel-btn-cyan"
+                >
+                  RANDOM
+                </button>
+              </div>
+
+              <div class="btn-row">
+                <button @click="leaveRoom" class="pixel-btn">
+                  LEAVE
+                </button>
+                <button
+                  @click="copyShareLink"
+                  :disabled="!shareLink"
+                  class="pixel-btn"
+                >
+                  INVITE
+                </button>
+              </div>
+
+              <p class="hint-text">
+                前两位进入的为对弈玩家，后续加入者自动观战。
+              </p>
+            </div>
+          </div>
+
+          <!-- Game state panel -->
+          <div class="panel">
+            <h3 class="panel-title">GAME STATE</h3>
+            <div class="panel-body info-list">
+              <p><span class="info-key">ROOM:</span> {{ roomId || "-" }}</p>
+              <p><span class="info-key">ROLE:</span> {{ isSpectator ? "SPECTATOR" : "PLAYER" }}</p>
+              <p><span class="info-key">COLOR:</span> {{ playerColorLabel }}</p>
+            </div>
+          </div>
+
+          <!-- Players panel -->
+          <div class="panel">
+            <h3 class="panel-title">PLAYERS</h3>
+            <div class="panel-body info-list">
+              <p>
+                <span class="stone-indicator stone-indicator-b"></span>
+                {{ players.black?.nickname || "WAITING..." }}
+              </p>
+              <p>
+                <span class="stone-indicator stone-indicator-w"></span>
+                {{ players.white?.nickname || "WAITING..." }}
+              </p>
               <button
-                @click="connectRoom"
-                :disabled="connecting"
-                class="px-4 py-2 rounded-xl bg-amber-500 text-black font-semibold hover:bg-amber-400 disabled:opacity-60 transition-colors"
+                @click="restartGame"
+                :disabled="!canRestart"
+                class="pixel-btn pixel-btn-green mt-2"
+                :class="{ 'pixel-btn-disabled': !canRestart }"
               >
-                {{ connecting ? "连接中..." : "加入房间" }}
-              </button>
-              <button
-                @click="randomRoomAndConnect"
-                :disabled="connecting"
-                class="px-4 py-2 rounded-xl bg-cyan-500/90 text-black font-semibold hover:bg-cyan-400 disabled:opacity-60 transition-colors"
-              >
-                随机房间
+                RESTART
               </button>
             </div>
+          </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                @click="leaveRoom"
-                class="px-4 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition-colors"
-              >
-                离开房间
-              </button>
-              <button
-                @click="copyShareLink"
-                :disabled="!shareLink"
-                class="px-4 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 disabled:opacity-50 transition-colors"
-              >
-                复制邀请链接
-              </button>
+          <!-- Online panel -->
+          <div class="panel">
+            <h3 class="panel-title">ONLINE</h3>
+            <div class="panel-body info-list">
+              <p>
+                <span class="info-key">ROOM:</span>
+                {{ online.room.total }}
+                (P:{{ online.room.players }} / S:{{ online.room.spectators }})
+              </p>
+              <p>
+                <span class="info-key">GLOBAL:</span>
+                {{ online.global.totalConnections }}
+                ({{ online.global.rooms }} rooms)
+              </p>
             </div>
-
-            <p class="text-xs text-slate-400">
-              提示：同一房间前两位为对弈玩家，后续加入会自动进入观战模式。
-            </p>
           </div>
 
-          <div class="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
-            <h3 class="font-semibold text-lg">对局状态</h3>
-            <p class="text-slate-200">{{ statusText }}</p>
-            <p class="text-slate-300 text-sm">房间号：{{ roomId || "-" }}</p>
-            <p class="text-slate-300 text-sm">当前身份：{{ isSpectator ? "观战者" : "玩家" }}</p>
-            <p class="text-slate-300 text-sm">你当前执子：{{ playerColorLabel }}</p>
+          <!-- Spectators panel -->
+          <div class="panel">
+            <h3 class="panel-title">SPECTATORS ({{ spectators.length }})</h3>
+            <div class="panel-body">
+              <div v-if="spectators.length === 0" class="hint-text">No spectators</div>
+              <ul v-else class="spectator-list">
+                <li
+                  v-for="(item, index) in spectators"
+                  :key="`${item.nickname}-${index}`"
+                >
+                  {{ item.nickname }}
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <div class="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
-            <h3 class="font-semibold text-lg">玩家列表</h3>
-            <p class="text-sm">
-              黑子：<span class="text-slate-200">{{ players.black?.nickname || "等待加入" }}</span>
-            </p>
-            <p class="text-sm">
-              白子：<span class="text-slate-200">{{ players.white?.nickname || "等待加入" }}</span>
-            </p>
-            <button
-              @click="restartGame"
-              :disabled="!canRestart"
-              class="mt-2 px-4 py-2 rounded-xl bg-emerald-500 text-black font-semibold hover:bg-emerald-400 transition-colors"
-              :class="{ 'opacity-50 cursor-not-allowed hover:bg-emerald-500': !canRestart }"
-            >
-              重开一局
-            </button>
-          </div>
-
-          <div class="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
-            <h3 class="font-semibold text-lg">在线人数</h3>
-            <p class="text-sm">
-              房间在线：
-              <span class="text-slate-200">{{ online.room.total }}</span>
-              （玩家 {{ online.room.players }} / 观战 {{ online.room.spectators }}）
-            </p>
-            <p class="text-sm">
-              全局在线：
-              <span class="text-slate-200">{{ online.global.totalConnections }}</span>
-              （活跃房间 {{ online.global.rooms }}）
-            </p>
-          </div>
-
-          <div class="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
-            <h3 class="font-semibold text-lg">观战列表</h3>
-            <p class="text-sm text-slate-300">共 {{ spectators.length }} 人观战</p>
-            <div v-if="spectators.length === 0" class="text-sm text-slate-400">暂无观战者</div>
-            <ul v-else class="max-h-32 overflow-auto space-y-1 pr-1">
-              <li
-                v-for="(item, index) in spectators"
-                :key="`${item.nickname}-${index}`"
-                class="text-sm text-slate-200"
-              >
-                {{ item.nickname }}
-              </li>
-            </ul>
-          </div>
-
-          <div v-if="noticeMessage" class="rounded-xl border border-emerald-300/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+          <!-- Messages -->
+          <div v-if="noticeMessage" class="msg msg-notice">
             {{ noticeMessage }}
           </div>
-          <div v-if="errorMessage" class="rounded-xl border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+          <div v-if="errorMessage" class="msg msg-error">
             {{ errorMessage }}
           </div>
         </aside>
@@ -500,8 +522,154 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* ===== Root ===== */
+.gomoku-root {
+  min-height: 100vh;
+  background: #0a0a0a;
+  position: relative;
+  font-family: 'Press Start 2P', monospace;
+  color: #b0b0b0;
+}
+
+/* ===== Scanlines ===== */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+}
+
+/* ===== Content ===== */
+.gomoku-content {
+  position: relative;
+  z-index: 10;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+/* ===== Header ===== */
+.gomoku-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.header-tag {
+  font-size: 0.45rem;
+  color: #00e5ff;
+  letter-spacing: 0.2em;
+}
+
+.header-title {
+  font-size: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .header-title { font-size: 1.1rem; }
+}
+
+.title-glow {
+  color: #00ff41;
+  text-shadow:
+    0 0 4px #00ff41,
+    0 0 10px rgba(0, 255, 65, 0.4);
+}
+
+.header-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ===== Status Bar ===== */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(0, 255, 65, 0.15);
+  background: rgba(0, 255, 65, 0.03);
+  clip-path: polygon(
+    0 4px, 4px 4px, 4px 0,
+    calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px,
+    100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%,
+    4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)
+  );
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+
+.dot-on {
+  background: #00ff41;
+  box-shadow: 0 0 6px #00ff41;
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+.dot-off {
+  background: #666;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.status-text {
+  font-size: 0.5rem;
+  color: #00ff41;
+  letter-spacing: 0.1em;
+}
+
+/* ===== Main Layout ===== */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Board ===== */
+.board-wrapper {
+  border: 2px solid rgba(0, 255, 65, 0.15);
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  clip-path: polygon(
+    0 8px, 8px 8px, 8px 0,
+    calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%,
+    8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px)
+  );
+}
+
 .gomoku-board {
-  width: min(92vw, 720px);
+  width: min(88vw, 660px);
   max-width: 100%;
   aspect-ratio: 1 / 1;
   margin: 0 auto;
@@ -509,7 +677,7 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(15, minmax(0, 1fr));
   grid-template-rows: repeat(15, minmax(0, 1fr));
   border: 2px solid rgba(0, 0, 0, 0.45);
-  border-radius: 18px;
+  border-radius: 4px;
   overflow: hidden;
   background: linear-gradient(145deg, #d8a15f, #c7883c);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 18px 40px rgba(0, 0, 0, 0.35);
@@ -548,5 +716,256 @@ onBeforeUnmount(() => {
 .stone-white {
   background: radial-gradient(circle at 30% 30%, #ffffff 0%, #f2f2f2 55%, #d8d8d8 100%);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== Sidebar ===== */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ===== Panel ===== */
+.panel {
+  border: 1px solid rgba(0, 255, 65, 0.12);
+  background: rgba(0, 255, 65, 0.02);
+  clip-path: polygon(
+    0 6px, 6px 6px, 6px 0,
+    calc(100% - 6px) 0, calc(100% - 6px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 6px) calc(100% - 6px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 6px), 0 calc(100% - 6px)
+  );
+}
+
+.panel-title {
+  font-size: 0.5rem;
+  color: #00ff41;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 255, 65, 0.1);
+  letter-spacing: 0.1em;
+}
+
+.panel-body {
+  padding: 0.6rem 0.75rem;
+}
+
+/* ===== Form Fields ===== */
+.field-label {
+  display: block;
+  font-size: 0.4rem;
+  color: #888;
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.1em;
+}
+
+.pixel-input {
+  display: block;
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.4rem 0.5rem;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  color: #ccc;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.45rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.pixel-input:focus {
+  border-color: #00ff41;
+  box-shadow: 0 0 6px rgba(0, 255, 65, 0.15);
+}
+
+.pixel-input.uppercase {
+  text-transform: uppercase;
+}
+
+/* ===== Buttons ===== */
+.btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.pixel-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border: 2px solid rgba(0, 255, 65, 0.25);
+  background: rgba(0, 255, 65, 0.05);
+  color: #00ff41;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  transition: all 0.15s;
+  letter-spacing: 0.05em;
+  clip-path: polygon(
+    0 3px, 3px 3px, 3px 0,
+    calc(100% - 3px) 0, calc(100% - 3px) 3px, 100% 3px,
+    100% calc(100% - 3px), calc(100% - 3px) calc(100% - 3px), calc(100% - 3px) 100%,
+    3px 100%, 3px calc(100% - 3px), 0 calc(100% - 3px)
+  );
+}
+
+.pixel-btn:hover {
+  background: rgba(0, 255, 65, 0.12);
+  border-color: #00ff41;
+}
+
+.pixel-btn:active {
+  transform: translateY(2px);
+}
+
+.pixel-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pixel-btn-primary {
+  background: rgba(255, 200, 0, 0.15);
+  border-color: rgba(255, 200, 0, 0.4);
+  color: #ffc800;
+}
+
+.pixel-btn-primary:hover {
+  background: rgba(255, 200, 0, 0.25);
+  border-color: #ffc800;
+}
+
+.pixel-btn-cyan {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: rgba(0, 229, 255, 0.3);
+  color: #00e5ff;
+}
+
+.pixel-btn-cyan:hover {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: #00e5ff;
+}
+
+.pixel-btn-green {
+  background: rgba(0, 255, 65, 0.1);
+  border-color: rgba(0, 255, 65, 0.3);
+  color: #00ff41;
+}
+
+.pixel-btn-green:hover {
+  background: rgba(0, 255, 65, 0.2);
+  border-color: #00ff41;
+}
+
+.pixel-btn-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pixel-btn-disabled:hover {
+  background: rgba(0, 255, 65, 0.1);
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+/* ===== Info List ===== */
+.info-list p {
+  font-size: 0.42rem;
+  line-height: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.info-key {
+  color: #666;
+}
+
+/* ===== Stone Indicator ===== */
+.stone-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stone-indicator-b {
+  background: radial-gradient(circle at 35% 35%, #555, #111);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+}
+
+.stone-indicator-w {
+  background: radial-gradient(circle at 35% 35%, #fff, #ccc);
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+/* ===== Spectator List ===== */
+.spectator-list {
+  max-height: 6rem;
+  overflow-y: auto;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.spectator-list li {
+  font-size: 0.4rem;
+  line-height: 2;
+  color: #999;
+}
+
+/* ===== Hint Text ===== */
+.hint-text {
+  font-size: 0.35rem;
+  color: #555;
+  line-height: 1.8;
+  font-family: 'Noto Sans SC', 'Press Start 2P', sans-serif;
+}
+
+/* ===== Messages ===== */
+.msg {
+  font-size: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  line-height: 1.8;
+  border: 1px solid;
+  font-family: 'Noto Sans SC', 'Press Start 2P', sans-serif;
+}
+
+.msg-notice {
+  border-color: rgba(0, 255, 65, 0.25);
+  background: rgba(0, 255, 65, 0.05);
+  color: #7dff7d;
+}
+
+.msg-error {
+  border-color: rgba(255, 80, 80, 0.3);
+  background: rgba(255, 0, 0, 0.05);
+  color: #ff8888;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 480px) {
+  .gomoku-content {
+    padding: 0.75rem 0.5rem 2rem;
+  }
+
+  .board-wrapper {
+    padding: 0.4rem;
+  }
+
+  .panel-title {
+    font-size: 0.4rem;
+  }
+
+  .pixel-btn {
+    font-size: 0.38rem;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .info-list p {
+    font-size: 0.38rem;
+  }
 }
 </style>
