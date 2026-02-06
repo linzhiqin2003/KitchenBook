@@ -25,7 +25,26 @@
     <StatCard label="收据数量" :value="stats.receipt_count" :subtitle="rangeLabel">
       <template #icon><Receipt :size="20" /></template>
     </StatCard>
-    <StatCard label="最大类目" :value="topCategory" subtitle="消费最高">
+    <!-- 组织模式：结算指引 -->
+    <div v-if="authStore.isOrgMode && stats.by_payer?.length >= 2" class="stat-card settlement-card">
+      <div class="stat-header">
+        <div class="label">结算指引</div>
+        <div class="stat-icon"><ArrowRightLeft :size="20" /></div>
+      </div>
+      <div class="settlement-share">人均 {{ formatGBP(fairShare) }}</div>
+      <div v-if="settlements.length" class="settlement-lines">
+        <div v-for="(t, idx) in settlements" :key="idx" class="settlement-line">
+          <span class="settlement-from">{{ t.from }}</span>
+          <span class="settlement-arrow">→</span>
+          <span class="settlement-to">{{ t.to }}</span>
+          <span class="settlement-amount">{{ formatGBP(t.amount) }}</span>
+          <span v-if="convertCNY(t.amount)" class="cny-hint">{{ convertCNY(t.amount) }}</span>
+        </div>
+      </div>
+      <div v-else class="settlement-balanced">已结清，无需转账</div>
+    </div>
+    <!-- 个人模式：最大类目 -->
+    <StatCard v-else label="最大类目" :value="topCategory" subtitle="消费最高">
       <template #icon><FolderOpen :size="20" /></template>
     </StatCard>
   </div>
@@ -125,7 +144,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { Wallet, Receipt, FolderOpen, Inbox } from "lucide-vue-next";
+import { Wallet, Receipt, FolderOpen, Inbox, ArrowRightLeft } from "lucide-vue-next";
 import ChartCard from "../components/ChartCard.vue";
 import StatCard from "../components/StatCard.vue";
 import { fetchStats, getExchangeRate } from "../api/receipts";
@@ -404,6 +423,49 @@ const topCategory = computed(() => {
   return stats.value.by_category[0].category_main__name || "-";
 });
 
+// ── 组织模式：结算指引 ──
+const fairShare = computed(() => {
+  const payers = stats.value.by_payer || [];
+  if (payers.length < 2) return 0;
+  return Number(stats.value.total_spend || 0) / payers.length;
+});
+
+const settlements = computed(() => {
+  const payers = stats.value.by_payer || [];
+  if (payers.length < 2) return [];
+
+  const share = fairShare.value;
+  const balances = payers.map((p: any) => ({
+    name: p.payer_name || "未指定",
+    balance: Number(p.total || 0) - share,
+  }));
+
+  const creditors = balances
+    .filter((b: any) => b.balance > 0.01)
+    .sort((a: any, b: any) => b.balance - a.balance);
+  const debtors = balances
+    .filter((b: any) => b.balance < -0.01)
+    .sort((a: any, b: any) => a.balance - b.balance);
+
+  const transfers: { from: string; to: string; amount: number }[] = [];
+  let i = 0, j = 0;
+  while (i < debtors.length && j < creditors.length) {
+    const amount = Math.min(-debtors[i].balance, creditors[j].balance);
+    if (amount > 0.01) {
+      transfers.push({
+        from: debtors[i].name,
+        to: creditors[j].name,
+        amount: Math.round(amount * 100) / 100,
+      });
+    }
+    debtors[i].balance += amount;
+    creditors[j].balance -= amount;
+    if (Math.abs(debtors[i].balance) < 0.01) i++;
+    if (Math.abs(creditors[j].balance) < 0.01) j++;
+  }
+  return transfers;
+});
+
 const categoryChart = computed(() => {
   const data = stats.value.by_category || [];
   return {
@@ -603,6 +665,61 @@ onMounted(() => {
   color: var(--muted);
   font-size: 11px;
   margin-left: 4px;
+}
+
+/* ── 结算指引卡片 ── */
+.settlement-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.settlement-share {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.settlement-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settlement-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settlement-from {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settlement-arrow {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settlement-to {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.settlement-amount {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.settlement-balanced {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 .date-range-bar {
