@@ -21,6 +21,7 @@ class ProviderType(Enum):
     AZURE = "azure"              # Azure AI Services
     ANTHROPIC = "anthropic"      # Anthropic (Claude)
     GOOGLE = "google"            # Google AI (Gemini)
+    CEREBRAS = "cerebras"        # Cerebras (fast inference)
     LOCAL = "local"              # Local models (Ollama, vLLM, etc.)
 
 
@@ -54,6 +55,7 @@ class ProviderConfig:
                 ProviderType.AZURE: None,  # Requires custom endpoint
                 ProviderType.ANTHROPIC: "https://api.anthropic.com",
                 ProviderType.GOOGLE: "https://generativelanguage.googleapis.com/v1beta",
+                ProviderType.CEREBRAS: "https://api.cerebras.ai/v1",
             }
             self.base_url = default_urls.get(self.provider_type)
 

@@ -52,18 +52,22 @@
       <div class="form-field">
         <label>小计</label>
         <input class="input" v-model="receipt.subtotal" :readonly="!isOwner" />
+        <span v-if="convert(receipt.subtotal)" class="converted-hint">{{ convert(receipt.subtotal) }}</span>
       </div>
       <div class="form-field">
         <label>税费</label>
         <input class="input" v-model="receipt.tax" :readonly="!isOwner" />
+        <span v-if="convert(receipt.tax)" class="converted-hint">{{ convert(receipt.tax) }}</span>
       </div>
       <div class="form-field">
         <label>折扣</label>
         <input class="input" v-model="receipt.discount" :readonly="!isOwner" />
+        <span v-if="convert(receipt.discount)" class="converted-hint">{{ convert(receipt.discount) }}</span>
       </div>
       <div class="form-field">
         <label>总计</label>
         <input class="input" v-model="receipt.total" :readonly="!isOwner" />
+        <span v-if="convert(receipt.total)" class="converted-hint">{{ convert(receipt.total) }}</span>
       </div>
       <div class="form-field">
         <label>付款人</label>
@@ -171,7 +175,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-vue-next";
-import { confirmReceipt, confirmReceiptWithSplit, deleteReceipt, getReceipt, moveReceiptItems, updateReceipt } from "../api/receipts";
+import { confirmReceipt, confirmReceiptWithSplit, deleteReceipt, getExchangeRate, getReceipt, moveReceiptItems, updateReceipt } from "../api/receipts";
 import ReceiptItemTable from "../components/ReceiptItemTable.vue";
 import { useAuthStore } from "../stores/auth";
 import { useOrgStore } from "../stores/org";
@@ -191,6 +195,7 @@ const fullscreen = ref(false);
 const isEmptyOnLoad = ref(false);
 const isOwner = computed(() => receipt.value?.user_id === authStore.user?.id);
 const moveTargets = reactive<Record<number, string>>({});
+const exchangeRate = ref<number | null>(null);
 const currentOrgIdStr = computed(() => authStore.activeOrgId || "");
 
 const imageUrl = computed(() => {
@@ -382,12 +387,29 @@ const batchMoveItems = async () => {
   }
 };
 
+const convert = (value: string | number | null | undefined): string | null => {
+  if (value == null || value === "" || exchangeRate.value == null) return null;
+  const num = Number(value);
+  if (isNaN(num) || num === 0) return null;
+  const currency = receipt.value?.currency?.toUpperCase();
+  if (currency === "GBP") {
+    return `≈ ¥${(num * exchangeRate.value).toFixed(2)}`;
+  } else if (currency === "CNY" || currency === "RMB") {
+    return `≈ £${(num / exchangeRate.value).toFixed(2)}`;
+  }
+  return null;
+};
+
 onMounted(async () => {
   await load();
   syncMoveTargets();
   if (authStore.isLoggedIn) {
     try { await orgStore.fetchOrgs(); } catch { /* ignore */ }
   }
+  // Non-blocking exchange rate fetch
+  getExchangeRate()
+    .then((res) => { exchangeRate.value = res.rate; })
+    .catch(() => { /* silently ignore */ });
 });
 </script>
 
@@ -430,6 +452,13 @@ onMounted(async () => {
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-weight: 500;
+}
+
+.converted-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted, #8e8e93);
 }
 
 .action-bar {

@@ -7,6 +7,7 @@ dashscope>=1.25.3
 aiohttp>=3.9.0
 websockets>=12.0
 groq>=0.11.0
+cerebras-cloud-sdk>=1.0.0
 Pillow==11.0.0
 python-dotenv==1.2.1
 openai==1.58.1
@@ -15,3 +16,4 @@ gunicorn==21.2.0
 gevent==24.2.1
 djangorestframework-simplejwt>=5.3,<6
 pydantic>=2.6,<3
+yfinance>=0.2.36

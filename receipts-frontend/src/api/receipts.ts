@@ -162,3 +162,18 @@ export async function moveReceiptItems(
 export async function deleteReceipt(id: string) {
   await api.delete(`/receipts/${id}/`);
 }
+
+export interface ExchangeRateResponse {
+  rate: number;
+  source: string;
+  target: string;
+  cached: boolean;
+  stale: boolean;
+  updated_at: number;
+  error?: string;
+}
+
+export async function getExchangeRate(): Promise<ExchangeRateResponse> {
+  const { data } = await api.get("/exchange-rate/");
+  return data;
+}

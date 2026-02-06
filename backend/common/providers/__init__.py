@@ -21,6 +21,7 @@ from .base import (
 from .dashscope import DashScopeLLMProvider, DashScopeTranslationProvider
 from .dashscope_tts import DashScopeTTSProvider
 from .openai_provider import OpenAILLMProvider, OpenAITTSProvider
+from .cerebras_provider import CerebrasLLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ PROVIDER_REGISTRY: Dict[tuple, Type[BaseProvider]] = {
     (ProviderType.OPENAI, ServiceType.LLM): OpenAILLMProvider,
     (ProviderType.OPENAI, ServiceType.VISION): OpenAILLMProvider,
     (ProviderType.OPENAI, ServiceType.TTS): OpenAITTSProvider,
+
+    # Cerebras providers
+    (ProviderType.CEREBRAS, ServiceType.LLM): CerebrasLLMProvider,
 }
 
 
@@ -56,6 +60,7 @@ API_KEY_ENV_VARS: Dict[ProviderType, str] = {
     ProviderType.AZURE: "AZURE_OPENAI_API_KEY",
     ProviderType.ANTHROPIC: "ANTHROPIC_API_KEY",
     ProviderType.GOOGLE: "GOOGLE_API_KEY",
+    ProviderType.CEREBRAS: "CEREBRAS_API_KEY",
 }
 
 

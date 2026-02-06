@@ -374,6 +374,7 @@ const clearChat = () => {
 }
 
 const handleKeydown = (e) => {
+  if (e.isComposing || e.keyCode === 229) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     sendMessage()
@@ -752,12 +753,26 @@ const formatDuration = (seconds) => {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* 聊天窗口动画 */
-.chat-window-enter-active { animation: chat-in 0.3s ease-out; }
-.chat-window-leave-active { animation: chat-in 0.2s ease-in reverse; }
-@keyframes chat-in {
-  0% { opacity: 0; transform: translateY(20px) scale(0.95); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+/* 聊天窗口动画 - 水滴展开效果 */
+.chat-window-enter-active {
+  animation: drop-expand 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.chat-window-leave-active {
+  animation: drop-expand 0.3s cubic-bezier(0.55, 0, 1, 0.45) reverse;
+}
+@keyframes drop-expand {
+  0% {
+    clip-path: circle(0% at calc(100% - 28px) calc(100% - 28px));
+    opacity: 0;
+  }
+  40% {
+    clip-path: circle(25% at calc(100% - 28px) calc(100% - 28px));
+    opacity: 1;
+  }
+  100% {
+    clip-path: circle(150% at calc(100% - 28px) calc(100% - 28px));
+    opacity: 1;
+  }
 }
 
 /* 消息动画 */

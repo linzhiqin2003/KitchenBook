@@ -601,6 +601,19 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         receipt.image.name = str(new_path.relative_to(Path(settings.MEDIA_ROOT)))
 
 
+class ExchangeRateView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .services.exchange import get_gbp_cny_rate
+
+        result = get_gbp_cny_rate()
+        if "error" in result:
+            return Response(result, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response(result)
+
+
 class StatsOverviewView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]

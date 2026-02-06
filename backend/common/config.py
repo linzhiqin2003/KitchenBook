@@ -69,6 +69,11 @@ class APIConfig:
     groq_api_key: str = field(
         default_factory=lambda: os.environ.get("GROQ_API_KEY", "")
     )
+
+    # Cerebras
+    cerebras_api_key: str = field(
+        default_factory=lambda: os.environ.get("CEREBRAS_API_KEY", "")
+    )
     groq_asr_model: str = field(
         default_factory=lambda: os.environ.get("GROQ_ASR_MODEL", "whisper-large-v3")
     )
