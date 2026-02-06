@@ -191,10 +191,8 @@ function connectRoom() {
   ws.value = socket
 
   socket.onopen = () => {
-    connected.value = true
-    connecting.value = false
     roomId.value = nextRoomId
-    noticeMessage.value = "连接成功，等待服务器分配座位..."
+    noticeMessage.value = "连接建立，正在加入房间..."
     router.replace({ path: `/games/gomoku/${nextRoomId}`, query: { name: nextNickname } })
   }
 
@@ -211,17 +209,24 @@ function connectRoom() {
     errorMessage.value = "WebSocket 连接异常，请稍后重试。"
   }
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
     if (ws.value === socket) {
       ws.value = null
     }
+    const closedBeforeJoin = !connected.value && connecting.value
     connected.value = false
     connecting.value = false
+    if (closedBeforeJoin) {
+      const codeInfo = event?.code ? ` (code: ${event.code})` : ""
+      errorMessage.value = `加入失败：连接已断开${codeInfo}，请重试。`
+    }
   }
 }
 
 function handleServerMessage(data) {
   if (data.type === "joined") {
+    connected.value = true
+    connecting.value = false
     role.value = data.role || (data.playerColor ? "player" : "spectator")
     playerColor.value = data.playerColor || ""
     roomId.value = data.roomId || roomId.value
@@ -250,6 +255,9 @@ function handleServerMessage(data) {
   }
 
   if (data.type === "error") {
+    if (!connected.value) {
+      connecting.value = false
+    }
     errorMessage.value = data.message || "服务器返回错误。"
     return
   }
