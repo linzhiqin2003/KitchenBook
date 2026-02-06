@@ -55,6 +55,12 @@ class GomokuConsumer(AsyncWebsocketConsumer):
     rooms_lock = threading.Lock()
     active_connections = set()
 
+    async def send_json(self, payload):
+        """
+        Lightweight JSON sender for AsyncWebsocketConsumer.
+        """
+        await self.send(text_data=json.dumps(payload, ensure_ascii=False))
+
     async def connect(self):
         room_id = (self.scope.get("url_route", {}).get("kwargs", {}).get("room_id", "") or "").upper()
         if not ROOM_ID_PATTERN.match(room_id):
@@ -383,4 +389,3 @@ class GomokuConsumer(AsyncWebsocketConsumer):
             cx += dx
             cy += dy
         return total
-
