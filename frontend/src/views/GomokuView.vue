@@ -595,17 +595,17 @@ onBeforeUnmount(() => {
 }
 
 .header-tag {
-  font-size: 0.45rem;
+  font-size: 0.7rem;
   color: #00e5ff;
   letter-spacing: 0.2em;
 }
 
 .header-title {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
 }
 
 @media (max-width: 640px) {
-  .header-title { font-size: 1.1rem; }
+  .header-title { font-size: 1.3rem; }
 }
 
 .title-glow {
@@ -655,7 +655,7 @@ onBeforeUnmount(() => {
 }
 
 .status-text {
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   color: #00ff41;
   letter-spacing: 0.1em;
 }
@@ -663,7 +663,7 @@ onBeforeUnmount(() => {
 /* ===== Main Layout ===== */
 .main-layout {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: 1fr 360px;
   gap: 1.25rem;
   align-items: start;
 }
@@ -774,7 +774,7 @@ onBeforeUnmount(() => {
 }
 
 .ov-text {
-  font-size: 1.4rem;
+  font-size: 1.8rem;
   color: #00ff41;
   text-shadow:
     0 0 6px #00ff41,
@@ -784,7 +784,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 480px) {
-  .ov-text { font-size: 1rem; }
+  .ov-text { font-size: 1.3rem; }
 }
 
 @keyframes neonPulse {
@@ -816,7 +816,7 @@ onBeforeUnmount(() => {
 }
 
 .overlay-sub {
-  font-size: 0.45rem;
+  font-size: 0.7rem;
   color: #666;
   margin-bottom: 1.5rem;
   letter-spacing: 0.1em;
@@ -828,7 +828,7 @@ onBeforeUnmount(() => {
 }
 
 .overlay-hint {
-  font-size: 0.35rem;
+  font-size: 0.55rem;
   color: #444;
   text-align: center;
   margin-top: 0.25rem;
@@ -866,7 +866,7 @@ onBeforeUnmount(() => {
 }
 
 .panel-title {
-  font-size: 0.45rem;
+  font-size: 0.7rem;
   color: #00ff41;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid rgba(0, 255, 65, 0.1);
@@ -877,7 +877,7 @@ onBeforeUnmount(() => {
 }
 
 .panel-badge {
-  font-size: 0.35rem;
+  font-size: 0.55rem;
   color: #00e5ff;
   border: 1px solid rgba(0, 229, 255, 0.3);
   padding: 0.15em 0.4em;
@@ -885,7 +885,7 @@ onBeforeUnmount(() => {
 }
 
 .panel-count {
-  font-size: 0.4rem;
+  font-size: 0.65rem;
   color: #ffc800;
   margin-left: auto;
 }
@@ -897,7 +897,7 @@ onBeforeUnmount(() => {
 /* ===== Form Fields ===== */
 .field-label {
   display: block;
-  font-size: 0.4rem;
+  font-size: 0.65rem;
   color: #888;
   margin-bottom: 0.6rem;
   letter-spacing: 0.1em;
@@ -912,7 +912,7 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(0, 255, 65, 0.2);
   color: #ccc;
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.45rem;
+  font-size: 0.7rem;
   outline: none;
   transition: border-color 0.2s;
 }
@@ -936,7 +936,7 @@ onBeforeUnmount(() => {
 
 .pixel-btn {
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.45rem;
+  font-size: 0.7rem;
   padding: 0.55rem 0.6rem;
   border: 2px solid rgba(0, 255, 65, 0.25);
   background: rgba(0, 255, 65, 0.05);
@@ -969,7 +969,7 @@ onBeforeUnmount(() => {
 }
 
 .pixel-btn-small {
-  font-size: 0.38rem;
+  font-size: 0.6rem;
   padding: 0.4rem 0.5rem;
 }
 
@@ -1017,7 +1017,7 @@ onBeforeUnmount(() => {
 
 /* ===== Info List ===== */
 .info-list p {
-  font-size: 0.42rem;
+  font-size: 0.65rem;
   line-height: 2.2;
   display: flex;
   align-items: center;
@@ -1035,7 +1035,7 @@ onBeforeUnmount(() => {
 
 .turn-arrow {
   color: #00ff41;
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   margin-left: auto;
   animation: arrowBlink 0.8s step-end infinite;
 }
@@ -1072,19 +1072,19 @@ onBeforeUnmount(() => {
 }
 
 .spectator-label {
-  font-size: 0.35rem;
+  font-size: 0.55rem;
   color: #555;
   margin-bottom: 0.2rem;
 }
 
 .spectator-name {
-  font-size: 0.35rem;
+  font-size: 0.55rem;
   color: #888;
 }
 
 /* ===== Messages ===== */
 .msg {
-  font-size: 0.4rem;
+  font-size: 0.65rem;
   padding: 0.5rem 0.6rem;
   line-height: 1.8;
   border: 1px solid;
@@ -1118,16 +1118,16 @@ onBeforeUnmount(() => {
   }
 
   .panel-title {
-    font-size: 0.38rem;
+    font-size: 0.6rem;
   }
 
   .pixel-btn {
-    font-size: 0.38rem;
+    font-size: 0.6rem;
     padding: 0.4rem 0.5rem;
   }
 
   .info-list p {
-    font-size: 0.38rem;
+    font-size: 0.55rem;
   }
 }
 </style>

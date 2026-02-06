@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
 }
 
 .subtitle-tag {
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   color: #00e5ff;
   letter-spacing: 0.25em;
   margin-bottom: 0.75rem;
@@ -290,7 +290,7 @@ onBeforeUnmount(() => {
 }
 
 .arcade-title {
-  font-size: 2.5rem;
+  font-size: 3rem;
   line-height: 1.2;
   display: inline-flex;
   align-items: center;
@@ -298,7 +298,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .arcade-title { font-size: 1.6rem; }
+  .arcade-title { font-size: 2rem; }
 }
 
 .title-glow {
@@ -340,7 +340,7 @@ onBeforeUnmount(() => {
 }
 
 .subtitle-desc {
-  font-size: 0.6rem;
+  font-size: 0.85rem;
   color: #666;
   margin-top: 0.75rem;
   letter-spacing: 0.15em;
@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
 }
 
 .section-label {
-  font-size: 0.65rem;
+  font-size: 0.9rem;
   color: #00ff41;
   letter-spacing: 0.15em;
   margin-bottom: 1rem;
@@ -470,7 +470,7 @@ onBeforeUnmount(() => {
 }
 
 .card-title {
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   color: #00ff41;
   margin-bottom: 0.25rem;
 }
@@ -480,13 +480,13 @@ onBeforeUnmount(() => {
 }
 
 .card-subtitle {
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   color: #888;
   margin-bottom: 0.5rem;
 }
 
 .card-desc {
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   color: #999;
   line-height: 1.8;
   margin-bottom: 0.6rem;
@@ -499,7 +499,7 @@ onBeforeUnmount(() => {
 }
 
 .pixel-tag {
-  font-size: 0.4rem;
+  font-size: 0.6rem;
   padding: 0.25em 0.6em;
   background: rgba(0, 229, 255, 0.1);
   border: 1px solid rgba(0, 229, 255, 0.25);
@@ -510,7 +510,7 @@ onBeforeUnmount(() => {
 .card-arrow {
   flex-shrink: 0;
   color: #00ff41;
-  font-size: 0.75rem;
+  font-size: 1rem;
   animation: arrowBlink 1s step-end infinite;
 }
 
@@ -523,7 +523,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0.6rem;
   right: 0.8rem;
-  font-size: 0.4rem;
+  font-size: 0.6rem;
   color: #ffff00;
   border: 1px solid rgba(255, 255, 0, 0.3);
   padding: 0.2em 0.5em;
@@ -656,7 +656,7 @@ onBeforeUnmount(() => {
 /* ===== Pixel Button ===== */
 .pixel-btn {
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   padding: 0.6em 1.2em;
   border: 2px solid rgba(0, 255, 65, 0.3);
   background: rgba(0, 255, 65, 0.05);
@@ -695,7 +695,7 @@ onBeforeUnmount(() => {
 }
 
 .footer-text {
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   color: #444;
   margin-top: 1rem;
   letter-spacing: 0.15em;
@@ -709,7 +709,7 @@ onBeforeUnmount(() => {
   }
 
   .arcade-title {
-    font-size: 1.3rem;
+    font-size: 1.6rem;
   }
 
   .game-card {
@@ -729,11 +729,11 @@ onBeforeUnmount(() => {
   }
 
   .card-title {
-    font-size: 0.7rem;
+    font-size: 0.9rem;
   }
 
   .subtitle-tag, .subtitle-desc {
-    font-size: 0.45rem;
+    font-size: 0.65rem;
   }
 }
 </style>
