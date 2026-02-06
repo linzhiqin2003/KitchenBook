@@ -23,6 +23,8 @@ const AiLabStudioView = () => import('../views/AiLabStudioView.vue')
 const AiLabLoginView = () => import('../views/AiLabLoginView.vue')
 const QuestionGenView = () => import('../views/QuestionGenView.vue')
 const PortfolioHomeView = () => import('../views/PortfolioHomeView.vue')
+const GamesHubView = () => import('../views/GamesHubView.vue')
+const GomokuView = () => import('../views/GomokuView.vue')
 const TarotSanctumView = () => import('../views/tarot/TarotSanctumView.vue')
 const TarotRitualView = () => import('../views/tarot/TarotRitualView.vue')
 
@@ -180,6 +182,22 @@ const router = createRouter({
       name: 'ai-lab-studio',
       component: AiLabStudioView,
       meta: { requiresAuth: true, authType: 'ai-lab', title: 'AI Studio | LZQ' }
+    },
+
+    // ========================================
+    // Games 模块 - /games 路径下
+    // ========================================
+    {
+      path: '/games',
+      name: 'games-hub',
+      component: GamesHubView,
+      meta: { title: '联机小游戏 | LZQ' }
+    },
+    {
+      path: '/games/gomoku/:roomId?',
+      name: 'games-gomoku',
+      component: GomokuView,
+      meta: { title: '五子棋联机 | LZQ' }
     },
 
     // ========================================

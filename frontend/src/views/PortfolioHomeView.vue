@@ -68,6 +68,17 @@ const navBlocks = [
     features: ['互动牌阵', 'AI解读', '仪式体验']
   },
   {
+    id: 'games',
+    title: '联机游戏',
+    subtitle: 'Realtime Games',
+    description: '和朋友一起实时对战，从五子棋开始',
+    icon: '🎮',
+    path: '/games',
+    gradient: 'from-emerald-500 via-teal-500 to-cyan-500',
+    shadowColor: 'shadow-teal-500/30',
+    features: ['WebSocket对战', '房间邀请', '轻量小游戏']
+  },
+  {
     id: 'ai-lab',
     title: 'AI 实验室',
     subtitle: 'AI Lab',

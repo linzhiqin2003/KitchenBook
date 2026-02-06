@@ -1,14 +1,15 @@
 [Unit]
-Description=Daphne ASGI Server for KitchenBook (WebSocket support)
+Description=Daphne ASGI Server for MyWeb (WebSocket support)
 After=network.target
 
 [Service]
-User=ubuntu
+User=kitchenbook
 Group=www-data
-WorkingDirectory=/home/ubuntu/KitchenBook/backend
+WorkingDirectory=/home/kitchenbook/KitchenBook/backend
+Environment="PATH=/home/kitchenbook/KitchenBook/venv/bin"
 Environment="DJANGO_SETTINGS_MODULE=config.settings"
-ExecStart=/home/ubuntu/KitchenBook/venv/bin/daphne \
-    -u /home/ubuntu/KitchenBook/backend/daphne.sock \
+EnvironmentFile=/home/kitchenbook/KitchenBook/backend/.env
+ExecStart=/home/kitchenbook/KitchenBook/venv/bin/daphne \
     -b 127.0.0.1 \
     -p 8001 \
     config.asgi:application

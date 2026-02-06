@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "questions",  # QuestionGen 刷题模块
     "apps.interpretation",
     "apps.emoji_generator",
+    "apps.games",
     "accounts",
     "receipts",
 ]

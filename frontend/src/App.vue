@@ -18,6 +18,8 @@ const isAiLabPage = computed(() => route.path.startsWith('/ai-lab'))
 const isBlogPage = computed(() => route.path === '/blog' || route.path.startsWith('/blog/'))
 // QuestionGen 刷题页面独立布局 (/questiongen)
 const isQuestionGenPage = computed(() => route.path === '/questiongen')
+// Games 页面独立布局 (/games)
+const isGamesPage = computed(() => route.path === '/games' || route.path.startsWith('/games/'))
 // Tarot 页面独立布局 (/tarot)
 const isTarotPage = computed(() => route.path.startsWith('/tarot'))
 // Kitchen 首页模式 - 排除chef和ai-lab
@@ -56,6 +58,11 @@ const handleLogout = () => {
   
   <!-- QuestionGen 刷题独立页面模式 -->
   <div v-else-if="isQuestionGenPage" class="min-h-screen">
+    <RouterView />
+  </div>
+
+  <!-- Games 独立页面模式 -->
+  <div v-else-if="isGamesPage" class="min-h-screen">
     <RouterView />
   </div>
 

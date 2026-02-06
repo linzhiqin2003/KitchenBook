@@ -44,6 +44,7 @@ npm run build
 
 echo -e "${YELLOW}🔄 7. 重启服务...${NC}"
 sudo systemctl restart gunicorn
+sudo systemctl restart daphne
 sleep 2
 sudo systemctl restart nginx
 
@@ -53,6 +54,14 @@ if systemctl is-active --quiet gunicorn; then
 else
     echo -e "${RED}✗ Gunicorn 启动失败${NC}"
     sudo journalctl -u gunicorn -n 20
+    exit 1
+fi
+
+if systemctl is-active --quiet daphne; then
+    echo -e "${GREEN}✓ Daphne (WebSocket) 运行正常${NC}"
+else
+    echo -e "${RED}✗ Daphne 启动失败${NC}"
+    sudo journalctl -u daphne -n 20
     exit 1
 fi
 

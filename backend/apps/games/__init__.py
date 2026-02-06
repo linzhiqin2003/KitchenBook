@@ -1,0 +1,4 @@
+"""
+Games app package.
+"""
+
