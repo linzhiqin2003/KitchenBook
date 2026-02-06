@@ -312,15 +312,23 @@ function cellValue(x, y) {
   return board.value[y]?.[x] ?? 0
 }
 
+// Blinking cursor for overlay
+let cursorInterval = null
+const cursorVisible = ref(true)
+
 onMounted(() => {
   updateRoomFromRoute()
   if (roomInput.value && nickname.value) {
     connectRoom()
   }
+  cursorInterval = setInterval(() => {
+    cursorVisible.value = !cursorVisible.value
+  }, 530)
 })
 
 onBeforeUnmount(() => {
   closeSocket(true)
+  if (cursorInterval) clearInterval(cursorInterval)
 })
 </script>
 
@@ -348,126 +356,148 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <!-- Status bar -->
-      <div class="status-bar">
-        <span class="status-dot" :class="connected ? 'dot-on' : 'dot-off'"></span>
+      <!-- Status bar (only when connected) -->
+      <div v-if="connected" class="status-bar">
+        <span class="status-dot dot-on"></span>
         <span class="status-text">{{ statusText }}</span>
       </div>
 
       <!-- Main layout -->
-      <section class="main-layout">
-        <!-- Board -->
-        <div class="board-wrapper">
-          <div class="gomoku-board">
-            <button
-              v-for="cell in flatCells"
-              :key="cell.key"
-              class="gomoku-cell"
-              :class="{
-                'gomoku-cell-playable': canPlaceStone && cellValue(cell.x, cell.y) === 0,
-                'gomoku-cell-last': isLastMove(cell.x, cell.y),
-              }"
-              :disabled="cellValue(cell.x, cell.y) !== 0 || !canPlaceStone"
-              @click="placeStone(cell.x, cell.y)"
-            >
-              <span
-                v-if="cellValue(cell.x, cell.y) !== 0"
-                :class="stoneClass(cellValue(cell.x, cell.y))"
-              ></span>
-            </button>
+      <section class="main-layout" :class="{ 'layout-full': !connected }">
+        <!-- Board area with overlay -->
+        <div class="board-area">
+          <div class="board-wrapper">
+            <div class="gomoku-board">
+              <button
+                v-for="cell in flatCells"
+                :key="cell.key"
+                class="gomoku-cell"
+                :class="{
+                  'gomoku-cell-playable': canPlaceStone && cellValue(cell.x, cell.y) === 0,
+                  'gomoku-cell-last': isLastMove(cell.x, cell.y),
+                }"
+                :disabled="cellValue(cell.x, cell.y) !== 0 || !canPlaceStone"
+                @click="placeStone(cell.x, cell.y)"
+              >
+                <span
+                  v-if="cellValue(cell.x, cell.y) !== 0"
+                  :class="stoneClass(cellValue(cell.x, cell.y))"
+                ></span>
+              </button>
+            </div>
           </div>
+
+          <!-- Board overlay when not connected -->
+          <Transition name="overlay-fade">
+            <div v-if="!connected" class="board-overlay">
+              <div class="overlay-content">
+                <div class="overlay-title">
+                  <span class="ov-text">INSERT COIN</span>
+                  <span class="ov-cursor" :class="{ 'cursor-on': cursorVisible }"></span>
+                </div>
+                <p class="overlay-sub">输入信息加入对局</p>
+
+                <div class="overlay-form">
+                  <label class="field-label">
+                    NICKNAME
+                    <input
+                      v-model="nickname"
+                      type="text"
+                      maxlength="20"
+                      placeholder="YOUR NAME"
+                      class="pixel-input"
+                      @keyup.enter="connectRoom"
+                    />
+                  </label>
+
+                  <label class="field-label">
+                    ROOM ID
+                    <input
+                      v-model="roomInput"
+                      type="text"
+                      maxlength="20"
+                      placeholder="e.g. A1B2C3"
+                      class="pixel-input uppercase"
+                      @keyup.enter="connectRoom"
+                    />
+                  </label>
+
+                  <div class="btn-row">
+                    <button
+                      @click="connectRoom"
+                      :disabled="connecting"
+                      class="pixel-btn pixel-btn-primary"
+                    >
+                      {{ connecting ? "CONNECTING..." : "JOIN ROOM" }}
+                    </button>
+                    <button
+                      @click="randomRoomAndConnect"
+                      :disabled="connecting"
+                      class="pixel-btn pixel-btn-cyan"
+                    >
+                      RANDOM
+                    </button>
+                  </div>
+
+                  <p class="overlay-hint">前两位进入为对弈玩家，后续自动观战</p>
+
+                  <!-- Error on overlay -->
+                  <div v-if="errorMessage" class="msg msg-error">
+                    {{ errorMessage }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Transition>
         </div>
 
-        <!-- Sidebar -->
-        <aside class="sidebar">
-          <!-- Connection panel -->
+        <!-- Sidebar (only when connected) -->
+        <aside v-if="connected" class="sidebar">
+          <!-- Room & identity -->
           <div class="panel">
-            <h3 class="panel-title">CONNECTION</h3>
+            <h3 class="panel-title">
+              ROOM: {{ roomId }}
+              <span class="panel-badge">{{ isSpectator ? "SPECTATOR" : playerColorLabel }}</span>
+            </h3>
             <div class="panel-body">
-              <label class="field-label">
-                NICKNAME
-                <input
-                  v-model="nickname"
-                  type="text"
-                  maxlength="20"
-                  placeholder="YOUR NAME"
-                  class="pixel-input"
-                />
-              </label>
-
-              <label class="field-label">
-                ROOM ID
-                <input
-                  v-model="roomInput"
-                  type="text"
-                  maxlength="20"
-                  placeholder="e.g. A1B2C3"
-                  class="pixel-input uppercase"
-                />
-              </label>
-
               <div class="btn-row">
-                <button
-                  @click="connectRoom"
-                  :disabled="connecting"
-                  class="pixel-btn pixel-btn-primary"
-                >
-                  {{ connecting ? "..." : "JOIN" }}
-                </button>
-                <button
-                  @click="randomRoomAndConnect"
-                  :disabled="connecting"
-                  class="pixel-btn pixel-btn-cyan"
-                >
-                  RANDOM
-                </button>
-              </div>
-
-              <div class="btn-row">
-                <button @click="leaveRoom" class="pixel-btn">
+                <button @click="leaveRoom" class="pixel-btn pixel-btn-small">
                   LEAVE
                 </button>
                 <button
                   @click="copyShareLink"
                   :disabled="!shareLink"
-                  class="pixel-btn"
+                  class="pixel-btn pixel-btn-small"
                 >
                   INVITE
                 </button>
               </div>
-
-              <p class="hint-text">
-                前两位进入的为对弈玩家，后续加入者自动观战。
-              </p>
             </div>
           </div>
 
-          <!-- Game state panel -->
-          <div class="panel">
-            <h3 class="panel-title">GAME STATE</h3>
-            <div class="panel-body info-list">
-              <p><span class="info-key">ROOM:</span> {{ roomId || "-" }}</p>
-              <p><span class="info-key">ROLE:</span> {{ isSpectator ? "SPECTATOR" : "PLAYER" }}</p>
-              <p><span class="info-key">COLOR:</span> {{ playerColorLabel }}</p>
-            </div>
-          </div>
-
-          <!-- Players panel -->
+          <!-- Players -->
           <div class="panel">
             <h3 class="panel-title">PLAYERS</h3>
             <div class="panel-body info-list">
               <p>
                 <span class="stone-indicator stone-indicator-b"></span>
-                {{ players.black?.nickname || "WAITING..." }}
+                <span :class="{ 'player-turn': turn === 'black' && status === 'playing' }">
+                  {{ players.black?.nickname || "WAITING..." }}
+                </span>
+                <span v-if="turn === 'black' && status === 'playing'" class="turn-arrow">&lt;</span>
               </p>
               <p>
                 <span class="stone-indicator stone-indicator-w"></span>
-                {{ players.white?.nickname || "WAITING..." }}
+                <span :class="{ 'player-turn': turn === 'white' && status === 'playing' }">
+                  {{ players.white?.nickname || "WAITING..." }}
+                </span>
+                <span v-if="turn === 'white' && status === 'playing'" class="turn-arrow">&lt;</span>
               </p>
               <button
+                v-if="canRestart || status === 'finished'"
                 @click="restartGame"
                 :disabled="!canRestart"
-                class="pixel-btn pixel-btn-green mt-2"
+                class="pixel-btn pixel-btn-green pixel-btn-small mt-2"
                 :class="{ 'pixel-btn-disabled': !canRestart }"
               >
                 RESTART
@@ -475,36 +505,29 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Online panel -->
+          <!-- Online + Spectators combined -->
           <div class="panel">
-            <h3 class="panel-title">ONLINE</h3>
+            <h3 class="panel-title">
+              ONLINE
+              <span class="panel-count">{{ online.room.total }}</span>
+            </h3>
             <div class="panel-body info-list">
               <p>
                 <span class="info-key">ROOM:</span>
-                {{ online.room.total }}
-                (P:{{ online.room.players }} / S:{{ online.room.spectators }})
+                P:{{ online.room.players }} / S:{{ online.room.spectators }}
               </p>
               <p>
                 <span class="info-key">GLOBAL:</span>
-                {{ online.global.totalConnections }}
-                ({{ online.global.rooms }} rooms)
+                {{ online.global.totalConnections }} ({{ online.global.rooms }} rooms)
               </p>
-            </div>
-          </div>
-
-          <!-- Spectators panel -->
-          <div class="panel">
-            <h3 class="panel-title">SPECTATORS ({{ spectators.length }})</h3>
-            <div class="panel-body">
-              <div v-if="spectators.length === 0" class="hint-text">No spectators</div>
-              <ul v-else class="spectator-list">
-                <li
+              <div v-if="spectators.length > 0" class="spectator-section">
+                <p class="spectator-label">SPECTATORS:</p>
+                <span
                   v-for="(item, index) in spectators"
                   :key="`${item.nickname}-${index}`"
-                >
-                  {{ item.nickname }}
-                </li>
-              </ul>
+                  class="spectator-name"
+                >{{ item.nickname }}<span v-if="index < spectators.length - 1">, </span></span>
+              </div>
             </div>
           </div>
 
@@ -626,10 +649,6 @@ onBeforeUnmount(() => {
   animation: dotPulse 1.5s ease-in-out infinite;
 }
 
-.dot-off {
-  background: #666;
-}
-
 @keyframes dotPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
@@ -644,9 +663,15 @@ onBeforeUnmount(() => {
 /* ===== Main Layout ===== */
 .main-layout {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 300px;
   gap: 1.25rem;
   align-items: start;
+}
+
+.layout-full {
+  grid-template-columns: 1fr;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 @media (max-width: 1024px) {
@@ -655,7 +680,11 @@ onBeforeUnmount(() => {
   }
 }
 
-/* ===== Board ===== */
+/* ===== Board Area (with overlay support) ===== */
+.board-area {
+  position: relative;
+}
+
 .board-wrapper {
   border: 2px solid rgba(0, 255, 65, 0.15);
   padding: 0.75rem;
@@ -669,7 +698,7 @@ onBeforeUnmount(() => {
 }
 
 .gomoku-board {
-  width: min(88vw, 660px);
+  width: 100%;
   max-width: 100%;
   aspect-ratio: 1 / 1;
   margin: 0 auto;
@@ -718,6 +747,105 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+/* ===== Board Overlay ===== */
+.board-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  backdrop-filter: blur(2px);
+}
+
+.overlay-content {
+  text-align: center;
+  padding: 2rem;
+  max-width: 380px;
+  width: 100%;
+}
+
+.overlay-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  margin-bottom: 0.6rem;
+}
+
+.ov-text {
+  font-size: 1.4rem;
+  color: #00ff41;
+  text-shadow:
+    0 0 6px #00ff41,
+    0 0 16px rgba(0, 255, 65, 0.5),
+    0 0 40px rgba(0, 255, 65, 0.2);
+  animation: neonPulse 2.5s ease-in-out infinite;
+}
+
+@media (max-width: 480px) {
+  .ov-text { font-size: 1rem; }
+}
+
+@keyframes neonPulse {
+  0%, 100% {
+    text-shadow:
+      0 0 6px #00ff41,
+      0 0 16px rgba(0, 255, 65, 0.5),
+      0 0 40px rgba(0, 255, 65, 0.2);
+  }
+  50% {
+    text-shadow:
+      0 0 8px #00ff41,
+      0 0 24px rgba(0, 255, 65, 0.7),
+      0 0 60px rgba(0, 255, 65, 0.35);
+  }
+}
+
+.ov-cursor {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  background: #00ff41;
+  opacity: 0;
+  transition: opacity 0.05s;
+}
+
+.cursor-on {
+  opacity: 1;
+}
+
+.overlay-sub {
+  font-size: 0.45rem;
+  color: #666;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.1em;
+  font-family: 'Noto Sans SC', 'Press Start 2P', sans-serif;
+}
+
+.overlay-form {
+  text-align: left;
+}
+
+.overlay-hint {
+  font-size: 0.35rem;
+  color: #444;
+  text-align: center;
+  margin-top: 0.25rem;
+  font-family: 'Noto Sans SC', 'Press Start 2P', sans-serif;
+}
+
+/* Overlay transition */
+.overlay-fade-enter-active,
+.overlay-fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+
+.overlay-fade-enter-from,
+.overlay-fade-leave-to {
+  opacity: 0;
+}
+
 /* ===== Sidebar ===== */
 .sidebar {
   display: flex;
@@ -738,15 +866,32 @@ onBeforeUnmount(() => {
 }
 
 .panel-title {
-  font-size: 0.5rem;
+  font-size: 0.45rem;
   color: #00ff41;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid rgba(0, 255, 65, 0.1);
   letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.panel-badge {
+  font-size: 0.35rem;
+  color: #00e5ff;
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  padding: 0.15em 0.4em;
+  margin-left: auto;
+}
+
+.panel-count {
+  font-size: 0.4rem;
+  color: #ffc800;
+  margin-left: auto;
 }
 
 .panel-body {
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.75rem;
 }
 
 /* ===== Form Fields ===== */
@@ -762,8 +907,8 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   margin-top: 0.3rem;
-  padding: 0.4rem 0.5rem;
-  background: rgba(0, 0, 0, 0.4);
+  padding: 0.5rem 0.6rem;
+  background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(0, 255, 65, 0.2);
   color: #ccc;
   font-family: 'Press Start 2P', monospace;
@@ -774,7 +919,7 @@ onBeforeUnmount(() => {
 
 .pixel-input:focus {
   border-color: #00ff41;
-  box-shadow: 0 0 6px rgba(0, 255, 65, 0.15);
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
 }
 
 .pixel-input.uppercase {
@@ -792,7 +937,7 @@ onBeforeUnmount(() => {
 .pixel-btn {
   font-family: 'Press Start 2P', monospace;
   font-size: 0.45rem;
-  padding: 0.5rem 0.6rem;
+  padding: 0.55rem 0.6rem;
   border: 2px solid rgba(0, 255, 65, 0.25);
   background: rgba(0, 255, 65, 0.05);
   color: #00ff41;
@@ -821,6 +966,11 @@ onBeforeUnmount(() => {
 .pixel-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.pixel-btn-small {
+  font-size: 0.38rem;
+  padding: 0.4rem 0.5rem;
 }
 
 .pixel-btn-primary {
@@ -861,10 +1011,6 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
-.pixel-btn-disabled:hover {
-  background: rgba(0, 255, 65, 0.1);
-}
-
 .mt-2 {
   margin-top: 0.5rem;
 }
@@ -872,14 +1018,31 @@ onBeforeUnmount(() => {
 /* ===== Info List ===== */
 .info-list p {
   font-size: 0.42rem;
-  line-height: 2;
+  line-height: 2.2;
   display: flex;
   align-items: center;
   gap: 0.4em;
 }
 
 .info-key {
-  color: #666;
+  color: #555;
+}
+
+/* ===== Player turn indicator ===== */
+.player-turn {
+  color: #00ff41;
+}
+
+.turn-arrow {
+  color: #00ff41;
+  font-size: 0.5rem;
+  margin-left: auto;
+  animation: arrowBlink 0.8s step-end infinite;
+}
+
+@keyframes arrowBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 /* ===== Stone Indicator ===== */
@@ -901,27 +1064,22 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
 }
 
-/* ===== Spectator List ===== */
-.spectator-list {
-  max-height: 6rem;
-  overflow-y: auto;
-  list-style: none;
-  padding: 0;
-  margin: 0;
+/* ===== Spectator section (inline) ===== */
+.spectator-section {
+  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid rgba(0, 255, 65, 0.08);
 }
 
-.spectator-list li {
-  font-size: 0.4rem;
-  line-height: 2;
-  color: #999;
-}
-
-/* ===== Hint Text ===== */
-.hint-text {
+.spectator-label {
   font-size: 0.35rem;
   color: #555;
-  line-height: 1.8;
-  font-family: 'Noto Sans SC', 'Press Start 2P', sans-serif;
+  margin-bottom: 0.2rem;
+}
+
+.spectator-name {
+  font-size: 0.35rem;
+  color: #888;
 }
 
 /* ===== Messages ===== */
@@ -955,8 +1113,12 @@ onBeforeUnmount(() => {
     padding: 0.4rem;
   }
 
+  .overlay-content {
+    padding: 1.25rem;
+  }
+
   .panel-title {
-    font-size: 0.4rem;
+    font-size: 0.38rem;
   }
 
   .pixel-btn {
