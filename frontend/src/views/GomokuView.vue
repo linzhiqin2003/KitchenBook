@@ -405,7 +405,7 @@ let cursorInterval = null
 const cursorVisible = ref(true)
 
 function handleGlobalKeydown(e) {
-  if ((e.ctrlKey || e.metaKey) && e.key === "m") {
+  if (e.ctrlKey && !e.metaKey && e.key === "m") {
     e.preventDefault()
     requestHint()
   }
