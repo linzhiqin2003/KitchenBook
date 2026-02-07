@@ -3,7 +3,7 @@
     <div class="panel-header">
       <h2>账单列表</h2>
       <div class="panel-header__actions">
-        <button class="button accent" @click="showAiInput = !showAiInput" :disabled="aiGenerating">
+        <button class="button accent" @click="openAiChat" :disabled="aiLoading">
           <Sparkles :size="16" />
           AI 智能记账
         </button>
@@ -14,30 +14,43 @@
       </div>
     </div>
 
-    <!-- AI 智能记账输入区 -->
-    <div v-if="showAiInput" class="ai-input-area">
-      <div class="ai-input-header">
-        <Sparkles :size="16" class="ai-input-icon" />
+    <!-- AI 对话记账 -->
+    <div v-if="showAiChat" class="ai-chat-panel">
+      <div class="ai-chat-header">
+        <Sparkles :size="16" class="ai-chat-icon" />
         <span>AI 智能记账</span>
-        <button class="ai-close-btn" @click="showAiInput = false"><X :size="16" /></button>
+        <button class="ai-close-btn" @click="closeAiChat"><X :size="16" /></button>
       </div>
-      <textarea
-        v-model="aiDescription"
-        class="input ai-textarea"
-        rows="3"
-        placeholder="例：昨天在 Tesco 买了牛奶 3.5 磅、面包 1.2 磅"
-        :disabled="aiGenerating"
-      />
-      <div class="ai-input-footer">
-        <span class="ai-hint">描述购买内容，AI 将自动生成账单</span>
-        <button
-          class="button accent"
-          @click="handleAiGenerate"
-          :disabled="aiGenerating || !aiDescription.trim()"
+      <div class="ai-chat-messages">
+        <div
+          v-for="(msg, i) in aiMessages"
+          :key="i"
+          :class="['ai-msg', msg.role === 'user' ? 'ai-msg--user' : 'ai-msg--bot']"
         >
-          <Loader2 v-if="aiGenerating" :size="16" class="spin" />
-          <Sparkles v-else :size="16" />
-          {{ aiGenerating ? '生成中...' : '生成账单' }}
+          <div class="ai-msg-bubble">{{ msg.content }}</div>
+        </div>
+        <div v-if="aiLoading" class="ai-msg ai-msg--bot">
+          <div class="ai-msg-bubble ai-msg-typing">
+            <Loader2 :size="14" class="spin" />
+            思考中...
+          </div>
+        </div>
+      </div>
+      <div class="ai-chat-input">
+        <textarea
+          v-model="aiInput"
+          class="input ai-chat-textarea"
+          rows="1"
+          placeholder="输入消息..."
+          :disabled="aiLoading"
+          @keydown="handleAiKeydown"
+        />
+        <button
+          class="button accent ai-send-btn"
+          @click="sendAiMessage"
+          :disabled="aiLoading || !aiInput.trim()"
+        >
+          <Send :size="16" />
         </button>
       </div>
     </div>
@@ -135,8 +148,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { ArrowDown, ArrowUp, ArrowUpDown, FileText, Loader2, PenLine, Search, Sparkles, Upload, X } from "lucide-vue-next";
-import { aiGenerateReceipt, createReceipt, deleteReceipt, listReceipts } from "../api/receipts";
+import { ArrowDown, ArrowUp, ArrowUpDown, FileText, Loader2, PenLine, Search, Send, Sparkles, Upload, X } from "lucide-vue-next";
+import { aiGenerate, createReceipt, deleteReceipt, listReceipts } from "../api/receipts";
+import type { AiChatMessage } from "../api/receipts";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
@@ -144,23 +158,62 @@ const authStore = useAuthStore();
 const receipts = ref<any[]>([]);
 const creating = ref(false);
 
-// AI generate
-const showAiInput = ref(false);
-const aiDescription = ref("");
-const aiGenerating = ref(false);
+// AI chat
+const showAiChat = ref(false);
+const aiMessages = ref<AiChatMessage[]>([]);
+const aiInput = ref("");
+const aiLoading = ref(false);
 
-const handleAiGenerate = async () => {
-  if (!aiDescription.value.trim()) return;
-  aiGenerating.value = true;
+const openAiChat = () => {
+  showAiChat.value = true;
+  if (!aiMessages.value.length) {
+    aiMessages.value = [{ role: "assistant", content: "你好！请描述你的购物经历，我来帮你生成账单。\n\n例如：昨天在 Tesco 买了牛奶 3.5 磅、面包 1.2 磅" }];
+  }
+};
+
+const closeAiChat = () => {
+  showAiChat.value = false;
+};
+
+const resetAiChat = () => {
+  aiMessages.value = [];
+  aiInput.value = "";
+  showAiChat.value = false;
+};
+
+const sendAiMessage = async () => {
+  const text = aiInput.value.trim();
+  if (!text || aiLoading.value) return;
+
+  aiMessages.value.push({ role: "user", content: text });
+  aiInput.value = "";
+  aiLoading.value = true;
+
+  // Only send the actual conversation (skip the initial greeting)
+  const apiMessages = aiMessages.value.filter((_, i) => i > 0);
+
   try {
-    const receipt = await aiGenerateReceipt(aiDescription.value.trim());
-    showAiInput.value = false;
-    aiDescription.value = "";
-    router.push(`/receipts/${receipt.id}`);
+    const res = await aiGenerate(apiMessages);
+    if (res.type === "chat") {
+      aiMessages.value.push({ role: "assistant", content: res.message });
+    } else {
+      resetAiChat();
+      router.push(`/receipts/${res.receipt.id}`);
+    }
   } catch (e: any) {
-    alert(e?.response?.data?.detail || e?.message || "AI 生成失败，请重试");
+    aiMessages.value.push({
+      role: "assistant",
+      content: `抱歉，出了点问题：${e?.response?.data?.detail || e?.message || "请重试"}`,
+    });
   } finally {
-    aiGenerating.value = false;
+    aiLoading.value = false;
+  }
+};
+
+const handleAiKeydown = (e: KeyboardEvent) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendAiMessage();
   }
 };
 
@@ -333,26 +386,27 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
-/* ── AI Input Area ── */
+/* ── AI Chat Panel ── */
 
-.ai-input-area {
+.ai-chat-panel {
   margin-bottom: 16px;
-  padding: 16px;
   border: 1px solid var(--accent, #007aff);
   border-radius: 10px;
   background: var(--surface, #fff);
+  overflow: hidden;
 }
 
-.ai-input-header {
+.ai-chat-header {
   display: flex;
   align-items: center;
   gap: 6px;
   font-weight: 600;
   font-size: 14px;
-  margin-bottom: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border, #e5e5ea);
 }
 
-.ai-input-icon {
+.ai-chat-icon {
   color: var(--accent, #007aff);
 }
 
@@ -370,25 +424,78 @@ onMounted(async () => {
   background: var(--hover, rgba(0,0,0,0.05));
 }
 
-.ai-textarea {
-  width: 100%;
-  resize: vertical;
-  min-height: 72px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.ai-input-footer {
+.ai-chat-messages {
+  padding: 12px 16px;
+  max-height: 320px;
+  overflow-y: auto;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 10px;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.ai-hint {
-  font-size: 12px;
+.ai-msg {
+  display: flex;
+}
+
+.ai-msg--user {
+  justify-content: flex-end;
+}
+
+.ai-msg--bot {
+  justify-content: flex-start;
+}
+
+.ai-msg-bubble {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-msg--user .ai-msg-bubble {
+  background: var(--accent, #007aff);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.ai-msg--bot .ai-msg-bubble {
+  background: var(--bg-secondary, #f2f2f7);
+  color: var(--text, #1c1c1e);
+  border-bottom-left-radius: 4px;
+}
+
+.ai-msg-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted, #8e8e93);
+  font-size: 13px;
+}
+
+.ai-chat-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border, #e5e5ea);
+}
+
+.ai-chat-textarea {
+  flex: 1;
+  resize: none;
+  font-size: 14px;
+  min-height: 36px;
+  max-height: 80px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+}
+
+.ai-send-btn {
+  padding: 8px 12px;
+  flex-shrink: 0;
 }
 
 @keyframes spin {

@@ -137,8 +137,23 @@ export async function uploadReceiptStream(
   return result;
 }
 
-export async function aiGenerateReceipt(description: string) {
-  const { data } = await api.post("/receipts/ai-generate/", { description }, {
+export interface AiChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AiChatResponse {
+  type: "chat";
+  message: string;
+}
+
+export interface AiReceiptResponse {
+  type: "receipt";
+  receipt: any;
+}
+
+export async function aiGenerate(messages: AiChatMessage[]): Promise<AiChatResponse | AiReceiptResponse> {
+  const { data } = await api.post("/receipts/ai-generate/", { messages }, {
     timeout: 120000,
   });
   return data;
