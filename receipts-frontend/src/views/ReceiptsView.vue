@@ -169,7 +169,7 @@ const aiLoading = ref(false);
 const openAiChat = () => {
   showAiChat.value = true;
   if (!aiMessages.value.length) {
-    aiMessages.value = [{ role: "assistant", content: "你好！请描述你的购物经历，我来帮你生成账单。\n\n例如：昨天在 Tesco 买了牛奶 3.5 磅、面包 1.2 磅" }];
+    aiMessages.value = [{ role: "assistant", content: "你好！请描述你的购物经历，我来帮你生成账单。\n\n例如：昨天在 Tesco 买了牛奶 3.5 镑、面包 1.2 镑" }];
   }
 };
 
