@@ -20,6 +20,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 BOARD_SIZE = 15
 ROOM_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,20}$")
 MAX_NICKNAME_LENGTH = 20
+MAX_CHAT_LENGTH = 200
 
 
 def _create_empty_board():
@@ -42,11 +43,13 @@ class GomokuConsumer(AsyncWebsocketConsumer):
     Client messages:
     - {"type":"move","x":3,"y":4}
     - {"type":"restart"}
+    - {"type":"chat","text":"hello"}
     - {"type":"ping"}
 
     Server messages:
     - joined
     - room_state
+    - chat_message
     - error
     - pong
     """
@@ -152,6 +155,8 @@ class GomokuConsumer(AsyncWebsocketConsumer):
             await self._handle_move(payload)
         elif msg_type == "restart":
             await self._handle_restart()
+        elif msg_type == "chat":
+            await self._handle_chat(payload)
         elif msg_type == "ping":
             await self.send_json({"type": "pong"})
         else:
@@ -231,6 +236,38 @@ class GomokuConsumer(AsyncWebsocketConsumer):
 
         if should_restart:
             await self._broadcast_room_state(reason="restart")
+
+    async def _handle_chat(self, payload):
+        text = (payload.get("text") or "").strip()
+        if not text:
+            return
+        if len(text) > MAX_CHAT_LENGTH:
+            text = text[:MAX_CHAT_LENGTH]
+
+        if self.player_color:
+            color = self.player_color
+        else:
+            color = "spectator"
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "chat_message",
+                "nickname": self.nickname,
+                "text": text,
+                "color": color,
+            },
+        )
+
+    async def chat_message(self, event):
+        await self.send_json(
+            {
+                "type": "chat_message",
+                "nickname": event["nickname"],
+                "text": event["text"],
+                "color": event["color"],
+            }
+        )
 
     async def _broadcast_room_state(self, reason):
         payload = self._build_room_payload(reason=reason)

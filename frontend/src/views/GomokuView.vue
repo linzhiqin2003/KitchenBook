@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 import { getWsBaseUrl } from "../config/ws"
@@ -31,6 +31,11 @@ const online = ref({
 const lastMove = ref(null)
 const pendingMove = ref(null)
 const board = ref(createEmptyBoard())
+
+const chatMessages = ref([])
+const chatInput = ref("")
+const isComposing = ref(false)
+const chatListRef = ref(null)
 
 const errorMessage = ref("")
 const noticeMessage = ref("")
@@ -157,6 +162,9 @@ function closeSocket(silent = false) {
     socket.close()
   }
 
+  chatMessages.value = []
+  chatInput.value = ""
+
   if (!silent) {
     noticeMessage.value = "已离开房间。"
   }
@@ -265,6 +273,20 @@ function handleServerMessage(data) {
     return
   }
 
+  if (data.type === "chat_message") {
+    chatMessages.value.push({
+      nickname: data.nickname,
+      text: data.text,
+      color: data.color,
+    })
+    nextTick(() => {
+      if (chatListRef.value) {
+        chatListRef.value.scrollTop = chatListRef.value.scrollHeight
+      }
+    })
+    return
+  }
+
   if (data.type === "pong") {
     return
   }
@@ -313,6 +335,20 @@ async function copyShareLink() {
     noticeMessage.value = "邀请链接已复制。"
   } catch (error) {
     errorMessage.value = "复制失败，请手动复制链接。"
+  }
+}
+
+function sendChat() {
+  const text = chatInput.value.trim()
+  if (!text) return
+  sendMessage({ type: "chat", text })
+  chatInput.value = ""
+}
+
+function handleChatKeydown(e) {
+  if (e.key === "Enter" && !isComposing.value) {
+    e.preventDefault()
+    sendChat()
   }
 }
 
@@ -414,7 +450,13 @@ onBeforeUnmount(() => {
                 <span
                   v-if="cellValue(cell.x, cell.y) !== 0"
                   :class="stoneClass(cellValue(cell.x, cell.y))"
-                ></span>
+                >
+                  <span
+                    v-if="isLastMove(cell.x, cell.y)"
+                    class="last-move-dot"
+                    :class="cellValue(cell.x, cell.y) === 1 ? 'last-dot-on-black' : 'last-dot-on-white'"
+                  ></span>
+                </span>
                 <span
                   v-else-if="isPending(cell.x, cell.y)"
                   class="stone stone-preview"
@@ -600,6 +642,52 @@ onBeforeUnmount(() => {
                   :key="`${item.nickname}-${index}`"
                   class="spectator-name"
                 >{{ item.nickname }}<span v-if="index < spectators.length - 1">, </span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat -->
+          <div class="panel">
+            <h3 class="panel-title">聊天</h3>
+            <div class="panel-body chat-panel">
+              <div ref="chatListRef" class="chat-messages">
+                <div
+                  v-for="(msg, i) in chatMessages"
+                  :key="i"
+                  class="chat-msg"
+                >
+                  <span
+                    class="chat-nick"
+                    :class="{
+                      'chat-nick-black': msg.color === 'black',
+                      'chat-nick-white': msg.color === 'white',
+                      'chat-nick-spectator': msg.color === 'spectator',
+                    }"
+                  >{{ msg.nickname }}</span>
+                  <span class="chat-text">{{ msg.text }}</span>
+                </div>
+                <div v-if="chatMessages.length === 0" class="chat-empty">
+                  暂无消息
+                </div>
+              </div>
+              <div class="chat-input-row">
+                <input
+                  v-model="chatInput"
+                  type="text"
+                  maxlength="200"
+                  placeholder="说点什么..."
+                  class="pixel-input chat-input"
+                  @compositionstart="isComposing = true"
+                  @compositionend="isComposing = false"
+                  @keydown="handleChatKeydown"
+                />
+                <button
+                  class="pixel-btn pixel-btn-small pixel-btn-green chat-send-btn"
+                  :disabled="!chatInput.trim()"
+                  @click="sendChat"
+                >
+                  发送
+                </button>
               </div>
             </div>
           </div>
@@ -870,6 +958,29 @@ onBeforeUnmount(() => {
 .stone-white {
   background: radial-gradient(circle at 30% 30%, #ffffff 0%, #f2f2f2 55%, #d8d8d8 100%);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Last-move dot marker in the center of the stone */
+.last-move-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.last-dot-on-black {
+  background: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.7);
+}
+
+.last-dot-on-white {
+  background: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.7);
 }
 
 /* Preview stone (anti-mistouch first click) */
@@ -1239,6 +1350,89 @@ onBeforeUnmount(() => {
 .spectator-name {
   font-size: 0.55rem;
   color: #888;
+}
+
+/* ===== Chat ===== */
+.chat-panel {
+  padding: 0 !important;
+}
+
+.chat-messages {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 0.4rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chat-messages::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.2);
+}
+
+.chat-msg {
+  font-size: 0.6rem;
+  line-height: 1.6;
+  font-family: 'Noto Sans SC', 'Press Start 2P', sans-serif;
+  word-break: break-all;
+}
+
+.chat-nick {
+  font-weight: 700;
+  margin-right: 0.4em;
+}
+
+.chat-nick::after {
+  content: ':';
+}
+
+.chat-nick-black {
+  color: #aaa;
+}
+
+.chat-nick-white {
+  color: #f0f0f0;
+}
+
+.chat-nick-spectator {
+  color: #888;
+}
+
+.chat-text {
+  color: #b0b0b0;
+}
+
+.chat-empty {
+  font-size: 0.55rem;
+  color: #444;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid rgba(0, 255, 65, 0.1);
+}
+
+.chat-input {
+  flex: 1;
+  border: none !important;
+  margin-top: 0 !important;
+  font-size: 0.6rem !important;
+  padding: 0.45rem 0.6rem !important;
+  font-family: 'Noto Sans SC', 'Press Start 2P', sans-serif !important;
+}
+
+.chat-send-btn {
+  flex-shrink: 0;
+  border: none !important;
+  clip-path: none !important;
+  padding: 0.45rem 0.6rem !important;
 }
 
 /* ===== Messages ===== */
