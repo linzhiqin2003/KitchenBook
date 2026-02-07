@@ -4,17 +4,15 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-// 当前时间
-const currentTime = ref('')
+// 当前时间（拆分 时:分 用于冒号闪烁）
+const timeHour = ref('')
+const timeMinute = ref('')
 const currentDate = ref('')
 
 const updateTime = () => {
   const now = new Date()
-  currentTime.value = now.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })
+  timeHour.value = String(now.getHours()).padStart(2, '0')
+  timeMinute.value = String(now.getMinutes()).padStart(2, '0')
   currentDate.value = now.toLocaleDateString('zh-CN', {
     weekday: 'long',
     month: 'long',
@@ -44,7 +42,8 @@ const navBlocks = [
     gradient: 'from-orange-400 via-amber-500 to-yellow-500',
     shadowColor: 'shadow-amber-500/30',
     features: ['拟物翻书', '菜谱管理', '订单系统'],
-    featured: true
+    featured: true,
+    decor: '🍜'
   },
   {
     id: 'ai-lab',
@@ -55,7 +54,8 @@ const navBlocks = [
     path: '/ai-lab',
     gradient: 'from-emerald-400 via-teal-500 to-cyan-500',
     shadowColor: 'shadow-teal-500/30',
-    features: ['思维链推理', '语音输入']
+    features: ['思维链推理', '语音输入'],
+    decor: '✦'
   },
   {
     id: 'questiongen',
@@ -66,7 +66,8 @@ const navBlocks = [
     path: '/questiongen',
     gradient: 'from-cyan-500 via-blue-500 to-indigo-500',
     shadowColor: 'shadow-blue-500/30',
-    features: ['AI出题', '知识巩固']
+    features: ['AI出题', '知识巩固'],
+    decor: '?'
   },
   {
     id: 'tarot',
@@ -77,7 +78,8 @@ const navBlocks = [
     path: '/tarot',
     gradient: 'from-violet-500 via-purple-500 to-indigo-500',
     shadowColor: 'shadow-purple-500/30',
-    features: ['互动牌阵', 'AI解读']
+    features: ['互动牌阵', 'AI解读'],
+    decor: '☽'
   },
   {
     id: 'games',
@@ -88,7 +90,8 @@ const navBlocks = [
     path: '/games',
     gradient: 'from-emerald-500 via-teal-500 to-cyan-500',
     shadowColor: 'shadow-teal-500/30',
-    features: ['WebSocket对战', '房间邀请']
+    features: ['WebSocket对战', '房间邀请'],
+    decor: '▶'
   }
 ]
 
@@ -150,20 +153,21 @@ const navigateTo = (path) => {
         <div class="max-w-5xl mx-auto">
           <!-- Hero区域 -->
           <div class="hero-section text-center pt-8 sm:pt-12 pb-10 sm:pb-14">
-            <!-- 头像 -->
+            <!-- 头像（呼吸光环） -->
             <div class="relative inline-block mb-5">
-              <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-[1.75rem] bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[3px] shadow-2xl shadow-purple-500/25">
+              <div class="avatar-glow"></div>
+              <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-[1.75rem] bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[3px] shadow-2xl shadow-purple-500/25 relative z-10">
                 <div class="w-full h-full rounded-[1.55rem] bg-slate-800 flex items-center justify-center">
                   <span class="text-4xl sm:text-5xl">&#x1F468;&#x200D;&#x1F4BB;</span>
                 </div>
               </div>
-              <div class="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-slate-900"></div>
+              <div class="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-slate-900 z-20"></div>
             </div>
 
-            <!-- 时间 -->
+            <!-- 时间（冒号闪烁） -->
             <div class="mb-4">
-              <div class="text-5xl sm:text-6xl lg:text-7xl font-extralight tracking-tight text-white/90 mb-1">
-                {{ currentTime }}
+              <div class="text-5xl sm:text-6xl lg:text-7xl font-extralight tracking-tight text-white/90 mb-1 tabular-nums">
+                <span>{{ timeHour }}</span><span class="colon-blink">:</span><span>{{ timeMinute }}</span>
               </div>
             </div>
 
@@ -194,6 +198,15 @@ const navigateTo = (path) => {
 
               <!-- Hover 角落光效 -->
               <div class="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-white/[0.03] to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+              <!-- 厨房卡片装饰图案 -->
+              <div v-if="block.featured" class="kitchen-decor-pattern"></div>
+
+              <!-- 右下角装饰大字符 -->
+              <div
+                class="decor-icon"
+                :class="block.featured ? 'text-[5rem] sm:text-[7rem]' : 'text-[4rem] sm:text-[5rem]'"
+              >{{ block.decor }}</div>
 
               <div class="relative z-10">
                 <!-- 图标 -->
@@ -266,6 +279,37 @@ const navigateTo = (path) => {
   from { opacity: 0; transform: translateY(16px); }
 }
 
+/* 头像呼吸光环 */
+.avatar-glow {
+  position: absolute;
+  inset: -6px;
+  border-radius: 2rem;
+  background: linear-gradient(135deg, #a855f7, #7c3aed, #d946ef);
+  opacity: 0.35;
+  filter: blur(14px);
+  z-index: 0;
+  animation: breatheGlow 3s ease-in-out infinite;
+}
+
+@keyframes breatheGlow {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.08); }
+}
+
+/* 冒号闪烁 */
+.colon-blink {
+  animation: blinkColon 1s step-end infinite;
+}
+
+@keyframes blinkColon {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ========== Bento Grid ========== */
 .bento-grid {
   display: grid;
@@ -318,6 +362,47 @@ const navigateTo = (path) => {
 
 .bento-card:active {
   transform: scale(0.99) !important;
+}
+
+/* 右下角装饰大字符 */
+.decor-icon {
+  position: absolute;
+  bottom: -0.15em;
+  right: 0.1em;
+  line-height: 1;
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.5s, transform 0.5s;
+  transform: rotate(-8deg);
+}
+
+.bento-card:hover .decor-icon {
+  opacity: 0.08;
+  transform: rotate(-4deg) scale(1.05);
+}
+
+/* 厨房卡片装饰线条图案 */
+.kitchen-decor-pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.025;
+  background-image:
+    radial-gradient(circle at 75% 25%, rgba(245, 158, 11, 0.5) 0%, transparent 50%),
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 20px,
+      rgba(245, 158, 11, 0.15) 20px,
+      rgba(245, 158, 11, 0.15) 21px
+    );
+  transition: opacity 0.5s;
+}
+
+.bento-card:hover .kitchen-decor-pattern {
+  opacity: 0.06;
 }
 
 /* ========== 动态背景光球 ========== */
