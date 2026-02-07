@@ -37,61 +37,51 @@ const navBlocks = [
     title: '私人厨房',
     subtitle: 'Kitchen Book',
     description: '私人菜谱收藏，记录美食制作方法',
-    icon: '🍳',
     path: '/kitchen',
     gradient: 'from-orange-400 via-amber-500 to-yellow-500',
     shadowColor: 'shadow-amber-500/30',
     features: ['拟物翻书', '菜谱管理', '订单系统'],
-    featured: true,
-    decor: '🍜'
+    featured: true
   },
   {
     id: 'ai-lab',
     title: 'AI 实验室',
     subtitle: 'AI Lab',
     description: 'DeepSeek Reasoner 思考模型对话',
-    icon: '🧠',
     path: '/ai-lab',
     gradient: 'from-emerald-400 via-teal-500 to-cyan-500',
     shadowColor: 'shadow-teal-500/30',
-    features: ['思维链推理', '语音输入'],
-    decor: '✦'
+    features: ['思维链推理', '语音输入']
   },
   {
     id: 'questiongen',
     title: '智能刷题',
     subtitle: 'Question Gen',
     description: 'AI驱动的智能学习工具',
-    icon: '📚',
     path: '/questiongen',
     gradient: 'from-cyan-500 via-blue-500 to-indigo-500',
     shadowColor: 'shadow-blue-500/30',
-    features: ['AI出题', '知识巩固'],
-    decor: '?'
+    features: ['AI出题', '知识巩固']
   },
   {
     id: 'tarot',
     title: '塔罗秘仪',
     subtitle: 'Tarot Sanctum',
     description: '沉浸式占卜与神秘解读体验',
-    icon: '🃏',
     path: '/tarot',
     gradient: 'from-violet-500 via-purple-500 to-indigo-500',
     shadowColor: 'shadow-purple-500/30',
-    features: ['互动牌阵', 'AI解读'],
-    decor: '☽'
+    features: ['互动牌阵', 'AI解读']
   },
   {
     id: 'games',
     title: '联机游戏',
     subtitle: 'Realtime Games',
     description: '和朋友一起实时对战',
-    icon: '🎮',
     path: '/games',
     gradient: 'from-emerald-500 via-teal-500 to-cyan-500',
     shadowColor: 'shadow-teal-500/30',
-    features: ['WebSocket对战', '房间邀请'],
-    decor: '▶'
+    features: ['WebSocket对战', '房间邀请']
   }
 ]
 
@@ -202,11 +192,19 @@ const navigateTo = (path) => {
               <!-- 厨房卡片装饰图案 -->
               <div v-if="block.featured" class="kitchen-decor-pattern"></div>
 
-              <!-- 右下角装饰大字符 -->
-              <div
-                class="decor-icon"
-                :class="block.featured ? 'text-[5rem] sm:text-[7rem]' : 'text-[4rem] sm:text-[5rem]'"
-              >{{ block.decor }}</div>
+              <!-- 右下角装饰 SVG -->
+              <div class="decor-icon" :class="block.featured ? 'decor-lg' : 'decor-sm'">
+                <!-- Kitchen: 叉勺交叉 -->
+                <svg v-if="block.id === 'kitchen'" viewBox="0 0 48 48" fill="currentColor"><path d="M14 4v14c0 2.2 1.8 4 4 4h1v22h2V22h1c2.2 0 4-1.8 4-4V4h-3v12h-2V4h-2v12h-2V4h-3zm20 0c-2 8-4 12-4 18 0 2.2 1.8 4 4 4v18h2V26c2.2 0 4-1.8 4-4 0-6-2-10-4-18h-2z"/></svg>
+                <!-- AI Lab: 原子轨道 -->
+                <svg v-else-if="block.id === 'ai-lab'" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(0 24 24)"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(60 24 24)"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(120 24 24)"/><circle cx="24" cy="24" r="3" fill="currentColor"/></svg>
+                <!-- QuestionGen: 灯泡 -->
+                <svg v-else-if="block.id === 'questiongen'" viewBox="0 0 48 48" fill="currentColor"><path d="M24 4C16.3 4 10 10.3 10 18c0 4.8 2.4 9 6 11.6V34a4 4 0 004 4h8a4 4 0 004-4v-4.4c3.6-2.6 6-6.8 6-11.6 0-7.7-6.3-14-14-14zm4 36h-8a2 2 0 010-4h8a2 2 0 010 4z"/></svg>
+                <!-- Tarot: 月亮与星 -->
+                <svg v-else-if="block.id === 'tarot'" viewBox="0 0 48 48" fill="currentColor"><path d="M36 28.6A16 16 0 1119.4 12 12.5 12.5 0 0036 28.6z"/><path d="M38 8l1.2 3.6L43 13l-3.8 1.4L38 18l-1.2-3.6L33 13l3.8-1.4z" opacity="0.7"/></svg>
+                <!-- Games: 骰子 -->
+                <svg v-else-if="block.id === 'games'" viewBox="0 0 48 48" fill="currentColor"><rect x="6" y="6" width="36" height="36" rx="6"/><circle cx="16" cy="16" r="3" fill="rgba(0,0,0,0.3)"/><circle cx="32" cy="16" r="3" fill="rgba(0,0,0,0.3)"/><circle cx="24" cy="24" r="3" fill="rgba(0,0,0,0.3)"/><circle cx="16" cy="32" r="3" fill="rgba(0,0,0,0.3)"/><circle cx="32" cy="32" r="3" fill="rgba(0,0,0,0.3)"/></svg>
+              </div>
 
               <div class="relative z-10">
                 <!-- 图标 -->
@@ -215,10 +213,38 @@ const navigateTo = (path) => {
                   :class="[
                     block.gradient,
                     block.shadowColor,
-                    block.featured ? 'w-14 h-14 sm:w-16 sm:h-16 text-3xl sm:text-4xl' : 'w-12 h-12 sm:w-14 sm:h-14 text-2xl sm:text-3xl'
+                    block.featured ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-12 h-12 sm:w-14 sm:h-14'
                   ]"
                 >
-                  {{ block.icon }}
+                  <!-- Kitchen: 火焰 -->
+                  <svg v-if="block.id === 'kitchen'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
+                    <path d="M12 2.5C10 6 6.5 8.5 6.5 13a5.5 5.5 0 0011 0c0-4.5-3.5-7-5.5-10.5z" fill-opacity="0.9"/>
+                    <path d="M12 9c-1 1.5-2.2 3-2.2 5a2.2 2.2 0 004.4 0c0-2-1.2-3.5-2.2-5z" fill-opacity="0.45"/>
+                  </svg>
+                  <!-- AI Lab: 多角星火花 -->
+                  <svg v-else-if="block.id === 'ai-lab'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
+                    <path d="M12 1.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5L4.5 9l5.5-2 2-5.5z" fill-opacity="0.92"/>
+                    <path d="M20 12l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" fill-opacity="0.5"/>
+                    <path d="M4 17l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5L2 19l1.5-.5.5-1.5z" fill-opacity="0.35"/>
+                  </svg>
+                  <!-- QuestionGen: 灯泡 -->
+                  <svg v-else-if="block.id === 'questiongen'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 21h6m-5-1.5h4M12 3a6 6 0 00-3.5 10.9c.5.5.8 1.2.9 1.8.05.25.2.3.6.3h4c.4 0 .55-.05.6-.3.1-.6.4-1.3.9-1.8A6 6 0 0012 3z" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 3v1.5m6 .5l-1 1M21 10.5h-1.5m-13 0H5m2.5-5l-1-1" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/>
+                  </svg>
+                  <!-- Tarot: 全视之眼 -->
+                  <svg v-else-if="block.id === 'tarot'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
+                    <path d="M12 5C6 5 1.5 12 1.5 12S6 19 12 19s10.5-7 10.5-7S18 5 12 5z" fill-opacity="0.2"/>
+                    <path d="M12 5C6 5 1.5 12 1.5 12S6 19 12 19s10.5-7 10.5-7S18 5 12 5zm0 11a4 4 0 110-8 4 4 0 010 8z" fill-opacity="0.85"/>
+                    <circle cx="12" cy="12" r="1.8" fill-opacity="0.95"/>
+                  </svg>
+                  <!-- Games: 手柄 -->
+                  <svg v-else-if="block.id === 'games'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
+                    <rect x="2" y="7.5" width="20" height="9" rx="4.5" fill-opacity="0.9"/>
+                    <path d="M8.5 10v4m-2-2h4" stroke="rgba(0,0,0,0.2)" stroke-width="1.6" stroke-linecap="round"/>
+                    <circle cx="15.5" cy="10.5" r="1" fill="rgba(0,0,0,0.15)"/>
+                    <circle cx="18" cy="12.5" r="1" fill="rgba(0,0,0,0.15)"/>
+                  </svg>
                 </div>
 
                 <!-- 标题 -->
@@ -364,22 +390,35 @@ const navigateTo = (path) => {
   transform: scale(0.99) !important;
 }
 
-/* 右下角装饰大字符 */
+/* 右下角装饰 SVG */
 .decor-icon {
   position: absolute;
-  bottom: -0.15em;
-  right: 0.1em;
-  line-height: 1;
-  opacity: 0.04;
+  bottom: -8%;
+  right: -2%;
   pointer-events: none;
   z-index: 1;
+  color: white;
+  opacity: 0.04;
   transition: opacity 0.5s, transform 0.5s;
   transform: rotate(-8deg);
 }
 
+.decor-lg { width: 120px; height: 120px; }
+.decor-sm { width: 90px; height: 90px; }
+
+@media (min-width: 640px) {
+  .decor-lg { width: 160px; height: 160px; }
+  .decor-sm { width: 110px; height: 110px; }
+}
+
+.decor-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
 .bento-card:hover .decor-icon {
-  opacity: 0.08;
-  transform: rotate(-4deg) scale(1.05);
+  opacity: 0.07;
+  transform: rotate(-4deg) scale(1.06);
 }
 
 /* 厨房卡片装饰线条图案 */
