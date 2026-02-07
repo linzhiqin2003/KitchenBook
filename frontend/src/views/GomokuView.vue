@@ -32,6 +32,9 @@ const lastMove = ref(null)
 const pendingMove = ref(null)
 const board = ref(createEmptyBoard())
 
+const hintMove = ref(null)
+const hintLoading = ref(false)
+
 const chatMessages = ref([])
 const chatInput = ref("")
 const isComposing = ref(false)
@@ -82,6 +85,8 @@ function resetGameState() {
   winner.value = null
   lastMove.value = null
   pendingMove.value = null
+  hintMove.value = null
+  hintLoading.value = false
 }
 
 const isSpectator = computed(() => role.value === "spectator")
@@ -164,6 +169,8 @@ function closeSocket(silent = false) {
 
   chatMessages.value = []
   chatInput.value = ""
+  hintMove.value = null
+  hintLoading.value = false
 
   if (!silent) {
     noticeMessage.value = "已离开房间。"
@@ -262,6 +269,13 @@ function handleServerMessage(data) {
       online.value = data.online
     }
     pendingMove.value = null
+    hintMove.value = null
+    return
+  }
+
+  if (data.type === "hint_result") {
+    hintMove.value = { x: data.x, y: data.y }
+    hintLoading.value = false
     return
   }
 
@@ -338,6 +352,17 @@ async function copyShareLink() {
   }
 }
 
+function requestHint() {
+  if (!connected.value || status.value !== "playing" || hintLoading.value) return
+  hintMove.value = null
+  hintLoading.value = true
+  sendMessage({ type: "hint" })
+}
+
+function isHint(x, y) {
+  return hintMove.value && hintMove.value.x === x && hintMove.value.y === y
+}
+
 function sendChat() {
   const text = chatInput.value.trim()
   if (!text) return
@@ -379,6 +404,13 @@ function cellValue(x, y) {
 let cursorInterval = null
 const cursorVisible = ref(true)
 
+function handleGlobalKeydown(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === "m") {
+    e.preventDefault()
+    requestHint()
+  }
+}
+
 onMounted(() => {
   updateRoomFromRoute()
   if (roomInput.value && nickname.value) {
@@ -387,11 +419,13 @@ onMounted(() => {
   cursorInterval = setInterval(() => {
     cursorVisible.value = !cursorVisible.value
   }, 530)
+  window.addEventListener("keydown", handleGlobalKeydown)
 })
 
 onBeforeUnmount(() => {
   closeSocket(true)
   if (cursorInterval) clearInterval(cursorInterval)
+  window.removeEventListener("keydown", handleGlobalKeydown)
 })
 </script>
 
@@ -443,6 +477,7 @@ onBeforeUnmount(() => {
                   'gomoku-cell-playable': canPlaceStone && cellValue(cell.x, cell.y) === 0 && !isPending(cell.x, cell.y),
                   'gomoku-cell-last': isLastMove(cell.x, cell.y),
                   'gomoku-cell-pending': isPending(cell.x, cell.y),
+                  'gomoku-cell-hint': isHint(cell.x, cell.y) && cellValue(cell.x, cell.y) === 0,
                 }"
                 :disabled="cellValue(cell.x, cell.y) !== 0 || !canPlaceStone"
                 @click="placeStone(cell.x, cell.y)"
@@ -461,6 +496,10 @@ onBeforeUnmount(() => {
                   v-else-if="isPending(cell.x, cell.y)"
                   class="stone stone-preview"
                   :class="playerColor === 'black' ? 'stone-preview-black' : 'stone-preview-white'"
+                ></span>
+                <span
+                  v-else-if="isHint(cell.x, cell.y)"
+                  class="hint-marker"
                 ></span>
                 <span
                   v-else-if="isStarPoint(cell.x, cell.y)"
@@ -1003,6 +1042,46 @@ onBeforeUnmount(() => {
 @keyframes previewPulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.75; }
+}
+
+/* ===== Hint Marker ===== */
+.hint-marker {
+  width: 60%;
+  height: 60%;
+  border-radius: 9999px;
+  border: 2.5px solid #00e5ff;
+  background: rgba(0, 229, 255, 0.15);
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow:
+    0 0 6px rgba(0, 229, 255, 0.6),
+    0 0 14px rgba(0, 229, 255, 0.3),
+    inset 0 0 4px rgba(0, 229, 255, 0.2);
+  animation: hintPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.9);
+    box-shadow:
+      0 0 6px rgba(0, 229, 255, 0.6),
+      0 0 14px rgba(0, 229, 255, 0.3),
+      inset 0 0 4px rgba(0, 229, 255, 0.2);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+    box-shadow:
+      0 0 10px rgba(0, 229, 255, 0.8),
+      0 0 24px rgba(0, 229, 255, 0.5),
+      inset 0 0 6px rgba(0, 229, 255, 0.3);
+  }
+}
+
+.gomoku-cell-hint {
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.12) 30%, transparent 42%);
 }
 
 /* ===== Board Overlay ===== */

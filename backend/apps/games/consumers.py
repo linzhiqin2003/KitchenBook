@@ -10,12 +10,15 @@ State is kept in process memory. For multi-instance deployments, move room
 state and counters to Redis or a database-backed design.
 """
 
+import asyncio
 import json
 import re
 import threading
 from urllib.parse import parse_qs
 
 from channels.generic.websocket import AsyncWebsocketConsumer
+
+from .gomoku_ai import find_best_move
 
 BOARD_SIZE = 15
 ROOM_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,20}$")
@@ -44,12 +47,14 @@ class GomokuConsumer(AsyncWebsocketConsumer):
     - {"type":"move","x":3,"y":4}
     - {"type":"restart"}
     - {"type":"chat","text":"hello"}
+    - {"type":"hint"}
     - {"type":"ping"}
 
     Server messages:
     - joined
     - room_state
     - chat_message
+    - hint_result
     - error
     - pong
     """
@@ -157,6 +162,8 @@ class GomokuConsumer(AsyncWebsocketConsumer):
             await self._handle_restart()
         elif msg_type == "chat":
             await self._handle_chat(payload)
+        elif msg_type == "hint":
+            await self._handle_hint()
         elif msg_type == "ping":
             await self.send_json({"type": "pong"})
         else:
@@ -236,6 +243,22 @@ class GomokuConsumer(AsyncWebsocketConsumer):
 
         if should_restart:
             await self._broadcast_room_state(reason="restart")
+
+    async def _handle_hint(self):
+        with self.rooms_lock:
+            room = self.rooms.get(self.room_id)
+            if not room:
+                await self.send_json({"type": "error", "message": "房间不存在。"})
+                return
+            if room["status"] != "playing":
+                await self.send_json({"type": "error", "message": "当前不是进行中的对局。"})
+                return
+            board_copy = [row[:] for row in room["board"]]
+            current_turn = room["turn"]
+
+        stone_color = current_turn
+        x, y = await asyncio.to_thread(find_best_move, board_copy, stone_color)
+        await self.send_json({"type": "hint_result", "x": x, "y": y})
 
     async def _handle_chat(self, payload):
         text = (payload.get("text") or "").strip()
