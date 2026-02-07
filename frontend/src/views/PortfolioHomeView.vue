@@ -216,11 +216,8 @@ const navigateTo = (path) => {
                     block.featured ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-12 h-12 sm:w-14 sm:h-14'
                   ]"
                 >
-                  <!-- Kitchen: 火焰 -->
-                  <svg v-if="block.id === 'kitchen'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
-                    <path d="M12 2.5C10 6 6.5 8.5 6.5 13a5.5 5.5 0 0011 0c0-4.5-3.5-7-5.5-10.5z" fill-opacity="0.9"/>
-                    <path d="M12 9c-1 1.5-2.2 3-2.2 5a2.2 2.2 0 004.4 0c0-2-1.2-3.5-2.2-5z" fill-opacity="0.45"/>
-                  </svg>
+                  <!-- Kitchen: emoji -->
+                  <span v-if="block.id === 'kitchen'" :class="block.featured ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'">🍳</span>
                   <!-- AI Lab: 多角星火花 -->
                   <svg v-else-if="block.id === 'ai-lab'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
                     <path d="M12 1.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5L4.5 9l5.5-2 2-5.5z" fill-opacity="0.92"/>
