@@ -29,6 +29,7 @@ const online = ref({
   global: { totalConnections: 0, rooms: 0 },
 })
 const lastMove = ref(null)
+const pendingMove = ref(null)
 const board = ref(createEmptyBoard())
 
 const errorMessage = ref("")
@@ -75,6 +76,7 @@ function resetGameState() {
   turn.value = "black"
   winner.value = null
   lastMove.value = null
+  pendingMove.value = null
 }
 
 const isSpectator = computed(() => role.value === "spectator")
@@ -251,6 +253,7 @@ function handleServerMessage(data) {
     if (data.online && data.online.room && data.online.global) {
       online.value = data.online
     }
+    pendingMove.value = null
     return
   }
 
@@ -277,7 +280,14 @@ function sendMessage(payload) {
 function placeStone(x, y) {
   if (!canPlaceStone.value) return
   if (board.value[y][x] !== 0) return
-  sendMessage({ type: "move", x, y })
+
+  // Two-step anti-mistouch: first click = preview, second click = confirm
+  if (pendingMove.value && pendingMove.value.x === x && pendingMove.value.y === y) {
+    sendMessage({ type: "move", x, y })
+    pendingMove.value = null
+    return
+  }
+  pendingMove.value = { x, y }
 }
 
 function restartGame() {
@@ -308,6 +318,15 @@ async function copyShareLink() {
 
 function isLastMove(x, y) {
   return lastMove.value && lastMove.value.x === x && lastMove.value.y === y
+}
+
+function isStarPoint(x, y) {
+  const stars = [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]]
+  return stars.some(([sx, sy]) => sx === x && sy === y)
+}
+
+function isPending(x, y) {
+  return pendingMove.value && pendingMove.value.x === x && pendingMove.value.y === y
 }
 
 function stoneClass(value) {
@@ -381,8 +400,13 @@ onBeforeUnmount(() => {
                 :key="cell.key"
                 class="gomoku-cell"
                 :class="{
-                  'gomoku-cell-playable': canPlaceStone && cellValue(cell.x, cell.y) === 0,
+                  'cell-top': cell.y === 0,
+                  'cell-bottom': cell.y === 14,
+                  'cell-left': cell.x === 0,
+                  'cell-right': cell.x === 14,
+                  'gomoku-cell-playable': canPlaceStone && cellValue(cell.x, cell.y) === 0 && !isPending(cell.x, cell.y),
                   'gomoku-cell-last': isLastMove(cell.x, cell.y),
+                  'gomoku-cell-pending': isPending(cell.x, cell.y),
                 }"
                 :disabled="cellValue(cell.x, cell.y) !== 0 || !canPlaceStone"
                 @click="placeStone(cell.x, cell.y)"
@@ -391,9 +415,50 @@ onBeforeUnmount(() => {
                   v-if="cellValue(cell.x, cell.y) !== 0"
                   :class="stoneClass(cellValue(cell.x, cell.y))"
                 ></span>
+                <span
+                  v-else-if="isPending(cell.x, cell.y)"
+                  class="stone stone-preview"
+                  :class="playerColor === 'black' ? 'stone-preview-black' : 'stone-preview-white'"
+                ></span>
+                <span
+                  v-else-if="isStarPoint(cell.x, cell.y)"
+                  class="star-dot"
+                ></span>
               </button>
             </div>
           </div>
+
+          <!-- Game over overlay -->
+          <Transition name="overlay-fade">
+            <div v-if="connected && status === 'finished'" class="board-overlay board-overlay-result">
+              <div class="overlay-content">
+                <div class="overlay-title">
+                  <span class="ov-text">{{ winnerLabel }}</span>
+                </div>
+                <p class="overlay-sub">
+                  <template v-if="isSpectator">对局已结束</template>
+                  <template v-else-if="winner === playerColor">恭喜你赢了！</template>
+                  <template v-else-if="winner === 'draw'">旗鼓相当！</template>
+                  <template v-else>下次再接再厉！</template>
+                </p>
+                <div class="result-actions">
+                  <button
+                    v-if="canRestart"
+                    @click="restartGame"
+                    class="pixel-btn pixel-btn-primary"
+                  >
+                    再来一把
+                  </button>
+                  <button
+                    @click="leaveRoom"
+                    class="pixel-btn pixel-btn-cyan"
+                  >
+                    离开房间
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Transition>
 
           <!-- Board overlay when not connected -->
           <Transition name="overlay-fade">
@@ -722,27 +787,79 @@ onBeforeUnmount(() => {
 
 .gomoku-cell {
   position: relative;
-  border: 1px solid rgba(71, 36, 7, 0.3);
-  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
 }
 
-.gomoku-cell-playable:hover {
-  background: rgba(255, 255, 255, 0.2);
+/* Horizontal grid line through intersection center */
+.gomoku-cell::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(71, 36, 7, 0.45);
+  transform: translateY(-0.5px);
+  pointer-events: none;
 }
 
+/* Vertical grid line through intersection center */
+.gomoku-cell::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(71, 36, 7, 0.45);
+  transform: translateX(-0.5px);
+  pointer-events: none;
+}
+
+/* Edge cells: lines stop at center (board boundary) */
+.cell-top::after { top: 50%; }
+.cell-bottom::after { bottom: 50%; }
+.cell-left::before { left: 50%; }
+.cell-right::before { right: 50%; }
+
+/* Playable cell hover indicator */
+.gomoku-cell-playable:hover {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.22) 28%, transparent 34%);
+}
+
+/* Last move - subtle red glow behind stone */
 .gomoku-cell-last {
-  box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.9);
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.2) 32%, transparent 40%);
+}
+
+/* Pending move preview highlight */
+.gomoku-cell-pending {
+  background: radial-gradient(circle, rgba(0, 255, 65, 0.1) 34%, transparent 42%);
+}
+
+/* Star point dots (天元 & 四星) */
+.star-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(71, 36, 7, 0.6);
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .stone {
-  width: 74%;
-  height: 74%;
+  width: 82%;
+  height: 82%;
   border-radius: 9999px;
   display: block;
+  position: relative;
+  z-index: 2;
 }
 
 .stone-black {
@@ -753,6 +870,28 @@ onBeforeUnmount(() => {
 .stone-white {
   background: radial-gradient(circle at 30% 30%, #ffffff 0%, #f2f2f2 55%, #d8d8d8 100%);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Preview stone (anti-mistouch first click) */
+.stone-preview {
+  animation: previewPulse 1.2s ease-in-out infinite;
+}
+
+.stone-preview-black {
+  background: radial-gradient(circle at 30% 30%, #5b5b5b 0%, #151515 55%, #020202 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  opacity: 0.5;
+}
+
+.stone-preview-white {
+  background: radial-gradient(circle at 30% 30%, #ffffff 0%, #f2f2f2 55%, #d8d8d8 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  opacity: 0.5;
+}
+
+@keyframes previewPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.75; }
 }
 
 /* ===== Board Overlay ===== */
@@ -833,6 +972,18 @@ onBeforeUnmount(() => {
 
 .overlay-form {
   text-align: left;
+}
+
+/* Game over overlay - slightly more transparent to show final board */
+.board-overlay-result {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.result-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-top: 1.2rem;
 }
 
 .overlay-hint {
