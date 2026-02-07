@@ -2,10 +2,44 @@
   <div class="panel">
     <div class="panel-header">
       <h2>账单列表</h2>
-      <button class="button" @click="createManual" :disabled="creating">
-        <PenLine :size="16" />
-        {{ creating ? '创建中...' : '手动记账' }}
-      </button>
+      <div class="panel-header__actions">
+        <button class="button accent" @click="showAiInput = !showAiInput" :disabled="aiGenerating">
+          <Sparkles :size="16" />
+          AI 智能记账
+        </button>
+        <button class="button" @click="createManual" :disabled="creating">
+          <PenLine :size="16" />
+          {{ creating ? '创建中...' : '手动记账' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- AI 智能记账输入区 -->
+    <div v-if="showAiInput" class="ai-input-area">
+      <div class="ai-input-header">
+        <Sparkles :size="16" class="ai-input-icon" />
+        <span>AI 智能记账</span>
+        <button class="ai-close-btn" @click="showAiInput = false"><X :size="16" /></button>
+      </div>
+      <textarea
+        v-model="aiDescription"
+        class="input ai-textarea"
+        rows="3"
+        placeholder="例：昨天在 Tesco 买了牛奶 3.5 磅、面包 1.2 磅"
+        :disabled="aiGenerating"
+      />
+      <div class="ai-input-footer">
+        <span class="ai-hint">描述购买内容，AI 将自动生成账单</span>
+        <button
+          class="button accent"
+          @click="handleAiGenerate"
+          :disabled="aiGenerating || !aiDescription.trim()"
+        >
+          <Loader2 v-if="aiGenerating" :size="16" class="spin" />
+          <Sparkles v-else :size="16" />
+          {{ aiGenerating ? '生成中...' : '生成账单' }}
+        </button>
+      </div>
     </div>
 
     <!-- 筛选栏 -->
@@ -101,14 +135,34 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { ArrowDown, ArrowUp, ArrowUpDown, FileText, PenLine, Search, Upload, X } from "lucide-vue-next";
-import { createReceipt, deleteReceipt, listReceipts } from "../api/receipts";
+import { ArrowDown, ArrowUp, ArrowUpDown, FileText, Loader2, PenLine, Search, Sparkles, Upload, X } from "lucide-vue-next";
+import { aiGenerateReceipt, createReceipt, deleteReceipt, listReceipts } from "../api/receipts";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
 const authStore = useAuthStore();
 const receipts = ref<any[]>([]);
 const creating = ref(false);
+
+// AI generate
+const showAiInput = ref(false);
+const aiDescription = ref("");
+const aiGenerating = ref(false);
+
+const handleAiGenerate = async () => {
+  if (!aiDescription.value.trim()) return;
+  aiGenerating.value = true;
+  try {
+    const receipt = await aiGenerateReceipt(aiDescription.value.trim());
+    showAiInput.value = false;
+    aiDescription.value = "";
+    router.push(`/receipts/${receipt.id}`);
+  } catch (e: any) {
+    alert(e?.response?.data?.detail || e?.message || "AI 生成失败，请重试");
+  } finally {
+    aiGenerating.value = false;
+  }
+};
 
 // Filters
 const filterMerchant = ref("");
@@ -252,10 +306,98 @@ onMounted(async () => {
   margin: 0;
 }
 
+.panel-header__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .panel-header .button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.button.accent {
+  background: var(--accent, #007aff);
+  color: #fff;
+  border-color: var(--accent, #007aff);
+}
+
+.button.accent:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.button.accent:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── AI Input Area ── */
+
+.ai-input-area {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--accent, #007aff);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.ai-input-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.ai-input-icon {
+  color: var(--accent, #007aff);
+}
+
+.ai-close-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted, #8e8e93);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.ai-close-btn:hover {
+  background: var(--hover, rgba(0,0,0,0.05));
+}
+
+.ai-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 72px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.ai-input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 12px;
+}
+
+.ai-hint {
+  font-size: 12px;
+  color: var(--muted, #8e8e93);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }
 
 /* ── Filter Bar ── */

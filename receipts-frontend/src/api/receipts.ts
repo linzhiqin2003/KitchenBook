@@ -137,6 +137,13 @@ export async function uploadReceiptStream(
   return result;
 }
 
+export async function aiGenerateReceipt(description: string) {
+  const { data } = await api.post("/receipts/ai-generate/", { description }, {
+    timeout: 120000,
+  });
+  return data;
+}
+
 export async function updateReceipt(id: string, payload: ReceiptPayload) {
   const { data } = await api.put(`/receipts/${id}/`, payload);
   return data;

@@ -21,6 +21,7 @@ from accounts.models import OrganizationMember
 from .models import CategoryMain, CategorySub, Receipt, ReceiptItem
 from .serializers import ReceiptSerializer
 from .services.doubao import analyze_receipt, analyze_receipt_stream
+from .services.ai_generate import generate_receipt_from_description
 from .services.parsing import NotReceiptError, parse_receipt_payload, parse_datetime_with_tz, to_decimal
 
 
@@ -296,6 +297,46 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "no-cache"
         response["X-Accel-Buffering"] = "no"
         return response
+
+    @action(detail=False, methods=["post"], url_path="ai-generate")
+    def ai_generate(self, request):
+        """Generate a receipt from a text description using AI."""
+        description = (request.data.get("description") or "").strip()
+        if not description:
+            return Response(
+                {"detail": "description is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        default_currency = getattr(settings, "DEFAULT_CURRENCY", "GBP")
+        receipt = Receipt.objects.create(
+            status=Receipt.STATUS_PROCESSING,
+            currency=default_currency,
+        )
+        self._set_ownership(receipt, request)
+        receipt.save()
+
+        try:
+            raw_text = generate_receipt_from_description(description)
+            parsed = parse_receipt_payload(raw_text)
+            _apply_parsed_result(receipt, parsed, raw_text, {})
+        except NotReceiptError as exc:
+            receipt.delete()
+            return Response(
+                {"detail": exc.reason, "not_receipt": True},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as exc:
+            receipt.status = Receipt.STATUS_FAILED
+            receipt.raw_model_output = str(exc)
+            receipt.save(update_fields=["status", "raw_model_output"])
+            return Response(
+                {"detail": f"AI 生成失败: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        serializer = self.get_serializer(receipt)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
