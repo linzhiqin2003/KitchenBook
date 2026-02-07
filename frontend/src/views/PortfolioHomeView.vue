@@ -166,7 +166,7 @@ const navigateTo = (path) => {
               LZQ 的个人空间
             </h1>
             <p class="text-base sm:text-lg text-white/45 max-w-sm mx-auto leading-relaxed">
-              探索代码世界，记录生活点滴
+              猛猛干 就是玩
             </p>
           </div>
 
