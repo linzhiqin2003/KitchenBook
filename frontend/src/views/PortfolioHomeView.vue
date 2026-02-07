@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
+// 当前时间
 const currentTime = ref('')
 const currentDate = ref('')
 
@@ -12,12 +13,12 @@ const updateTime = () => {
   currentTime.value = now.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: false
   })
   currentDate.value = now.toLocaleDateString('zh-CN', {
     weekday: 'long',
     month: 'long',
-    day: 'numeric',
+    day: 'numeric'
   })
 }
 
@@ -31,6 +32,66 @@ onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
 
+// 导航区块配置
+const navBlocks = [
+  {
+    id: 'kitchen',
+    title: '私人厨房',
+    subtitle: 'Kitchen Book',
+    description: '私人菜谱收藏，记录美食制作方法',
+    icon: '🍳',
+    path: '/kitchen',
+    gradient: 'from-orange-400 via-amber-500 to-yellow-500',
+    shadowColor: 'shadow-amber-500/30',
+    features: ['拟物翻书', '菜谱管理', '订单系统'],
+    featured: true
+  },
+  {
+    id: 'ai-lab',
+    title: 'AI 实验室',
+    subtitle: 'AI Lab',
+    description: 'DeepSeek Reasoner 思考模型对话',
+    icon: '🧠',
+    path: '/ai-lab',
+    gradient: 'from-emerald-400 via-teal-500 to-cyan-500',
+    shadowColor: 'shadow-teal-500/30',
+    features: ['思维链推理', '语音输入']
+  },
+  {
+    id: 'questiongen',
+    title: '智能刷题',
+    subtitle: 'Question Gen',
+    description: 'AI驱动的智能学习工具',
+    icon: '📚',
+    path: '/questiongen',
+    gradient: 'from-cyan-500 via-blue-500 to-indigo-500',
+    shadowColor: 'shadow-blue-500/30',
+    features: ['AI出题', '知识巩固']
+  },
+  {
+    id: 'tarot',
+    title: '塔罗秘仪',
+    subtitle: 'Tarot Sanctum',
+    description: '沉浸式占卜与神秘解读体验',
+    icon: '🃏',
+    path: '/tarot',
+    gradient: 'from-violet-500 via-purple-500 to-indigo-500',
+    shadowColor: 'shadow-purple-500/30',
+    features: ['互动牌阵', 'AI解读']
+  },
+  {
+    id: 'games',
+    title: '联机游戏',
+    subtitle: 'Realtime Games',
+    description: '和朋友一起实时对战',
+    icon: '🎮',
+    path: '/games',
+    gradient: 'from-emerald-500 via-teal-500 to-cyan-500',
+    shadowColor: 'shadow-teal-500/30',
+    features: ['WebSocket对战', '房间邀请']
+  }
+]
+
 const navigateTo = (path) => {
   router.push(path)
 }
@@ -38,7 +99,7 @@ const navigateTo = (path) => {
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
-    <!-- Dynamic background -->
+    <!-- 动态背景 -->
     <div class="fixed inset-0 pointer-events-none overflow-hidden">
       <div class="orb orb-1"></div>
       <div class="orb orb-2"></div>
@@ -56,12 +117,10 @@ const navigateTo = (path) => {
     </div>
 
     <div class="relative min-h-screen flex flex-col">
-      <!-- Top bar -->
-      <header class="pt-safe px-5 sm:px-8 py-4 flex items-center justify-between">
-        <div class="text-sm text-white/45 font-medium flex items-center gap-2.5">
-          <span>{{ currentDate }}</span>
-          <span class="text-white/20">|</span>
-          <span class="tabular-nums text-white/35">{{ currentTime }}</span>
+      <!-- 顶部状态栏 -->
+      <header class="pt-safe px-6 py-4 flex items-center justify-between">
+        <div class="text-sm text-white/60 font-medium">
+          {{ currentDate }}
         </div>
         <div class="flex items-center gap-3">
           <router-link
@@ -86,131 +145,111 @@ const navigateTo = (path) => {
         </div>
       </header>
 
-      <!-- Main content -->
+      <!-- 主内容 -->
       <main class="flex-1 px-4 sm:px-6 lg:px-8 pb-8">
         <div class="max-w-5xl mx-auto">
-
-          <!-- Compact Hero -->
-          <section class="hero-section text-center py-8 sm:py-10">
-            <div class="relative inline-block mb-4">
-              <div class="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-[1.25rem] bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[2.5px] shadow-xl shadow-purple-500/20">
-                <div class="w-full h-full rounded-[1.1rem] bg-slate-800/90 backdrop-blur flex items-center justify-center">
-                  <span class="text-[1.6rem] sm:text-[1.8rem] font-bold bg-clip-text text-transparent bg-gradient-to-br from-violet-300 to-fuchsia-300" style="font-family: 'Playfair Display', serif;">L</span>
+          <!-- Hero区域 -->
+          <div class="hero-section text-center pt-8 sm:pt-12 pb-10 sm:pb-14">
+            <!-- 头像 -->
+            <div class="relative inline-block mb-5">
+              <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-[1.75rem] bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[3px] shadow-2xl shadow-purple-500/25">
+                <div class="w-full h-full rounded-[1.55rem] bg-slate-800 flex items-center justify-center">
+                  <span class="text-4xl sm:text-5xl">&#x1F468;&#x200D;&#x1F4BB;</span>
                 </div>
               </div>
-              <div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-[3px] border-slate-900"></div>
+              <div class="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-slate-900"></div>
             </div>
-            <h1 class="text-xl sm:text-2xl font-bold mb-1.5 text-white/95">
+
+            <!-- 时间 -->
+            <div class="mb-4">
+              <div class="text-5xl sm:text-6xl lg:text-7xl font-extralight tracking-tight text-white/90 mb-1">
+                {{ currentTime }}
+              </div>
+            </div>
+
+            <!-- 名称和标语 -->
+            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/80">
               LZQ 的个人空间
             </h1>
-            <p class="text-sm text-white/40 max-w-xs mx-auto">
+            <p class="text-base sm:text-lg text-white/45 max-w-sm mx-auto leading-relaxed">
               探索代码世界，记录生活点滴
             </p>
-          </section>
+          </div>
 
-          <!-- Bento Grid -->
-          <div class="bento-grid">
+          <!-- Bento 网格 -->
+          <div class="bento-grid max-w-4xl mx-auto">
+            <button
+              v-for="(block, idx) in navBlocks"
+              :key="block.id"
+              @click="navigateTo(block.path)"
+              class="group relative overflow-hidden rounded-3xl backdrop-blur-xl border border-white/10 text-left transition-all duration-500 hover:scale-[1.02] hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-white/20 bento-card"
+              :class="[block.featured ? 'card-featured p-6 sm:p-8' : 'p-5 sm:p-6']"
+              :style="{ animationDelay: (idx * 0.08 + 0.1) + 's' }"
+            >
+              <!-- Hover 渐变背景 -->
+              <div
+                class="absolute inset-0 bg-gradient-to-br opacity-[0.05] group-hover:opacity-[0.12] transition-opacity duration-500"
+                :class="block.gradient"
+              ></div>
 
-            <!-- Kitchen - Featured (spans 2 cols on lg) -->
-            <button @click="navigateTo('/kitchen')" class="bento-card card-kitchen group">
-              <div class="card-glow glow-kitchen"></div>
-              <div class="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-amber-500/[0.04] to-transparent rounded-bl-[4rem] pointer-events-none"></div>
+              <!-- Hover 角落光效 -->
+              <div class="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-white/[0.03] to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
               <div class="relative z-10">
-                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-5 shadow-lg shadow-amber-500/20 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-                  <svg class="w-7 h-7" viewBox="0 0 24 24" fill="white" fill-opacity="0.92">
-                    <path d="M12 2C9 2 5 7.5 5 14c0 4.4 3.1 8 7 8s7-3.6 7-8c0-6.5-4-12-7-12zm0 17c-2.5 0-4.5-2.2-4.5-5.5C7.5 9 10 5 12 3.5 14 5 16.5 9 16.5 13.5c0 3.3-2 5.5-4.5 5.5z"/>
-                    <ellipse cx="12" cy="15.5" rx="2" ry="2.5" fill-opacity="0.35"/>
-                  </svg>
+                <!-- 图标 -->
+                <div
+                  class="rounded-2xl bg-gradient-to-br flex items-center justify-center mb-4 shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3"
+                  :class="[
+                    block.gradient,
+                    block.shadowColor,
+                    block.featured ? 'w-14 h-14 sm:w-16 sm:h-16 text-3xl sm:text-4xl' : 'w-12 h-12 sm:w-14 sm:h-14 text-2xl sm:text-3xl'
+                  ]"
+                >
+                  {{ block.icon }}
                 </div>
-                <h2 class="text-xl sm:text-2xl font-bold text-white mb-1">私人厨房</h2>
-                <p class="text-[11px] font-medium text-white/30 uppercase tracking-[0.15em] mb-2.5">Kitchen Book</p>
-                <p class="text-sm text-white/50 mb-5 leading-relaxed">私人菜谱收藏，记录美食制作方法</p>
+
+                <!-- 标题 -->
+                <div class="mb-2">
+                  <h2
+                    class="font-bold text-white mb-0.5"
+                    :class="block.featured ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'"
+                  >
+                    {{ block.title }}
+                  </h2>
+                  <p class="text-[11px] font-medium text-white/35 uppercase tracking-wider">
+                    {{ block.subtitle }}
+                  </p>
+                </div>
+
+                <!-- 描述 -->
+                <p class="text-sm text-white/55 mb-4 leading-relaxed">
+                  {{ block.description }}
+                </p>
+
+                <!-- 特性标签 -->
                 <div class="flex flex-wrap gap-2">
-                  <span class="tag">拟物翻书</span>
-                  <span class="tag">菜谱管理</span>
-                  <span class="tag">订单系统</span>
+                  <span
+                    v-for="feature in block.features"
+                    :key="feature"
+                    class="px-2.5 py-1 text-xs font-medium rounded-full bg-white/[0.08] text-white/60 border border-white/[0.06]"
+                  >
+                    {{ feature }}
+                  </span>
                 </div>
               </div>
             </button>
-
-            <!-- AI Lab -->
-            <button @click="navigateTo('/ai-lab')" class="bento-card card-ailab group">
-              <div class="card-glow glow-ailab"></div>
-              <div class="relative z-10">
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center mb-4 shadow-lg shadow-cyan-500/20 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="white">
-                    <path fill-opacity="0.9" d="M8 2l1.5 4.5L14 8l-4.5 1.5L8 14l-1.5-4.5L2 8l4.5-1.5L8 2z"/>
-                    <path fill-opacity="0.6" d="M18 12l.8 2.2L21 15l-2.2.8L18 18l-.8-2.2L15 15l2.2-.8L18 12z"/>
-                  </svg>
-                </div>
-                <h2 class="text-lg sm:text-xl font-bold text-white mb-1">AI 实验室</h2>
-                <p class="text-[11px] font-medium text-white/30 uppercase tracking-[0.15em] mb-2">AI Lab</p>
-                <p class="text-sm text-white/50 leading-relaxed">DeepSeek 思考模型对话</p>
-                <div class="flex flex-wrap gap-2 mt-4">
-                  <span class="tag">思维链推理</span>
-                  <span class="tag">语音输入</span>
-                </div>
-              </div>
-            </button>
-
-            <!-- QuestionGen -->
-            <button @click="navigateTo('/questiongen')" class="bento-card card-qgen group">
-              <div class="card-glow glow-qgen"></div>
-              <div class="relative z-10">
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="white" fill-opacity="0.9">
-                    <path d="M12 6.5C10 4.5 7 4 5 4v13c2 0 5 .5 7 2.5 2-2 5-2.5 7-2.5V4c-2 0-5 .5-7 2.5z"/>
-                  </svg>
-                </div>
-                <h2 class="text-lg font-bold text-white mb-1">智能刷题</h2>
-                <p class="text-[11px] font-medium text-white/30 uppercase tracking-[0.15em] mb-2">Question Gen</p>
-                <p class="text-sm text-white/50">AI 驱动的智能学习工具</p>
-              </div>
-            </button>
-
-            <!-- Tarot -->
-            <button @click="navigateTo('/tarot')" class="bento-card card-tarot group">
-              <div class="card-glow glow-tarot"></div>
-              <div class="relative z-10">
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/20 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="white" fill-opacity="0.9">
-                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
-                  </svg>
-                </div>
-                <h2 class="text-lg font-bold text-white mb-1">塔罗秘仪</h2>
-                <p class="text-[11px] font-medium text-white/30 uppercase tracking-[0.15em] mb-2">Tarot Sanctum</p>
-                <p class="text-sm text-white/50">沉浸式占卜与神秘解读</p>
-              </div>
-            </button>
-
-            <!-- Games -->
-            <button @click="navigateTo('/games')" class="bento-card card-games group">
-              <div class="card-glow glow-games"></div>
-              <div class="relative z-10">
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none">
-                    <rect x="2" y="7" width="20" height="10" rx="5" fill="white" fill-opacity="0.9"/>
-                    <path d="M8.5 10v4M6.5 12h4" stroke="rgba(0,0,0,0.2)" stroke-width="1.5" stroke-linecap="round"/>
-                    <circle cx="15.5" cy="10.5" r="1" fill="rgba(0,0,0,0.15)"/>
-                    <circle cx="18" cy="12.5" r="1" fill="rgba(0,0,0,0.15)"/>
-                  </svg>
-                </div>
-                <h2 class="text-lg font-bold text-white mb-1">联机游戏</h2>
-                <p class="text-[11px] font-medium text-white/30 uppercase tracking-[0.15em] mb-2">Realtime Games</p>
-                <p class="text-sm text-white/50">和朋友一起实时对战</p>
-              </div>
-            </button>
-
           </div>
         </div>
       </main>
 
-      <!-- Footer -->
+      <!-- 底部 -->
       <footer class="px-6 py-6 text-center">
-        <div class="flex items-center justify-center gap-2 text-sm text-white/25">
+        <div class="flex items-center justify-center gap-2 text-sm text-white/30">
           <span>Built with</span>
-          <span class="text-red-400/80">&#10084;</span>
+          <span class="text-red-400">&#10084;&#65039;</span>
           <span>by LZQ</span>
+          <span class="mx-2">&middot;</span>
+          <span>&copy; 2025</span>
         </div>
       </footer>
     </div>
@@ -218,27 +257,23 @@ const navigateTo = (path) => {
 </template>
 
 <style scoped>
-/* ========== Hero entrance ========== */
+/* ========== Hero ========== */
 .hero-section {
   animation: heroIn 0.7s ease-out;
 }
 
 @keyframes heroIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
+  from { opacity: 0; transform: translateY(16px); }
 }
 
 /* ========== Bento Grid ========== */
 .bento-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: auto auto;
   gap: 1rem;
 }
 
-.card-kitchen {
+.card-featured {
   grid-column: span 2;
 }
 
@@ -246,7 +281,7 @@ const navigateTo = (path) => {
   .bento-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .card-kitchen {
+  .card-featured {
     grid-column: span 2;
   }
 }
@@ -255,35 +290,21 @@ const navigateTo = (path) => {
   .bento-grid {
     grid-template-columns: 1fr;
   }
-  .card-kitchen {
+  .card-featured {
     grid-column: span 1;
   }
 }
 
 /* ========== Bento Card ========== */
 .bento-card {
-  position: relative;
-  overflow: hidden;
-  border-radius: 1.25rem;
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  padding: 1.5rem;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-  animation: cardIn 0.6s ease-out backwards;
+  background: rgba(255, 255, 255, 0.04);
+  animation: cardIn 0.55s ease-out backwards;
 }
-
-.bento-card:nth-child(1) { animation-delay: 0.08s; }
-.bento-card:nth-child(2) { animation-delay: 0.16s; }
-.bento-card:nth-child(3) { animation-delay: 0.24s; }
-.bento-card:nth-child(4) { animation-delay: 0.32s; }
-.bento-card:nth-child(5) { animation-delay: 0.40s; }
 
 @keyframes cardIn {
   from {
     opacity: 0;
-    transform: translateY(24px) scale(0.97);
+    transform: translateY(20px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -292,69 +313,14 @@ const navigateTo = (path) => {
 }
 
 .bento-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .bento-card:active {
-  transform: translateY(-1px) scale(0.99);
+  transform: scale(0.99) !important;
 }
 
-/* Per-card background tints */
-.card-kitchen {
-  background: linear-gradient(145deg, rgba(245, 158, 11, 0.07) 0%, rgba(249, 115, 22, 0.025) 100%);
-}
-.card-kitchen:hover { background: linear-gradient(145deg, rgba(245, 158, 11, 0.11) 0%, rgba(249, 115, 22, 0.04) 100%); }
-
-.card-ailab {
-  background: linear-gradient(145deg, rgba(6, 182, 212, 0.07) 0%, rgba(20, 184, 166, 0.025) 100%);
-}
-.card-ailab:hover { background: linear-gradient(145deg, rgba(6, 182, 212, 0.11) 0%, rgba(20, 184, 166, 0.04) 100%); }
-
-.card-qgen {
-  background: linear-gradient(145deg, rgba(59, 130, 246, 0.07) 0%, rgba(99, 102, 241, 0.025) 100%);
-}
-.card-qgen:hover { background: linear-gradient(145deg, rgba(59, 130, 246, 0.11) 0%, rgba(99, 102, 241, 0.04) 100%); }
-
-.card-tarot {
-  background: linear-gradient(145deg, rgba(139, 92, 246, 0.07) 0%, rgba(99, 102, 241, 0.025) 100%);
-}
-.card-tarot:hover { background: linear-gradient(145deg, rgba(139, 92, 246, 0.11) 0%, rgba(99, 102, 241, 0.04) 100%); }
-
-.card-games {
-  background: linear-gradient(145deg, rgba(16, 185, 129, 0.07) 0%, rgba(20, 184, 166, 0.025) 100%);
-}
-.card-games:hover { background: linear-gradient(145deg, rgba(16, 185, 129, 0.11) 0%, rgba(20, 184, 166, 0.04) 100%); }
-
-/* Hover glow (radial light effect) */
-.card-glow {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 0.5s;
-  pointer-events: none;
-}
-.bento-card:hover .card-glow { opacity: 1; }
-
-.glow-kitchen { background: radial-gradient(ellipse at 25% 20%, rgba(245, 158, 11, 0.1), transparent 65%); }
-.glow-ailab   { background: radial-gradient(ellipse at 25% 20%, rgba(6, 182, 212, 0.1), transparent 65%); }
-.glow-qgen    { background: radial-gradient(ellipse at 25% 20%, rgba(59, 130, 246, 0.1), transparent 65%); }
-.glow-tarot   { background: radial-gradient(ellipse at 25% 20%, rgba(139, 92, 246, 0.1), transparent 65%); }
-.glow-games   { background: radial-gradient(ellipse at 25% 20%, rgba(16, 185, 129, 0.1), transparent 65%); }
-
-/* Feature tags */
-.tag {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.7rem;
-  font-weight: 500;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* ========== Dynamic background orbs ========== */
+/* ========== 动态背景光球 ========== */
 .orb {
   position: absolute;
   border-radius: 50%;
@@ -427,7 +393,7 @@ const navigateTo = (path) => {
   50% { transform: translate(-60px, 40px) scale(1.08); }
 }
 
-/* ========== Particles ========== */
+/* ========== 小光点粒子 ========== */
 .particle {
   position: absolute;
   border-radius: 50%;
@@ -466,13 +432,16 @@ const navigateTo = (path) => {
   50% { transform: translate(-50px, -30px); }
 }
 
-/* ========== Utilities ========== */
+/* ========== 其他样式 ========== */
 .pt-safe {
   padding-top: max(1rem, env(safe-area-inset-top));
 }
 
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
