@@ -44,6 +44,8 @@
           placeholder="输入消息..."
           :disabled="aiLoading"
           @keydown="handleAiKeydown"
+          @compositionstart="isComposing = true"
+          @compositionend="isComposing = false"
         />
         <button
           class="button accent ai-send-btn"
@@ -210,8 +212,10 @@ const sendAiMessage = async () => {
   }
 };
 
+const isComposing = ref(false);
+
 const handleAiKeydown = (e: KeyboardEvent) => {
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (e.key === "Enter" && !e.shiftKey && !isComposing.value && !e.isComposing) {
     e.preventDefault();
     sendAiMessage();
   }

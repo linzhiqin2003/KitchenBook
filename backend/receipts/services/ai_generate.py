@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date
+from datetime import datetime
 
 from cerebras.cloud.sdk import Cerebras
 
@@ -36,7 +36,7 @@ CHAT_INSTRUCTIONS = """
 - is_receipt 设为 true
 - confidence 设为 0.95
 - 如果用户没提到日期且不想填，purchased_at 设为 null
-- 如果用户说"昨天""今天""前天"等相对日期，根据当前日期推算：当前日期是 {today}
+- 如果用户说"昨天""今天""前天""刚才"等相对日期/时间，根据当前时间推算：当前时间是 {now}
 - 如果用户没提到总价但有各商品价格，自动计算 subtotal 和 total
 """.strip()
 
@@ -44,7 +44,7 @@ CHAT_INSTRUCTIONS = """
 def _build_chat_prompt() -> str:
     """Build system prompt for conversational receipt generation."""
     base = _build_prompt()
-    instructions = CHAT_INSTRUCTIONS.format(today=date.today().isoformat())
+    instructions = CHAT_INSTRUCTIONS.format(now=datetime.now().strftime("%Y-%m-%d %H:%M"))
     return base + "\n\n" + instructions
 
 
