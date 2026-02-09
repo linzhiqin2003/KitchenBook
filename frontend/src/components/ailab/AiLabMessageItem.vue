@@ -426,7 +426,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
       <!-- 消息内容 -->
       <div class="flex flex-col items-start flex-1 min-w-0">
-        <div class="text-xs font-medium mb-2 text-indigo-500">DeepSeek Reasoner</div>
+        <div class="text-xs font-medium mb-2 text-indigo-500">{{ message.modelName || 'DeepSeek Reasoner' }}</div>
 
         <!-- 工具调用时间线 -->
         <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3">

@@ -118,6 +118,7 @@ const normalizeAssistantMessage = (message) => {
     ...message,
     phase: message.phase || STREAM_PHASE.IDLE,
     subTurns,
+    modelName: message.modelName || message.model_name || null,
     currentReasoning: message.currentReasoning || '',
     currentToolCall: message.currentToolCall || null
   }
@@ -207,11 +208,14 @@ const deleteConversation = async (id) => {
 }
 
 // 保存消息到后端
-const saveMessage = async (conversationId, role, content, reasoning = null, subTurns = null) => {
+const saveMessage = async (conversationId, role, content, reasoning = null, subTurns = null, modelName = null) => {
   try {
     const body = { role, content, reasoning }
     if (subTurns && subTurns.length > 0) {
       body.sub_turns = subTurns
+    }
+    if (modelName) {
+      body.model_name = modelName
     }
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${conversationId}/messages/`, {
       method: 'POST',
@@ -277,6 +281,7 @@ const streamResponse = async () => {
   // 添加空的 AI 消息用于流式填充
   const aiMessageIndex = messages.value.length
   currentStreamingIndex.value = aiMessageIndex
+  const currentModelName = MODEL_OPTIONS.find(m => m.id === selectedModel.value)?.name || selectedModel.value
   messages.value.push({
     role: 'assistant',
     content: '',
@@ -286,7 +291,8 @@ const streamResponse = async () => {
     phase: STREAM_PHASE.REASONING,
     subTurns: [],
     currentReasoning: '',
-    currentToolCall: null
+    currentToolCall: null,
+    modelName: currentModelName
   })
 
   let streamPhase = STREAM_PHASE.REASONING
@@ -685,7 +691,8 @@ const streamResponse = async () => {
       'assistant',
       currentContent.value,
       currentReasoning.value,
-      aiMsg?.subTurns || streamSubTurns
+      aiMsg?.subTurns || streamSubTurns,
+      currentModelName
     )
     if (savedAiMsg) {
       messages.value[aiMessageIndex].id = savedAiMsg.id

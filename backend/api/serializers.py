@@ -164,7 +164,7 @@ class AiLabMessageSerializer(serializers.ModelSerializer):
     """AI Lab 消息序列化器"""
     class Meta:
         model = AiLabMessage
-        fields = ['id', 'conversation', 'role', 'content', 'reasoning', 'sub_turns', 'created_at']
+        fields = ['id', 'conversation', 'role', 'content', 'reasoning', 'sub_turns', 'model_name', 'created_at']
         read_only_fields = ['id', 'created_at']
         extra_kwargs = {
             'conversation': {'required': False}
