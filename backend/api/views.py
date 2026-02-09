@@ -1318,8 +1318,11 @@ class DeepSeekSpecialeView(APIView):
                 if collected_refs:
                     ref_lines = ["\n\n---\n**引用来源**\n"]
                     for ref_id, url, title, domain in collected_refs:
-                        ref_lines.append(f"\\[REF:{ref_id}\\] [{title}]({url})\n")
-                    ref_block = "".join(ref_lines)
+                        safe_title = title.replace('[', '').replace(']', '')
+                        ref_lines.append(
+                            f"- **{ref_id}.** [{safe_title}]({url})"
+                        )
+                    ref_block = "\n".join(ref_lines) + "\n"
                     if not content_started:
                         yield emit({"type": "content_start"})
                     yield emit({"type": "content", "content": ref_block})
