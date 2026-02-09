@@ -380,6 +380,7 @@ const streamResponse = async () => {
       status: TOOL_STATUS.PARSING,
       result: '',
       error: '',
+      progressMessage: '',
       startedAt: Date.now(),
       finishedAt: null
     }
@@ -422,6 +423,13 @@ const streamResponse = async () => {
     }
     if (fragment.durationMs && !existing.finishedAt) {
       existing.finishedAt = existing.startedAt + fragment.durationMs
+    }
+    if (fragment.progressMessage !== undefined) {
+      existing.progressMessage = fragment.progressMessage
+    }
+    // 完成后清除进度消息
+    if (existing.status === TOOL_STATUS.SUCCESS || existing.status === TOOL_STATUS.ERROR) {
+      existing.progressMessage = ''
     }
 
     existing.parsedArguments = safeParseJson(existing.argumentsText)
@@ -516,7 +524,7 @@ const streamResponse = async () => {
     const rawToolCall = payload.tool_call || payload.call || payload
     const hasArguments = rawToolCall?.arguments !== undefined || rawToolCall?.args !== undefined || rawToolCall?.function?.arguments !== undefined
 
-    if (eventType === 'tool_execution_start') {
+    if (eventType === 'tool_execution_start' || eventType === 'tool_progress') {
       setPhase(STREAM_PHASE.TOOL_EXECUTING)
     } else {
       setPhase(STREAM_PHASE.TOOL_CALLING)
@@ -530,7 +538,7 @@ const streamResponse = async () => {
         ? (rawToolCall?.function?.arguments ?? rawToolCall?.arguments ?? rawToolCall?.args)
         : undefined,
       status: payload.status || (
-        eventType === 'tool_execution_start'
+        eventType === 'tool_execution_start' || eventType === 'tool_progress'
           ? TOOL_STATUS.RUNNING
           : eventType === 'tool_execution_error'
             ? TOOL_STATUS.ERROR
@@ -540,7 +548,8 @@ const streamResponse = async () => {
       ),
       result: payload.result ?? payload.output,
       error: payload.error,
-      durationMs: payload.duration_ms || payload.durationMs
+      durationMs: payload.duration_ms || payload.durationMs,
+      progressMessage: eventType === 'tool_progress' ? payload.message : undefined
     }, { appendArguments: eventType !== 'tool_call' })
   }
 
@@ -568,6 +577,7 @@ const streamResponse = async () => {
       case 'tool_execution_result':
       case 'tool_execution_error':
       case 'tool_result':
+      case 'tool_progress':
         handleToolEvent(parsed, parsed.type)
         break
 

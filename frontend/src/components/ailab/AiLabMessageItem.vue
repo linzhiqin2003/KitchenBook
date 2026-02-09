@@ -610,6 +610,11 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                 <span :class="['trace-meta', formatToolStatus(currentToolCall.status).textClass]">{{ formatToolStatus(currentToolCall.status).label }}</span>
                 <span v-if="formatToolDuration(currentToolCall)" class="trace-meta text-slate-400">{{ formatToolDuration(currentToolCall) }}</span>
               </div>
+              <!-- 工具执行进度 -->
+              <div v-if="currentToolCall.progressMessage && currentToolCall.status === 'running'" class="trace-progress">
+                <span class="trace-progress-dot"></span>
+                {{ currentToolCall.progressMessage }}
+              </div>
               <div v-if="hasToolArguments(currentToolCall)" class="ml-4 mt-0.5">
                 <button
                   class="trace-toggle"
@@ -896,6 +901,30 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.trace-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0.25rem 0 0.125rem 1rem;
+  font-size: 0.7rem;
+  color: #3b82f6;
+  animation: fadeInSoft 0.2s ease-out;
+}
+
+.trace-progress-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #3b82f6;
+  animation: progressPulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes progressPulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
 }
 
 /* Markdown 样式 */

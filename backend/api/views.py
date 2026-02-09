@@ -1091,7 +1091,7 @@ class DeepSeekSpecialeView(APIView):
 
         def generate():
             from openai import OpenAI
-            from .tools import TOOL_DEFINITIONS, execute_tool
+            from .tools import TOOL_DEFINITIONS, execute_tool_streaming
             import time as _time
 
             client = OpenAI(api_key=api_key, base_url=base_url)
@@ -1249,7 +1249,20 @@ class DeepSeekSpecialeView(APIView):
                                 tool_args = {}
 
                             t0 = _time.time()
-                            result_str, error_str = execute_tool(tool_name, tool_args)
+                            result_str, error_str = None, None
+                            for tool_event in execute_tool_streaming(tool_name, tool_args):
+                                if "progress" in tool_event:
+                                    yield emit({
+                                        "type": "tool_progress",
+                                        "index": idx,
+                                        "id": tool_id,
+                                        "name": tool_name,
+                                        "message": tool_event["progress"],
+                                    })
+                                elif "result" in tool_event:
+                                    result_str = tool_event["result"]
+                                elif "error" in tool_event:
+                                    error_str = tool_event["error"]
                             duration_ms = int((_time.time() - t0) * 1000)
 
                             if error_str:

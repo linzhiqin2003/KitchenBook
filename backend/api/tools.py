@@ -465,7 +465,9 @@ def _ai_consolidate(summaries, references, query):
 
 
 def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
-    """增强版 web_search：搜索 + 抓取 + AI 摘要 + 引用标记"""
+    """增强版 web_search（generator）：搜索 + 抓取 + AI 摘要 + 引用标记
+    yield {"progress": msg} 报告阶段进度，yield {"result": text} 返回最终结果。
+    """
     query = query.strip()
     if not query:
         raise ValueError("搜索关键词不能为空")
@@ -473,15 +475,14 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
     max_results = max(1, min(10, int(max_results)))
 
     # ── 1. 双引擎搜索：Google CSE → Serper ──
+    yield {"progress": "正在搜索..."}
     search_results = None
 
-    # 优先 Google CSE（news 模式 CSE 不支持，直接走 Serper）
     if search_type != "news":
         search_results = _search_google_cse(query, num=max_results)
         if search_results:
             logger.info("Search via Google CSE: %d results", len(search_results))
 
-    # CSE 失败或 news 模式，走 Serper
     if not search_results:
         search_results = _search_serper(query, search_type=search_type, num=max_results)
         if search_results:
@@ -490,27 +491,27 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
     if not search_results:
         raise ValueError("搜索引擎均不可用，请检查 API 配置")
 
-    if not search_results:
-        return f"未找到与 \"{query}\" 相关的结果。"
-
     # ── 2. 构建引用列表 & 清理 URL ──
-    references = []  # [(ref_id, url, title, domain)]
+    references = []
     for i, item in enumerate(search_results[:max_results], 1):
         url = _normalize_url(item.get("link", ""))
         title = item.get("title", "无标题")
         domain = _extract_domain(url)
         references.append((i, url, title, domain))
 
-    # ── 3. Jina Reader 并行抓取 top N URL ──
-    scraped = []  # [{ref_id, title, content, url}]
-    scrape_status = {}  # ref_id → 'scraped' | 'snippet' | 'skipped'
+    # ── 3. Jina Reader 并行抓取 ──
+    scrape_refs = references[:_SCRAPE_TOP_N]
+    yield {"progress": f"找到 {len(references)} 条结果，正在抓取 {len(scrape_refs)} 个网页..."}
 
-    to_scrape = [(r, s) for r, s in zip(references[:_SCRAPE_TOP_N], search_results) if r[1]]
-    for ref_id, url, title, domain in references[:_SCRAPE_TOP_N]:
+    scraped = []
+    scrape_status = {}
+
+    to_scrape = [(r, s) for r, s in zip(scrape_refs, search_results) if r[1]]
+    for ref_id, url, title, domain in scrape_refs:
         if not url:
             scrape_status[ref_id] = 'skipped'
 
-    with ThreadPoolExecutor(max_workers=_SCRAPE_TOP_N) as pool:
+    with ThreadPoolExecutor(max_workers=max(len(to_scrape), 1)) as pool:
         future_map = {}
         for (ref_id, url, title, domain), sr in to_scrape:
             future_map[pool.submit(_jina_scrape, url)] = (ref_id, url, title, domain, sr)
@@ -527,31 +528,15 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                     scraped.append({"ref_id": ref_id, "title": title, "content": snippet, "url": url})
                 scrape_status[ref_id] = 'snippet'
 
-    # 未尝试抓取的标记为 skipped（仅当有截断时）
     if _SCRAPE_TOP_N is not None:
         for ref_id, url, title, domain in references[_SCRAPE_TOP_N:]:
             scrape_status[ref_id] = 'skipped'
 
-    # ── 3.5 构建抓取状态头部 ──
     scraped_count = sum(1 for s in scrape_status.values() if s == 'scraped')
-    status_lines = [f"🔍 搜索「{query}」| {len(references)} 条结果，已抓取 {scraped_count} 个网页\n"]
-    for ref_id, url, title, domain in references:
-        st = scrape_status.get(ref_id, 'skipped')
-        if st == 'scraped':
-            status_lines.append(f"  [REF:{ref_id}] {domain} ✅")
-        elif st == 'snippet':
-            status_lines.append(f"  [REF:{ref_id}] {domain} ⚠️ 仅摘要")
-        else:
-            status_lines.append(f"  [REF:{ref_id}] {domain}")
-    scrape_header = "\n".join(status_lines) + "\n\n"
-
-    # 构建引用来源块（始终附在末尾，供前端解析 ref→URL 映射）
-    ref_lines = ["### 引用来源"]
-    for ref_id, url, title, domain in references:
-        ref_lines.append(f"[REF:{ref_id}] {title} - {url}")
-    ref_block = "\n".join(ref_lines)
 
     # ── 4. Cerebras/DeepSeek 并行结构化提取 ──
+    yield {"progress": f"已抓取 {scraped_count} 个网页，AI 正在提取关键信息..."}
+
     summaries = []
     if scraped:
         with ThreadPoolExecutor(max_workers=len(scraped)) as pool:
@@ -574,28 +559,44 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                         "title": item["title"],
                         "content": item["content"][:500],
                     })
-        # 按 ref_id 排序保持顺序
         summaries.sort(key=lambda s: s["ref_id"])
 
-    # ── 5. Consolidation（2+ 条摘要且总长度 > 500 字） ──
+    # ── 构建输出辅助块 ──
+    status_lines = [f"🔍 搜索「{query}」| {len(references)} 条结果，已抓取 {scraped_count} 个网页\n"]
+    for ref_id, url, title, domain in references:
+        st = scrape_status.get(ref_id, 'skipped')
+        if st == 'scraped':
+            status_lines.append(f"  [REF:{ref_id}] {domain} ✅")
+        elif st == 'snippet':
+            status_lines.append(f"  [REF:{ref_id}] {domain} ⚠️ 仅摘要")
+        else:
+            status_lines.append(f"  [REF:{ref_id}] {domain}")
+    scrape_header = "\n".join(status_lines) + "\n\n"
+
+    ref_lines = ["### 引用来源"]
+    for ref_id, url, title, domain in references:
+        ref_lines.append(f"[REF:{ref_id}] {title} - {url}")
+    ref_block = "\n".join(ref_lines)
+
+    # ── 5. Consolidation ──
     total_summary_len = sum(len(s["content"]) for s in summaries)
 
     if len(summaries) >= 2 and total_summary_len > 500:
+        yield {"progress": "正在生成综合报告..."}
         consolidated = _ai_consolidate(summaries, references, query)
         if consolidated:
-            return scrape_header + consolidated + "\n\n" + ref_block
+            yield {"result": scrape_header + consolidated + "\n\n" + ref_block}
+            return
 
     # ── 6. 降级：直接拼接摘要 + 引用列表 ──
     lines = [scrape_header]
 
-    # 有摘要时输出摘要
     if summaries:
         for s in summaries:
             lines.append(f"**[REF:{s['ref_id']}] {s['title']}**")
             lines.append(s["content"])
             lines.append("")
     else:
-        # 没有摘要，输出原始搜索结果
         for i, item in enumerate(search_results[:max_results], 1):
             title = item.get("title", "无标题")
             snippet = item.get("snippet", "无摘要")
@@ -609,10 +610,8 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                 lines.append(f"   链接: {link}")
             lines.append("")
 
-    # 附引用列表
     lines.append(ref_block)
-
-    return "\n".join(lines)
+    yield {"result": "\n".join(lines)}
 
 
 # ==================== 工具映射 & 统一执行入口 ====================
@@ -625,12 +624,37 @@ TOOL_HANDLERS = {
 
 
 def execute_tool(name, args):
-    """统一执行入口，返回 (result_str, error_str)"""
+    """非流式执行入口，返回 (result_str, error_str)。兼容 generator 工具。"""
     handler = TOOL_HANDLERS.get(name)
     if not handler:
         return None, f"未知工具: {name}"
     try:
         result = handler(**args)
+        if hasattr(result, '__next__'):
+            final = None
+            for event in result:
+                if "result" in event:
+                    final = event["result"]
+                elif "error" in event:
+                    return None, event["error"]
+            return str(final) if final is not None else None, None
         return str(result), None
     except Exception as exc:
         return None, str(exc)
+
+
+def execute_tool_streaming(name, args):
+    """流式执行入口（generator），yield {"progress": msg} 或 {"result": str} 或 {"error": str}。"""
+    handler = TOOL_HANDLERS.get(name)
+    if not handler:
+        yield {"error": f"未知工具: {name}"}
+        return
+    try:
+        result = handler(**args)
+        if hasattr(result, '__next__'):
+            for event in result:
+                yield event
+        else:
+            yield {"result": str(result)}
+    except Exception as exc:
+        yield {"error": str(exc)}
