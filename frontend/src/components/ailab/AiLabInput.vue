@@ -154,7 +154,7 @@ const formatDuration = (seconds) => {
         </div>
       </div>
       <div class="text-center mt-2 text-xs text-gray-400">
-        DeepSeek Reasoner · 按 Enter 发送，Shift+Enter 换行
+        DeepSeek Reasoner + Tool Calling · Enter 发送，Shift+Enter 换行
       </div>
     </div>
   </div>

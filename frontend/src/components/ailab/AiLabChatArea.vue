@@ -47,6 +47,22 @@ watch(() => props.messages[props.currentStreamingIndex]?.reasoning, () => {
   scrollToBottom()
 }, { deep: true })
 
+watch(() => props.messages[props.currentStreamingIndex]?.subTurns?.length, () => {
+  scrollToBottom()
+})
+
+watch(() => props.messages[props.currentStreamingIndex]?.currentReasoning, () => {
+  scrollToBottom()
+}, { deep: true })
+
+watch(() => props.messages[props.currentStreamingIndex]?.currentToolCall?.argumentsText, () => {
+  scrollToBottom()
+})
+
+watch(() => props.messages[props.currentStreamingIndex]?.currentToolCall?.status, () => {
+  scrollToBottom()
+})
+
 // 切换思维链折叠
 const toggleReasoning = (index) => {
   reasoningCollapsed.value[index] = !reasoningCollapsed.value[index]

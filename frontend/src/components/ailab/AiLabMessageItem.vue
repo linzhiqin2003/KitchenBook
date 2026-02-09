@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 
 const props = defineProps({
   message: {
@@ -84,6 +84,140 @@ const copyContent = async () => {
   } catch (e) {
     console.error('复制失败:', e)
   }
+}
+
+const reasoningTurnCollapsed = ref({})
+const toolArgsCollapsed = ref({})
+
+const subTurns = computed(() => Array.isArray(props.message.subTurns) ? props.message.subTurns : [])
+const currentReasoning = computed(() => props.message.currentReasoning || '')
+const currentToolCall = computed(() => props.message.currentToolCall || null)
+
+const hasTraceTimeline = computed(() => {
+  return subTurns.value.length > 0 || Boolean(currentReasoning.value) || Boolean(currentToolCall.value)
+})
+
+const shouldShowLegacyReasoning = computed(() => {
+  return Boolean(props.message.reasoning) && !hasTraceTimeline.value
+})
+
+const getTurnKey = (turn, turnIndex) => {
+  return turn?.id || `${props.index}-${turnIndex}`
+}
+
+const getToolKey = (toolCall, fallback = '') => {
+  return toolCall?.id || `${fallback || `tool-${props.index}`}-${toolCall?.index ?? 0}`
+}
+
+const isTurnCollapsed = (turn, turnIndex) => {
+  const key = getTurnKey(turn, turnIndex)
+  if (reasoningTurnCollapsed.value[key] === undefined) {
+    return true
+  }
+  return reasoningTurnCollapsed.value[key]
+}
+
+const toggleTurnCollapse = (turn, turnIndex) => {
+  const key = getTurnKey(turn, turnIndex)
+  reasoningTurnCollapsed.value[key] = !isTurnCollapsed(turn, turnIndex)
+}
+
+const isToolArgsCollapsed = (toolCall, fallback = '') => {
+  const key = getToolKey(toolCall, fallback)
+  if (toolArgsCollapsed.value[key] === undefined) {
+    return toolCall?.status !== 'parsing'
+  }
+  return toolArgsCollapsed.value[key]
+}
+
+const toggleToolArgs = (toolCall, fallback = '') => {
+  const key = getToolKey(toolCall, fallback)
+  toolArgsCollapsed.value[key] = !isToolArgsCollapsed(toolCall, fallback)
+}
+
+watch(subTurns, (turns) => {
+  turns.forEach((turn, turnIndex) => {
+    const key = getTurnKey(turn, turnIndex)
+    if (reasoningTurnCollapsed.value[key] === undefined) {
+      reasoningTurnCollapsed.value[key] = true
+    }
+    if (turn?.toolCall) {
+      const toolKey = getToolKey(turn.toolCall, key)
+      if (toolArgsCollapsed.value[toolKey] === undefined) {
+        toolArgsCollapsed.value[toolKey] = true
+      }
+    }
+  })
+}, { deep: true, immediate: true })
+
+watch(currentToolCall, (toolCall) => {
+  if (!toolCall) return
+  const key = getToolKey(toolCall, `current-${props.index}`)
+  if (toolArgsCollapsed.value[key] === undefined) {
+    toolArgsCollapsed.value[key] = false
+  }
+}, { deep: true, immediate: true })
+
+const summarizeText = (text, maxLength = 58) => {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim()
+  if (!normalized) return '思考过程'
+  if (normalized.length <= maxLength) return normalized
+  return `${normalized.slice(0, maxLength)}...`
+}
+
+const formatToolStatus = (status = 'parsing') => {
+  switch (status) {
+    case 'running':
+      return { label: '执行中', dotClass: 'bg-blue-500', textClass: 'text-blue-600', cardClass: 'tool-step-running', spinning: true }
+    case 'success':
+      return { label: '已完成', dotClass: 'bg-emerald-500', textClass: 'text-emerald-600', cardClass: 'tool-step-success', spinning: false }
+    case 'error':
+      return { label: '失败', dotClass: 'bg-red-500', textClass: 'text-red-600', cardClass: 'tool-step-error', spinning: false }
+    case 'pending':
+      return { label: '等待执行', dotClass: 'bg-slate-500', textClass: 'text-slate-500', cardClass: 'tool-step-pending', spinning: false }
+    default:
+      return { label: '参数拼接中', dotClass: 'bg-amber-500', textClass: 'text-amber-600', cardClass: 'tool-step-parsing', spinning: false }
+  }
+}
+
+const displayToolName = (toolCall) => {
+  return toolCall?.name || 'unnamed_tool'
+}
+
+const formatToolDuration = (toolCall) => {
+  if (!toolCall?.startedAt || !toolCall?.finishedAt) return ''
+  const seconds = (toolCall.finishedAt - toolCall.startedAt) / 1000
+  if (!Number.isFinite(seconds) || seconds < 0) return ''
+  return `${seconds.toFixed(1)}s`
+}
+
+const formatToolArguments = (toolCall) => {
+  if (!toolCall) return '{}'
+  const parsed = toolCall.parsedArguments
+  if (parsed && typeof parsed === 'object') {
+    try {
+      return JSON.stringify(parsed, null, 2)
+    } catch {
+      // ignore and fallback to raw
+    }
+  }
+  if (toolCall.argumentsText) {
+    return toolCall.argumentsText
+  }
+  return '{}'
+}
+
+const formatToolResult = (toolCall) => {
+  if (!toolCall) return ''
+  if (toolCall.status === 'error') {
+    return toolCall.error || toolCall.result || '工具执行失败'
+  }
+  return toolCall.result || ''
+}
+
+const hasToolArguments = (toolCall) => {
+  const args = formatToolArguments(toolCall)
+  return args && args !== '{}'
 }
 
 // HTML 转义
@@ -292,38 +426,192 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
       <!-- 消息内容 -->
       <div class="flex flex-col items-start flex-1 min-w-0">
-        <div class="text-xs font-medium mb-1.5 text-purple-500">DeepSeek Reasoner</div>
+        <div class="text-xs font-medium mb-2 text-indigo-500">DeepSeek Reasoner</div>
 
-        <!-- 思维链展示 -->
-        <div v-if="message.reasoning" class="mb-2 w-full">
-          <!-- 折叠按钮 -->
-          <div @click="emit('toggle-reasoning', index)"
-               class="inline-flex items-center gap-1 text-gray-400 cursor-pointer hover:text-gray-500 transition-colors text-xs">
-            <svg :class="['w-3.5 h-3.5 transition-transform', { 'rotate-180': !reasoningCollapsed }]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-            <span>已深度思考</span>
-            <span v-if="isStreaming && isReasoningPhase" class="flex items-center gap-1 text-amber-600">
-              <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-              思考中...
-            </span>
-            <span v-else class="text-gray-300">{{ message.reasoning.length }} 字</span>
-          </div>
+        <!-- 工具调用时间线 -->
+        <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3 trace-timeline space-y-2">
+          <template v-if="hasTraceTimeline">
+            <div
+              v-for="(turn, turnIndex) in subTurns"
+              :key="getTurnKey(turn, turnIndex)"
+              class="trace-turn space-y-2"
+            >
+              <div v-if="turn.reasoning" class="thinking-block">
+                <button
+                  class="thinking-header w-full"
+                  @click="toggleTurnCollapse(turn, turnIndex)"
+                >
+                  <svg
+                    :class="['w-3.5 h-3.5 shrink-0 transition-transform text-slate-500', { 'rotate-180': !isTurnCollapsed(turn, turnIndex) }]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                  <span class="text-xs font-semibold text-slate-600 shrink-0">思考</span>
+                  <span class="text-xs text-slate-500 truncate">{{ summarizeText(turn.reasoning) }}</span>
+                  <span class="text-[11px] text-slate-400 shrink-0">{{ turn.reasoning.length }} 字</span>
+                </button>
 
-          <!-- 展开后的内容 -->
-          <Transition name="collapse">
-            <div v-if="!reasoningCollapsed" class="mt-2 text-sm text-gray-500 italic leading-relaxed bg-amber-50/50 rounded-lg px-3 py-2 border border-amber-100 max-h-64 overflow-y-auto custom-scrollbar">
-              <div class="whitespace-pre-wrap font-mono text-xs">{{ message.reasoning }}</div>
+                <Transition name="collapse">
+                  <div
+                    v-if="!isTurnCollapsed(turn, turnIndex)"
+                    class="thinking-content mt-2 text-xs font-mono leading-relaxed whitespace-pre-wrap"
+                  >
+                    {{ turn.reasoning }}
+                  </div>
+                </Transition>
+              </div>
+
+              <div
+                v-if="turn.toolCall"
+                :class="['tool-step', formatToolStatus(turn.toolCall.status).cardClass]"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span
+                      :class="[
+                        'w-2 h-2 rounded-full shrink-0',
+                        formatToolStatus(turn.toolCall.status).dotClass,
+                        formatToolStatus(turn.toolCall.status).spinning && 'animate-pulse'
+                      ]"
+                    ></span>
+                    <span class="text-xs font-semibold text-slate-700 truncate">{{ displayToolName(turn.toolCall) }}()</span>
+                  </div>
+                  <div class="flex items-center gap-2 text-[11px]">
+                    <span :class="formatToolStatus(turn.toolCall.status).textClass">{{ formatToolStatus(turn.toolCall.status).label }}</span>
+                    <span v-if="formatToolDuration(turn.toolCall)" class="text-slate-400">{{ formatToolDuration(turn.toolCall) }}</span>
+                  </div>
+                </div>
+
+                <div v-if="hasToolArguments(turn.toolCall)" class="mt-2">
+                  <button
+                    class="tool-toggle text-[11px] flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                    @click="toggleToolArgs(turn.toolCall, getTurnKey(turn, turnIndex))"
+                  >
+                    <svg
+                      :class="['w-3 h-3 transition-transform', { 'rotate-180': !isToolArgsCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                    参数
+                  </button>
+                  <Transition name="collapse">
+                    <pre
+                      v-if="!isToolArgsCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))"
+                      class="tool-code mt-2"
+                    >{{ formatToolArguments(turn.toolCall) }}</pre>
+                  </Transition>
+                </div>
+
+                <div
+                  v-if="formatToolResult(turn.toolCall)"
+                  :class="[
+                    'tool-result mt-2',
+                    turn.toolCall.status === 'error' ? 'tool-result-error' : 'tool-result-success'
+                  ]"
+                >
+                  <div class="tool-result-label">{{ turn.toolCall.status === 'error' ? '错误' : '结果' }}</div>
+                  <div class="text-xs leading-relaxed whitespace-pre-wrap break-words mt-1">{{ formatToolResult(turn.toolCall) }}</div>
+                </div>
+              </div>
             </div>
-          </Transition>
+
+            <div v-if="currentReasoning" class="thinking-block thinking-block-live">
+              <div class="thinking-header w-full">
+                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                <span class="text-xs font-semibold text-amber-700">思考中...</span>
+              </div>
+              <div class="thinking-content mt-2 text-xs font-mono leading-relaxed whitespace-pre-wrap">{{ currentReasoning }}</div>
+            </div>
+
+            <div
+              v-if="currentToolCall"
+              :class="['tool-step', formatToolStatus(currentToolCall.status).cardClass]"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span
+                    :class="[
+                      'w-2 h-2 rounded-full shrink-0',
+                      formatToolStatus(currentToolCall.status).dotClass,
+                      formatToolStatus(currentToolCall.status).spinning && 'animate-pulse'
+                    ]"
+                  ></span>
+                  <span class="text-xs font-semibold text-slate-700 truncate">{{ displayToolName(currentToolCall) }}()</span>
+                </div>
+                <div class="flex items-center gap-2 text-[11px]">
+                  <span :class="formatToolStatus(currentToolCall.status).textClass">{{ formatToolStatus(currentToolCall.status).label }}</span>
+                  <span v-if="formatToolDuration(currentToolCall)" class="text-slate-400">{{ formatToolDuration(currentToolCall) }}</span>
+                </div>
+              </div>
+
+              <div v-if="hasToolArguments(currentToolCall)" class="mt-2">
+                <button
+                  class="tool-toggle text-[11px] flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                  @click="toggleToolArgs(currentToolCall, `current-${index}`)"
+                >
+                  <svg
+                    :class="['w-3 h-3 transition-transform', { 'rotate-180': !isToolArgsCollapsed(currentToolCall, `current-${index}`) }]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                  参数
+                </button>
+                <Transition name="collapse">
+                  <pre
+                    v-if="!isToolArgsCollapsed(currentToolCall, `current-${index}`)"
+                    class="tool-code mt-2"
+                  >{{ formatToolArguments(currentToolCall) }}</pre>
+                </Transition>
+              </div>
+
+              <div
+                v-if="formatToolResult(currentToolCall)"
+                :class="[
+                  'tool-result mt-2',
+                  currentToolCall.status === 'error' ? 'tool-result-error' : 'tool-result-success'
+                ]"
+              >
+                <div class="tool-result-label">{{ currentToolCall.status === 'error' ? '错误' : '结果' }}</div>
+                <div class="text-xs leading-relaxed whitespace-pre-wrap break-words mt-1">{{ formatToolResult(currentToolCall) }}</div>
+              </div>
+            </div>
+          </template>
+
+          <!-- 兼容旧数据结构 -->
+          <template v-else-if="shouldShowLegacyReasoning">
+            <div class="thinking-block">
+              <button
+                @click="emit('toggle-reasoning', index)"
+                class="thinking-header w-full"
+              >
+                <svg :class="['w-3.5 h-3.5 transition-transform text-slate-500', { 'rotate-180': !reasoningCollapsed }]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+                <span class="text-xs font-semibold text-slate-600">思考过程</span>
+                <span v-if="isStreaming && isReasoningPhase" class="text-xs text-amber-600">思考中...</span>
+                <span v-else class="text-[11px] text-slate-400">{{ message.reasoning.length }} 字</span>
+              </button>
+              <Transition name="collapse">
+                <div v-if="!reasoningCollapsed" class="thinking-content mt-2 text-xs font-mono leading-relaxed whitespace-pre-wrap">
+                  {{ message.reasoning }}
+                </div>
+              </Transition>
+            </div>
+          </template>
         </div>
 
         <!-- 主要内容 -->
         <div
-          v-if="message.content || (!isReasoningPhase && isStreaming && !message.reasoning)"
+          v-if="message.content || (!isReasoningPhase && isStreaming && !currentReasoning && !currentToolCall && subTurns.length === 0 && !shouldShowLegacyReasoning)"
           class="group relative w-full"
         >
           <div
@@ -418,6 +706,110 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .theme-avatar {
   background: var(--theme-gradient);
   box-shadow: 0 4px 14px var(--theme-shadow);
+}
+
+.trace-timeline {
+  position: relative;
+}
+
+.thinking-block {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+  padding: 0.55rem 0.7rem;
+}
+
+.thinking-block-live {
+  border-color: #fbbf24;
+  background: linear-gradient(135deg, #fffbeb, #fefce8);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.thinking-content {
+  border-radius: 0.6rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 0.65rem 0.75rem;
+  color: #475569;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.tool-step {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  padding: 0.6rem 0.7rem;
+}
+
+.tool-step-parsing {
+  border-color: #fcd34d;
+  background: linear-gradient(135deg, #fffbeb, #ffffff);
+}
+
+.tool-step-pending {
+  border-color: #cbd5e1;
+  background: linear-gradient(135deg, #f8fafc, #ffffff);
+}
+
+.tool-step-running {
+  border-color: #93c5fd;
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+}
+
+.tool-step-success {
+  border-color: #6ee7b7;
+  background: linear-gradient(135deg, #ecfdf5, #ffffff);
+}
+
+.tool-step-error {
+  border-color: #fca5a5;
+  background: linear-gradient(135deg, #fef2f2, #ffffff);
+}
+
+.tool-code {
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #dbeafe;
+  border-radius: 0.6rem;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.73rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-result {
+  border-radius: 0.6rem;
+  border: 1px solid transparent;
+  padding: 0.5rem 0.6rem;
+}
+
+.tool-result-success {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+.tool-result-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.tool-result-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
 }
 
 /* Markdown 样式 */

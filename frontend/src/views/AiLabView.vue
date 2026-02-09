@@ -52,6 +52,70 @@ const stats = ref({
 const hasMessages = computed(() => messages.value.length > 0)
 const conversationTitle = computed(() => currentConversation.value?.title || '')
 
+const STREAM_PHASE = {
+  IDLE: 'idle',
+  REASONING: 'reasoning',
+  TOOL_CALLING: 'tool_calling',
+  TOOL_EXECUTING: 'tool_executing',
+  ANSWERING: 'answering',
+  ERROR: 'error'
+}
+
+const TOOL_STATUS = {
+  PARSING: 'parsing',
+  PENDING: 'pending',
+  RUNNING: 'running',
+  SUCCESS: 'success',
+  ERROR: 'error'
+}
+
+const createTraceId = () => `trace_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+const formatStructuredValue = (value) => {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
+const safeParseJson = (raw) => {
+  if (!raw || typeof raw !== 'string') return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+const normalizeToolStatus = (status) => {
+  if (!status) return TOOL_STATUS.PARSING
+  const normalized = String(status).toLowerCase()
+  if (normalized === 'ok' || normalized === 'done') return TOOL_STATUS.SUCCESS
+  if (normalized === 'failed') return TOOL_STATUS.ERROR
+  if (Object.values(TOOL_STATUS).includes(normalized)) return normalized
+  return TOOL_STATUS.PARSING
+}
+
+const normalizeAssistantMessage = (message) => {
+  if (message?.role !== 'assistant') {
+    return message
+  }
+  return {
+    ...message,
+    phase: message.phase || STREAM_PHASE.IDLE,
+    subTurns: Array.isArray(message.subTurns) ? message.subTurns : [],
+    currentReasoning: message.currentReasoning || '',
+    currentToolCall: message.currentToolCall || null
+  }
+}
+
+const normalizeMessagesForUI = (list) => {
+  return (list || []).map(normalizeAssistantMessage)
+}
+
 // ===== API 调用 =====
 
 // 获取会话列表
@@ -76,7 +140,7 @@ const fetchConversation = async (id) => {
     if (response.ok) {
       const data = await response.json()
       currentConversation.value = data
-      messages.value = data.messages || []
+      messages.value = normalizeMessagesForUI(data.messages || [])
       await nextTick()
       chatAreaRef.value?.scrollToBottom()
       renderMath()
@@ -203,8 +267,326 @@ const streamResponse = async () => {
     content: '',
     reasoning: '',
     type: 'text',
-    isStreaming: true
+    isStreaming: true,
+    phase: STREAM_PHASE.REASONING,
+    subTurns: [],
+    currentReasoning: '',
+    currentToolCall: null
   })
+
+  let streamPhase = STREAM_PHASE.REASONING
+  let activeReasoning = ''
+  let activeToolIndex = null
+  let hasDoneEvent = false
+  const streamSubTurns = []
+  const streamToolCalls = new Map()
+
+  const getAiMessage = () => messages.value[aiMessageIndex]
+
+  const syncTraceState = () => {
+    const aiMsg = getAiMessage()
+    if (!aiMsg) return
+    aiMsg.phase = streamPhase
+    aiMsg.subTurns = streamSubTurns.map(turn => ({
+      ...turn,
+      toolCall: turn.toolCall ? { ...turn.toolCall } : null
+    }))
+    aiMsg.currentReasoning = activeReasoning
+    if (activeToolIndex === null) {
+      aiMsg.currentToolCall = null
+      return
+    }
+    const activeCall = streamToolCalls.get(activeToolIndex)
+    aiMsg.currentToolCall = activeCall ? { ...activeCall } : null
+  }
+
+  const pushSubTurns = () => {
+    const hasReasoning = Boolean(activeReasoning.trim())
+    if (!hasReasoning && streamToolCalls.size === 0) {
+      return
+    }
+
+    const orderedToolCalls = Array.from(streamToolCalls.values()).sort((a, b) => a.index - b.index)
+    if (orderedToolCalls.length === 0) {
+      streamSubTurns.push({
+        id: createTraceId(),
+        reasoning: activeReasoning.trim(),
+        toolCall: null
+      })
+    } else {
+      orderedToolCalls.forEach((toolCall, index) => {
+        streamSubTurns.push({
+          id: createTraceId(),
+          reasoning: index === 0 ? activeReasoning.trim() : '',
+          toolCall: { ...toolCall }
+        })
+      })
+    }
+
+    activeReasoning = ''
+    streamToolCalls.clear()
+    activeToolIndex = null
+    syncTraceState()
+  }
+
+  const setPhase = (nextPhase) => {
+    if (nextPhase === streamPhase) {
+      return
+    }
+
+    // 工具调用结束后切回 reasoning/answering 时，归档本轮 sub-turn
+    if (
+      (nextPhase === STREAM_PHASE.REASONING || nextPhase === STREAM_PHASE.ANSWERING || nextPhase === STREAM_PHASE.IDLE) &&
+      streamToolCalls.size > 0
+    ) {
+      pushSubTurns()
+    }
+
+    streamPhase = nextPhase
+    isReasoningPhase.value = nextPhase === STREAM_PHASE.REASONING
+    syncTraceState()
+  }
+
+  const upsertToolCall = (fragment = {}, options = {}) => {
+    const appendArguments = options.appendArguments !== false
+    const index = Number.isInteger(fragment.index) ? fragment.index : (activeToolIndex ?? 0)
+    const existing = streamToolCalls.get(index) || {
+      id: fragment.id || `call_${createTraceId()}`,
+      index,
+      name: '',
+      argumentsText: '',
+      parsedArguments: null,
+      status: TOOL_STATUS.PARSING,
+      result: '',
+      error: '',
+      startedAt: Date.now(),
+      finishedAt: null
+    }
+
+    if (fragment.id) existing.id = fragment.id
+    if (fragment.name) existing.name = fragment.name
+
+    if (fragment.argumentsText !== undefined) {
+      const incomingArgs = typeof fragment.argumentsText === 'string'
+        ? fragment.argumentsText
+        : formatStructuredValue(fragment.argumentsText)
+      existing.argumentsText = appendArguments ? `${existing.argumentsText}${incomingArgs}` : incomingArgs
+    }
+
+    if (fragment.status) {
+      existing.status = normalizeToolStatus(fragment.status)
+      if (existing.status === TOOL_STATUS.RUNNING && !existing.startedAt) {
+        existing.startedAt = Date.now()
+      }
+      if ((existing.status === TOOL_STATUS.SUCCESS || existing.status === TOOL_STATUS.ERROR) && !existing.finishedAt) {
+        existing.finishedAt = Date.now()
+      }
+    }
+
+    if (fragment.result !== undefined) {
+      existing.result = formatStructuredValue(fragment.result)
+    }
+    if (fragment.error !== undefined) {
+      existing.error = formatStructuredValue(fragment.error)
+      existing.status = TOOL_STATUS.ERROR
+      if (!existing.finishedAt) {
+        existing.finishedAt = Date.now()
+      }
+    }
+    if (fragment.startedAt) {
+      existing.startedAt = fragment.startedAt
+    }
+    if (fragment.finishedAt) {
+      existing.finishedAt = fragment.finishedAt
+    }
+    if (fragment.durationMs && !existing.finishedAt) {
+      existing.finishedAt = existing.startedAt + fragment.durationMs
+    }
+
+    existing.parsedArguments = safeParseJson(existing.argumentsText)
+    streamToolCalls.set(index, existing)
+    activeToolIndex = index
+    syncTraceState()
+    return existing
+  }
+
+  const ingestToolCalls = (toolCalls, options = {}) => {
+    if (!Array.isArray(toolCalls)) return
+    const appendArguments = options.appendArguments !== false
+    const defaultStatus = options.defaultStatus || TOOL_STATUS.PARSING
+
+    for (const call of toolCalls) {
+      const callFunction = call?.function || {}
+      const hasArguments = callFunction.arguments !== undefined || call.arguments !== undefined || call.args !== undefined
+      upsertToolCall({
+        index: call?.index,
+        id: call?.id,
+        name: callFunction.name || call?.name,
+        argumentsText: hasArguments ? (callFunction.arguments ?? call.arguments ?? call.args) : undefined,
+        status: call?.status || defaultStatus,
+        result: call?.result,
+        error: call?.error,
+        durationMs: call?.duration_ms || call?.durationMs
+      }, { appendArguments })
+    }
+  }
+
+  const appendReasoningChunk = (chunk) => {
+    if (!chunk) return
+    setPhase(STREAM_PHASE.REASONING)
+    currentReasoning.value += chunk
+    activeReasoning += chunk
+    const aiMsg = getAiMessage()
+    if (aiMsg) {
+      aiMsg.reasoning = currentReasoning.value
+    }
+    syncTraceState()
+    chatAreaRef.value?.scrollToBottom()
+  }
+
+  const appendContentChunk = (chunk) => {
+    if (!chunk) return
+    setPhase(STREAM_PHASE.ANSWERING)
+    currentContent.value += chunk
+    const aiMsg = getAiMessage()
+    if (aiMsg) {
+      aiMsg.content = currentContent.value
+    }
+    syncTraceState()
+    chatAreaRef.value?.scrollToBottom()
+    renderMath()
+  }
+
+  const markToolCallsStatus = (status) => {
+    for (const call of streamToolCalls.values()) {
+      upsertToolCall({
+        index: call.index,
+        status
+      }, { appendArguments: false })
+    }
+  }
+
+  const handleOpenAIChunk = (payload) => {
+    const delta = payload?.delta || payload?.choices?.[0]?.delta || payload?.chunk?.choices?.[0]?.delta
+    const finishReason = payload?.finish_reason ?? payload?.choices?.[0]?.finish_reason ?? payload?.chunk?.choices?.[0]?.finish_reason
+
+    if (typeof delta?.reasoning_content === 'string' && delta.reasoning_content) {
+      appendReasoningChunk(delta.reasoning_content)
+    }
+
+    if (Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0) {
+      setPhase(STREAM_PHASE.TOOL_CALLING)
+      ingestToolCalls(delta.tool_calls, { appendArguments: true, defaultStatus: TOOL_STATUS.PARSING })
+    }
+
+    if (typeof delta?.content === 'string' && delta.content) {
+      appendContentChunk(delta.content)
+    }
+
+    if (finishReason === 'tool_calls') {
+      markToolCallsStatus(TOOL_STATUS.PENDING)
+    }
+    if (finishReason === 'stop') {
+      hasDoneEvent = true
+      stats.value.endTime = Date.now()
+      setPhase(STREAM_PHASE.IDLE)
+    }
+  }
+
+  const handleToolEvent = (payload, eventType) => {
+    const rawToolCall = payload.tool_call || payload.call || payload
+    const hasArguments = rawToolCall?.arguments !== undefined || rawToolCall?.args !== undefined || rawToolCall?.function?.arguments !== undefined
+
+    if (eventType === 'tool_execution_start') {
+      setPhase(STREAM_PHASE.TOOL_EXECUTING)
+    } else {
+      setPhase(STREAM_PHASE.TOOL_CALLING)
+    }
+
+    upsertToolCall({
+      index: rawToolCall?.index,
+      id: rawToolCall?.id || payload.tool_call_id,
+      name: rawToolCall?.function?.name || rawToolCall?.name || payload.name,
+      argumentsText: hasArguments
+        ? (rawToolCall?.function?.arguments ?? rawToolCall?.arguments ?? rawToolCall?.args)
+        : undefined,
+      status: payload.status || (
+        eventType === 'tool_execution_start'
+          ? TOOL_STATUS.RUNNING
+          : eventType === 'tool_execution_error'
+            ? TOOL_STATUS.ERROR
+            : eventType === 'tool_execution_result' || eventType === 'tool_result'
+              ? TOOL_STATUS.SUCCESS
+              : TOOL_STATUS.PARSING
+      ),
+      result: payload.result ?? payload.output,
+      error: payload.error,
+      durationMs: payload.duration_ms || payload.durationMs
+    }, { appendArguments: eventType !== 'tool_call' })
+  }
+
+  const handleStreamEvent = (parsed) => {
+    if (!parsed || typeof parsed !== 'object') return
+
+    switch (parsed.type) {
+      case 'reasoning_start':
+        setPhase(STREAM_PHASE.REASONING)
+        break
+
+      case 'reasoning':
+        appendReasoningChunk(parsed.content)
+        break
+
+      case 'reasoning_end':
+        isReasoningPhase.value = false
+        break
+
+      case 'tool_call':
+      case 'tool_call_start':
+      case 'tool_call_delta':
+      case 'tool_call_end':
+      case 'tool_execution_start':
+      case 'tool_execution_result':
+      case 'tool_execution_error':
+      case 'tool_result':
+        handleToolEvent(parsed, parsed.type)
+        break
+
+      case 'content_start':
+        setPhase(STREAM_PHASE.ANSWERING)
+        break
+
+      case 'content':
+        appendContentChunk(parsed.content)
+        break
+
+      case 'done':
+        hasDoneEvent = true
+        stats.value.reasoningLength = parsed.reasoning_length ?? currentReasoning.value.length
+        stats.value.contentLength = parsed.content_length ?? currentContent.value.length
+        stats.value.endTime = Date.now()
+        if (parsed.finish_reason === 'tool_calls') {
+          markToolCallsStatus(TOOL_STATUS.PENDING)
+        }
+        setPhase(STREAM_PHASE.IDLE)
+        break
+
+      case 'error':
+        throw new Error(parsed.error)
+
+      default:
+        if (parsed.phase && Object.values(STREAM_PHASE).includes(parsed.phase)) {
+          setPhase(parsed.phase)
+        }
+        if (Array.isArray(parsed.tool_calls) && parsed.tool_calls.length > 0) {
+          setPhase(STREAM_PHASE.TOOL_CALLING)
+          ingestToolCalls(parsed.tool_calls, { appendArguments: parsed.type === 'tool_calls_delta', defaultStatus: TOOL_STATUS.PARSING })
+        }
+        if (parsed.delta || parsed.choices || parsed.chunk) {
+          handleOpenAIChunk(parsed)
+        }
+    }
+  }
 
   // 构建 API 消息
   const apiMessages = messages.value
@@ -254,41 +636,7 @@ const streamResponse = async () => {
 
           try {
             const parsed = JSON.parse(data)
-
-            switch (parsed.type) {
-              case 'reasoning_start':
-                isReasoningPhase.value = true
-                break
-
-              case 'reasoning':
-                currentReasoning.value += parsed.content
-                messages.value[aiMessageIndex].reasoning = currentReasoning.value
-                chatAreaRef.value?.scrollToBottom()
-                break
-
-              case 'reasoning_end':
-                isReasoningPhase.value = false
-                break
-
-              case 'content_start':
-                break
-
-              case 'content':
-                currentContent.value += parsed.content
-                messages.value[aiMessageIndex].content = currentContent.value
-                chatAreaRef.value?.scrollToBottom()
-                renderMath()
-                break
-
-              case 'done':
-                stats.value.reasoningLength = parsed.reasoning_length
-                stats.value.contentLength = parsed.content_length
-                stats.value.endTime = Date.now()
-                break
-
-              case 'error':
-                throw new Error(parsed.error)
-            }
+            handleStreamEvent(parsed)
           } catch (e) {
             if (!(e instanceof SyntaxError)) {
               throw e
@@ -298,8 +646,25 @@ const streamResponse = async () => {
       }
     }
 
-    messages.value[aiMessageIndex].isStreaming = false
-    messages.value[aiMessageIndex].stats = { ...stats.value }
+    if (!hasDoneEvent) {
+      stats.value.reasoningLength = currentReasoning.value.length
+      stats.value.contentLength = currentContent.value.length
+      stats.value.endTime = Date.now()
+    }
+
+    if (activeReasoning.trim() || streamToolCalls.size > 0) {
+      pushSubTurns()
+    }
+
+    setPhase(STREAM_PHASE.IDLE)
+    const aiMsg = getAiMessage()
+    if (aiMsg) {
+      aiMsg.isStreaming = false
+      aiMsg.phase = STREAM_PHASE.IDLE
+      aiMsg.currentReasoning = ''
+      aiMsg.currentToolCall = null
+      aiMsg.stats = { ...stats.value }
+    }
 
     // 保存 AI 消息到后端
     const savedAiMsg = await saveMessage(
@@ -318,9 +683,21 @@ const streamResponse = async () => {
     if (error.name === 'AbortError') {
       return
     }
-    messages.value[aiMessageIndex].content = `抱歉，我遇到了一点问题 😅\n\n${error.message}\n\n请稍后再试~`
-    messages.value[aiMessageIndex].reasoning = ''
-    messages.value[aiMessageIndex].isStreaming = false
+    const aiMsg = getAiMessage()
+    if (aiMsg) {
+      aiMsg.content = `抱歉，我遇到了一点问题 😅\n\n${error.message}\n\n请稍后再试~`
+      aiMsg.reasoning = currentReasoning.value
+      aiMsg.phase = STREAM_PHASE.ERROR
+      aiMsg.isStreaming = false
+      aiMsg.currentReasoning = ''
+      aiMsg.currentToolCall = null
+      aiMsg.stats = {
+        ...stats.value,
+        endTime: Date.now(),
+        reasoningLength: currentReasoning.value.length,
+        contentLength: currentContent.value.length
+      }
+    }
   } finally {
     isLoading.value = false
     isReasoningPhase.value = false
