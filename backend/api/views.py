@@ -1127,8 +1127,11 @@ class DeepSeekSpecialeView(APIView):
                         delta = choice.delta
                         finish_reason = choice.finish_reason or finish_reason
 
-                        # 2a. reasoning_content
+                        # 2a. reasoning_content (DeepSeek) 或 reasoning (OpenRouter)
                         rc = getattr(delta, 'reasoning_content', None)
+                        if not rc:
+                            extra = getattr(delta, 'model_extra', None) or {}
+                            rc = extra.get('reasoning')
                         if rc:
                             if not reasoning_started:
                                 reasoning_started = True
