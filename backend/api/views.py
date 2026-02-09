@@ -1020,14 +1020,21 @@ class DeepSeekSpecialeView(APIView):
 
     MAX_ROUNDS = 10
 
-    SYSTEM_PROMPT = (
-        "你是一个乐于助人的 AI 助手。"
-        "你可以使用工具来获取实时信息或执行计算。"
-        "使用 web_search 搜索时，结果包含 AI 摘要和引用标记 [REF:n]。"
-        "在你的回复中引用信息时，请保留 [REF:n] 标记以标注来源。"
-        "如果用户的问题不需要工具，直接回答即可。"
-        "使用工具后，务必在回复中为用户清晰总结结果，不要仅在思考过程中回答。"
-    )
+    @staticmethod
+    def _build_system_prompt():
+        from datetime import datetime
+        now = datetime.now()
+        weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+        time_str = f"{now.strftime('%Y年%m月%d日 %H:%M')} {weekdays[now.weekday()]}"
+        return (
+            f"当前时间：{time_str}。"
+            "你是一个乐于助人的 AI 助手。"
+            "你可以使用工具来获取实时信息或执行计算。"
+            "使用 web_search 搜索时，结果包含 AI 摘要和引用标记 [REF:n]。"
+            "在你的回复中引用信息时，请保留 [REF:n] 标记以标注来源。"
+            "如果用户的问题不需要工具，直接回答即可。"
+            "使用工具后，务必在回复中为用户清晰总结结果，不要仅在思考过程中回答。"
+        )
 
     # 统一走 OpenRouter，reasoning 字段一致为 model_extra['reasoning']
     OPENROUTER_HEADERS = {
@@ -1078,7 +1085,7 @@ class DeepSeekSpecialeView(APIView):
 
         # 构建消息 — 前端只发 role + content，不含 reasoning_content
         full_messages = [
-            {"role": "system", "content": self.SYSTEM_PROMPT}
+            {"role": "system", "content": self._build_system_prompt()}
         ] + messages
 
         def generate():
