@@ -429,182 +429,130 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
         <div class="text-xs font-medium mb-2 text-indigo-500">DeepSeek Reasoner</div>
 
         <!-- 工具调用时间线 -->
-        <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3 trace-timeline space-y-2">
+        <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3">
           <template v-if="hasTraceTimeline">
+            <div class="trace-timeline">
             <div
               v-for="(turn, turnIndex) in subTurns"
               :key="getTurnKey(turn, turnIndex)"
-              class="trace-turn space-y-2"
             >
-              <div v-if="turn.reasoning" class="thinking-block">
-                <button
-                  class="thinking-header w-full"
-                  @click="toggleTurnCollapse(turn, turnIndex)"
-                >
+              <div v-if="turn.reasoning" class="trace-step">
+                <button class="trace-row" @click="toggleTurnCollapse(turn, turnIndex)">
                   <svg
-                    :class="['w-3.5 h-3.5 shrink-0 transition-transform text-slate-500', { 'rotate-180': !isTurnCollapsed(turn, turnIndex) }]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                    :class="['w-3 h-3 shrink-0 transition-transform text-slate-400', { 'rotate-90': !isTurnCollapsed(turn, turnIndex) }]"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
                   >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                   </svg>
-                  <span class="text-xs font-semibold text-slate-600 shrink-0">思考</span>
-                  <span class="text-xs text-slate-500 truncate">{{ summarizeText(turn.reasoning) }}</span>
-                  <span class="text-[11px] text-slate-400 shrink-0">{{ turn.reasoning.length }} 字</span>
+                  <span class="trace-label text-slate-500">思考</span>
+                  <span class="trace-summary">{{ summarizeText(turn.reasoning) }}</span>
+                  <span class="trace-meta">{{ turn.reasoning.length }} 字</span>
                 </button>
-
                 <Transition name="collapse">
-                  <div
-                    v-if="!isTurnCollapsed(turn, turnIndex)"
-                    class="thinking-content mt-2 text-xs font-mono leading-relaxed whitespace-pre-wrap"
-                  >
-                    {{ turn.reasoning }}
-                  </div>
+                  <div v-if="!isTurnCollapsed(turn, turnIndex)" class="trace-body">{{ turn.reasoning }}</div>
                 </Transition>
               </div>
 
-              <div
-                v-if="turn.toolCall"
-                :class="['tool-step', formatToolStatus(turn.toolCall.status).cardClass]"
-              >
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span
-                      :class="[
-                        'w-2 h-2 rounded-full shrink-0',
-                        formatToolStatus(turn.toolCall.status).dotClass,
-                        formatToolStatus(turn.toolCall.status).spinning && 'animate-pulse'
-                      ]"
-                    ></span>
-                    <span class="text-xs font-semibold text-slate-700 truncate">{{ displayToolName(turn.toolCall) }}()</span>
-                  </div>
-                  <div class="flex items-center gap-2 text-[11px]">
-                    <span :class="formatToolStatus(turn.toolCall.status).textClass">{{ formatToolStatus(turn.toolCall.status).label }}</span>
-                    <span v-if="formatToolDuration(turn.toolCall)" class="text-slate-400">{{ formatToolDuration(turn.toolCall) }}</span>
-                  </div>
+              <div v-if="turn.toolCall" class="trace-step">
+                <div class="trace-row">
+                  <span
+                    :class="['trace-dot', formatToolStatus(turn.toolCall.status).dotClass, formatToolStatus(turn.toolCall.status).spinning && 'animate-pulse']"
+                  ></span>
+                  <span class="trace-label font-mono text-slate-700">{{ displayToolName(turn.toolCall) }}</span>
+                  <span :class="['trace-meta', formatToolStatus(turn.toolCall.status).textClass]">{{ formatToolStatus(turn.toolCall.status).label }}</span>
+                  <span v-if="formatToolDuration(turn.toolCall)" class="trace-meta text-slate-400">{{ formatToolDuration(turn.toolCall) }}</span>
                 </div>
-
-                <div v-if="hasToolArguments(turn.toolCall)" class="mt-2">
+                <div v-if="hasToolArguments(turn.toolCall)" class="ml-4 mt-0.5">
                   <button
-                    class="tool-toggle text-[11px] flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                    class="trace-toggle"
                     @click="toggleToolArgs(turn.toolCall, getTurnKey(turn, turnIndex))"
                   >
                     <svg
-                      :class="['w-3 h-3 transition-transform', { 'rotate-180': !isToolArgsCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                      :class="['w-3 h-3 transition-transform', { 'rotate-90': !isToolArgsCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
                     >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                     </svg>
                     参数
                   </button>
                   <Transition name="collapse">
                     <pre
                       v-if="!isToolArgsCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))"
-                      class="tool-code mt-2"
+                      class="trace-code"
                     >{{ formatToolArguments(turn.toolCall) }}</pre>
                   </Transition>
                 </div>
-
-                <div
-                  v-if="formatToolResult(turn.toolCall)"
-                  :class="[
-                    'tool-result mt-2',
-                    turn.toolCall.status === 'error' ? 'tool-result-error' : 'tool-result-success'
-                  ]"
-                >
-                  <div class="tool-result-label">{{ turn.toolCall.status === 'error' ? '错误' : '结果' }}</div>
-                  <div class="text-xs leading-relaxed whitespace-pre-wrap break-words mt-1">{{ formatToolResult(turn.toolCall) }}</div>
+                <div v-if="formatToolResult(turn.toolCall)" class="ml-4 mt-1">
+                  <div class="trace-result-label">{{ turn.toolCall.status === 'error' ? '错误' : '结果' }}</div>
+                  <div :class="['trace-result-text', turn.toolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']">{{ formatToolResult(turn.toolCall) }}</div>
                 </div>
               </div>
             </div>
 
-            <div v-if="currentReasoning" class="thinking-block thinking-block-live">
-              <div class="thinking-header w-full">
+            <div v-if="currentReasoning" class="trace-step">
+              <div class="trace-row">
                 <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
-                <span class="text-xs font-semibold text-amber-700">思考中...</span>
+                <span class="trace-label text-amber-600">思考中...</span>
               </div>
-              <div class="thinking-content mt-2 text-xs font-mono leading-relaxed whitespace-pre-wrap">{{ currentReasoning }}</div>
+              <div class="trace-body trace-body-live">{{ currentReasoning }}</div>
             </div>
 
-            <div
-              v-if="currentToolCall"
-              :class="['tool-step', formatToolStatus(currentToolCall.status).cardClass]"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span
-                    :class="[
-                      'w-2 h-2 rounded-full shrink-0',
-                      formatToolStatus(currentToolCall.status).dotClass,
-                      formatToolStatus(currentToolCall.status).spinning && 'animate-pulse'
-                    ]"
-                  ></span>
-                  <span class="text-xs font-semibold text-slate-700 truncate">{{ displayToolName(currentToolCall) }}()</span>
-                </div>
-                <div class="flex items-center gap-2 text-[11px]">
-                  <span :class="formatToolStatus(currentToolCall.status).textClass">{{ formatToolStatus(currentToolCall.status).label }}</span>
-                  <span v-if="formatToolDuration(currentToolCall)" class="text-slate-400">{{ formatToolDuration(currentToolCall) }}</span>
-                </div>
+            <div v-if="currentToolCall" class="trace-step">
+              <div class="trace-row">
+                <span
+                  :class="['trace-dot', formatToolStatus(currentToolCall.status).dotClass, formatToolStatus(currentToolCall.status).spinning && 'animate-pulse']"
+                ></span>
+                <span class="trace-label font-mono text-slate-700">{{ displayToolName(currentToolCall) }}</span>
+                <span :class="['trace-meta', formatToolStatus(currentToolCall.status).textClass]">{{ formatToolStatus(currentToolCall.status).label }}</span>
+                <span v-if="formatToolDuration(currentToolCall)" class="trace-meta text-slate-400">{{ formatToolDuration(currentToolCall) }}</span>
               </div>
-
-              <div v-if="hasToolArguments(currentToolCall)" class="mt-2">
+              <div v-if="hasToolArguments(currentToolCall)" class="ml-4 mt-0.5">
                 <button
-                  class="tool-toggle text-[11px] flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                  class="trace-toggle"
                   @click="toggleToolArgs(currentToolCall, `current-${index}`)"
                 >
                   <svg
-                    :class="['w-3 h-3 transition-transform', { 'rotate-180': !isToolArgsCollapsed(currentToolCall, `current-${index}`) }]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                    :class="['w-3 h-3 transition-transform', { 'rotate-90': !isToolArgsCollapsed(currentToolCall, `current-${index}`) }]"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
                   >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                   </svg>
                   参数
                 </button>
                 <Transition name="collapse">
                   <pre
                     v-if="!isToolArgsCollapsed(currentToolCall, `current-${index}`)"
-                    class="tool-code mt-2"
+                    class="trace-code"
                   >{{ formatToolArguments(currentToolCall) }}</pre>
                 </Transition>
               </div>
-
-              <div
-                v-if="formatToolResult(currentToolCall)"
-                :class="[
-                  'tool-result mt-2',
-                  currentToolCall.status === 'error' ? 'tool-result-error' : 'tool-result-success'
-                ]"
-              >
-                <div class="tool-result-label">{{ currentToolCall.status === 'error' ? '错误' : '结果' }}</div>
-                <div class="text-xs leading-relaxed whitespace-pre-wrap break-words mt-1">{{ formatToolResult(currentToolCall) }}</div>
+              <div v-if="formatToolResult(currentToolCall)" class="ml-4 mt-1">
+                <div class="trace-result-label">{{ currentToolCall.status === 'error' ? '错误' : '结果' }}</div>
+                <div :class="['trace-result-text', currentToolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']">{{ formatToolResult(currentToolCall) }}</div>
               </div>
+            </div>
             </div>
           </template>
 
           <!-- 兼容旧数据结构 -->
           <template v-else-if="shouldShowLegacyReasoning">
-            <div class="thinking-block">
-              <button
-                @click="emit('toggle-reasoning', index)"
-                class="thinking-header w-full"
-              >
-                <svg :class="['w-3.5 h-3.5 transition-transform text-slate-500', { 'rotate-180': !reasoningCollapsed }]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                </svg>
-                <span class="text-xs font-semibold text-slate-600">思考过程</span>
-                <span v-if="isStreaming && isReasoningPhase" class="text-xs text-amber-600">思考中...</span>
-                <span v-else class="text-[11px] text-slate-400">{{ message.reasoning.length }} 字</span>
-              </button>
-              <Transition name="collapse">
-                <div v-if="!reasoningCollapsed" class="thinking-content mt-2 text-xs font-mono leading-relaxed whitespace-pre-wrap">
-                  {{ message.reasoning }}
-                </div>
-              </Transition>
+            <div class="trace-timeline">
+              <div class="trace-step">
+                <button @click="emit('toggle-reasoning', index)" class="trace-row">
+                  <svg
+                    :class="['w-3 h-3 shrink-0 transition-transform text-slate-400', { 'rotate-90': !reasoningCollapsed }]"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                  </svg>
+                  <span class="trace-label text-slate-500">思考过程</span>
+                  <span v-if="isStreaming && isReasoningPhase" class="trace-meta text-amber-600">思考中...</span>
+                  <span v-else class="trace-meta">{{ message.reasoning.length }} 字</span>
+                </button>
+                <Transition name="collapse">
+                  <div v-if="!reasoningCollapsed" class="trace-body">{{ message.reasoning }}</div>
+                </Transition>
+              </div>
             </div>
           </template>
         </div>
@@ -718,108 +666,109 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   box-shadow: 0 4px 14px var(--theme-shadow);
 }
 
+/* === Trace Timeline === */
 .trace-timeline {
-  position: relative;
+  border-left: 2px solid #e2e8f0;
+  padding-left: 0.875rem;
+  margin-left: 0.125rem;
 }
 
-.thinking-block {
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  background: linear-gradient(135deg, #ffffff, #f8fafc);
-  padding: 0.55rem 0.7rem;
+.trace-step {
+  padding: 0.2rem 0;
 }
 
-.thinking-block-live {
-  border-color: #fbbf24;
-  background: linear-gradient(135deg, #fffbeb, #fefce8);
-}
-
-.thinking-header {
+.trace-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  text-align: left;
+  gap: 0.375rem;
   cursor: pointer;
+  padding: 0.1rem 0;
 }
 
-.thinking-content {
-  border-radius: 0.6rem;
-  border: 1px solid #e2e8f0;
+.trace-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.trace-summary {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.trace-meta {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.trace-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.trace-body {
+  margin: 0.25rem 0 0.375rem 0;
+  padding: 0.5rem 0.625rem;
   background: #f8fafc;
-  padding: 0.65rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  line-height: 1.6;
   color: #475569;
   max-height: 14rem;
   overflow-y: auto;
+  white-space: pre-wrap;
 }
 
-.tool-step {
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  background: #ffffff;
-  padding: 0.6rem 0.7rem;
+.trace-body-live {
+  border-left: 2px solid #f59e0b;
 }
 
-.tool-step-parsing {
-  border-color: #fcd34d;
-  background: linear-gradient(135deg, #fffbeb, #ffffff);
+.trace-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s;
 }
 
-.tool-step-pending {
-  border-color: #cbd5e1;
-  background: linear-gradient(135deg, #f8fafc, #ffffff);
+.trace-toggle:hover {
+  color: #64748b;
 }
 
-.tool-step-running {
-  border-color: #93c5fd;
-  background: linear-gradient(135deg, #eff6ff, #ffffff);
-}
-
-.tool-step-success {
-  border-color: #6ee7b7;
-  background: linear-gradient(135deg, #ecfdf5, #ffffff);
-}
-
-.tool-step-error {
-  border-color: #fca5a5;
-  background: linear-gradient(135deg, #fef2f2, #ffffff);
-}
-
-.tool-code {
-  margin: 0;
-  padding: 0.6rem 0.7rem;
-  border: 1px solid #dbeafe;
-  border-radius: 0.6rem;
+.trace-code {
+  margin: 0.25rem 0;
+  padding: 0.4rem 0.5rem;
   background: #f8fafc;
-  color: #334155;
-  font-size: 0.73rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
   line-height: 1.5;
+  color: #334155;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.tool-result {
-  border-radius: 0.6rem;
-  border: 1px solid transparent;
-  padding: 0.5rem 0.6rem;
-}
-
-.tool-result-success {
-  border-color: #a7f3d0;
-  background: #f0fdf4;
-  color: #065f46;
-}
-
-.tool-result-error {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
-}
-
-.tool-result-label {
-  font-size: 0.65rem;
-  letter-spacing: 0.08em;
+.trace-result-label {
+  font-size: 0.6rem;
   text-transform: uppercase;
-  opacity: 0.8;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.trace-result-text {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Markdown 样式 */

@@ -146,7 +146,7 @@ const fetchConversation = async (id) => {
       currentConversation.value = data
       messages.value = normalizeMessagesForUI(data.messages || [])
       await nextTick()
-      chatAreaRef.value?.scrollToBottom()
+      chatAreaRef.value?.scrollToBottom(true)
       renderMath()
     }
   } catch (error) {
@@ -449,7 +449,6 @@ const streamResponse = async () => {
       aiMsg.reasoning = currentReasoning.value
     }
     syncTraceState()
-    chatAreaRef.value?.scrollToBottom()
   }
 
   const appendContentChunk = (chunk) => {
@@ -461,7 +460,6 @@ const streamResponse = async () => {
       aiMsg.content = currentContent.value
     }
     syncTraceState()
-    chatAreaRef.value?.scrollToBottom()
     renderMath()
   }
 
