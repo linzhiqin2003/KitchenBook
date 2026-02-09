@@ -103,6 +103,10 @@ TOOL_DEFINITIONS = [
                     "max_results": {
                         "type": "integer",
                         "description": "返回结果数量，1-10，默认 5"
+                    },
+                    "focus": {
+                        "type": "string",
+                        "description": "告诉摘要 AI 重点提取什么信息。例如：'关注最新季度营收和利润数据'、'重点提取技术架构和性能指标'。不传则做通用提取。"
                     }
                 },
                 "required": ["query"]
@@ -485,18 +489,24 @@ _CONSOLIDATE_PROMPT_TEMPLATE = (
 )
 
 
-def _ai_extract(title, content, ref_id, url):
+def _ai_extract(title, content, ref_id, url, focus=""):
     """使用 Cerebras/DeepSeek 对网页内容做结构化提取"""
+    focus_block = ""
+    if focus:
+        focus_block = f"\n【检索重点】\n{focus}\n请围绕上述重点提取信息，忽略无关内容。\n"
     prompt = _EXTRACT_PROMPT_TEMPLATE.format(
         ref_id=ref_id,
         title=title,
         url=url,
         content=content[:6000],
     )
+    # 将 focus 插入到 prompt 开头（在正文之前）
+    if focus_block:
+        prompt = focus_block + "\n" + prompt
     return _llm_call(_EXTRACT_SYSTEM_MSG, prompt, max_tokens=2048, timeout=20)
 
 
-def _ai_consolidate(summaries, references, query):
+def _ai_consolidate(summaries, references, query, focus=""):
     """使用 Cerebras/DeepSeek 对多条摘要做综合报告"""
     # 构建引用映射表
     ref_mapping = ""
@@ -508,15 +518,21 @@ def _ai_consolidate(summaries, references, query):
     for s in summaries:
         combined += f"\n--- [REF:{s['ref_id']}] {s['title']} ---\n{s['content']}\n"
 
+    focus_block = ""
+    if focus:
+        focus_block = f"\n【用户关注重点】\n{focus}\n请围绕上述重点组织综合报告，优先呈现相关内容。\n\n"
+
     prompt = _CONSOLIDATE_PROMPT_TEMPLATE.format(
         query=query,
         ref_mapping=ref_mapping,
         content=combined,
     )
+    if focus_block:
+        prompt = focus_block + prompt
     return _llm_call(_CONSOLIDATE_SYSTEM_MSG, prompt, max_tokens=4096, timeout=45)
 
 
-def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
+def handle_web_search(query="", search_type="search", max_results=5, focus="", **kwargs):
     """增强版 web_search（generator）：搜索 + 抓取 + AI 摘要 + 引用标记
     yield {"progress": msg} 报告阶段进度，yield {"result": text} 返回最终结果。
     """
@@ -627,7 +643,7 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
         total_extract = len(scraped)
         with ThreadPoolExecutor(max_workers=total_extract) as pool:
             future_map = {
-                pool.submit(_ai_extract, it["title"], it["content"], it["ref_id"], it["url"]): it
+                pool.submit(_ai_extract, it["title"], it["content"], it["ref_id"], it["url"], focus): it
                 for it in scraped
             }
             for future in as_completed(future_map):
@@ -678,7 +694,7 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
 
     if len(summaries) >= 2 and total_summary_len > 500:
         yield {"progress": "正在生成综合报告..."}
-        consolidated = _ai_consolidate(summaries, references, query)
+        consolidated = _ai_consolidate(summaries, references, query, focus)
         if consolidated:
             yield {"result": scrape_header + consolidated + "\n\n" + ref_block}
             return
