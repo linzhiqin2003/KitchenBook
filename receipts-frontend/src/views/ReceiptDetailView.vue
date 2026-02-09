@@ -84,6 +84,9 @@
   <ReceiptItemTable
     v-if="receipt && isOwner"
     :items="items"
+    :subtotal="parseFloat(receipt.subtotal) || 0"
+    :tax="parseFloat(receipt.tax) || 0"
+    :discount="parseFloat(receipt.discount) || 0"
     :showDiscard="true"
     :showConfirm="receipt.status === 'ready'"
     :hideActions="receipt.status === 'confirmed' && orgStore.orgs.length > 0"
@@ -152,6 +155,8 @@
             <th>单位</th>
             <th>单价</th>
             <th>总价</th>
+            <th v-if="parseFloat(receipt.tax)">分摊税费</th>
+            <th v-if="parseFloat(receipt.discount)">分摊折扣</th>
           </tr>
         </thead>
         <tbody>
@@ -164,6 +169,8 @@
             <td data-label="单位">{{ item.unit || '-' }}</td>
             <td data-label="单价">{{ item.unit_price ?? '-' }}</td>
             <td data-label="总价">{{ item.total_price ?? '-' }}</td>
+            <td v-if="parseFloat(receipt.tax)" data-label="分摊税费" class="prorate-cell">{{ readonlyProrated[index]?.tax ?? '-' }}</td>
+            <td v-if="parseFloat(receipt.discount)" data-label="分摊折扣" class="prorate-cell">{{ readonlyProrated[index]?.discount ?? '-' }}</td>
           </tr>
         </tbody>
       </table>
@@ -172,7 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-vue-next";
 import { confirmReceipt, confirmReceiptWithSplit, deleteReceipt, getExchangeRate, getReceipt, moveReceiptItems, updateReceipt } from "../api/receipts";
@@ -198,6 +205,12 @@ const moveTargets = reactive<Record<number, string>>({});
 const exchangeRate = ref<number | null>(null);
 const currentOrgIdStr = computed(() => authStore.activeOrgId || "");
 
+// baseline refs — 记录加载时的基准值，作为等比缩放参照
+const baselineSubtotal = ref(0);
+const baselineTax = ref(0);
+const baselineDiscount = ref(0);
+let programmaticUpdate = false;
+
 const imageUrl = computed(() => {
   if (!receipt.value?.image) return "";
   const img = receipt.value.image;
@@ -222,19 +235,74 @@ const localDatetime = computed({
   }
 });
 
+const recalcReady = ref(false);
+
 const load = async () => {
   try {
+    recalcReady.value = false;
     const data = await getReceipt(route.params.id as string);
     receipt.value = data;
     items.value = data.items || [];
+    // 初始化 baseline
+    baselineSubtotal.value = parseFloat(data.subtotal) || 0;
+    baselineTax.value = parseFloat(data.tax) || 0;
+    baselineDiscount.value = parseFloat(data.discount) || 0;
     // 判断加载时是否为空记录（手动新建且从未保存过有效数据）
     const loadedItems = data.items || [];
     isEmptyOnLoad.value = !data.merchant && !data.address && !data.purchased_at
       && !data.total && !data.notes && loadedItems.length === 0;
+    await nextTick();
+    recalcReady.value = true;
   } catch (err) {
     console.error("加载收据失败:", err);
+    recalcReady.value = true;
   }
 };
+
+// 从商品明细重新计算小计和总计，等比缩放 tax/discount
+const recalcTotals = () => {
+  if (!receipt.value) return;
+  const newSubtotal = items.value.reduce((sum, item) => {
+    return sum + (parseFloat(item.total_price) || 0);
+  }, 0);
+  receipt.value.subtotal = parseFloat(newSubtotal.toFixed(2));
+  if (baselineSubtotal.value > 0) {
+    const ratio = newSubtotal / baselineSubtotal.value;
+    programmaticUpdate = true;
+    receipt.value.tax = parseFloat((baselineTax.value * ratio).toFixed(2));
+    receipt.value.discount = parseFloat((baselineDiscount.value * ratio).toFixed(2));
+    programmaticUpdate = false;
+  }
+  recalcTotal();
+};
+
+// 仅重算总计 = 小计 + 税费 - 折扣
+const recalcTotal = () => {
+  if (!receipt.value) return;
+  const subtotal = parseFloat(receipt.value.subtotal) || 0;
+  const tax = parseFloat(receipt.value.tax) || 0;
+  const discount = parseFloat(receipt.value.discount) || 0;
+  receipt.value.total = parseFloat((subtotal + tax - discount).toFixed(2));
+};
+
+// 商品明细变化时自动重算小计和总计
+watch(items, () => {
+  if (recalcReady.value) recalcTotals();
+});
+
+// 税费或折扣变化时：用户手动改则更新 baseline，然后重算总计
+watch(
+  () => [receipt.value?.tax, receipt.value?.discount],
+  () => {
+    if (!recalcReady.value) return;
+    if (!programmaticUpdate) {
+      baselineTax.value = parseFloat(receipt.value?.tax) || 0;
+      baselineDiscount.value = parseFloat(receipt.value?.discount) || 0;
+      baselineSubtotal.value = parseFloat(receipt.value?.subtotal) || 0;
+    }
+    recalcTotal();
+  }
+);
 
 const saveAndBack = async (itemsData?: any[]) => {
   if (!receipt.value) return;
@@ -387,6 +455,27 @@ const batchMoveItems = async () => {
   }
 };
 
+// 只读表格的分摊计算
+const readonlyProrated = computed(() => {
+  const sub = parseFloat(receipt.value?.subtotal) || 0;
+  const tax = parseFloat(receipt.value?.tax) || 0;
+  const disc = parseFloat(receipt.value?.discount) || 0;
+  if (sub <= 0) return items.value.map(() => ({ tax: '0.00', discount: '0.00' }));
+  let taxRemain = tax;
+  let discRemain = disc;
+  return items.value.map((item, i) => {
+    const price = parseFloat(item.total_price) || 0;
+    if (i === items.value.length - 1) {
+      return { tax: taxRemain.toFixed(2), discount: discRemain.toFixed(2) };
+    }
+    const t = parseFloat((tax * price / sub).toFixed(2));
+    const d = parseFloat((disc * price / sub).toFixed(2));
+    taxRemain -= t;
+    discRemain -= d;
+    return { tax: t.toFixed(2), discount: d.toFixed(2) };
+  });
+});
+
 const convert = (value: string | number | null | undefined): string | null => {
   if (value == null || value === "" || exchangeRate.value == null) return null;
   const num = Number(value);
@@ -523,6 +612,12 @@ onMounted(async () => {
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
+}
+
+.prorate-cell {
+  color: var(--muted, #8e8e93);
+  text-align: right;
+  font-size: 13px;
 }
 
 /* Move cell */

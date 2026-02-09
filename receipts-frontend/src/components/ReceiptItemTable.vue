@@ -13,6 +13,8 @@
             <th>单位</th>
             <th>单价</th>
             <th>总价</th>
+            <th v-if="tax" class="prorate-header">分摊税费</th>
+            <th v-if="discount" class="prorate-header">分摊折扣</th>
             <th v-if="showOrgSelector">归属</th>
             <th></th>
           </tr>
@@ -27,6 +29,8 @@
             <td data-label="单位"><input class="input" v-model="item.unit" /></td>
             <td data-label="单价"><input class="input" v-model="item.unit_price" /></td>
             <td data-label="总价"><input class="input" v-model="item.total_price" /></td>
+            <td v-if="tax" data-label="分摊税费" class="prorate-cell">{{ proratedValues[index]?.tax }}</td>
+            <td v-if="discount" data-label="分摊折扣" class="prorate-cell">{{ proratedValues[index]?.discount }}</td>
             <td v-if="showOrgSelector" data-label="归属">
               <select class="input org-select" v-model="item.target_org_id">
                 <option value="">个人</option>
@@ -54,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch, watchEffect } from "vue";
+import { computed, reactive, watch, watchEffect } from "vue";
 import { Trash2 } from "lucide-vue-next";
 import type { ReceiptItemPayload } from "../api/receipts";
 
@@ -65,6 +69,9 @@ interface OrgOption {
 
 const props = withDefaults(defineProps<{
   items: ReceiptItemPayload[];
+  subtotal?: number;
+  tax?: number;
+  discount?: number;
   showDiscard?: boolean;
   showConfirm?: boolean;
   hideActions?: boolean;
@@ -72,6 +79,9 @@ const props = withDefaults(defineProps<{
   currentOrgId?: string;
   showOrgSelector?: boolean;
 }>(), {
+  subtotal: 0,
+  tax: 0,
+  discount: 0,
   showDiscard: false,
   showConfirm: false,
   hideActions: false,
@@ -85,6 +95,27 @@ const emit = defineEmits<{
   (e: "confirm", items: ReceiptItemPayload[]): void;
   (e: "discard"): void;
 }>();
+
+// 按价格占比计算每行分摊税费/折扣，最后一行取余数避免舍入漂移
+const proratedValues = computed(() => {
+  const sub = props.subtotal;
+  const tax = props.tax;
+  const disc = props.discount;
+  if (sub <= 0) return localItems.map(() => ({ tax: '0.00', discount: '0.00' }));
+  let taxRemain = tax;
+  let discRemain = disc;
+  return localItems.map((item, i) => {
+    const price = parseFloat(item.total_price as any) || 0;
+    if (i === localItems.length - 1) {
+      return { tax: taxRemain.toFixed(2), discount: discRemain.toFixed(2) };
+    }
+    const t = parseFloat((tax * price / sub).toFixed(2));
+    const d = parseFloat((disc * price / sub).toFixed(2));
+    taxRemain -= t;
+    discRemain -= d;
+    return { tax: t.toFixed(2), discount: d.toFixed(2) };
+  });
+});
 
 const localItems = reactive<ReceiptItemPayload[]>([]);
 
@@ -189,6 +220,17 @@ const onConfirm = () => {
 
 .danger-text {
   color: var(--danger) !important;
+}
+
+.prorate-header {
+  text-align: right;
+}
+
+.prorate-cell {
+  color: var(--muted, #8e8e93);
+  text-align: right;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .org-select {
