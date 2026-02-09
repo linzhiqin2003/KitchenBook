@@ -86,9 +86,10 @@ const copyContent = async () => {
   }
 }
 
-const reasoningTurnCollapsed = ref({})
-const toolArgsCollapsed = ref({})
-const toolResultCollapsed = ref({})
+// 整体思维链折叠（非流式默认折叠）
+const traceCollapsed = ref(!props.isStreaming)
+// 单个工具调用整体折叠
+const toolCollapsed = ref({})
 
 const subTurns = computed(() => Array.isArray(props.message.subTurns) ? props.message.subTurns : [])
 const currentReasoning = computed(() => props.message.currentReasoning || '')
@@ -110,61 +111,40 @@ const getToolKey = (toolCall, fallback = '') => {
   return toolCall?.id || `${fallback || `tool-${props.index}`}-${toolCall?.index ?? 0}`
 }
 
-const isTurnCollapsed = (turn, turnIndex) => {
-  const key = getTurnKey(turn, turnIndex)
-  if (reasoningTurnCollapsed.value[key] === undefined) {
-    return true
+// 流式结束后自动折叠思维链
+watch(() => props.isStreaming, (streaming, wasStreaming) => {
+  if (wasStreaming && !streaming && hasTraceTimeline.value) {
+    traceCollapsed.value = true
   }
-  return reasoningTurnCollapsed.value[key]
-}
+})
 
-const toggleTurnCollapse = (turn, turnIndex) => {
-  const key = getTurnKey(turn, turnIndex)
-  reasoningTurnCollapsed.value[key] = !isTurnCollapsed(turn, turnIndex)
-}
-
-const isToolArgsCollapsed = (toolCall, fallback = '') => {
+// 工具调用整体折叠（完成的默认折叠，进行中的展开）
+const isToolCollapsed = (toolCall, fallback = '') => {
   const key = getToolKey(toolCall, fallback)
-  if (toolArgsCollapsed.value[key] === undefined) {
-    return toolCall?.status !== 'parsing'
+  if (toolCollapsed.value[key] === undefined) {
+    return toolCall?.status === 'success' || toolCall?.status === 'error'
   }
-  return toolArgsCollapsed.value[key]
+  return toolCollapsed.value[key]
 }
 
-const toggleToolArgs = (toolCall, fallback = '') => {
+const toggleToolCollapse = (toolCall, fallback = '') => {
   const key = getToolKey(toolCall, fallback)
-  toolArgsCollapsed.value[key] = !isToolArgsCollapsed(toolCall, fallback)
+  toolCollapsed.value[key] = !isToolCollapsed(toolCall, fallback)
 }
 
-watch(subTurns, (turns) => {
-  turns.forEach((turn, turnIndex) => {
-    const key = getTurnKey(turn, turnIndex)
-    if (reasoningTurnCollapsed.value[key] === undefined) {
-      reasoningTurnCollapsed.value[key] = true
-    }
-    if (turn?.toolCall) {
-      const toolKey = getToolKey(turn.toolCall, key)
-      if (toolArgsCollapsed.value[toolKey] === undefined) {
-        toolArgsCollapsed.value[toolKey] = true
-      }
-    }
-  })
-}, { deep: true, immediate: true })
-
-watch(currentToolCall, (toolCall) => {
-  if (!toolCall) return
-  const key = getToolKey(toolCall, `current-${props.index}`)
-  if (toolArgsCollapsed.value[key] === undefined) {
-    toolArgsCollapsed.value[key] = false
+// 折叠时的摘要文字
+const traceSummary = computed(() => {
+  const tools = subTurns.value.filter(t => t.toolCall)
+  if (!tools.length) {
+    const total = subTurns.value.reduce((s, t) => s + (t.reasoning?.length || 0), 0)
+    return total ? `${total} 字思考` : ''
   }
-}, { deep: true, immediate: true })
-
-const summarizeText = (text, maxLength = 58) => {
-  const normalized = String(text || '').replace(/\s+/g, ' ').trim()
-  if (!normalized) return '思考过程'
-  if (normalized.length <= maxLength) return normalized
-  return `${normalized.slice(0, maxLength)}...`
-}
+  const names = [...new Set(tools.map(t => displayToolName(t.toolCall)))]
+  if (names.length === 1) {
+    return tools.length > 1 ? `${tools.length}x ${names[0]}` : names[0]
+  }
+  return `${tools.length}次工具调用`
+})
 
 const formatToolStatus = (status = 'parsing') => {
   switch (status) {
@@ -219,20 +199,6 @@ const formatToolResult = (toolCall) => {
 const hasToolArguments = (toolCall) => {
   const args = formatToolArguments(toolCall)
   return args && args !== '{}'
-}
-
-// 工具结果折叠控制
-const isToolResultCollapsed = (toolCall, fallback = '') => {
-  const key = getToolKey(toolCall, fallback)
-  if (toolResultCollapsed.value[key] === undefined) {
-    return true // 默认折叠
-  }
-  return toolResultCollapsed.value[key]
-}
-
-const toggleToolResult = (toolCall, fallback = '') => {
-  const key = getToolKey(toolCall, fallback)
-  toolResultCollapsed.value[key] = !isToolResultCollapsed(toolCall, fallback)
 }
 
 // 从工具结果文本中解析 [REF:n] → URL 映射
@@ -513,86 +479,69 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
         <!-- 工具调用时间线 -->
         <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3">
           <template v-if="hasTraceTimeline">
-            <div class="trace-timeline">
+            <!-- 思维链折叠头 -->
+            <button class="trace-header" @click="traceCollapsed = !traceCollapsed">
+              <svg
+                :class="['w-3.5 h-3.5 shrink-0 transition-transform text-slate-400', { 'rotate-90': !traceCollapsed }]"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+              <span class="trace-header-label">思维过程</span>
+              <span v-if="traceCollapsed && traceSummary" class="trace-header-summary">{{ traceSummary }}</span>
+              <span v-if="!traceCollapsed && isStreaming && (currentReasoning || currentToolCall)" class="trace-header-live">进行中</span>
+            </button>
+
+            <!-- 展开内容 -->
+            <Transition name="collapse">
+            <div v-if="!traceCollapsed" class="trace-timeline">
             <div
               v-for="(turn, turnIndex) in subTurns"
               :key="getTurnKey(turn, turnIndex)"
             >
+              <!-- 思考：直接展示，不折叠 -->
               <div v-if="turn.reasoning" class="trace-step">
-                <div v-if="turn.reasoning.length <= 80" class="trace-row trace-row-static">
+                <div v-if="turn.reasoning.length <= 120" class="trace-row trace-row-static">
                   <span class="trace-label text-slate-400">思考</span>
                   <span class="trace-inline-text">{{ turn.reasoning }}</span>
                 </div>
                 <template v-else>
-                  <button class="trace-row" @click="toggleTurnCollapse(turn, turnIndex)">
-                    <svg
-                      :class="['w-3 h-3 shrink-0 transition-transform text-slate-400', { 'rotate-90': !isTurnCollapsed(turn, turnIndex) }]"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
+                  <div class="trace-row trace-row-static">
                     <span class="trace-label text-slate-400">思考</span>
-                    <span class="trace-summary">{{ summarizeText(turn.reasoning) }}</span>
                     <span class="trace-meta">{{ turn.reasoning.length }} 字</span>
-                  </button>
-                  <Transition name="collapse">
-                    <div v-if="!isTurnCollapsed(turn, turnIndex)" class="trace-body">{{ turn.reasoning }}</div>
-                  </Transition>
+                  </div>
+                  <div class="trace-body">{{ turn.reasoning }}</div>
                 </template>
               </div>
 
+              <!-- 工具调用：整体折叠 -->
               <div v-if="turn.toolCall" class="trace-step">
-                <div class="trace-row">
+                <button class="trace-row" @click="toggleToolCollapse(turn.toolCall, getTurnKey(turn, turnIndex))">
+                  <svg
+                    :class="['w-3 h-3 shrink-0 transition-transform text-slate-400', { 'rotate-90': !isToolCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                  </svg>
                   <span
-                    :class="['trace-dot', formatToolStatus(turn.toolCall.status).dotClass, formatToolStatus(turn.toolCall.status).spinning && 'animate-pulse']"
+                    :class="['trace-dot', formatToolStatus(turn.toolCall.status).dotClass]"
                   ></span>
                   <span class="trace-label font-mono text-slate-700">{{ displayToolName(turn.toolCall) }}</span>
                   <span :class="['trace-meta', formatToolStatus(turn.toolCall.status).textClass]">{{ formatToolStatus(turn.toolCall.status).label }}</span>
                   <span v-if="formatToolDuration(turn.toolCall)" class="trace-meta text-slate-400">{{ formatToolDuration(turn.toolCall) }}</span>
-                </div>
-                <div v-if="hasToolArguments(turn.toolCall)" class="ml-4 mt-0.5">
-                  <button
-                    class="trace-toggle"
-                    @click="toggleToolArgs(turn.toolCall, getTurnKey(turn, turnIndex))"
-                  >
-                    <svg
-                      :class="['w-3 h-3 transition-transform', { 'rotate-90': !isToolArgsCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                    参数
-                  </button>
-                  <Transition name="collapse">
-                    <pre
-                      v-if="!isToolArgsCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))"
-                      class="trace-code"
-                    >{{ formatToolArguments(turn.toolCall) }}</pre>
-                  </Transition>
-                </div>
-                <div v-if="formatToolResult(turn.toolCall)" class="ml-4 mt-0.5">
-                  <button
-                    class="trace-toggle"
-                    @click="toggleToolResult(turn.toolCall, getTurnKey(turn, turnIndex))"
-                  >
-                    <svg
-                      :class="['w-3 h-3 transition-transform', { 'rotate-90': !isToolResultCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                    {{ turn.toolCall.status === 'error' ? '错误' : '结果' }}
-                  </button>
-                  <Transition name="collapse">
-                    <div
-                      v-if="!isToolResultCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))"
-                      :class="['trace-result-text', turn.toolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
+                </button>
+                <Transition name="collapse">
+                  <div v-if="!isToolCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))" class="ml-4 mt-0.5">
+                    <pre v-if="hasToolArguments(turn.toolCall)" class="trace-code">{{ formatToolArguments(turn.toolCall) }}</pre>
+                    <div v-if="formatToolResult(turn.toolCall)"
+                         :class="['trace-result-text mt-1', turn.toolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
                     >{{ formatToolResult(turn.toolCall) }}</div>
-                  </Transition>
-                </div>
+                  </div>
+                </Transition>
               </div>
             </div>
 
+            <!-- 当前思考（流式） -->
             <div v-if="currentReasoning" class="trace-step">
               <div class="trace-row">
                 <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
@@ -601,6 +550,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
               <div class="trace-body trace-body-live">{{ currentReasoning }}</div>
             </div>
 
+            <!-- 当前工具调用（流式） -->
             <div v-if="currentToolCall" class="trace-step">
               <div class="trace-row">
                 <span
@@ -634,48 +584,18 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                   {{ currentToolCall.progressMessage }}
                 </div>
               </template>
+              <!-- 参数和结果直接展示 -->
               <div v-if="hasToolArguments(currentToolCall)" class="ml-4 mt-0.5">
-                <button
-                  class="trace-toggle"
-                  @click="toggleToolArgs(currentToolCall, `current-${index}`)"
-                >
-                  <svg
-                    :class="['w-3 h-3 transition-transform', { 'rotate-90': !isToolArgsCollapsed(currentToolCall, `current-${index}`) }]"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                  </svg>
-                  参数
-                </button>
-                <Transition name="collapse">
-                  <pre
-                    v-if="!isToolArgsCollapsed(currentToolCall, `current-${index}`)"
-                    class="trace-code"
-                  >{{ formatToolArguments(currentToolCall) }}</pre>
-                </Transition>
+                <pre class="trace-code">{{ formatToolArguments(currentToolCall) }}</pre>
               </div>
               <div v-if="formatToolResult(currentToolCall)" class="ml-4 mt-0.5">
-                <button
-                  class="trace-toggle"
-                  @click="toggleToolResult(currentToolCall, `current-${index}`)"
-                >
-                  <svg
-                    :class="['w-3 h-3 transition-transform', { 'rotate-90': !isToolResultCollapsed(currentToolCall, `current-${index}`) }]"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                  </svg>
-                  {{ currentToolCall.status === 'error' ? '错误' : '结果' }}
-                </button>
-                <Transition name="collapse">
-                  <div
-                    v-if="!isToolResultCollapsed(currentToolCall, `current-${index}`)"
-                    :class="['trace-result-text', currentToolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
-                  >{{ formatToolResult(currentToolCall) }}</div>
-                </Transition>
+                <div
+                  :class="['trace-result-text', currentToolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
+                >{{ formatToolResult(currentToolCall) }}</div>
               </div>
             </div>
             </div>
+            </Transition>
           </template>
 
           <!-- 兼容旧数据结构 -->
@@ -808,6 +728,35 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .theme-avatar {
   background: var(--theme-gradient);
   box-shadow: 0 4px 14px var(--theme-shadow);
+}
+
+/* === Trace Header (整体折叠) === */
+.trace-header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  user-select: none;
+  border: none;
+  background: none;
+}
+
+.trace-header-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.trace-header-summary {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.trace-header-live {
+  font-size: 0.65rem;
+  color: #f59e0b;
+  animation: progressPulse 1.2s ease-in-out infinite;
 }
 
 /* === Trace Timeline === */
