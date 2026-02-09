@@ -103,10 +103,14 @@ const normalizeAssistantMessage = (message) => {
   if (message?.role !== 'assistant') {
     return message
   }
+  // 后端字段 sub_turns → 前端 subTurns
+  const subTurns = Array.isArray(message.subTurns) ? message.subTurns
+    : Array.isArray(message.sub_turns) ? message.sub_turns
+    : []
   return {
     ...message,
     phase: message.phase || STREAM_PHASE.IDLE,
-    subTurns: Array.isArray(message.subTurns) ? message.subTurns : [],
+    subTurns,
     currentReasoning: message.currentReasoning || '',
     currentToolCall: message.currentToolCall || null
   }
@@ -196,12 +200,16 @@ const deleteConversation = async (id) => {
 }
 
 // 保存消息到后端
-const saveMessage = async (conversationId, role, content, reasoning = null) => {
+const saveMessage = async (conversationId, role, content, reasoning = null, subTurns = null) => {
   try {
+    const body = { role, content, reasoning }
+    if (subTurns && subTurns.length > 0) {
+      body.sub_turns = subTurns
+    }
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${conversationId}/messages/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, content, reasoning })
+      body: JSON.stringify(body)
     })
     if (response.ok) {
       return await response.json()
@@ -666,12 +674,13 @@ const streamResponse = async () => {
       aiMsg.stats = { ...stats.value }
     }
 
-    // 保存 AI 消息到后端
+    // 保存 AI 消息到后端（含完整 subTurns）
     const savedAiMsg = await saveMessage(
       currentConversationId.value,
       'assistant',
       currentContent.value,
-      currentReasoning.value
+      currentReasoning.value,
+      aiMsg?.subTurns || streamSubTurns
     )
     if (savedAiMsg) {
       messages.value[aiMessageIndex].id = savedAiMsg.id

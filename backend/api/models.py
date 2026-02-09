@@ -137,6 +137,7 @@ class AiLabMessage(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     content = models.TextField()
     reasoning = models.TextField(blank=True, null=True, help_text="AI 思维链内容")
+    sub_turns = models.JSONField(blank=True, null=True, help_text="工具调用时间线 [{reasoning, toolCall}]")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
