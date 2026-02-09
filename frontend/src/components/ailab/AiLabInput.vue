@@ -51,9 +51,16 @@ watch(localValue, (val) => {
   emit('update:modelValue', val)
 })
 
+// IME 组合状态跟踪（解决 Chrome 在 compositionend 后 isComposing 已为 false 的问题）
+const composing = ref(false)
+const onCompositionStart = () => { composing.value = true }
+const onCompositionEnd = () => {
+  // 延迟一帧清除，确保紧随其后的 keydown Enter 仍被拦截
+  requestAnimationFrame(() => { composing.value = false })
+}
+
 const handleKeydown = (e) => {
-  // 如果是 IME 输入法正在组合，不发送
-  if (e.isComposing || e.keyCode === 229) return
+  if (composing.value || e.isComposing || e.keyCode === 229) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     emit('send')
@@ -130,6 +137,8 @@ const formatDuration = (seconds) => {
         <textarea
           v-model="localValue"
           @keydown="handleKeydown"
+          @compositionstart="onCompositionStart"
+          @compositionend="onCompositionEnd"
           @paste="handlePaste"
           :disabled="isLoading || isRecording"
           :placeholder="isRecording ? '录音中...' : '继续对话...'"
