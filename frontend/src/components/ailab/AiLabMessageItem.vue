@@ -437,20 +437,26 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
               :key="getTurnKey(turn, turnIndex)"
             >
               <div v-if="turn.reasoning" class="trace-step">
-                <button class="trace-row" @click="toggleTurnCollapse(turn, turnIndex)">
-                  <svg
-                    :class="['w-3 h-3 shrink-0 transition-transform text-slate-400', { 'rotate-90': !isTurnCollapsed(turn, turnIndex) }]"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                  </svg>
-                  <span class="trace-label text-slate-500">思考</span>
-                  <span class="trace-summary">{{ summarizeText(turn.reasoning) }}</span>
-                  <span class="trace-meta">{{ turn.reasoning.length }} 字</span>
-                </button>
-                <Transition name="collapse">
-                  <div v-if="!isTurnCollapsed(turn, turnIndex)" class="trace-body">{{ turn.reasoning }}</div>
-                </Transition>
+                <div v-if="turn.reasoning.length <= 80" class="trace-row trace-row-static">
+                  <span class="trace-label text-slate-400">思考</span>
+                  <span class="trace-inline-text">{{ turn.reasoning }}</span>
+                </div>
+                <template v-else>
+                  <button class="trace-row" @click="toggleTurnCollapse(turn, turnIndex)">
+                    <svg
+                      :class="['w-3 h-3 shrink-0 transition-transform text-slate-400', { 'rotate-90': !isTurnCollapsed(turn, turnIndex) }]"
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    <span class="trace-label text-slate-400">思考</span>
+                    <span class="trace-summary">{{ summarizeText(turn.reasoning) }}</span>
+                    <span class="trace-meta">{{ turn.reasoning.length }} 字</span>
+                  </button>
+                  <Transition name="collapse">
+                    <div v-if="!isTurnCollapsed(turn, turnIndex)" class="trace-body">{{ turn.reasoning }}</div>
+                  </Transition>
+                </template>
               </div>
 
               <div v-if="turn.toolCall" class="trace-step">
@@ -713,15 +719,22 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   flex-shrink: 0;
 }
 
+.trace-row-static {
+  cursor: default;
+}
+
+.trace-inline-text {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
 .trace-body {
-  margin: 0.25rem 0 0.375rem 0;
-  padding: 0.5rem 0.625rem;
-  background: #f8fafc;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  margin: 0.125rem 0 0.25rem 0;
+  padding-left: 1.125rem;
+  font-size: 0.7rem;
   line-height: 1.6;
-  color: #475569;
+  color: #94a3b8;
   max-height: 14rem;
   overflow-y: auto;
   white-space: pre-wrap;
