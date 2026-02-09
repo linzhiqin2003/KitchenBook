@@ -125,7 +125,11 @@ const normalizeAssistantMessage = (message) => {
 }
 
 const normalizeMessagesForUI = (list) => {
-  return (list || []).map(normalizeAssistantMessage)
+  return (list || []).map(m => {
+    const normalized = normalizeAssistantMessage(m)
+    if (!normalized.type) normalized.type = 'text'
+    return normalized
+  })
 }
 
 // ===== API 调用 =====
@@ -625,7 +629,7 @@ const streamResponse = async () => {
 
   // 构建 API 消息
   const apiMessages = messages.value
-    .filter(m => m.type === 'text' && (m.role === 'user' || m.role === 'assistant') && !m.isStreaming)
+    .filter(m => (m.role === 'user' || m.role === 'assistant') && !m.isStreaming)
     .map(m => ({
       role: m.role,
       content: m.content?.replace(/\n\n\*\[已停止生成\]\*$/, '') || ''
