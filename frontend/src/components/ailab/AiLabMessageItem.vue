@@ -347,15 +347,43 @@ const parseMarkdown = (markdown) => {
   html = html.replace(/^\s*\d+\.\s+(.+)$/gm, '<li class="md-oli">$1</li>')
   html = html.replace(/(<li class="md-oli">.*<\/li>\n?)+/g, '<ol class="md-ol">$&</ol>')
 
-  // 引用块
-  html = html.replace(/^>\s*(.+)$/gm, '<blockquote class="md-quote">$1</blockquote>')
+  // 引用块 — 合并连续 > 行为一个 blockquote
+  html = html.replace(/(^>.*$\n?)+/gm, (block) => {
+    const inner = block.split('\n')
+      .map(line => line.replace(/^>\s?/, ''))
+      .join('\n')
+      .trim()
+    return `<blockquote class="md-quote">${inner.replace(/\n/g, '<br>')}</blockquote>`
+  })
 
   // 水平线
   html = html.replace(/^---$/gm, '<hr class="md-hr" />')
 
+  // 表格
+  html = html.replace(/(^\|.+\|$\n?){2,}/gm, (tableBlock) => {
+    const rows = tableBlock.trim().split('\n').filter(r => r.trim())
+    if (rows.length < 2) return tableBlock
+    if (!/^\|[\s\-:|]+\|$/.test(rows[1])) return tableBlock
+    const parseRow = (row) => row.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim())
+    const headers = parseRow(rows[0])
+    const dataRows = rows.slice(2)
+    let t = '<table><thead><tr>'
+    headers.forEach(h => { t += `<th>${h}</th>` })
+    t += '</tr></thead><tbody>'
+    dataRows.forEach(row => {
+      if (/^\|[\s\-:|]+\|$/.test(row)) return
+      const cells = parseRow(row)
+      t += '<tr>'
+      cells.forEach(c => { t += `<td>${c}</td>` })
+      t += '</tr>'
+    })
+    t += '</tbody></table>'
+    return t
+  })
+
   // 段落
   html = html.split('\n\n').map(block => {
-    if (block.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr)/) ||
+    if (block.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr|table)/) ||
         block.includes('__CODE_BLOCK_') ||
         block.includes('__MATH_BLOCK_')) {
       return block
