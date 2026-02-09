@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import math
+import threading
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -19,6 +20,22 @@ from datetime import datetime
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+# ==================== 请求级引用计数器（线程安全） ====================
+_ref_state = threading.local()
+
+
+def reset_ref_counter():
+    """在每次新的 agentic loop 开始时调用，重置引用编号为 0。"""
+    _ref_state.counter = 0
+
+
+def _next_ref_id():
+    """获取下一个全局引用编号（同一请求内单调递增）。"""
+    if not hasattr(_ref_state, 'counter'):
+        _ref_state.counter = 0
+    _ref_state.counter += 1
+    return _ref_state.counter
 
 
 # ==================== 工具定义（OpenAI 格式） ====================
@@ -513,13 +530,14 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
     if not search_results:
         raise ValueError("搜索引擎均不可用，请检查 API 配置")
 
-    # ── 2. 构建引用列表 & 清理 URL ──
+    # ── 2. 构建引用列表 & 清理 URL（使用全局引用计数器，避免多次调用编号重叠） ──
     references = []
-    for i, item in enumerate(search_results[:max_results], 1):
+    for item in search_results[:max_results]:
+        ref_id = _next_ref_id()
         url = _normalize_url(item.get("link", ""))
         title = item.get("title", "无标题")
         domain = _extract_domain(url)
-        references.append((i, url, title, domain))
+        references.append((ref_id, url, title, domain))
 
     # ── 3. Jina Reader 并行抓取 ──
     scrape_refs = references[:_SCRAPE_TOP_N]

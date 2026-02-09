@@ -1035,6 +1035,7 @@ class DeepSeekSpecialeView(APIView):
             "3. 引用时将 [REF:n] 放在具体数据或论述旁边，不要把多个引用堆在一起。\n"
             "4. 使用工具后直接给出答案，不要说「让我帮你查找」「稍等」之类的过渡语。\n"
             "5. 如果用户的问题不需要工具（常识、闲聊），直接回答即可。\n"
+            "6. 多次搜索时，每次工具返回的 [REF:n] 编号全局唯一递增，请直接使用工具给出的编号，不要重新编号。\n"
         )
 
     # 统一走 OpenRouter，reasoning 字段一致为 model_extra['reasoning']
@@ -1091,8 +1092,11 @@ class DeepSeekSpecialeView(APIView):
 
         def generate():
             from openai import OpenAI
-            from .tools import TOOL_DEFINITIONS, execute_tool_streaming
+            from .tools import TOOL_DEFINITIONS, execute_tool_streaming, reset_ref_counter
             import time as _time
+
+            # 重置引用计数器，确保本次请求内 [REF:n] 编号全局唯一递增
+            reset_ref_counter()
 
             client = OpenAI(api_key=api_key, base_url=base_url)
 
