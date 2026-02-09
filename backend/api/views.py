@@ -1014,7 +1014,7 @@ class AiAgentView(APIView):
 # ==================== DeepSeek Reasoner 思考模型 ====================
 
 class DeepSeekSpecialeView(APIView):
-    """DeepSeek Speciale 思考模型 - 支持 agentic 工具调用循环"""
+    """AI Lab 思考模型 - 支持多模型 + agentic 工具调用循环"""
     authentication_classes = []
     permission_classes = []
 
@@ -1027,19 +1027,48 @@ class DeepSeekSpecialeView(APIView):
         "使用工具后，务必在回复中为用户清晰总结结果，不要仅在思考过程中回答。"
     )
 
+    MODEL_CONFIGS = {
+        'deepseek-reasoner': {
+            'label': 'DeepSeek Reasoner',
+            'api_key_setting': 'DEEPSEEK_API_KEY',
+            'base_url_setting': 'DEEPSEEK_BASE_URL',
+            'model': 'deepseek-chat',
+            'extra_body': {"thinking": {"type": "enabled", "budget_tokens": 4096}},
+            'extra_headers': {},
+        },
+        'stepfun-flash': {
+            'label': 'StepFun Flash',
+            'api_key_setting': 'OPENROUTER_API_KEY',
+            'base_url': 'https://openrouter.ai/api/v1',
+            'model': 'stepfun/step-3.5-flash:free',
+            'extra_body': {},
+            'extra_headers': {
+                'HTTP-Referer': 'https://www.lzqqq.org',
+                'X-Title': 'AI Lab',
+            },
+        },
+    }
+
     def post(self, request):
         """处理对话请求（流式响应 + agentic 工具调用循环）"""
         messages = request.data.get('messages', [])
+        model_key = request.data.get('model', 'deepseek-reasoner')
 
         if not messages:
             return Response({'error': '消息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
 
-        deepseek_api_key = settings.DEEPSEEK_API_KEY
-        deepseek_base_url = settings.DEEPSEEK_BASE_URL
+        # 查找模型配置
+        model_config = self.MODEL_CONFIGS.get(model_key)
+        if not model_config:
+            return Response({'error': f'不支持的模型: {model_key}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not deepseek_api_key:
+        # 获取 API 凭证
+        api_key = getattr(settings, model_config['api_key_setting'], '')
+        base_url = model_config.get('base_url') or getattr(settings, model_config.get('base_url_setting', ''), '')
+
+        if not api_key:
             return Response({
-                'error': 'AI 服务未配置，请联系管理员'
+                'error': f'{model_config["label"]} 服务未配置，请联系管理员'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         # 构建消息 — 前端只发 role + content，不含 reasoning_content
@@ -1052,7 +1081,11 @@ class DeepSeekSpecialeView(APIView):
             from .tools import TOOL_DEFINITIONS, execute_tool
             import time as _time
 
-            client = OpenAI(api_key=deepseek_api_key, base_url=deepseek_base_url)
+            client = OpenAI(api_key=api_key, base_url=base_url)
+
+            extra_body = model_config.get('extra_body') or {}
+            extra_headers = model_config.get('extra_headers') or {}
+            model_name = model_config['model']
 
             def emit(data):
                 return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
@@ -1062,14 +1095,19 @@ class DeepSeekSpecialeView(APIView):
 
             try:
                 for round_num in range(self.MAX_ROUNDS):
-                    # ── 1. 调用 DeepSeek API（流式 + 工具） ──
-                    stream = client.chat.completions.create(
-                        model="deepseek-chat",
+                    # ── 1. 调用 API（流式 + 工具） ──
+                    create_kwargs = dict(
+                        model=model_name,
                         messages=full_messages,
                         tools=TOOL_DEFINITIONS,
                         stream=True,
-                        extra_body={"thinking": {"type": "enabled", "budget_tokens": 4096}},
                     )
+                    if extra_body:
+                        create_kwargs['extra_body'] = extra_body
+                    if extra_headers:
+                        create_kwargs['extra_headers'] = extra_headers
+
+                    stream = client.chat.completions.create(**create_kwargs)
 
                     reasoning_started = False
                     content_started = False

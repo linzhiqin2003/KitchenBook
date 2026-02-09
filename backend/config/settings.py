@@ -226,6 +226,9 @@ DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.co
 SILICONFLOW_API_KEY = os.environ.get('SILICONFLOW_API_KEY', 'sk-ywlsinkhxbuyohliisofjlkpjsilkqhceeibsgeakinkwjxj')
 SILICONFLOW_BASE_URL = os.environ.get('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')
 
+# OpenRouter API 配置 (用于 StepFun 等第三方模型)
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
+
 # Groq API 配置 (用于 Whisper 语音转录)
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 

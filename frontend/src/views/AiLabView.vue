@@ -11,6 +11,13 @@ const currentConversation = ref(null)
 const isSidebarCollapsed = ref(window.innerWidth < 1024)
 const isLoadingConversations = ref(false)
 
+// ===== 模型选择 =====
+const MODEL_OPTIONS = [
+  { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', desc: 'Tool Calling' },
+  { id: 'stepfun-flash', name: 'StepFun Flash', desc: 'Free' },
+]
+const selectedModel = ref('deepseek-reasoner')
+
 // ===== 聊天状态 =====
 const isLoading = ref(false)
 const inputMessage = ref('')
@@ -609,7 +616,7 @@ const streamResponse = async () => {
     const response = await fetch(`${API_BASE_URL}/api/ai/speciale/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: apiMessages }),
+      body: JSON.stringify({ messages: apiMessages, model: selectedModel.value }),
       signal: abortController.signal
     })
 
@@ -1101,6 +1108,9 @@ onMounted(async () => {
       <AiLabWelcome
         v-if="!hasMessages"
         :is-loading="isLoading"
+        :selected-model="selectedModel"
+        :model-options="MODEL_OPTIONS"
+        @update:selected-model="selectedModel = $event"
         @ask="handleQuickAsk"
       />
 
@@ -1180,6 +1190,9 @@ onMounted(async () => {
         :is-ocr-processing="isOcrProcessing"
         :recording-duration="recordingDuration"
         :has-image="!!selectedImage"
+        :selected-model="selectedModel"
+        :model-options="MODEL_OPTIONS"
+        @update:selected-model="selectedModel = $event"
         @send="handleSend"
         @stop="stopGeneration"
         @image-click="triggerFileInput"
