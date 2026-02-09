@@ -149,6 +149,10 @@ _CEREBRAS_MODEL = "gpt-oss-120b"
 # Cerebras key pool round-robin 计数器
 _cerebras_key_index = 0
 
+# Cerebras 熔断器：连续失败 N 次后自动跳过，避免浪费时间
+_cerebras_consecutive_fails = 0
+_CEREBRAS_CIRCUIT_BREAKER_THRESHOLD = 3
+
 
 def _normalize_url(url):
     """清理 URL：去除 tracking 参数和 fragment"""
@@ -294,36 +298,49 @@ def _get_cerebras_key():
 
 def _llm_call(system_msg, user_msg, max_tokens=2048, timeout=30):
     """通用 LLM 调用：Cerebras 优先 → DeepSeek 降级。返回文本或 None。"""
-    # ── 尝试 Cerebras（极速推理）──
-    cerebras_key = _get_cerebras_key()
-    if cerebras_key:
-        payload = json.dumps({
-            "model": _CEREBRAS_MODEL,
-            "messages": [
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            "max_tokens": max_tokens,
-            "temperature": 0.1,
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            f"{_CEREBRAS_BASE_URL}/chat/completions",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {cerebras_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            text = data["choices"][0]["message"]["content"].strip()
-            if text:
-                logger.info("LLM call via Cerebras OK (%d chars)", len(text))
-                return text
-        except Exception as e:
-            logger.warning("Cerebras LLM call failed (key=%s...): %s", cerebras_key[:12], e)
+    global _cerebras_consecutive_fails
+
+    # ── 尝试 Cerebras（极速推理）── 熔断器未打开时才尝试
+    if _cerebras_consecutive_fails < _CEREBRAS_CIRCUIT_BREAKER_THRESHOLD:
+        cerebras_key = _get_cerebras_key()
+        if cerebras_key:
+            payload = json.dumps({
+                "model": _CEREBRAS_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                "max_tokens": max_tokens,
+                "temperature": 0.1,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                f"{_CEREBRAS_BASE_URL}/chat/completions",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {cerebras_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"].strip()
+                if text:
+                    _cerebras_consecutive_fails = 0  # 成功，重置计数器
+                    logger.info("LLM call via Cerebras OK (%d chars)", len(text))
+                    return text
+            except Exception as e:
+                _cerebras_consecutive_fails += 1
+                logger.warning(
+                    "Cerebras failed (%d/%d, key=%s...): %s",
+                    _cerebras_consecutive_fails,
+                    _CEREBRAS_CIRCUIT_BREAKER_THRESHOLD,
+                    cerebras_key[:12],
+                    e,
+                )
+    else:
+        logger.debug("Cerebras circuit breaker OPEN (fails=%d), skipping to DeepSeek", _cerebras_consecutive_fails)
 
     # ── 降级到 DeepSeek ──
     api_key = getattr(settings, 'DEEPSEEK_API_KEY', '')
@@ -441,7 +458,7 @@ def _ai_extract(title, content, ref_id, url):
         url=url,
         content=content[:6000],
     )
-    return _llm_call(_EXTRACT_SYSTEM_MSG, prompt, max_tokens=2048, timeout=30)
+    return _llm_call(_EXTRACT_SYSTEM_MSG, prompt, max_tokens=2048, timeout=20)
 
 
 def _ai_consolidate(summaries, references, query):
@@ -511,7 +528,9 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
         if not url:
             scrape_status[ref_id] = 'skipped'
 
-    with ThreadPoolExecutor(max_workers=max(len(to_scrape), 1)) as pool:
+    done_count = 0
+    total_to_scrape = len(to_scrape)
+    with ThreadPoolExecutor(max_workers=max(total_to_scrape, 1)) as pool:
         future_map = {}
         for (ref_id, url, title, domain), sr in to_scrape:
             future_map[pool.submit(_jina_scrape, url)] = (ref_id, url, title, domain, sr)
@@ -519,6 +538,7 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
         for future in as_completed(future_map):
             ref_id, url, title, domain, sr = future_map[future]
             content = future.result()
+            done_count += 1
             if content and len(content) > 100:
                 scraped.append({"ref_id": ref_id, "title": title, "content": content, "url": url})
                 scrape_status[ref_id] = 'scraped'
@@ -527,6 +547,8 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                 if snippet:
                     scraped.append({"ref_id": ref_id, "title": title, "content": snippet, "url": url})
                 scrape_status[ref_id] = 'snippet'
+            # 逐条进度
+            yield {"progress": f"正在抓取网页... ({done_count}/{total_to_scrape})"}
 
     if _SCRAPE_TOP_N is not None:
         for ref_id, url, title, domain in references[_SCRAPE_TOP_N:]:
@@ -539,7 +561,9 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
 
     summaries = []
     if scraped:
-        with ThreadPoolExecutor(max_workers=len(scraped)) as pool:
+        extract_done = 0
+        total_extract = len(scraped)
+        with ThreadPoolExecutor(max_workers=total_extract) as pool:
             future_map = {
                 pool.submit(_ai_extract, it["title"], it["content"], it["ref_id"], it["url"]): it
                 for it in scraped
@@ -547,6 +571,7 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
             for future in as_completed(future_map):
                 item = future_map[future]
                 extracted = future.result()
+                extract_done += 1
                 if extracted:
                     summaries.append({
                         "ref_id": item["ref_id"],
@@ -559,6 +584,8 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                         "title": item["title"],
                         "content": item["content"][:500],
                     })
+                # 逐条进度
+                yield {"progress": f"AI 正在提取关键信息... ({extract_done}/{total_extract})"}
         summaries.sort(key=lambda s: s["ref_id"])
 
     # ── 构建输出辅助块 ──
