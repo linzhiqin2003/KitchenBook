@@ -1024,6 +1024,7 @@ class DeepSeekSpecialeView(APIView):
         "你是一个乐于助人的 AI 助手。"
         "你可以使用工具来获取实时信息或执行计算。"
         "如果用户的问题不需要工具，直接回答即可。"
+        "使用工具后，务必在回复中为用户清晰总结结果，不要仅在思考过程中回答。"
     )
 
     def post(self, request):
@@ -1232,6 +1233,13 @@ class DeepSeekSpecialeView(APIView):
 
                     # finish_reason == "stop" 或其他 → 完成
                     break
+
+                # ── 兜底：若模型未生成 content，用最后一轮 reasoning 作为回复 ──
+                if total_content == 0 and current_reasoning:
+                    fallback = current_reasoning.strip()
+                    yield emit({"type": "content_start"})
+                    yield emit({"type": "content", "content": fallback})
+                    total_content = len(fallback)
 
                 # ── 发送完成信号 ──
                 yield emit({
