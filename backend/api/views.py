@@ -1171,6 +1171,7 @@ class DeepSeekSpecialeView(APIView):
                         full_messages.append({
                             "role": "assistant",
                             "content": None,
+                            "reasoning_content": current_reasoning or None,
                             "tool_calls": assistant_tool_calls,
                         })
 
