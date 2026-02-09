@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch } from 'vue'
 import AiLabMessageItem from './AiLabMessageItem.vue'
 
 const props = defineProps({
@@ -26,42 +26,36 @@ const emit = defineEmits(['edit', 'regenerate'])
 const messagesContainer = ref(null)
 const reasoningCollapsed = ref({})
 
-// 滚动到底部
-const scrollToBottom = async () => {
-  await nextTick()
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-  }
+// 防抖滚动：合并高频调用为一次 rAF
+let scrollRafId = null
+const scrollToBottom = () => {
+  if (scrollRafId) return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = null
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
+  })
 }
 
-// 监听消息变化，自动滚动
-watch(() => props.messages.length, () => {
-  scrollToBottom()
-})
-
-watch(() => props.messages[props.currentStreamingIndex]?.content, () => {
-  scrollToBottom()
-}, { deep: true })
-
-watch(() => props.messages[props.currentStreamingIndex]?.reasoning, () => {
-  scrollToBottom()
-}, { deep: true })
-
-watch(() => props.messages[props.currentStreamingIndex]?.subTurns?.length, () => {
-  scrollToBottom()
-})
-
-watch(() => props.messages[props.currentStreamingIndex]?.currentReasoning, () => {
-  scrollToBottom()
-}, { deep: true })
-
-watch(() => props.messages[props.currentStreamingIndex]?.currentToolCall?.argumentsText, () => {
-  scrollToBottom()
-})
-
-watch(() => props.messages[props.currentStreamingIndex]?.currentToolCall?.status, () => {
-  scrollToBottom()
-})
+// 监听消息变化，自动滚动（合并为单个 watcher）
+watch(
+  () => {
+    const idx = props.currentStreamingIndex
+    const msg = idx != null ? props.messages[idx] : null
+    return [
+      props.messages.length,
+      msg?.content,
+      msg?.reasoning,
+      msg?.subTurns?.length,
+      msg?.currentReasoning,
+      msg?.currentToolCall?.argumentsText,
+      msg?.currentToolCall?.status,
+    ]
+  },
+  () => { scrollToBottom() },
+  { deep: false }
+)
 
 // 切换思维链折叠
 const toggleReasoning = (index) => {
@@ -84,45 +78,27 @@ defineExpose({
     <!-- 消息列表 -->
     <div
       ref="messagesContainer"
-      class="flex-1 overflow-y-auto px-4 py-6 scroll-smooth"
+      class="flex-1 overflow-y-auto px-4 py-6"
     >
       <div class="max-w-4xl mx-auto space-y-6">
-        <TransitionGroup name="message">
-          <AiLabMessageItem
-            v-for="(msg, index) in messages"
-            :key="msg.id || index"
-            :message="msg"
-            :index="index"
-            :is-streaming="index === currentStreamingIndex"
-            :is-reasoning-phase="index === currentStreamingIndex && isReasoningPhase"
-            :reasoning-collapsed="reasoningCollapsed[index]"
-            @edit="(id, content) => emit('edit', id, content, index)"
-            @regenerate="(id) => emit('regenerate', id, index)"
-            @toggle-reasoning="toggleReasoning"
-          />
-        </TransitionGroup>
+        <AiLabMessageItem
+          v-for="(msg, index) in messages"
+          :key="msg.id || index"
+          :message="msg"
+          :index="index"
+          :is-streaming="index === currentStreamingIndex"
+          :is-reasoning-phase="index === currentStreamingIndex && isReasoningPhase"
+          :reasoning-collapsed="reasoningCollapsed[index]"
+          @edit="(id, content) => emit('edit', id, content, index)"
+          @regenerate="(id) => emit('regenerate', id, index)"
+          @toggle-reasoning="toggleReasoning"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* 消息动画 */
-.message-enter-active {
-  animation: message-in 0.3s ease-out;
-}
-
-@keyframes message-in {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* 滚动条样式 */
 .overflow-y-auto::-webkit-scrollbar {
   width: 8px;
