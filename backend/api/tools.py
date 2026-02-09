@@ -139,8 +139,8 @@ _TRACKING_PARAMS = {
 # Jina 抓取内容最大字符数
 _JINA_MAX_CHARS = 8000
 
-# 抓取 top N URL
-_SCRAPE_TOP_N = 3
+# 抓取 top N URL（None = 全部抓取）
+_SCRAPE_TOP_N = None
 
 # Cerebras API 配置
 _CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
@@ -527,9 +527,10 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                     scraped.append({"ref_id": ref_id, "title": title, "content": snippet, "url": url})
                 scrape_status[ref_id] = 'snippet'
 
-    # 未尝试抓取的标记为 skipped
-    for ref_id, url, title, domain in references[_SCRAPE_TOP_N:]:
-        scrape_status[ref_id] = 'skipped'
+    # 未尝试抓取的标记为 skipped（仅当有截断时）
+    if _SCRAPE_TOP_N is not None:
+        for ref_id, url, title, domain in references[_SCRAPE_TOP_N:]:
+            scrape_status[ref_id] = 'skipped'
 
     # ── 3.5 构建抓取状态头部 ──
     scraped_count = sum(1 for s in scrape_status.values() if s == 'scraped')
