@@ -232,6 +232,10 @@ OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', 'sk-or-v1-37e65424010e
 # Serper API 配置 (用于 AI Lab 网页搜索)
 SERPER_API_KEY = os.environ.get('SERPER_API_KEY', '916263416ebbe08863fca6f625106344d7b65271')
 
+# Google CSE 配置 (用于 AI Lab 网页搜索，主搜索引擎)
+GOOGLE_CSE_API_KEY = os.environ.get('GOOGLE_CSE_API_KEY', 'AIzaSyBhySp9gzvIf5nVyBG0Lwjvjy0ubLXfYKk')
+GOOGLE_CSE_CX = os.environ.get('GOOGLE_CSE_CX', 'a2143e2153b8c4b38')
+
 # Groq API 配置 (用于 Whisper 语音转录)
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
