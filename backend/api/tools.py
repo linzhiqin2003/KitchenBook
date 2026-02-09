@@ -144,7 +144,9 @@ _SCRAPE_TOP_N = None
 
 # Cerebras API 配置
 _CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
-_CEREBRAS_MODEL = "gpt-oss-120b"
+_CEREBRAS_MODEL = "qwen-3-32b"
+# 必须设置浏览器 User-Agent，否则 Cloudflare 返回 403
+_CEREBRAS_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
 
 # Cerebras key pool round-robin 计数器
 _cerebras_key_index = 0
@@ -307,7 +309,7 @@ def _llm_call(system_msg, user_msg, max_tokens=2048, timeout=30):
             payload = json.dumps({
                 "model": _CEREBRAS_MODEL,
                 "messages": [
-                    {"role": "system", "content": system_msg},
+                    {"role": "system", "content": "/no_think\n" + system_msg},
                     {"role": "user", "content": user_msg},
                 ],
                 "max_tokens": max_tokens,
@@ -319,13 +321,16 @@ def _llm_call(system_msg, user_msg, max_tokens=2048, timeout=30):
                 headers={
                     "Authorization": f"Bearer {cerebras_key}",
                     "Content-Type": "application/json",
+                    "User-Agent": _CEREBRAS_USER_AGENT,
                 },
                 method="POST",
             )
             try:
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
-                text = data["choices"][0]["message"]["content"].strip()
+                text = (data["choices"][0]["message"].get("content") or "").strip()
+                # qwen-3-32b 推理模型：剥离 <think>...</think> 标签
+                text = re.sub(r'<think>[\s\S]*?</think>\s*', '', text).strip()
                 if text:
                     _cerebras_consecutive_fails = 0  # 成功，重置计数器
                     logger.info("LLM call via Cerebras OK (%d chars)", len(text))
