@@ -97,7 +97,7 @@ defineExpose({
     <div
       ref="messagesContainer"
       @scroll="handleScroll"
-      class="flex-1 overflow-y-auto px-4 py-6"
+      class="flex-1 overflow-y-auto px-4 pt-6 pb-40"
     >
       <div class="max-w-4xl mx-auto space-y-6">
         <AiLabMessageItem
