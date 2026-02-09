@@ -4,8 +4,8 @@ AI Lab 工具注册表 - 供 agentic loop 使用
 增强版 web_search：
 - Google CSE + Serper 双引擎搜索
 - Jina Reader 网页抓取
-- DeepSeek AI 摘要
-- 引用标记 [REF:n]
+- Cerebras AI 结构化提取（DeepSeek 降级）
+- Consolidation 综合报告 + 引用标记 [REF:n]
 """
 import json
 import logging
@@ -138,11 +138,15 @@ _TRACKING_PARAMS = {
 # Jina 抓取内容最大字符数
 _JINA_MAX_CHARS = 8000
 
-# AI 摘要最大字数
-_SUMMARY_MAX_CHARS = 300
-
 # 抓取 top N URL
 _SCRAPE_TOP_N = 3
+
+# Cerebras API 配置
+_CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
+_CEREBRAS_MODEL = "gpt-oss-120b"
+
+# Cerebras key pool round-robin 计数器
+_cerebras_key_index = 0
 
 
 def _normalize_url(url):
@@ -270,35 +274,67 @@ def _jina_scrape(url, timeout=15):
         return None
 
 
-def _ai_summarize(title, content, ref_id):
-    """使用 DeepSeek Chat 对网页内容生成摘要"""
+def _get_cerebras_key():
+    """从 key pool 中轮询取一个 Cerebras API key"""
+    global _cerebras_key_index
+    pool_str = getattr(settings, 'CEREBRAS_API_KEY_POOL', '')
+    if not pool_str:
+        return None
+    keys = [k.strip() for k in pool_str.split(',') if k.strip()]
+    if not keys:
+        return None
+    key = keys[_cerebras_key_index % len(keys)]
+    _cerebras_key_index += 1
+    return key
+
+
+def _llm_call(system_msg, user_msg, max_tokens=2048, timeout=30):
+    """通用 LLM 调用：Cerebras 优先 → DeepSeek 降级。返回文本或 None。"""
+    # ── 尝试 Cerebras（极速推理）──
+    cerebras_key = _get_cerebras_key()
+    if cerebras_key:
+        payload = json.dumps({
+            "model": _CEREBRAS_MODEL,
+            "messages": [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            "max_tokens": max_tokens,
+            "temperature": 0.1,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"{_CEREBRAS_BASE_URL}/chat/completions",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {cerebras_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            text = data["choices"][0]["message"]["content"].strip()
+            if text:
+                return text
+        except Exception as e:
+            logger.warning("Cerebras LLM call failed, falling back to DeepSeek: %s", e)
+
+    # ── 降级到 DeepSeek ──
     api_key = getattr(settings, 'DEEPSEEK_API_KEY', '')
     base_url = getattr(settings, 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
     if not api_key:
         return None
 
-    prompt = (
-        f"请为以下网页内容生成简洁的结构化摘要。\n"
-        f"要求：\n"
-        f"1. 提取核心信息和关键数据\n"
-        f"2. 保留所有重要的数字、日期、名称\n"
-        f"3. 控制在 {_SUMMARY_MAX_CHARS} 字以内\n"
-        f"4. 使用中文\n\n"
-        f"网页标题：{title}\n"
-        f"来源：[REF:{ref_id}]\n"
-        f"网页内容：\n{content[:6000]}"
-    )
-
     payload = json.dumps({
         "model": "deepseek-chat",
         "messages": [
-            {"role": "system", "content": "你是一个专业的信息提取助手。只输出摘要内容，不要添加额外说明。"},
-            {"role": "user", "content": prompt},
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
         ],
-        "max_tokens": 500,
+        "max_tokens": max_tokens,
         "temperature": 0.3,
     }).encode("utf-8")
-
     req = urllib.request.Request(
         f"{base_url}/chat/completions",
         data=payload,
@@ -308,76 +344,117 @@ def _ai_summarize(title, content, ref_id):
         },
         method="POST",
     )
-
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         return data["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        logger.warning("AI summarize failed: %s", e)
+        logger.warning("DeepSeek LLM call failed: %s", e)
         return None
+
+
+# ── 结构化提取 prompt（移植自 research_agent） ──
+
+_EXTRACT_SYSTEM_MSG = (
+    "你是严谨的研究助手，专注于从网页中提取结构化信息。"
+    "你的输出将直接供下游分析使用，因此必须：\n"
+    "1) 严格遵循指定的 Markdown 输出格式\n"
+    "2) 保留所有量化数据（数字、百分比、金额）及其上下文\n"
+    "3) 保持信息密度，不要注水或重复\n"
+    "4) 如果信息不确定，明确标注 [待核实]\n"
+    "5) 使用中文输出"
+)
+
+_EXTRACT_PROMPT_TEMPLATE = (
+    "基于以下网页正文，提取结构化研究摘要。\n\n"
+    "来源标记：[REF:{ref_id}]\n\n"
+    "【严格要求】\n"
+    "- 只基于提供的文本，禁止编造任何信息\n"
+    "- 保留所有关键数字、日期、百分比、金额、人名、公司名\n"
+    "- 使用中文输出\n\n"
+    "【输出格式】按以下 Markdown 结构输出：\n\n"
+    "### 核心发现\n"
+    "(用 1-3 句话概括本页最重要的信息，标注 [REF:{ref_id}])\n\n"
+    "### 关键数据\n"
+    "| 指标 | 数值 | 时间/口径 | 变动 |\n"
+    "| --- | --- | --- | --- |\n"
+    "| (指标名) | (具体数值) | (财年/季度/日期) | (同比/环比变化) |\n\n"
+    "(如页面无量化数据，写「本页无量化数据」)\n\n"
+    "### 定性要点\n"
+    "- (重要的非数值信息，标注 [REF:{ref_id}])\n\n"
+    "--- 网页正文 ---\n"
+    "标题：{title}\n"
+    "URL：{url}\n\n"
+    "{content}"
+)
+
+# ── Consolidation prompt（移植自 research_agent） ──
+
+_CONSOLIDATE_SYSTEM_MSG = (
+    "你是严谨的研究助手。你的任务是将多个网页摘要综合为一份精炼的研究摘要。\n"
+    "要求：\n"
+    "1) 保留所有量化数据（数字、百分比、金额）及其上下文\n"
+    "2) 去除不同来源间的重复信息，保留最详细的版本\n"
+    "3) 按主题组织信息，而不是按来源罗列\n"
+    "4) 使用【引用映射表】中提供的全局 [REF:n] 编号标注数据来源，禁止自行编造引用编号\n"
+    "5) 使用中文输出\n"
+    "6) 只基于提供的内容，禁止编造"
+)
+
+_CONSOLIDATE_PROMPT_TEMPLATE = (
+    "以下是针对搜索词「{query}」从多个网页提取的摘要。"
+    "请将所有来源的信息综合为一份精炼的结构化研究摘要。\n\n"
+    "【引用映射表】\n"
+    "以下是本次涉及的页面 URL 及其全局引用 ID，请在输出中使用这些 [REF:n] 编号标注数据来源：\n"
+    "{ref_mapping}\n\n"
+    "【严格要求】\n"
+    "- 在关键数据表和正文中必须使用上方【引用映射表】提供的 [REF:n] 编号标注数据出处\n"
+    "- 禁止自行编造引用编号；如某数据无法归属到具体来源，注明「来源不明」\n\n"
+    "【输出格式】\n"
+    "### 核心发现\n"
+    "(3-5 条最重要的发现，每条一行，标注 [REF:n])\n\n"
+    "### 关键数据\n"
+    "| 指标 | 数值 | 时间/口径 | 变动 | 来源 |\n"
+    "| --- | --- | --- | --- | --- |\n"
+    "(合并所有来源的量化数据，「来源」列使用 [REF:n] 编号)\n\n"
+    "### 详细分析\n"
+    "(按主题组织的深入分析，关键数据标注 [REF:n])\n\n"
+    "### 风险与不确定性\n"
+    "(如有相关信息，标注 [REF:n])\n\n"
+    "--- 待综合内容 ---\n"
+    "{content}"
+)
+
+
+def _ai_extract(title, content, ref_id, url):
+    """使用 Cerebras/DeepSeek 对网页内容做结构化提取"""
+    prompt = _EXTRACT_PROMPT_TEMPLATE.format(
+        ref_id=ref_id,
+        title=title,
+        url=url,
+        content=content[:6000],
+    )
+    return _llm_call(_EXTRACT_SYSTEM_MSG, prompt, max_tokens=2048, timeout=30)
 
 
 def _ai_consolidate(summaries, references, query):
-    """使用 DeepSeek Chat 对多条摘要做综合分析"""
-    api_key = getattr(settings, 'DEEPSEEK_API_KEY', '')
-    base_url = getattr(settings, 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
-    if not api_key:
-        return None
-
-    # 构建摘要文本
-    summary_text = ""
-    for i, s in enumerate(summaries):
-        summary_text += f"\n--- 来源 [REF:{s['ref_id']}] {s['title']} ---\n{s['content']}\n"
-
-    # 构建引用列表
-    ref_text = ""
+    """使用 Cerebras/DeepSeek 对多条摘要做综合报告"""
+    # 构建引用映射表
+    ref_mapping = ""
     for ref_id, url, title, domain in references:
-        ref_text += f"[REF:{ref_id}] {title} - {url}\n"
+        ref_mapping += f"- [REF:{ref_id}] {url}\n"
 
-    prompt = (
-        f"用户搜索：{query}\n\n"
-        f"以下是从多个来源提取的摘要信息：\n{summary_text}\n\n"
-        f"请综合以上信息，生成一份结构化的搜索报告。\n"
-        f"要求：\n"
-        f"1. 在引用信息时标注 [REF:n]\n"
-        f"2. 使用以下格式：\n\n"
-        f"### 核心发现\n"
-        f"（3-5 条要点，标注 [REF:n]）\n\n"
-        f"### 详细分析\n"
-        f"（按主题组织，标注 [REF:n]）\n\n"
-        f"### 引用来源\n"
-        f"{ref_text}\n"
-        f"注意：直接输出报告内容，不要有多余的前言。使用中文。"
+    # 构建待综合内容
+    combined = ""
+    for s in summaries:
+        combined += f"\n--- [REF:{s['ref_id']}] {s['title']} ---\n{s['content']}\n"
+
+    prompt = _CONSOLIDATE_PROMPT_TEMPLATE.format(
+        query=query,
+        ref_mapping=ref_mapping,
+        content=combined,
     )
-
-    payload = json.dumps({
-        "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": "你是一个专业的信息综合分析助手。"},
-            {"role": "user", "content": prompt},
-        ],
-        "max_tokens": 1500,
-        "temperature": 0.3,
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        return data["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        logger.warning("AI consolidation failed: %s", e)
-        return None
+    return _llm_call(_CONSOLIDATE_SYSTEM_MSG, prompt, max_tokens=4096, timeout=45)
 
 
 def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
@@ -441,18 +518,20 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                     "url": url,
                 })
 
-    # ── 4. AI 摘要 ──
+    # ── 4. Cerebras/DeepSeek 结构化提取 ──
     summaries = []
     for item in scraped:
-        summary = _ai_summarize(item["title"], item["content"], item["ref_id"])
-        if summary:
+        extracted = _ai_extract(
+            item["title"], item["content"], item["ref_id"], item["url"],
+        )
+        if extracted:
             summaries.append({
                 "ref_id": item["ref_id"],
                 "title": item["title"],
-                "content": summary,
+                "content": extracted,
             })
         else:
-            # AI 摘要失败，用截断的原文内容替代
+            # AI 提取失败，用截断的原文内容替代
             truncated = item["content"][:500]
             summaries.append({
                 "ref_id": item["ref_id"],

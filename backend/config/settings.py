@@ -236,6 +236,22 @@ SERPER_API_KEY = os.environ.get('SERPER_API_KEY', '916263416ebbe08863fca6f625106
 GOOGLE_CSE_API_KEY = os.environ.get('GOOGLE_CSE_API_KEY', 'AIzaSyBhySp9gzvIf5nVyBG0Lwjvjy0ubLXfYKk')
 GOOGLE_CSE_CX = os.environ.get('GOOGLE_CSE_CX', 'a2143e2153b8c4b38')
 
+# Cerebras API 配置 (用于 AI Lab 快速 AI 提取，极速推理)
+CEREBRAS_API_KEY_POOL = os.environ.get(
+    'CEREBRAS_API_KEY_POOL',
+    'csk-662rtm42mw3fmte9enwkxn2k9kxjn2r2r3trvcm2ntkrjrrn,'
+    'csk-2ymymn9dw36jxmyvmvpedwvw94kdw2v63tw5njr254jk9dd9,'
+    'csk-wrhvwd38nnt25e3y5r4cenckt24df5frxdcynycwhj8ycenj,'
+    'csk-m8dcc82h6539rcy298cx4jcye6ncpyp2j99enh5jvxpyy3vd,'
+    'csk-pkxjtrdyf4vmnxverj5mdr8hntjx5h3krhtrtnynennkhw5d,'
+    'csk-pyrr684y3dfd9rc555wrfj35v39mrdtrwemkv3e5rxrhtn9p,'
+    'csk-jt5vc8r3r8hreem835eckfvh6rxfjr8pj9hfk9kwf9hdcwe8,'
+    'csk-52wekfenrmpv8j8mc364mwvn2th29mt54rff9wx6yvkdxfkv,'
+    'csk-5cyjk85452vvk4xnm39pfph5e2yeychcmej8j8598pr8j4tp,'
+    'csk-92rth5tr3w6mjh58t36njdf5wm4weev5mcdx8mtdx53m4j48,'
+    'csk-y63er2v2ktmmxr8chv6y5ptmf4w98tr4yfc5mnnkex4hcj54'
+)
+
 # Groq API 配置 (用于 Whisper 语音转录)
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
