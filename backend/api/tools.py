@@ -14,6 +14,7 @@ import math
 import urllib.request
 import urllib.error
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from django.conf import settings
 
@@ -254,7 +255,7 @@ def _search_serper(query, search_type="search", num=5):
     return results
 
 
-def _jina_scrape(url, timeout=15):
+def _jina_scrape(url, timeout=10):
     """使用 Jina Reader 抓取网页内容（纯文本）"""
     jina_url = f"https://r.jina.ai/{url}"
     req = urllib.request.Request(
@@ -319,9 +320,10 @@ def _llm_call(system_msg, user_msg, max_tokens=2048, timeout=30):
                 data = json.loads(resp.read().decode("utf-8"))
             text = data["choices"][0]["message"]["content"].strip()
             if text:
+                logger.info("LLM call via Cerebras OK (%d chars)", len(text))
                 return text
         except Exception as e:
-            logger.warning("Cerebras LLM call failed, falling back to DeepSeek: %s", e)
+            logger.warning("Cerebras LLM call failed (key=%s...): %s", cerebras_key[:12], e)
 
     # ── 降级到 DeepSeek ──
     api_key = getattr(settings, 'DEEPSEEK_API_KEY', '')
@@ -350,9 +352,11 @@ def _llm_call(system_msg, user_msg, max_tokens=2048, timeout=30):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        return data["choices"][0]["message"]["content"].strip()
+        text = data["choices"][0]["message"]["content"].strip()
+        logger.info("LLM call via DeepSeek fallback OK (%d chars)", len(text))
+        return text
     except Exception as e:
-        logger.warning("DeepSeek LLM call failed: %s", e)
+        logger.warning("DeepSeek LLM call also failed: %s", e)
         return None
 
 
@@ -497,33 +501,32 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
         domain = _extract_domain(url)
         references.append((i, url, title, domain))
 
-    # ── 3. Jina Reader 抓取 top N URL ──
+    # ── 3. Jina Reader 并行抓取 top N URL ──
     scraped = []  # [{ref_id, title, content, url}]
     scrape_status = {}  # ref_id → 'scraped' | 'snippet' | 'skipped'
+
+    to_scrape = [(r, s) for r, s in zip(references[:_SCRAPE_TOP_N], search_results) if r[1]]
     for ref_id, url, title, domain in references[:_SCRAPE_TOP_N]:
         if not url:
             scrape_status[ref_id] = 'skipped'
-            continue
-        content = _jina_scrape(url)
-        if content and len(content) > 100:
-            scraped.append({
-                "ref_id": ref_id,
-                "title": title,
-                "content": content,
-                "url": url,
-            })
-            scrape_status[ref_id] = 'scraped'
-        else:
-            # Jina 抓取失败，用搜索 snippet 替代
-            snippet = search_results[ref_id - 1].get("snippet", "")
-            if snippet:
-                scraped.append({
-                    "ref_id": ref_id,
-                    "title": title,
-                    "content": snippet,
-                    "url": url,
-                })
-            scrape_status[ref_id] = 'snippet'
+
+    with ThreadPoolExecutor(max_workers=_SCRAPE_TOP_N) as pool:
+        future_map = {}
+        for (ref_id, url, title, domain), sr in to_scrape:
+            future_map[pool.submit(_jina_scrape, url)] = (ref_id, url, title, domain, sr)
+
+        for future in as_completed(future_map):
+            ref_id, url, title, domain, sr = future_map[future]
+            content = future.result()
+            if content and len(content) > 100:
+                scraped.append({"ref_id": ref_id, "title": title, "content": content, "url": url})
+                scrape_status[ref_id] = 'scraped'
+            else:
+                snippet = sr.get("snippet", "")
+                if snippet:
+                    scraped.append({"ref_id": ref_id, "title": title, "content": snippet, "url": url})
+                scrape_status[ref_id] = 'snippet'
+
     # 未尝试抓取的标记为 skipped
     for ref_id, url, title, domain in references[_SCRAPE_TOP_N:]:
         scrape_status[ref_id] = 'skipped'
@@ -547,26 +550,31 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
         ref_lines.append(f"[REF:{ref_id}] {title} - {url}")
     ref_block = "\n".join(ref_lines)
 
-    # ── 4. Cerebras/DeepSeek 结构化提取 ──
+    # ── 4. Cerebras/DeepSeek 并行结构化提取 ──
     summaries = []
-    for item in scraped:
-        extracted = _ai_extract(
-            item["title"], item["content"], item["ref_id"], item["url"],
-        )
-        if extracted:
-            summaries.append({
-                "ref_id": item["ref_id"],
-                "title": item["title"],
-                "content": extracted,
-            })
-        else:
-            # AI 提取失败，用截断的原文内容替代
-            truncated = item["content"][:500]
-            summaries.append({
-                "ref_id": item["ref_id"],
-                "title": item["title"],
-                "content": truncated,
-            })
+    if scraped:
+        with ThreadPoolExecutor(max_workers=len(scraped)) as pool:
+            future_map = {
+                pool.submit(_ai_extract, it["title"], it["content"], it["ref_id"], it["url"]): it
+                for it in scraped
+            }
+            for future in as_completed(future_map):
+                item = future_map[future]
+                extracted = future.result()
+                if extracted:
+                    summaries.append({
+                        "ref_id": item["ref_id"],
+                        "title": item["title"],
+                        "content": extracted,
+                    })
+                else:
+                    summaries.append({
+                        "ref_id": item["ref_id"],
+                        "title": item["title"],
+                        "content": item["content"][:500],
+                    })
+        # 按 ref_id 排序保持顺序
+        summaries.sort(key=lambda s: s["ref_id"])
 
     # ── 5. Consolidation（2+ 条摘要且总长度 > 500 字） ──
     total_summary_len = sum(len(s["content"]) for s in summaries)
