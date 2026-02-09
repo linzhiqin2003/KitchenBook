@@ -282,6 +282,13 @@ const parseMarkdown = (markdown) => {
     return placeholder
   })
 
+  // 规范化多余空行（3+ 连续换行 → 2 个，避免产生空白段落）
+  html = html.replace(/\n{3,}/g, '\n\n')
+
+  // 合并被空行分隔的列表项（确保它们分组到同一个 <ul>/<ol>）
+  html = html.replace(/(^\s*[-*]\s+.+$)\n\n+(?=^\s*[-*]\s+)/gm, '$1\n')
+  html = html.replace(/(^\s*\d+\.\s+.+$)\n\n+(?=^\s*\d+\.\s+)/gm, '$1\n')
+
   // 标题
   html = html.replace(/^#### (.+)$/gm, '<h4 class="md-h4">$1</h4>')
   html = html.replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
@@ -347,9 +354,9 @@ const parseMarkdown = (markdown) => {
     return t
   })
 
-  // 段落
-  html = html.split('\n\n').map(block => {
-    if (block.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr|table)/) ||
+  // 段落（过滤空块避免多余间距）
+  html = html.split('\n\n').filter(b => b.trim()).map(block => {
+    if (block.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr|table|li)/) ||
         block.includes('__CODE_BLOCK_') ||
         block.includes('__MATH_BLOCK_')) {
       return block
