@@ -496,8 +496,10 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
 
     # ── 3. Jina Reader 抓取 top N URL ──
     scraped = []  # [{ref_id, title, content, url}]
+    scrape_status = {}  # ref_id → 'scraped' | 'snippet' | 'skipped'
     for ref_id, url, title, domain in references[:_SCRAPE_TOP_N]:
         if not url:
+            scrape_status[ref_id] = 'skipped'
             continue
         content = _jina_scrape(url)
         if content and len(content) > 100:
@@ -507,6 +509,7 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                 "content": content,
                 "url": url,
             })
+            scrape_status[ref_id] = 'scraped'
         else:
             # Jina 抓取失败，用搜索 snippet 替代
             snippet = search_results[ref_id - 1].get("snippet", "")
@@ -517,6 +520,23 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                     "content": snippet,
                     "url": url,
                 })
+            scrape_status[ref_id] = 'snippet'
+    # 未尝试抓取的标记为 skipped
+    for ref_id, url, title, domain in references[_SCRAPE_TOP_N:]:
+        scrape_status[ref_id] = 'skipped'
+
+    # ── 3.5 构建抓取状态头部 ──
+    scraped_count = sum(1 for s in scrape_status.values() if s == 'scraped')
+    status_lines = [f"🔍 搜索「{query}」| {len(references)} 条结果，已抓取 {scraped_count} 个网页\n"]
+    for ref_id, url, title, domain in references:
+        st = scrape_status.get(ref_id, 'skipped')
+        if st == 'scraped':
+            status_lines.append(f"  [REF:{ref_id}] {domain} ✅")
+        elif st == 'snippet':
+            status_lines.append(f"  [REF:{ref_id}] {domain} ⚠️ 仅摘要")
+        else:
+            status_lines.append(f"  [REF:{ref_id}] {domain}")
+    scrape_header = "\n".join(status_lines) + "\n\n---\n\n"
 
     # ── 4. Cerebras/DeepSeek 结构化提取 ──
     summaries = []
@@ -545,10 +565,10 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
     if len(summaries) >= 2 and total_summary_len > 500:
         consolidated = _ai_consolidate(summaries, references, query)
         if consolidated:
-            return consolidated
+            return scrape_header + consolidated
 
     # ── 6. 降级：直接拼接摘要 + 引用列表 ──
-    lines = [f"搜索 \"{query}\" 的结果：\n"]
+    lines = [scrape_header]
 
     # 有摘要时输出摘要
     if summaries:

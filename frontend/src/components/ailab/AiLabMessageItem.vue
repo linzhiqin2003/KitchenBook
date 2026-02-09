@@ -88,6 +88,7 @@ const copyContent = async () => {
 
 const reasoningTurnCollapsed = ref({})
 const toolArgsCollapsed = ref({})
+const toolResultCollapsed = ref({})
 
 const subTurns = computed(() => Array.isArray(props.message.subTurns) ? props.message.subTurns : [])
 const currentReasoning = computed(() => props.message.currentReasoning || '')
@@ -220,6 +221,52 @@ const hasToolArguments = (toolCall) => {
   return args && args !== '{}'
 }
 
+// 工具结果折叠控制
+const isToolResultCollapsed = (toolCall, fallback = '') => {
+  const key = getToolKey(toolCall, fallback)
+  if (toolResultCollapsed.value[key] === undefined) {
+    return true // 默认折叠
+  }
+  return toolResultCollapsed.value[key]
+}
+
+const toggleToolResult = (toolCall, fallback = '') => {
+  const key = getToolKey(toolCall, fallback)
+  toolResultCollapsed.value[key] = !isToolResultCollapsed(toolCall, fallback)
+}
+
+// 从工具结果文本中解析 [REF:n] → URL 映射
+const parseRefMap = (text) => {
+  if (!text) return {}
+  const map = {}
+  // 匹配引用来源部分: [REF:1] title - url 或 - [REF:1] url
+  const patterns = [
+    /\[REF:(\d+)\]\s+[^-\n]*?-\s+(https?:\/\/\S+)/g,
+    /\[REF:(\d+)\]\s+(https?:\/\/\S+)/g,
+  ]
+  for (const re of patterns) {
+    let m
+    while ((m = re.exec(text)) !== null) {
+      map[m[1]] = m[2].replace(/[)\],.]+$/, '')
+    }
+  }
+  return map
+}
+
+// 全局引用映射（从所有工具结果中收集）
+const globalRefMap = computed(() => {
+  const map = {}
+  for (const turn of subTurns.value) {
+    if (turn.toolCall?.result) {
+      Object.assign(map, parseRefMap(turn.toolCall.result))
+    }
+  }
+  if (currentToolCall.value?.result) {
+    Object.assign(map, parseRefMap(currentToolCall.value.result))
+  }
+  return map
+})
+
 // HTML 转义
 const escapeHtml = (text) => {
   const div = document.createElement('div')
@@ -284,6 +331,16 @@ const parseMarkdown = (markdown) => {
 
   // 链接
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="md-link" target="_blank" rel="noopener">$1</a>')
+
+  // [REF:n] → 可点击超链接
+  const refMap = globalRefMap.value
+  html = html.replace(/\[REF:(\d+)\]/g, (match, num) => {
+    const url = refMap[num]
+    if (url) {
+      return `<a href="${escapeHtml(url)}" class="ref-link" target="_blank" rel="noopener" title="${escapeHtml(url)}">[${num}]</a>`
+    }
+    return `<span class="ref-tag">[${num}]</span>`
+  })
 
   // 无序列表
   html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li class="md-li">$1</li>')
@@ -488,9 +545,25 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                     >{{ formatToolArguments(turn.toolCall) }}</pre>
                   </Transition>
                 </div>
-                <div v-if="formatToolResult(turn.toolCall)" class="ml-4 mt-1">
-                  <div class="trace-result-label">{{ turn.toolCall.status === 'error' ? '错误' : '结果' }}</div>
-                  <div :class="['trace-result-text', turn.toolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']">{{ formatToolResult(turn.toolCall) }}</div>
+                <div v-if="formatToolResult(turn.toolCall)" class="ml-4 mt-0.5">
+                  <button
+                    class="trace-toggle"
+                    @click="toggleToolResult(turn.toolCall, getTurnKey(turn, turnIndex))"
+                  >
+                    <svg
+                      :class="['w-3 h-3 transition-transform', { 'rotate-90': !isToolResultCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    {{ turn.toolCall.status === 'error' ? '错误' : '结果' }}
+                  </button>
+                  <Transition name="collapse">
+                    <div
+                      v-if="!isToolResultCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))"
+                      :class="['trace-result-text', turn.toolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
+                    >{{ formatToolResult(turn.toolCall) }}</div>
+                  </Transition>
                 </div>
               </div>
             </div>
@@ -532,9 +605,25 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                   >{{ formatToolArguments(currentToolCall) }}</pre>
                 </Transition>
               </div>
-              <div v-if="formatToolResult(currentToolCall)" class="ml-4 mt-1">
-                <div class="trace-result-label">{{ currentToolCall.status === 'error' ? '错误' : '结果' }}</div>
-                <div :class="['trace-result-text', currentToolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']">{{ formatToolResult(currentToolCall) }}</div>
+              <div v-if="formatToolResult(currentToolCall)" class="ml-4 mt-0.5">
+                <button
+                  class="trace-toggle"
+                  @click="toggleToolResult(currentToolCall, `current-${index}`)"
+                >
+                  <svg
+                    :class="['w-3 h-3 transition-transform', { 'rotate-90': !isToolResultCollapsed(currentToolCall, `current-${index}`) }]"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                  </svg>
+                  {{ currentToolCall.status === 'error' ? '错误' : '结果' }}
+                </button>
+                <Transition name="collapse">
+                  <div
+                    v-if="!isToolResultCollapsed(currentToolCall, `current-${index}`)"
+                    :class="['trace-result-text', currentToolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
+                  >{{ formatToolResult(currentToolCall) }}</div>
+                </Transition>
               </div>
             </div>
             </div>
@@ -972,5 +1061,41 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
 .markdown-content :deep(mjx-container) {
   color: #1f2937 !important;
+}
+
+/* 引用标记超链接 */
+.markdown-content :deep(.ref-link) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7em;
+  font-weight: 600;
+  color: #7c3aed;
+  background: #f3e8ff;
+  padding: 0.05em 0.35em;
+  border-radius: 0.25em;
+  text-decoration: none;
+  border-bottom: none !important;
+  vertical-align: super;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.markdown-content :deep(.ref-link:hover) {
+  background: #7c3aed;
+  color: #fff;
+  border-bottom: none !important;
+}
+
+.markdown-content :deep(.ref-tag) {
+  display: inline-flex;
+  font-size: 0.7em;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 0.05em 0.35em;
+  border-radius: 0.25em;
+  vertical-align: super;
+  line-height: 1;
 }
 </style>
