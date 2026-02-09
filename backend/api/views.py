@@ -1092,7 +1092,7 @@ class DeepSeekSpecialeView(APIView):
 
         def generate():
             from openai import OpenAI
-            from .tools import TOOL_DEFINITIONS, execute_tool_streaming, reset_ref_counter
+            from .tools import TOOL_DEFINITIONS, execute_tool_streaming, reset_ref_counter, get_collected_references
             import time as _time
 
             # 重置引用计数器，确保本次请求内 [REF:n] 编号全局唯一递增
@@ -1312,6 +1312,18 @@ class DeepSeekSpecialeView(APIView):
                     yield emit({"type": "content_start"})
                     yield emit({"type": "content", "content": fallback})
                     total_content = len(fallback)
+
+                # ── 自动补齐引用来源列表 ──
+                collected_refs = get_collected_references()
+                if collected_refs:
+                    ref_lines = ["\n\n---\n**引用来源**\n"]
+                    for ref_id, url, title, domain in collected_refs:
+                        ref_lines.append(f"\\[REF:{ref_id}\\] [{title}]({url})\n")
+                    ref_block = "".join(ref_lines)
+                    if not content_started:
+                        yield emit({"type": "content_start"})
+                    yield emit({"type": "content", "content": ref_block})
+                    total_content += len(ref_block)
 
                 # ── 发送完成信号 ──
                 yield emit({

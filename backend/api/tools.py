@@ -26,8 +26,9 @@ _ref_state = threading.local()
 
 
 def reset_ref_counter():
-    """在每次新的 agentic loop 开始时调用，重置引用编号为 0。"""
+    """在每次新的 agentic loop 开始时调用，重置引用编号和收集列表。"""
     _ref_state.counter = 0
+    _ref_state.references = []  # [(ref_id, url, title, domain), ...]
 
 
 def _next_ref_id():
@@ -36,6 +37,18 @@ def _next_ref_id():
         _ref_state.counter = 0
     _ref_state.counter += 1
     return _ref_state.counter
+
+
+def _collect_ref(ref_id, url, title, domain):
+    """将引用信息收集到请求级列表中，供最终补齐用。"""
+    if not hasattr(_ref_state, 'references'):
+        _ref_state.references = []
+    _ref_state.references.append((ref_id, url, title, domain))
+
+
+def get_collected_references():
+    """获取本次请求中所有工具调用收集到的引用列表。"""
+    return getattr(_ref_state, 'references', [])
 
 
 # ==================== 工具定义（OpenAI 格式） ====================
@@ -538,6 +551,7 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
         title = item.get("title", "无标题")
         domain = _extract_domain(url)
         references.append((ref_id, url, title, domain))
+        _collect_ref(ref_id, url, title, domain)
 
     # ── 3. Jina Reader 并行抓取 ──
     scrape_refs = references[:_SCRAPE_TOP_N]
