@@ -1027,14 +1027,20 @@ class DeepSeekSpecialeView(APIView):
         "使用工具后，务必在回复中为用户清晰总结结果，不要仅在思考过程中回答。"
     )
 
+    # 统一走 OpenRouter，reasoning 字段一致为 model_extra['reasoning']
+    OPENROUTER_HEADERS = {
+        'HTTP-Referer': 'https://www.lzqqq.org',
+        'X-Title': 'AI Lab',
+    }
+
     MODEL_CONFIGS = {
         'deepseek-reasoner': {
             'label': 'DeepSeek Reasoner',
-            'api_key_setting': 'DEEPSEEK_API_KEY',
-            'base_url_setting': 'DEEPSEEK_BASE_URL',
-            'model': 'deepseek-chat',
-            'extra_body': {"thinking": {"type": "enabled", "budget_tokens": 4096}},
-            'extra_headers': {},
+            'api_key_setting': 'OPENROUTER_API_KEY',
+            'base_url': 'https://openrouter.ai/api/v1',
+            'model': 'deepseek/deepseek-r1',
+            'extra_body': {},
+            'extra_headers': OPENROUTER_HEADERS,
         },
         'stepfun-flash': {
             'label': 'StepFun Flash',
@@ -1042,10 +1048,7 @@ class DeepSeekSpecialeView(APIView):
             'base_url': 'https://openrouter.ai/api/v1',
             'model': 'stepfun/step-3.5-flash:free',
             'extra_body': {},
-            'extra_headers': {
-                'HTTP-Referer': 'https://www.lzqqq.org',
-                'X-Title': 'AI Lab',
-            },
+            'extra_headers': OPENROUTER_HEADERS,
         },
     }
 
@@ -1127,11 +1130,9 @@ class DeepSeekSpecialeView(APIView):
                         delta = choice.delta
                         finish_reason = choice.finish_reason or finish_reason
 
-                        # 2a. reasoning_content (DeepSeek) 或 reasoning (OpenRouter)
-                        rc = getattr(delta, 'reasoning_content', None)
-                        if not rc:
-                            extra = getattr(delta, 'model_extra', None) or {}
-                            rc = extra.get('reasoning')
+                        # 2a. reasoning (OpenRouter 统一字段)
+                        extra = getattr(delta, 'model_extra', None) or {}
+                        rc = extra.get('reasoning') or getattr(delta, 'reasoning_content', None)
                         if rc:
                             if not reasoning_started:
                                 reasoning_started = True
