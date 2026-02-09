@@ -1252,13 +1252,16 @@ class DeepSeekSpecialeView(APIView):
                             result_str, error_str = None, None
                             for tool_event in execute_tool_streaming(tool_name, tool_args):
                                 if "progress" in tool_event:
-                                    yield emit({
+                                    evt = {
                                         "type": "tool_progress",
                                         "index": idx,
                                         "id": tool_id,
                                         "name": tool_name,
                                         "message": tool_event["progress"],
-                                    })
+                                    }
+                                    if "urls" in tool_event:
+                                        evt["urls"] = tool_event["urls"]
+                                    yield emit(evt)
                                 elif "result" in tool_event:
                                     result_str = tool_event["result"]
                                 elif "error" in tool_event:

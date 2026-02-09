@@ -381,6 +381,7 @@ const streamResponse = async () => {
       result: '',
       error: '',
       progressMessage: '',
+      progressUrls: [],
       startedAt: Date.now(),
       finishedAt: null
     }
@@ -427,9 +428,13 @@ const streamResponse = async () => {
     if (fragment.progressMessage !== undefined) {
       existing.progressMessage = fragment.progressMessage
     }
+    if (fragment.progressUrls !== undefined) {
+      existing.progressUrls = fragment.progressUrls
+    }
     // 完成后清除进度消息
     if (existing.status === TOOL_STATUS.SUCCESS || existing.status === TOOL_STATUS.ERROR) {
       existing.progressMessage = ''
+      existing.progressUrls = []
     }
 
     existing.parsedArguments = safeParseJson(existing.argumentsText)
@@ -549,7 +554,8 @@ const streamResponse = async () => {
       result: payload.result ?? payload.output,
       error: payload.error,
       durationMs: payload.duration_ms || payload.durationMs,
-      progressMessage: eventType === 'tool_progress' ? payload.message : undefined
+      progressMessage: eventType === 'tool_progress' ? payload.message : undefined,
+      progressUrls: eventType === 'tool_progress' && payload.urls ? payload.urls : undefined
     }, { appendArguments: eventType !== 'tool_call' })
   }
 

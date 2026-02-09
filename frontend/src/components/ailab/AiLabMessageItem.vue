@@ -610,11 +610,30 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                 <span :class="['trace-meta', formatToolStatus(currentToolCall.status).textClass]">{{ formatToolStatus(currentToolCall.status).label }}</span>
                 <span v-if="formatToolDuration(currentToolCall)" class="trace-meta text-slate-400">{{ formatToolDuration(currentToolCall) }}</span>
               </div>
-              <!-- 工具执行进度 -->
-              <div v-if="currentToolCall.progressMessage && currentToolCall.status === 'running'" class="trace-progress">
-                <span class="trace-progress-dot"></span>
-                {{ currentToolCall.progressMessage }}
-              </div>
+              <!-- 工具执行进度：URL 标签 + 文字 -->
+              <template v-if="currentToolCall.status === 'running'">
+                <div v-if="currentToolCall.progressUrls && currentToolCall.progressUrls.length" class="trace-url-tags">
+                  <span
+                    v-for="(u, ui) in currentToolCall.progressUrls"
+                    :key="ui"
+                    :class="['url-tag', u.status === 'done' ? 'url-tag-done' : u.status === 'fail' ? 'url-tag-fail' : 'url-tag-pending']"
+                  >
+                    <img
+                      :src="`https://www.google.com/s2/favicons?domain=${u.domain}&sz=16`"
+                      class="url-tag-icon"
+                      loading="lazy"
+                      @error="$event.target.style.display='none'"
+                    />
+                    <span class="url-tag-text">{{ u.domain }}</span>
+                    <svg v-if="u.status === 'done'" class="url-tag-check" viewBox="0 0 16 16" fill="currentColor"><path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z"/></svg>
+                    <span v-else-if="u.status === 'pending'" class="url-tag-spinner"></span>
+                  </span>
+                </div>
+                <div v-if="currentToolCall.progressMessage" class="trace-progress">
+                  <span class="trace-progress-dot"></span>
+                  {{ currentToolCall.progressMessage }}
+                </div>
+              </template>
               <div v-if="hasToolArguments(currentToolCall)" class="ml-4 mt-0.5">
                 <button
                   class="trace-toggle"
@@ -901,6 +920,81 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* URL favicon 标签容器 */
+.trace-url-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.35rem 0 0.25rem 1rem;
+  animation: fadeInSoft 0.2s ease-out;
+}
+
+.url-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem 0.15rem 0.3rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  line-height: 1;
+  white-space: nowrap;
+  transition: all 0.25s ease;
+}
+
+.url-tag-done {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.url-tag-fail {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  opacity: 0.7;
+}
+
+.url-tag-pending {
+  background: #f8fafc;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+  opacity: 0.55;
+}
+
+.url-tag-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.url-tag-text {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.url-tag-check {
+  width: 12px;
+  height: 12px;
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.url-tag-spinner {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid #cbd5e1;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .trace-progress {

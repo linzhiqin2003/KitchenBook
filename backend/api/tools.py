@@ -518,7 +518,17 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
 
     # ── 3. Jina Reader 并行抓取 ──
     scrape_refs = references[:_SCRAPE_TOP_N]
-    yield {"progress": f"找到 {len(references)} 条结果，正在抓取 {len(scrape_refs)} 个网页..."}
+
+    # 构建 URL 进度追踪列表 — 供前端渲染 favicon 标签
+    url_progress = [
+        {"ref_id": ref_id, "domain": domain, "status": "pending"}
+        for ref_id, url, title, domain in scrape_refs
+    ]
+
+    yield {
+        "progress": f"找到 {len(references)} 条结果，正在抓取 {len(scrape_refs)} 个网页...",
+        "urls": [dict(u) for u in url_progress],
+    }
 
     scraped = []
     scrape_status = {}
@@ -539,7 +549,8 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
             ref_id, url, title, domain, sr = future_map[future]
             content = future.result()
             done_count += 1
-            if content and len(content) > 100:
+            ok = content and len(content) > 100
+            if ok:
                 scraped.append({"ref_id": ref_id, "title": title, "content": content, "url": url})
                 scrape_status[ref_id] = 'scraped'
             else:
@@ -547,8 +558,14 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                 if snippet:
                     scraped.append({"ref_id": ref_id, "title": title, "content": snippet, "url": url})
                 scrape_status[ref_id] = 'snippet'
-            # 逐条进度
-            yield {"progress": f"正在抓取网页... ({done_count}/{total_to_scrape})"}
+            # 更新 URL 进度状态
+            for u in url_progress:
+                if u["ref_id"] == ref_id:
+                    u["status"] = "done" if ok else "fail"
+            yield {
+                "progress": f"正在抓取网页... ({done_count}/{total_to_scrape})",
+                "urls": [dict(u) for u in url_progress],
+            }
 
     if _SCRAPE_TOP_N is not None:
         for ref_id, url, title, domain in references[_SCRAPE_TOP_N:]:
@@ -557,7 +574,15 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
     scraped_count = sum(1 for s in scrape_status.values() if s == 'scraped')
 
     # ── 4. Cerebras/DeepSeek 并行结构化提取 ──
-    yield {"progress": f"已抓取 {scraped_count} 个网页，AI 正在提取关键信息..."}
+    # 重置进度列表用于提取阶段
+    extract_url_progress = [
+        {"ref_id": it["ref_id"], "domain": _extract_domain(it["url"]), "status": "pending"}
+        for it in scraped
+    ]
+    yield {
+        "progress": f"已抓取 {scraped_count} 个网页，AI 正在提取关键信息...",
+        "urls": [dict(u) for u in extract_url_progress],
+    }
 
     summaries = []
     if scraped:
@@ -584,8 +609,14 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
                         "title": item["title"],
                         "content": item["content"][:500],
                     })
-                # 逐条进度
-                yield {"progress": f"AI 正在提取关键信息... ({extract_done}/{total_extract})"}
+                # 更新提取进度
+                for u in extract_url_progress:
+                    if u["ref_id"] == item["ref_id"]:
+                        u["status"] = "done" if extracted else "fail"
+                yield {
+                    "progress": f"AI 正在提取关键信息... ({extract_done}/{total_extract})",
+                    "urls": [dict(u) for u in extract_url_progress],
+                }
         summaries.sort(key=lambda s: s["ref_id"])
 
     # ── 构建输出辅助块 ──

@@ -227,7 +227,7 @@ SILICONFLOW_API_KEY = os.environ.get('SILICONFLOW_API_KEY', 'sk-ywlsinkhxbuyohli
 SILICONFLOW_BASE_URL = os.environ.get('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')
 
 # OpenRouter API 配置 (用于 StepFun 等第三方模型)
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 
 # Serper API 配置 (用于 AI Lab 网页搜索)
 SERPER_API_KEY = os.environ.get('SERPER_API_KEY', '916263416ebbe08863fca6f625106344d7b65271')
