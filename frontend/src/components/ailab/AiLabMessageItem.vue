@@ -239,15 +239,12 @@ const toggleToolResult = (toolCall, fallback = '') => {
 const parseRefMap = (text) => {
   if (!text) return {}
   const map = {}
-  // 匹配引用来源部分: [REF:1] title - url 或 - [REF:1] url
-  const patterns = [
-    /\[REF:(\d+)\]\s+[^-\n]*?-\s+(https?:\/\/\S+)/g,
-    /\[REF:(\d+)\]\s+(https?:\/\/\S+)/g,
-  ]
-  for (const re of patterns) {
-    let m
-    while ((m = re.exec(text)) !== null) {
-      map[m[1]] = m[2].replace(/[)\],.]+$/, '')
+  // 匹配 [REF:n] ... https://url（同一行内，取最后出现的 URL）
+  const re = /\[REF:(\d+)\][^\n]*(https?:\/\/\S+)/g
+  let m
+  while ((m = re.exec(text)) !== null) {
+    if (!map[m[1]]) {
+      map[m[1]] = m[2].replace(/[)\],.;:]+$/, '')
     }
   }
   return map

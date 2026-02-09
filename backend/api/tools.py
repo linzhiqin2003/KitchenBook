@@ -259,7 +259,10 @@ def _jina_scrape(url, timeout=15):
     jina_url = f"https://r.jina.ai/{url}"
     req = urllib.request.Request(
         jina_url,
-        headers={"Accept": "text/plain"},
+        headers={
+            "Accept": "text/plain",
+            "User-Agent": "Mozilla/5.0 (compatible; AILabBot/1.0)",
+        },
         method="GET",
     )
     try:
@@ -536,7 +539,13 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
             status_lines.append(f"  [REF:{ref_id}] {domain} ⚠️ 仅摘要")
         else:
             status_lines.append(f"  [REF:{ref_id}] {domain}")
-    scrape_header = "\n".join(status_lines) + "\n\n---\n\n"
+    scrape_header = "\n".join(status_lines) + "\n\n"
+
+    # 构建引用来源块（始终附在末尾，供前端解析 ref→URL 映射）
+    ref_lines = ["### 引用来源"]
+    for ref_id, url, title, domain in references:
+        ref_lines.append(f"[REF:{ref_id}] {title} - {url}")
+    ref_block = "\n".join(ref_lines)
 
     # ── 4. Cerebras/DeepSeek 结构化提取 ──
     summaries = []
@@ -565,7 +574,7 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
     if len(summaries) >= 2 and total_summary_len > 500:
         consolidated = _ai_consolidate(summaries, references, query)
         if consolidated:
-            return scrape_header + consolidated
+            return scrape_header + consolidated + "\n\n" + ref_block
 
     # ── 6. 降级：直接拼接摘要 + 引用列表 ──
     lines = [scrape_header]
@@ -592,9 +601,7 @@ def handle_web_search(query="", search_type="search", max_results=5, **kwargs):
             lines.append("")
 
     # 附引用列表
-    lines.append("### 引用来源")
-    for ref_id, url, title, domain in references:
-        lines.append(f"[REF:{ref_id}] {title} - {url}")
+    lines.append(ref_block)
 
     return "\n".join(lines)
 
