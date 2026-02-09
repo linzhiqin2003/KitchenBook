@@ -1014,95 +1014,237 @@ class AiAgentView(APIView):
 # ==================== DeepSeek Reasoner 思考模型 ====================
 
 class DeepSeekSpecialeView(APIView):
-    """DeepSeek Reasoner 思考模型 - 流式输出思维链"""
+    """DeepSeek Speciale 思考模型 - 支持 agentic 工具调用循环"""
     authentication_classes = []
     permission_classes = []
-    
+
+    MAX_ROUNDS = 10
+
+    SYSTEM_PROMPT = (
+        "你是一个乐于助人的 AI 助手。"
+        "你可以使用工具来获取实时信息或执行计算。"
+        "如果用户的问题不需要工具，直接回答即可。"
+    )
+
     def post(self, request):
-        """处理对话请求（流式响应 + 思维链展示）"""
+        """处理对话请求（流式响应 + agentic 工具调用循环）"""
         messages = request.data.get('messages', [])
-        
+
         if not messages:
             return Response({'error': '消息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # 使用标准 DeepSeek API
+
         deepseek_api_key = settings.DEEPSEEK_API_KEY
         deepseek_base_url = settings.DEEPSEEK_BASE_URL
-        
+
         if not deepseek_api_key:
             return Response({
                 'error': 'AI 服务未配置，请联系管理员'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        
-        # 构建消息
-        full_messages = messages
-        
+
+        # 构建消息 — 前端只发 role + content，不含 reasoning_content
+        full_messages = [
+            {"role": "system", "content": self.SYSTEM_PROMPT}
+        ] + messages
+
         def generate():
-            """流式生成器"""
             from openai import OpenAI
-            
-            client = OpenAI(
-                api_key=deepseek_api_key,
-                base_url=deepseek_base_url
-            )
-            
+            from .tools import TOOL_DEFINITIONS, execute_tool
+            import time as _time
+
+            client = OpenAI(api_key=deepseek_api_key, base_url=deepseek_base_url)
+
+            def emit(data):
+                return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+            total_reasoning = 0
+            total_content = 0
+
             try:
-                # 发送初始状态
-                yield f"data: {json.dumps({'type': 'status', 'content': '正在连接 DeepSeek Reasoner...'}, ensure_ascii=False)}\n\n"
-                
-                # 调用 DeepSeek V3.2 Speciale (思考模型，流式)
-                response = client.chat.completions.create(
-                    model="deepseek-reasoner",
-                    messages=full_messages,
-                    stream=True
-                )
-                
-                current_reasoning = ""
-                current_content = ""
-                reasoning_started = False
-                content_started = False
-                
-                for chunk in response:
-                    # 检查是否有有效的 choices
-                    if not chunk.choices:
+                for round_num in range(self.MAX_ROUNDS):
+                    # ── 1. 调用 DeepSeek API（流式 + 工具） ──
+                    stream = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=full_messages,
+                        tools=TOOL_DEFINITIONS,
+                        stream=True,
+                        extra_body={"thinking": {"type": "enabled", "budget_tokens": 4096}},
+                    )
+
+                    reasoning_started = False
+                    content_started = False
+                    current_reasoning = ""
+                    current_content = ""
+
+                    # 工具调用累积器: {index: {id, name, arguments}}
+                    tool_calls_acc = {}
+                    finish_reason = None
+
+                    # ── 2. 处理流式 chunks ──
+                    for chunk in stream:
+                        if not chunk.choices:
+                            continue
+
+                        choice = chunk.choices[0]
+                        delta = choice.delta
+                        finish_reason = choice.finish_reason or finish_reason
+
+                        # 2a. reasoning_content
+                        rc = getattr(delta, 'reasoning_content', None)
+                        if rc:
+                            if not reasoning_started:
+                                reasoning_started = True
+                                yield emit({"type": "reasoning_start"})
+                            current_reasoning += rc
+                            yield emit({"type": "reasoning", "content": rc})
+
+                        # 2b. tool_calls delta
+                        if delta.tool_calls:
+                            for tc_delta in delta.tool_calls:
+                                idx = tc_delta.index
+                                if idx not in tool_calls_acc:
+                                    # 结束 reasoning 阶段
+                                    if reasoning_started and not content_started:
+                                        yield emit({"type": "reasoning_end"})
+                                        reasoning_started = False
+                                    # 首次出现 — 替换模式
+                                    tool_calls_acc[idx] = {
+                                        "id": tc_delta.id or "",
+                                        "name": (tc_delta.function.name if tc_delta.function else "") or "",
+                                        "arguments": (tc_delta.function.arguments if tc_delta.function else "") or "",
+                                    }
+                                    yield emit({
+                                        "type": "tool_call",
+                                        "index": idx,
+                                        "id": tool_calls_acc[idx]["id"],
+                                        "name": tool_calls_acc[idx]["name"],
+                                        "arguments": tool_calls_acc[idx]["arguments"],
+                                    })
+                                else:
+                                    # 后续 chunk — 追加 arguments
+                                    args_chunk = (tc_delta.function.arguments if tc_delta.function else "") or ""
+                                    tool_calls_acc[idx]["arguments"] += args_chunk
+                                    # 补全 id/name（有些 API 只在首 chunk 给）
+                                    if tc_delta.id:
+                                        tool_calls_acc[idx]["id"] = tc_delta.id
+                                    if tc_delta.function and tc_delta.function.name:
+                                        tool_calls_acc[idx]["name"] = tc_delta.function.name
+                                    yield emit({
+                                        "type": "tool_call_delta",
+                                        "index": idx,
+                                        "id": tool_calls_acc[idx]["id"],
+                                        "arguments": args_chunk,
+                                    })
+
+                        # 2c. content
+                        if delta.content:
+                            if not content_started:
+                                content_started = True
+                                if reasoning_started:
+                                    yield emit({"type": "reasoning_end"})
+                                    reasoning_started = False
+                                yield emit({"type": "content_start"})
+                            current_content += delta.content
+                            yield emit({"type": "content", "content": delta.content})
+
+                    # 收尾 reasoning
+                    if reasoning_started and not content_started and not tool_calls_acc:
+                        yield emit({"type": "reasoning_end"})
+
+                    total_reasoning += len(current_reasoning)
+                    total_content += len(current_content)
+
+                    # ── 3. 判断 finish_reason ──
+                    if finish_reason == "tool_calls" and tool_calls_acc:
+                        # 构建 assistant 消息（带 tool_calls，content 为 None）
+                        assistant_tool_calls = []
+                        for idx in sorted(tool_calls_acc.keys()):
+                            tc = tool_calls_acc[idx]
+                            assistant_tool_calls.append({
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tc["name"],
+                                    "arguments": tc["arguments"],
+                                }
+                            })
+
+                        full_messages.append({
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": assistant_tool_calls,
+                        })
+
+                        # 执行每个工具
+                        for idx in sorted(tool_calls_acc.keys()):
+                            tc = tool_calls_acc[idx]
+                            tool_id = tc["id"]
+                            tool_name = tc["name"]
+
+                            # emit execution_start
+                            yield emit({
+                                "type": "tool_execution_start",
+                                "index": idx,
+                                "id": tool_id,
+                                "name": tool_name,
+                            })
+
+                            # 解析参数
+                            try:
+                                tool_args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                            except json.JSONDecodeError:
+                                tool_args = {}
+
+                            t0 = _time.time()
+                            result_str, error_str = execute_tool(tool_name, tool_args)
+                            duration_ms = int((_time.time() - t0) * 1000)
+
+                            if error_str:
+                                yield emit({
+                                    "type": "tool_execution_error",
+                                    "index": idx,
+                                    "id": tool_id,
+                                    "name": tool_name,
+                                    "error": error_str,
+                                    "duration_ms": duration_ms,
+                                })
+                                tool_content = json.dumps({"error": error_str}, ensure_ascii=False)
+                            else:
+                                yield emit({
+                                    "type": "tool_execution_result",
+                                    "index": idx,
+                                    "id": tool_id,
+                                    "name": tool_name,
+                                    "result": result_str,
+                                    "duration_ms": duration_ms,
+                                })
+                                tool_content = result_str
+
+                            # 追加 tool 消息到历史
+                            full_messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_id,
+                                "content": tool_content,
+                            })
+
+                        # continue loop — 下一轮会让模型继续思考
                         continue
-                    
-                    delta = chunk.choices[0].delta
-                    
-                    # 处理思维链 (reasoning_content)
-                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
-                        reasoning_chunk = delta.reasoning_content
-                        current_reasoning += reasoning_chunk
-                        if not reasoning_started:
-                            reasoning_started = True
-                            yield f"data: {json.dumps({'type': 'reasoning_start'}, ensure_ascii=False)}\n\n"
-                        yield f"data: {json.dumps({'type': 'reasoning', 'content': reasoning_chunk}, ensure_ascii=False)}\n\n"
-                    
-                    # 处理最终内容 (content)
-                    if hasattr(delta, 'content') and delta.content:
-                        content_chunk = delta.content
-                        current_content += content_chunk
-                        if not content_started:
-                            content_started = True
-                            # 标记思维链结束
-                            if reasoning_started:
-                                yield f"data: {json.dumps({'type': 'reasoning_end'}, ensure_ascii=False)}\n\n"
-                            yield f"data: {json.dumps({'type': 'content_start'}, ensure_ascii=False)}\n\n"
-                        yield f"data: {json.dumps({'type': 'content', 'content': content_chunk}, ensure_ascii=False)}\n\n"
-                
-                # 如果有思维链但没有内容，也要发送结束信号
-                if reasoning_started and not content_started:
-                    yield f"data: {json.dumps({'type': 'reasoning_end'}, ensure_ascii=False)}\n\n"
-                
-                # 发送完成信号
-                yield f"data: {json.dumps({'type': 'done', 'reasoning_length': len(current_reasoning), 'content_length': len(current_content)}, ensure_ascii=False)}\n\n"
+
+                    # finish_reason == "stop" 或其他 → 完成
+                    break
+
+                # ── 发送完成信号 ──
+                yield emit({
+                    "type": "done",
+                    "reasoning_length": total_reasoning,
+                    "content_length": total_content,
+                })
                 yield "data: [DONE]\n\n"
-                
+
             except Exception as e:
                 import traceback
                 traceback.print_exc()
-                yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
-        
+                yield emit({"type": "error", "error": str(e)})
+
         response = StreamingHttpResponse(generate(), content_type='text/event-stream')
         response['Cache-Control'] = 'no-cache'
         response['X-Accel-Buffering'] = 'no'
