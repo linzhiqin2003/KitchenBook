@@ -399,6 +399,11 @@ const parseMarkdown = (markdown) => {
     }
   })
 
+  // 最终清理：移除空段落，合并相邻列表
+  html = html.replace(/<p class="md-p">\s*(<br\s*\/?>)?\s*<\/p>/g, '')
+  html = html.replace(/<\/ul>\s*<ul class="md-ul">/g, '')
+  html = html.replace(/<\/ol>\s*<ol class="md-ol">/g, '')
+
   return html
 }
 
