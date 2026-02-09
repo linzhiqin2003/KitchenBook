@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import AiLabMessageItem from './AiLabMessageItem.vue'
 
 const props = defineProps({
@@ -26,15 +26,18 @@ const emit = defineEmits(['edit', 'regenerate'])
 const messagesContainer = ref(null)
 const reasoningCollapsed = ref({})
 
-// 防抖滚动：合并高频调用为一次 rAF
-let scrollRafId = null
+// 防抖滚动：等 Vue DOM 更新后再滚动，合并高频调用
+let scrollPending = false
 const scrollToBottom = () => {
-  if (scrollRafId) return
-  scrollRafId = requestAnimationFrame(() => {
-    scrollRafId = null
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-    }
+  if (scrollPending) return
+  scrollPending = true
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      scrollPending = false
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+      }
+    })
   })
 }
 

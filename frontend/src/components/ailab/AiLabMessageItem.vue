@@ -632,7 +632,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
           <!-- AI 消息操作按钮 -->
           <div v-if="message.content && !isStreaming"
-               class="flex items-center gap-1 mt-2 text-gray-400">
+               class="flex items-center gap-1 mt-2 text-gray-400 animate-fade-in-soft">
             <button @click="copyContent"
                     class="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 hover:text-gray-600 transition-colors text-xs cursor-pointer">
               <svg v-if="!copied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -654,7 +654,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
         </div>
 
         <!-- 统计信息 -->
-        <div v-if="message.stats && message.stats.endTime" class="flex items-center gap-4 mt-2 text-xs text-gray-400">
+        <div v-if="message.stats && message.stats.endTime" class="flex items-center gap-4 mt-2 text-xs text-gray-400 animate-fade-in-soft">
           <span class="flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -677,6 +677,16 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* 柔和淡入（无位移，避免布局跳动） */
+.animate-fade-in-soft {
+  animation: fadeInSoft 0.3s ease-out;
+}
+
+@keyframes fadeInSoft {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* 折叠动画 */
