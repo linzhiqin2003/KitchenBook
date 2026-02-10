@@ -142,6 +142,7 @@ const paragraphs = computed(() => {
 
 // ── Recording with VAD ──
 async function startRecording() {
+  // Step 1: Get microphone access
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -150,19 +151,25 @@ async function startRecording() {
         autoGainControl: true,
       },
     })
-    segmentSeq = 0
-    currentParagraphId = null
-    isRecording.value = true
-    recordingTime.value = 0
-    recordingStartTime = Date.now()
-    errorMsg.value = ''
+  } catch (e) {
+    errorMsg.value = '无法访问麦克风，请检查权限设置'
+    return
+  }
 
-    // Timer display
-    timerInterval = setInterval(() => {
-      recordingTime.value = Math.floor((Date.now() - recordingStartTime) / 1000)
-    }, 200)
+  segmentSeq = 0
+  currentParagraphId = null
+  isRecording.value = true
+  recordingTime.value = 0
+  recordingStartTime = Date.now()
+  errorMsg.value = ''
 
-    // Create VAD instance
+  // Timer display
+  timerInterval = setInterval(() => {
+    recordingTime.value = Math.floor((Date.now() - recordingStartTime) / 1000)
+  }, 200)
+
+  // Step 2: Initialize VAD
+  try {
     const { MicVAD } = await import('@ricky0123/vad-web')
     vadInstance = await MicVAD.new({
       stream: mediaStream,
@@ -182,7 +189,9 @@ async function startRecording() {
     })
     vadInstance.start()
   } catch (e) {
-    errorMsg.value = '无法访问麦克风，请检查权限设置'
+    console.error('VAD init failed:', e)
+    errorMsg.value = `语音检测模型加载失败: ${e.message}`
+    stopRecording()
   }
 }
 
