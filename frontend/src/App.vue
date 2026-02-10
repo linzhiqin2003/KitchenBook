@@ -5,11 +5,16 @@ import CartSidebar from './components/CartSidebar.vue'
 import AiChatWidget from './components/AiChatWidget.vue'
 import { cart } from './store/cart'
 import { auth } from './store/auth'
+import { useAuthStore } from './store/auth'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+
 // 个人首页独立布局
 const isPortfolioHome = computed(() => route.path === '/')
+// 统一登录页独立布局
+const isAuthPage = computed(() => route.path === '/login')
 // 更新为新的 /kitchen 路径结构
 const isChefMode = computed(() => route.path.startsWith('/kitchen/chef'))
 const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
@@ -33,16 +38,28 @@ watch(() => route.path, () => {
   mobileMenuOpen.value = false
 })
 
-// 登出
+// 登出（厨师模式退出）
 const handleLogout = () => {
   auth.logout()
+  authStore.chefLogout()
   router.push('/kitchen/chef/login')
+}
+
+// 全站登出
+const handleFullLogout = () => {
+  authStore.logout()
+  router.push('/login')
 }
 </script>
 
 <template>
   <!-- 个人网站首页独立模式 -->
   <div v-if="isPortfolioHome" class="min-h-screen">
+    <RouterView />
+  </div>
+
+  <!-- 统一登录页独立模式 -->
+  <div v-else-if="isAuthPage" class="min-h-screen">
     <RouterView />
   </div>
 

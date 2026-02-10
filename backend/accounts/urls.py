@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     path("register/", views.RegisterView.as_view(), name="auth-register"),
     path("login/", TokenObtainPairView.as_view(), name="auth-login"),
+    path("google/", views.GoogleLoginView.as_view(), name="auth-google"),
     path("token/refresh/", TokenRefreshView.as_view(), name="auth-token-refresh"),
     path("me/", views.UserProfileView.as_view(), name="auth-me"),
     path("orgs/", views.OrganizationListCreateView.as_view(), name="auth-orgs"),

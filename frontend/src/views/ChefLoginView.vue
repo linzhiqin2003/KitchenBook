@@ -3,10 +3,11 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import API_BASE_URL from '../config/api'
-import { auth } from '../store/auth'
+import { useAuthStore } from '../store/auth'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 
 const username = ref('')
 const password = ref('')
@@ -19,28 +20,24 @@ const handleLogin = async () => {
         error.value = '请输入用户名和密码'
         return
     }
-    
+
     loading.value = true
     error.value = ''
     success.value = false
-    
+
     try {
         const response = await axios.post(`${API_BASE_URL}/api/chef/login/`, {
             username: username.value,
             password: password.value
         })
-        
+
         if (response.data.success) {
-            // 更新 auth store（这会同时更新 localStorage）
-            auth.login(response.data.token)
-            
-            // 显示成功提示
+            authStore.chefLogin(response.data.token)
+
             success.value = true
-            
-            // 获取重定向目标，默认跳转到 chef 后台
+
             const redirectPath = route.query.redirect || '/kitchen/chef'
-            
-            // 稍微延迟后跳转，让用户看到成功提示
+
             setTimeout(() => {
                 router.push(redirectPath)
             }, 500)

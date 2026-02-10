@@ -17,3 +17,5 @@ gevent==24.2.1
 djangorestframework-simplejwt>=5.3,<6
 pydantic>=2.6,<3
 yfinance>=0.2.36
+django-allauth[socialaccount]>=65.0,<66
+google-auth>=2.27,<3

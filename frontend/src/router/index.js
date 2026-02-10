@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { auth } from '../store/auth'
 
 // 使用懒加载（动态导入）减小首屏加载体积
 // 首页直接加载，其他页面按需加载
@@ -20,7 +19,7 @@ const BlogEditorView = () => import('../views/BlogEditorView.vue')
 const BlogManagerView = () => import('../views/BlogManagerView.vue')
 const AiLabView = () => import('../views/AiLabView.vue')
 const AiLabStudioView = () => import('../views/AiLabStudioView.vue')
-const AiLabLoginView = () => import('../views/AiLabLoginView.vue')
+const AuthView = () => import('../views/AuthView.vue')
 const QuestionGenView = () => import('../views/QuestionGenView.vue')
 const PortfolioHomeView = () => import('../views/PortfolioHomeView.vue')
 const GamesHubView = () => import('../views/GamesHubView.vue')
@@ -34,6 +33,22 @@ const DEFAULT_TITLE = 'LZQ的个人空间'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // ========================================
+    // 公开页面
+    // ========================================
+    {
+      path: '/',
+      name: 'home',
+      component: PortfolioHomeView,
+      meta: { public: true, title: 'LZQ的个人空间' }
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: AuthView,
+      meta: { public: true, title: '登录 | LZQ Space' }
+    },
+
     // ========================================
     // Kitchen 模块 - /kitchen 路径下
     // ========================================
@@ -56,68 +71,68 @@ const router = createRouter({
       meta: { title: '菜谱详情 | 私房厨房' }
     },
 
-    // 登录页面（不需要验证）
+    // 厨师登录页面（需要 JWT 登录，但不需要厨师密码）
     {
       path: '/kitchen/chef/login',
       name: 'chef-login',
       component: ChefLoginView,
-      meta: { requiresAuth: false, title: '厨师登录' }
+      meta: { title: '厨师登录' }
     },
-    // 以下路由需要登录验证
+    // 以下路由需要厨师密码验证
     {
       path: '/kitchen/chef',
       name: 'chef-landing',
       component: AdminLandingView,
-      meta: { requiresAuth: true, title: '管理后台 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '管理后台 | 私房厨房' }
     },
     {
       path: '/kitchen/chef/orders',
       name: 'chef-orders',
       component: ChefDashboard,
-      meta: { requiresAuth: true, title: '订单管理 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '订单管理 | 私房厨房' }
     },
     {
       path: '/kitchen/chef/recipes',
       name: 'chef-recipes',
       component: RecipeManagerView,
-      meta: { requiresAuth: true, title: '菜谱管理 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '菜谱管理 | 私房厨房' }
     },
     {
       path: '/kitchen/chef/recipes/new',
       name: 'chef-recipe-new',
       component: RecipeEditorView,
-      meta: { requiresAuth: true, title: '新建菜谱 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '新建菜谱 | 私房厨房' }
     },
     {
       path: '/kitchen/chef/recipes/:id/edit',
       name: 'chef-recipe-edit',
       component: RecipeEditorView,
-      meta: { requiresAuth: true, title: '编辑菜谱 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '编辑菜谱 | 私房厨房' }
     },
     {
       path: '/kitchen/chef/inventory',
       name: 'chef-inventory',
       component: InventoryView,
-      meta: { requiresAuth: true, title: '库存管理 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '库存管理 | 私房厨房' }
     },
-    // 博客管理路由（需要登录）
+    // 博客管理路由（需要厨师密码）
     {
       path: '/kitchen/chef/blog',
       name: 'chef-blog',
       component: BlogManagerView,
-      meta: { requiresAuth: true, title: '博客管理 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '博客管理 | 私房厨房' }
     },
     {
       path: '/kitchen/chef/blog/new',
       name: 'chef-blog-new',
       component: BlogEditorView,
-      meta: { requiresAuth: true, title: '新建博客 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '新建博客 | 私房厨房' }
     },
     {
       path: '/kitchen/chef/blog/:id/edit',
       name: 'chef-blog-edit',
       component: BlogEditorView,
-      meta: { requiresAuth: true, title: '编辑博客 | 私房厨房' }
+      meta: { requiresAuth: true, authType: 'chef', title: '编辑博客 | 私房厨房' }
     },
 
     // ========================================
@@ -163,25 +178,19 @@ const router = createRouter({
     },
 
     // ========================================
-    // AI Lab 模块 - /ai-lab 路径下 (需要登录)
+    // AI Lab 模块 - /ai-lab 路径下
     // ========================================
-    {
-      path: '/ai-lab/login',
-      name: 'ai-lab-login',
-      component: AiLabLoginView,
-      meta: { title: 'AI Lab 登录 | LZQ' }
-    },
     {
       path: '/ai-lab',
       name: 'ai-lab',
       component: AiLabView,
-      meta: { requiresAuth: true, authType: 'ai-lab', title: 'AI Lab | DeepSeek Reasoner' }
+      meta: { title: 'AI Lab | DeepSeek Reasoner' }
     },
     {
       path: '/ai-lab/studio',
       name: 'ai-lab-studio',
       component: AiLabStudioView,
-      meta: { requiresAuth: true, authType: 'ai-lab', title: 'AI Studio | LZQ' }
+      meta: { title: 'AI Studio | LZQ' }
     },
 
     // ========================================
@@ -199,39 +208,49 @@ const router = createRouter({
       component: GomokuView,
       meta: { title: '五子棋联机 | LZQ' }
     },
-
-    // ========================================
-    // 根路径 - 个人网站首页
-    // ========================================
-    {
-      path: '/',
-      name: 'home',
-      component: PortfolioHomeView,
-      meta: { title: 'LZQ的个人空间' }
-    }
   ]
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+let initPromise = null
+
+router.beforeEach(async (to, from, next) => {
   // 动态设置页面标题
   document.title = to.meta.title || DEFAULT_TITLE
 
-  // 检查路由是否需要认证
-  if (to.meta.requiresAuth) {
-    if (auth.checkAuth()) {
-      next() // 已登录，允许访问
-    } else {
-      // 根据 authType 决定跳转到哪个登录页
-      const loginPath = to.meta.authType === 'ai-lab' ? '/ai-lab/login' : '/kitchen/chef/login'
-      next({
-        path: loginPath,
-        query: { redirect: to.fullPath }
-      })
-    }
-  } else {
-    next() // 不需要认证，直接访问
+  // Lazy-import auth store (Pinia must be installed by this point)
+  const { useAuthStore } = await import('../store/auth')
+  const authStore = useAuthStore()
+
+  // Initialize auth state once
+  if (!initPromise) {
+    initPromise = authStore.init()
   }
+  await initPromise
+
+  const isPublic = to.meta.public === true
+
+  // Public routes — let through; redirect logged-in users away from /login
+  if (isPublic) {
+    if (to.path === '/login' && authStore.isLoggedIn) {
+      return next(to.query.redirect ? String(to.query.redirect) : '/kitchen')
+    }
+    return next()
+  }
+
+  // All non-public routes require JWT login
+  if (!authStore.isLoggedIn) {
+    return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+
+  // Chef routes require second-level auth
+  if (to.meta.authType === 'chef') {
+    if (!authStore.checkChefAuth()) {
+      return next({ path: '/kitchen/chef/login', query: { redirect: to.fullPath } })
+    }
+  }
+
+  next()
 })
 
 export default router

@@ -1,9 +1,16 @@
+import logging
+
+from django.conf import settings
+from django.contrib.auth.models import User
 from django.utils import timezone
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from rest_framework import generics, permissions, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Organization, OrganizationMember, InviteLink, UserProfile
 from .serializers import (
@@ -13,6 +20,8 @@ from .serializers import (
     OrganizationMemberSerializer,
     InviteLinkSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -24,6 +33,69 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"detail": "注册成功"}, status=status.HTTP_201_CREATED)
+
+
+class GoogleLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        token = request.data.get("id_token")
+        if not token:
+            return Response({"detail": "缺少 id_token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        client_id = settings.GOOGLE_OAUTH_CLIENT_ID
+        if not client_id:
+            return Response({"detail": "Google 登录未配置"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        try:
+            idinfo = google_id_token.verify_oauth2_token(
+                token, google_requests.Request(), client_id
+            )
+        except ValueError:
+            return Response({"detail": "无效的 Google token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        email = idinfo.get("email")
+        name = idinfo.get("name", "")
+        picture = idinfo.get("picture", "")
+
+        if not email:
+            return Response({"detail": "无法获取邮箱信息"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user, created = User.objects.get_or_create(
+            username=email,
+            defaults={"email": email, "first_name": name},
+        )
+        if created:
+            user.set_unusable_password()
+            user.save()
+
+        profile, _ = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={"nickname": name or email.split("@")[0], "avatar_url": picture},
+        )
+        if not created and picture and not profile.avatar_url:
+            profile.avatar_url = picture
+            profile.save(update_fields=["avatar_url"])
+
+        # Track social account via allauth
+        try:
+            from allauth.socialaccount.models import SocialAccount
+            SocialAccount.objects.get_or_create(
+                user=user,
+                provider="google",
+                defaults={"uid": idinfo["sub"], "extra_data": idinfo},
+            )
+        except Exception:
+            logger.warning("Failed to create SocialAccount record", exc_info=True)
+
+        refresh = RefreshToken.for_user(user)
+        profile_serializer = UserProfileSerializer(profile, context={"request": request})
+
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": profile_serializer.data,
+        })
 
 
 class UserProfileView(APIView):

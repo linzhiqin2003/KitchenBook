@@ -16,6 +16,7 @@
     "html2canvas": "^1.4.1",
     "marked": "^17.0.1",
     "page-flip": "^2.0.1",
+    "pinia": "^3.0.4",
     "vue": "^3.4.19",
     "vue-router": "^4.2.5"
   },
