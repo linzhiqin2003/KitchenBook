@@ -29,6 +29,9 @@ let segmentSeq = 0
 // VAD
 let vadInstance = null
 let currentParagraphId = null
+let forceSegmentTimer = null
+let lastSegmentTime = null
+const MAX_SEGMENT_MS = 15000 // 连续说话超过 15 秒强制切分
 
 // File input
 const fileInput = ref(null)
@@ -169,6 +172,7 @@ async function startRecording() {
       },
       onSpeechEnd: (audio) => {
         console.log('[VAD] Speech ended, audio length:', audio.length)
+        lastSegmentTime = Date.now()
         const blob = float32ToWavBlob(audio)
         if (blob.size <= 44) return // empty WAV (header only)
 
@@ -179,6 +183,23 @@ async function startRecording() {
         submitSegment(blob, seq, currentParagraphId)
       },
     })
+
+    // Force-split timer: if continuous speech exceeds MAX_SEGMENT_MS, pause+resume VAD to flush
+    lastSegmentTime = Date.now()
+    forceSegmentTimer = setInterval(async () => {
+      if (!vadInstance || !vadInstance.listening) return
+      const elapsed = Date.now() - lastSegmentTime
+      if (elapsed >= MAX_SEGMENT_MS) {
+        console.log('[VAD] Force splitting after', Math.round(elapsed / 1000), 's continuous speech')
+        lastSegmentTime = Date.now()
+        try {
+          await vadInstance.pause()
+          if (vadInstance) await vadInstance.start()
+        } catch (e) {
+          console.warn('[VAD] Force split error:', e)
+        }
+      }
+    }, 3000)
   } catch (e) {
     console.error('VAD init failed:', e)
     if (e.name === 'NotAllowedError' || e.name === 'NotFoundError') {
@@ -194,6 +215,8 @@ function stopRecording() {
   isRecording.value = false
   clearInterval(timerInterval)
   timerInterval = null
+  clearInterval(forceSegmentTimer)
+  forceSegmentTimer = null
 
   if (vadInstance) {
     vadInstance.destroy()
