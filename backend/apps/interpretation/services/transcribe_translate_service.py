@@ -1,6 +1,6 @@
 """
 Transcribe + Translate pipeline:
-  1. Groq Whisper (whisper-large-v3) — ASR
+  1. Qwen3-ASR-1.7B (primary) / Groq Whisper (fallback) — ASR
   2. Cerebras Qwen3-32B — translation
 """
 
@@ -19,6 +19,14 @@ except ImportError:
     Groq = None
 
 logger = logging.getLogger(__name__)
+
+# ── Source language code mapping for Qwen3-ASR ──
+# Qwen3-ASR supports: zh, en, yue, ar, de, fr, es, pt, id, it, ko, ru, th, vi, ja, tr, hi, ms, nl, sv, da, fi, pl, cs, fil, fa, el, hu, mk, ro
+_QWEN3_ASR_LANGS = {
+    'zh', 'en', 'yue', 'ar', 'de', 'fr', 'es', 'pt', 'id', 'it', 'ko',
+    'ru', 'th', 'vi', 'ja', 'tr', 'hi', 'ms', 'nl', 'sv', 'da', 'fi',
+    'pl', 'cs', 'fil', 'fa', 'el', 'hu', 'mk', 'ro',
+}
 
 # ── Cerebras key pool (mirrors api/tools.py) ──
 _cerebras_key_index = 0
@@ -76,8 +84,82 @@ def _cerebras_translate(text: str, source_lang: str, target_lang: str) -> str:
     return result
 
 
+def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
+    """Transcribe audio using self-hosted Qwen3-ASR-1.7B. Returns transcribed text."""
+    base_url = getattr(django_settings, 'QWEN3_ASR_BASE_URL', '')
+    if not base_url:
+        raise RuntimeError("QWEN3_ASR_BASE_URL not configured")
+
+    url = f"{base_url.rstrip('/')}/v1/audio/transcriptions"
+
+    # Build multipart/form-data manually using urllib (no requests dependency)
+    import mimetypes
+    boundary = f"----WebKitFormBoundary{os.urandom(8).hex()}"
+
+    with open(file_path, "rb") as f:
+        file_data = f.read()
+
+    filename = os.path.basename(file_path)
+    content_type = mimetypes.guess_type(filename)[0] or "audio/wav"
+
+    parts = []
+    # file field
+    parts.append(
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: {content_type}\r\n\r\n"
+    )
+    parts.append(file_data)
+    parts.append(b"\r\n")
+    # model field
+    parts.append(
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="model"\r\n\r\n'
+        f"Qwen/Qwen3-ASR-1.7B\r\n"
+    )
+    # response_format field
+    parts.append(
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="response_format"\r\n\r\n'
+        f"json\r\n"
+    )
+    # language field (optional)
+    lang_code = source_lang.lower() if source_lang else ""
+    if lang_code and lang_code in _QWEN3_ASR_LANGS:
+        parts.append(
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="language"\r\n\r\n'
+            f"{lang_code}\r\n"
+        )
+    parts.append(f"--{boundary}--\r\n")
+
+    # Encode body
+    body = b""
+    for part in parts:
+        if isinstance(part, str):
+            body += part.encode("utf-8")
+        else:
+            body += part
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Authorization": "Bearer EMPTY",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    text = (data.get("text") or "").strip()
+    logger.info("Qwen3-ASR transcription done (%d chars)", len(text))
+    return text
+
+
 def _groq_transcribe(file_path: str) -> str:
-    """Transcribe audio using Groq Whisper. Returns transcribed text."""
+    """Transcribe audio using Groq Whisper (fallback). Returns transcribed text."""
     if not Groq:
         raise ImportError("groq package not installed")
 
@@ -100,6 +182,18 @@ def _groq_transcribe(file_path: str) -> str:
     return text
 
 
+def _transcribe(file_path: str, source_lang: str = "") -> str:
+    """Transcribe audio: try Qwen3-ASR first, fall back to Groq Whisper."""
+    # Try Qwen3-ASR (self-hosted, primary)
+    try:
+        return _qwen3_asr_transcribe(file_path, source_lang)
+    except Exception as e:
+        logger.warning("Qwen3-ASR failed, falling back to Groq Whisper: %s", e)
+
+    # Fallback to Groq Whisper
+    return _groq_transcribe(file_path)
+
+
 def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str):
     """
     Full pipeline: Groq Whisper transcription → Cerebras translation.
@@ -107,7 +201,7 @@ def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str)
     Returns dict: { transcription, translation, source_lang, target_lang }
     Raises on failure.
     """
-    text = _groq_transcribe(file_path)
+    text = _transcribe(file_path, source_lang)
 
     if not text:
         return {
@@ -134,7 +228,7 @@ def transcribe_and_translate_stream(file_path: str, source_lang: str, target_lan
     Each line is a JSON object with an 'event' field.
     """
     # Step 1: Groq Whisper transcription
-    text = _groq_transcribe(file_path)
+    text = _transcribe(file_path, source_lang)
     yield json.dumps({"event": "transcription", "text": text}) + "\n"
 
     if not text:
