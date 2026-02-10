@@ -162,10 +162,10 @@ async function startRecording() {
     vadInstance = await MicVAD.new({
       baseAssetPath: '/vad/',
       onnxWASMBasePath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.1/dist/',
-      positiveSpeechThreshold: 0.6,
-      negativeSpeechThreshold: 0.45,
-      redemptionMs: 300,
-      minSpeechMs: 150,
+      positiveSpeechThreshold: 0.7,
+      negativeSpeechThreshold: 0.55,
+      redemptionMs: 200,
+      minSpeechMs: 100,
       submitUserSpeechOnPause: true,
       onSpeechStart: () => {
         console.log('[VAD] Speech started')
@@ -719,45 +719,37 @@ onUnmounted(() => {
                 <span class="text-[10px] font-bold uppercase tracking-wider text-ios-blue/60">Translation</span>
               </div>
 
-              <!-- Rows: one per paragraph -->
-              <div class="px-3 py-1">
-                <div
-                  v-for="group in paragraphs"
-                  :key="group.paragraphId"
-                  @mouseenter="hoveredId = group.paragraphId"
-                  @mouseleave="hoveredId = null"
-                  class="grid grid-cols-2 gap-4 py-2.5 px-2 rounded-lg transition-colors duration-100 cursor-default"
-                  :class="hoveredId === group.paragraphId ? 'bg-white/[0.04]' : ''"
-                >
-                  <!-- Original (left) -->
-                  <div>
-                    <div v-if="group.pending === true && !group.original" class="flex items-center gap-2">
-                      <span class="w-3 h-3 border-2 border-ios-blue border-t-transparent rounded-full animate-spin"></span>
-                      <span class="text-[13px] text-white/30">转录中...</span>
-                    </div>
-                    <p v-else class="text-[14px] leading-relaxed text-white/80">
-                      {{ group.original }}
-                      <span v-if="group.pending" class="inline-flex items-center ml-1 align-middle">
-                        <span class="w-2.5 h-2.5 border-[1.5px] border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
-                      </span>
-                    </p>
-                  </div>
+              <!-- Continuous text flow -->
+              <div class="grid grid-cols-2 gap-4 px-5 py-3">
+                <!-- Original (left) -->
+                <p class="text-[14px] leading-relaxed text-white/80">
+                  <template v-for="group in paragraphs" :key="'o-' + group.paragraphId">
+                    <span
+                      @mouseenter="hoveredId = group.paragraphId"
+                      @mouseleave="hoveredId = null"
+                      class="transition-colors duration-100 rounded px-0.5 -mx-0.5"
+                      :class="hoveredId === group.paragraphId ? 'bg-white/[0.08]' : ''"
+                    >{{ group.original }}</span>{{ ' ' }}
+                  </template>
+                  <span v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending" class="inline-flex items-center ml-1 align-middle">
+                    <span class="w-2.5 h-2.5 border-[1.5px] border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
+                  </span>
+                </p>
 
-                  <!-- Translation (right) -->
-                  <div>
-                    <div v-if="group.pending === true && !group.translated" class="text-[13px] text-white/[0.06]">&mdash;</div>
-                    <div v-else-if="group.pending === 'translating' && !group.translated" class="flex items-center gap-2">
-                      <span class="w-3 h-3 border-2 border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
-                      <span class="text-[13px] text-white/30">翻译中...</span>
-                    </div>
-                    <p v-else class="text-[14px] leading-relaxed text-white/90">
-                      {{ group.translated }}
-                      <span v-if="group.pending && group.translated" class="inline-flex items-center ml-1 align-middle">
-                        <span class="w-2.5 h-2.5 border-[1.5px] border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
-                      </span>
-                    </p>
-                  </div>
-                </div>
+                <!-- Translation (right) -->
+                <p class="text-[14px] leading-relaxed text-white/90">
+                  <template v-for="group in paragraphs" :key="'t-' + group.paragraphId">
+                    <span
+                      @mouseenter="hoveredId = group.paragraphId"
+                      @mouseleave="hoveredId = null"
+                      class="transition-colors duration-100 rounded px-0.5 -mx-0.5"
+                      :class="hoveredId === group.paragraphId ? 'bg-white/[0.08]' : ''"
+                    >{{ group.translated }}</span>{{ ' ' }}
+                  </template>
+                  <span v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending && paragraphs[paragraphs.length - 1].translated" class="inline-flex items-center ml-1 align-middle">
+                    <span class="w-2.5 h-2.5 border-[1.5px] border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
+                  </span>
+                </p>
               </div>
 
               <!-- Stats footer -->
