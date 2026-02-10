@@ -40,6 +40,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['page-flip']
+    include: ['page-flip'],
+    exclude: ['onnxruntime-web'],
   }
 })

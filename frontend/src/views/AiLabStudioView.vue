@@ -9,8 +9,6 @@ import { getAiLabApiBase } from '../config/aiLab'
 const API_BASE = getAiLabApiBase()
 const route = useRoute()
 
-const SEGMENT_SECONDS = 3 // auto-split interval
-
 // View toggle
 const currentView = ref(route.query.view === 'emoji' ? 'emoji' : 'interpretation')
 
@@ -20,23 +18,23 @@ const targetLang = ref('Chinese')
 
 // State
 const errorMsg = ref('')
-const inflight = ref(0) // number of segments being processed
+const inflight = ref(0)
 const isRecording = ref(false)
 const recordingTime = ref(0)
 
 let mediaStream = null
-let mediaRecorder = null
-let recordedChunks = []
 let timerInterval = null
-let segmentInterval = null
 let recordingStartTime = null
-let segmentSeq = 0 // monotonic ordering
+let segmentSeq = 0
+
+// VAD
+let vadInstance = null
+let currentParagraphId = null
 
 // File input
 const fileInput = ref(null)
 
-// History — items can be pending (placeholder) or resolved
-// { id, seq, original, translated, timestamp, pending }
+// History — items: { id, seq, paragraphId, original, translated, timestamp, pending }
 const transcriptionHistory = ref([])
 const historyContainer = ref(null)
 
@@ -47,15 +45,102 @@ const showMinutes = ref(false)
 
 // Two-column layout: hover highlight
 const hoveredId = ref(null)
-const chronologicalHistory = computed(() => [...transcriptionHistory.value].reverse())
 
-// Sentence-level refinement: dual recorder approach
-let sentenceRecorder = null
-let sentenceChunks = []
-let sentenceGroupIds = [] // entry IDs of current sentence fragments
 const SENTENCE_END_RE = /[.。!！?？]\s*$/
 
-// ── Recording with auto-segmentation ──
+// ── Float32Array → WAV Blob ──
+function float32ToWavBlob(samples, sampleRate = 16000) {
+  const numChannels = 1
+  const bitsPerSample = 16
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
+  const blockAlign = numChannels * (bitsPerSample / 8)
+  const dataSize = samples.length * (bitsPerSample / 8)
+  const buffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buffer)
+
+  // RIFF header
+  writeString(view, 0, 'RIFF')
+  view.setUint32(4, 36 + dataSize, true)
+  writeString(view, 8, 'WAVE')
+
+  // fmt chunk
+  writeString(view, 12, 'fmt ')
+  view.setUint32(16, 16, true)           // chunk size
+  view.setUint16(20, 1, true)            // PCM
+  view.setUint16(22, numChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, byteRate, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, bitsPerSample, true)
+
+  // data chunk
+  writeString(view, 36, 'data')
+  view.setUint32(40, dataSize, true)
+
+  // PCM samples: float32 → int16
+  let offset = 44
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]))
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true)
+    offset += 2
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' })
+}
+
+function writeString(view, offset, str) {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i))
+  }
+}
+
+// ── Paragraphs computed ──
+const paragraphs = computed(() => {
+  // Group entries by paragraphId, maintain chronological order (oldest first)
+  const groups = []
+  const map = new Map()
+
+  // transcriptionHistory is newest-first (unshift), so reverse for chronological
+  const chronological = [...transcriptionHistory.value].reverse()
+
+  for (const entry of chronological) {
+    const pid = entry.paragraphId
+    if (!pid) {
+      // standalone entry (e.g., file upload without paragraphId grouping)
+      groups.push({
+        paragraphId: entry.id,
+        entries: [entry],
+        original: entry.original,
+        translated: entry.translated,
+        timestamp: entry.timestamp,
+        pending: entry.pending,
+      })
+      continue
+    }
+    if (!map.has(pid)) {
+      const group = { paragraphId: pid, entries: [], original: '', translated: '', timestamp: '', pending: false }
+      map.set(pid, group)
+      groups.push(group)
+    }
+    map.get(pid).entries.push(entry)
+  }
+
+  // Build concatenated text for each group
+  for (const g of groups) {
+    if (g.entries.length === 0) continue
+    g.entries.sort((a, b) => a.seq - b.seq)
+    g.original = g.entries.map(e => e.original).filter(Boolean).join(' ')
+    g.translated = g.entries.map(e => e.translated).filter(Boolean).join(' ')
+    g.timestamp = g.entries[0].timestamp
+    // pending if any entry is still pending
+    const pendingEntry = g.entries.find(e => e.pending)
+    g.pending = pendingEntry ? pendingEntry.pending : false
+  }
+
+  return groups
+})
+
+// ── Recording with VAD ──
 async function startRecording() {
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -66,7 +151,7 @@ async function startRecording() {
       },
     })
     segmentSeq = 0
-    sentenceGroupIds = []
+    currentParagraphId = null
     isRecording.value = true
     recordingTime.value = 0
     recordingStartTime = Date.now()
@@ -77,81 +162,42 @@ async function startRecording() {
       recordingTime.value = Math.floor((Date.now() - recordingStartTime) / 1000)
     }, 200)
 
-    startNewSegment()
-    startSentenceRecorder()
+    // Create VAD instance
+    const { MicVAD } = await import('@ricky0123/vad-web')
+    vadInstance = await MicVAD.new({
+      stream: mediaStream,
+      redemptionFrames: 12,     // ~1.15s silence to end speech
+      minSpeechFrames: 5,       // ~480ms minimum speech
+      submitUserSpeechOnPause: true,
+      onSpeechEnd: (audio) => {
+        const blob = float32ToWavBlob(audio)
+        if (blob.size <= 44) return // empty WAV (header only)
 
-    // Auto-split every N seconds
-    segmentInterval = setInterval(() => {
-      rotateSegment()
-    }, SEGMENT_SECONDS * 1000)
+        if (!currentParagraphId) {
+          currentParagraphId = `para-${Date.now()}`
+        }
+        const seq = segmentSeq++
+        submitSegment(blob, seq, currentParagraphId)
+      },
+    })
+    vadInstance.start()
   } catch (e) {
     errorMsg.value = '无法访问麦克风，请检查权限设置'
-  }
-}
-
-function startNewSegment() {
-  recordedChunks = []
-  mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm;codecs=opus' })
-  mediaRecorder.ondataavailable = (e) => {
-    if (e.data.size > 0) recordedChunks.push(e.data)
-  }
-  mediaRecorder.start()
-}
-
-function rotateSegment() {
-  if (!mediaRecorder || mediaRecorder.state === 'inactive') return
-  // Capture current chunks callback before stopping
-  const chunks = recordedChunks
-  const seq = segmentSeq++
-
-  mediaRecorder.onstop = () => {
-    const blob = new Blob(chunks, { type: 'audio/webm' })
-    if (blob.size > 0) {
-      submitSegment(blob, seq)
-    }
-  }
-  mediaRecorder.stop()
-
-  // Immediately start next segment on the same stream
-  if (isRecording.value && mediaStream) {
-    startNewSegment()
   }
 }
 
 function stopRecording() {
   isRecording.value = false
   clearInterval(timerInterval)
-  clearInterval(segmentInterval)
   timerInterval = null
-  segmentInterval = null
 
-  // Flush final segment
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    const chunks = recordedChunks
-    const seq = segmentSeq++
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'audio/webm' })
-      if (blob.size > 0) {
-        submitSegment(blob, seq)
-      }
-    }
-    mediaRecorder.stop()
+  if (vadInstance) {
+    vadInstance.pause()
+    vadInstance.destroy()
+    vadInstance = null
   }
 
-  // Stop sentence recorder and refine pending group
-  const pendingGroupIds = [...sentenceGroupIds]
-  sentenceGroupIds = []
-  if (sentenceRecorder && sentenceRecorder.state !== 'inactive') {
-    if (pendingGroupIds.length > 1) {
-      const chunks = sentenceChunks
-      sentenceRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        if (blob.size > 0) refineSentenceGroup(pendingGroupIds, blob)
-      }
-    }
-    sentenceRecorder.stop()
-  }
-  sentenceRecorder = null
+  currentParagraphId = null
 
   if (mediaStream) {
     mediaStream.getTracks().forEach(t => t.stop())
@@ -179,7 +225,7 @@ async function processNDJSONStream(res, entryId) {
     buffer += decoder.decode(value, { stream: true })
 
     const lines = buffer.split('\n')
-    buffer = lines.pop() // keep incomplete trailing line
+    buffer = lines.pop()
 
     for (const line of lines) {
       if (!line.trim()) continue
@@ -191,21 +237,14 @@ async function processNDJSONStream(res, entryId) {
         if (!event.text) {
           // Empty transcription (silence) — remove placeholder
           transcriptionHistory.value.splice(idx, 1)
-          const sgIdx = sentenceGroupIds.indexOf(entryId)
-          if (sgIdx !== -1) sentenceGroupIds.splice(sgIdx, 1)
           return
         }
         transcriptionHistory.value[idx].original = event.text
         transcriptionHistory.value[idx].pending = 'translating'
 
-        // Sentence boundary detection for refinement (only during recording)
-        if (isRecording.value) {
-          sentenceGroupIds.push(entryId)
-          if (SENTENCE_END_RE.test(event.text.trim()) && sentenceGroupIds.length > 1) {
-            const groupToRefine = [...sentenceGroupIds]
-            sentenceGroupIds = []
-            triggerSentenceRefinement(groupToRefine)
-          }
+        // Sentence boundary: close current paragraph so next speech starts a new one
+        if (SENTENCE_END_RE.test(event.text.trim())) {
+          currentParagraphId = null
         }
       } else if (event.event === 'translation') {
         transcriptionHistory.value[idx].translated = event.text
@@ -220,12 +259,13 @@ async function processNDJSONStream(res, entryId) {
   }
 }
 
-// ── Submit a segment (fire-and-forget, updates history in place) ──
-async function submitSegment(blob, seq) {
+// ── Submit a segment ──
+async function submitSegment(blob, seq, paragraphId) {
   const placeholderId = `seg-${Date.now()}-${seq}`
   const entry = {
     id: placeholderId,
     seq,
+    paragraphId,
     original: '',
     translated: '',
     timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -241,7 +281,7 @@ async function submitSegment(blob, seq) {
 
   try {
     const formData = new FormData()
-    formData.append('file', blob, 'segment.webm')
+    formData.append('file', blob, 'segment.wav')
     formData.append('source_lang', sourceLang.value)
     formData.append('target_lang', targetLang.value)
 
@@ -284,9 +324,11 @@ async function handleFileSelect(event) {
   errorMsg.value = ''
   event.target.value = ''
 
+  const fileParagraphId = `file-para-${Date.now()}`
   const entry = {
     id: `file-${Date.now()}`,
     seq: -1,
+    paragraphId: fileParagraphId,
     original: '',
     translated: '',
     timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -324,137 +366,9 @@ async function handleFileSelect(event) {
   }
 }
 
-// ── Sentence-level refinement ──
-function startSentenceRecorder() {
-  if (!mediaStream) return
-  sentenceChunks = []
-  sentenceRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm;codecs=opus' })
-  sentenceRecorder.ondataavailable = (e) => {
-    if (e.data.size > 0) sentenceChunks.push(e.data)
-  }
-  sentenceRecorder.start()
-}
-
-async function triggerSentenceRefinement(groupIds) {
-  if (!sentenceRecorder || sentenceRecorder.state === 'inactive') return
-  const oldRecorder = sentenceRecorder
-  const oldChunks = sentenceChunks
-
-  // Start new sentence recorder IMMEDIATELY (no audio gap)
-  startSentenceRecorder()
-
-  // Then stop old recorder and get its blob
-  const blob = await new Promise(resolve => {
-    oldRecorder.onstop = () => {
-      resolve(new Blob(oldChunks, { type: 'audio/webm' }))
-    }
-    oldRecorder.stop()
-  })
-
-  if (blob.size > 0) {
-    refineSentenceGroup(groupIds, blob)
-  }
-}
-
-async function refineSentenceGroup(groupIds, audioBlob) {
-  // Wait for all entries in the group to have transcription text
-  await new Promise(resolve => {
-    const check = () => {
-      const allReady = groupIds.every(id => {
-        const entry = transcriptionHistory.value.find(h => h.id === id)
-        return entry && entry.original && entry.pending !== true
-      })
-      if (allReady) resolve()
-      else setTimeout(check, 200)
-    }
-    check()
-  })
-
-  // Find entries in history
-  const entryIndices = groupIds
-    .map(id => transcriptionHistory.value.findIndex(h => h.id === id))
-    .filter(i => i !== -1)
-  if (entryIndices.length === 0) return
-
-  // Keep the first entry in array (newest, top of display)
-  const keepIdx = Math.min(...entryIndices)
-  const keepId = transcriptionHistory.value[keepIdx].id
-
-  // Collect text chronologically (oldest first = highest array index first)
-  const sortedIndices = [...entryIndices].sort((a, b) => b - a)
-  const mergedOriginal = sortedIndices
-    .map(i => transcriptionHistory.value[i].original).filter(Boolean).join(' ')
-  const mergedTranslated = sortedIndices
-    .map(i => transcriptionHistory.value[i].translated).filter(Boolean).join(' ')
-  const oldestTimestamp = transcriptionHistory.value[Math.max(...entryIndices)].timestamp
-
-  // Remove all entries except kept one (remove from highest index first to avoid shifting)
-  const removeIndices = entryIndices.filter(i => i !== keepIdx).sort((a, b) => b - a)
-  for (const idx of removeIndices) {
-    transcriptionHistory.value.splice(idx, 1)
-  }
-
-  // Update kept entry to "refining" state with merged text
-  const newIdx = transcriptionHistory.value.findIndex(h => h.id === keepId)
-  if (newIdx === -1) return
-  transcriptionHistory.value[newIdx].original = mergedOriginal
-  transcriptionHistory.value[newIdx].translated = mergedTranslated
-  transcriptionHistory.value[newIdx].timestamp = oldestTimestamp
-  transcriptionHistory.value[newIdx].pending = 'refining'
-
-  // Re-transcribe+translate the combined audio
-  inflight.value++
-  try {
-    const formData = new FormData()
-    formData.append('file', audioBlob, 'sentence.webm')
-    formData.append('source_lang', sourceLang.value)
-    formData.append('target_lang', targetLang.value)
-
-    const res = await fetch(`${API_BASE}/api/interpretation/transcribe-translate-stream/`, {
-      method: 'POST',
-      body: formData,
-    })
-    if (!res.ok) throw new Error(`Server error (${res.status})`)
-
-    // Process refined result (same NDJSON protocol)
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop()
-      for (const line of lines) {
-        if (!line.trim()) continue
-        const evt = JSON.parse(line)
-        const idx = transcriptionHistory.value.findIndex(h => h.id === keepId)
-        if (idx === -1) continue
-        if (evt.event === 'transcription' && evt.text) {
-          transcriptionHistory.value[idx].original = evt.text
-          transcriptionHistory.value[idx].pending = 'translating'
-        } else if (evt.event === 'translation') {
-          transcriptionHistory.value[idx].translated = evt.text
-          transcriptionHistory.value[idx].pending = false
-        } else if (evt.event === 'done') {
-          transcriptionHistory.value[idx].pending = false
-        } else if (evt.event === 'error') {
-          transcriptionHistory.value[idx].pending = false
-        }
-      }
-    }
-  } catch (e) {
-    const idx = transcriptionHistory.value.findIndex(h => h.id === keepId)
-    if (idx !== -1) transcriptionHistory.value[idx].pending = false
-  } finally {
-    inflight.value--
-  }
-}
-
 // ── Meeting minutes ──
 async function generateMeetingMinutes() {
-  const resolved = transcriptionHistory.value.filter(i => !i.pending && !i.original.startsWith('[Error'))
+  const resolved = paragraphs.value.filter(g => !g.pending && !g.original.startsWith('[Error'))
   if (resolved.length < 3) return
 
   generatingMinutes.value = true
@@ -462,9 +376,9 @@ async function generateMeetingMinutes() {
   showMinutes.value = true
 
   try {
-    const entries = resolved.map(item => ({
-      original: item.original,
-      translated: item.translated,
+    const entries = resolved.map(g => ({
+      original: g.original,
+      translated: g.translated,
     }))
 
     const res = await fetch(`${API_BASE}/api/interpretation/meeting-minutes/`, {
@@ -533,21 +447,21 @@ function clearHistory() {
   transcriptionHistory.value = []
   meetingMinutes.value = ''
   showMinutes.value = false
-  sentenceGroupIds = []
+  currentParagraphId = null
 }
 
 function copyAll() {
-  const resolved = transcriptionHistory.value.filter(i => !i.pending)
+  const resolved = paragraphs.value.filter(g => !g.pending)
   const text = resolved
-    .map(item => `[${item.timestamp}]\n原文: ${item.original}\n译文: ${item.translated}`)
+    .map(g => `[${g.timestamp}]\n原文: ${g.original}\n译文: ${g.translated}`)
     .join('\n\n')
   navigator.clipboard.writeText(text)
 }
 
 function downloadText() {
-  const resolved = transcriptionHistory.value.filter(i => !i.pending)
+  const resolved = paragraphs.value.filter(g => !g.pending)
   const text = resolved
-    .map(item => `[${item.timestamp}]\n原文: ${item.original}\n译文: ${item.translated}`)
+    .map(g => `[${g.timestamp}]\n原文: ${g.original}\n译文: ${g.translated}`)
     .join('\n\n')
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -558,9 +472,9 @@ function downloadText() {
   URL.revokeObjectURL(url)
 }
 
-const totalEntries = computed(() => transcriptionHistory.value.filter(i => !i.pending).length)
+const totalEntries = computed(() => paragraphs.value.filter(g => !g.pending).length)
 const canGenerateMinutes = computed(() => {
-  return transcriptionHistory.value.filter(i => !i.pending && !i.original.startsWith('[Error')).length >= 3
+  return paragraphs.value.filter(g => !g.pending && !g.original.startsWith('[Error')).length >= 3
 })
 
 onUnmounted(() => {
@@ -734,7 +648,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Results: two-column transcript -->
+          <!-- Results: two-column transcript by paragraphs -->
           <div ref="historyContainer" class="flex-1 overflow-y-auto custom-scrollbar min-h-0 space-y-3">
             <!-- Meeting minutes card -->
             <div
@@ -772,11 +686,11 @@ onUnmounted(() => {
               <div class="text-center space-y-3 opacity-40">
                 <div class="text-4xl">🎙️</div>
                 <p class="text-[14px] text-white/60">录音或上传音频文件，自动转录并翻译</p>
-                <p class="text-[11px] text-white/30">Powered by Groq Whisper + Cerebras Qwen3-32B</p>
+                <p class="text-[11px] text-white/30">语音自动检测，停顿时自动切分 · Powered by Silero VAD + Groq + Cerebras</p>
               </div>
             </div>
 
-            <!-- Two-column transcript table -->
+            <!-- Two-column transcript table (paragraph groups) -->
             <div v-if="transcriptionHistory.length" class="ios-glass rounded-2xl ring-1 ring-white/10 overflow-hidden">
               <!-- Column headers -->
               <div class="grid grid-cols-2 gap-4 px-5 pt-3 pb-2 border-b border-white/5 sticky top-0 bg-black/60 backdrop-blur-md z-10">
@@ -784,39 +698,42 @@ onUnmounted(() => {
                 <span class="text-[10px] font-bold uppercase tracking-wider text-ios-blue/60">Translation</span>
               </div>
 
-              <!-- Rows in chronological order -->
+              <!-- Rows: one per paragraph -->
               <div class="px-3 py-1">
                 <div
-                  v-for="item in chronologicalHistory"
-                  :key="item.id"
-                  @mouseenter="hoveredId = item.id"
+                  v-for="group in paragraphs"
+                  :key="group.paragraphId"
+                  @mouseenter="hoveredId = group.paragraphId"
                   @mouseleave="hoveredId = null"
                   class="grid grid-cols-2 gap-4 py-2.5 px-2 rounded-lg transition-colors duration-100 cursor-default"
-                  :class="hoveredId === item.id ? 'bg-white/[0.04]' : ''"
+                  :class="hoveredId === group.paragraphId ? 'bg-white/[0.04]' : ''"
                 >
                   <!-- Original (left) -->
                   <div>
-                    <div v-if="item.pending === true" class="flex items-center gap-2">
+                    <div v-if="group.pending === true && !group.original" class="flex items-center gap-2">
                       <span class="w-3 h-3 border-2 border-ios-blue border-t-transparent rounded-full animate-spin"></span>
                       <span class="text-[13px] text-white/30">转录中...</span>
                     </div>
-                    <p v-else class="text-[14px] leading-relaxed" :class="item.pending === 'refining' ? 'text-white/40' : 'text-white/80'">
-                      {{ item.original }}
-                      <span v-if="item.pending === 'refining'" class="inline-flex items-center ml-1 align-middle">
-                        <span class="w-2.5 h-2.5 border-[1.5px] border-purple-400/50 border-t-transparent rounded-full animate-spin"></span>
+                    <p v-else class="text-[14px] leading-relaxed text-white/80">
+                      {{ group.original }}
+                      <span v-if="group.pending" class="inline-flex items-center ml-1 align-middle">
+                        <span class="w-2.5 h-2.5 border-[1.5px] border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
                       </span>
                     </p>
                   </div>
 
                   <!-- Translation (right) -->
                   <div>
-                    <div v-if="item.pending === true" class="text-[13px] text-white/[0.06]">&mdash;</div>
-                    <div v-else-if="item.pending === 'translating'" class="flex items-center gap-2">
+                    <div v-if="group.pending === true && !group.translated" class="text-[13px] text-white/[0.06]">&mdash;</div>
+                    <div v-else-if="group.pending === 'translating' && !group.translated" class="flex items-center gap-2">
                       <span class="w-3 h-3 border-2 border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
                       <span class="text-[13px] text-white/30">翻译中...</span>
                     </div>
-                    <p v-else class="text-[14px] leading-relaxed" :class="item.pending === 'refining' ? 'text-white/40' : 'text-white/90'">
-                      {{ item.translated }}
+                    <p v-else class="text-[14px] leading-relaxed text-white/90">
+                      {{ group.translated }}
+                      <span v-if="group.pending && group.translated" class="inline-flex items-center ml-1 align-middle">
+                        <span class="w-2.5 h-2.5 border-[1.5px] border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -824,7 +741,7 @@ onUnmounted(() => {
 
               <!-- Stats footer -->
               <div class="px-5 py-2 border-t border-white/5 text-center">
-                <span class="text-[11px] text-white/20">{{ totalEntries }} 条记录</span>
+                <span class="text-[11px] text-white/20">{{ totalEntries }} 段记录</span>
               </div>
             </div>
           </div>
