@@ -173,6 +173,7 @@ async function startRecording() {
     const { MicVAD } = await import('@ricky0123/vad-web')
     vadInstance = await MicVAD.new({
       stream: mediaStream,
+      baseAssetPath: 'https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/',
       onnxWASMBasePath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.1/dist/',
       redemptionFrames: 12,     // ~1.15s silence to end speech
       minSpeechFrames: 5,       // ~480ms minimum speech
