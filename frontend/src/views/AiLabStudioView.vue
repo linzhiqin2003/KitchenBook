@@ -190,7 +190,15 @@ async function startRecording() {
         console.log('[VAD] Speech started')
       },
       onSpeechEnd: (audio) => {
-        console.log('[VAD] Speech ended, audio length:', audio.length)
+        // RMS energy check: skip near-silent segments to prevent ASR hallucination
+        let sumSq = 0
+        for (let i = 0; i < audio.length; i++) sumSq += audio[i] * audio[i]
+        const rms = Math.sqrt(sumSq / audio.length)
+        if (rms < 0.01) {
+          console.log('[VAD] Skipped silent segment, RMS:', rms.toFixed(4))
+          return
+        }
+        console.log('[VAD] Speech ended, audio length:', audio.length, 'RMS:', rms.toFixed(4))
         const blob = float32ToWavBlob(audio)
         if (blob.size <= 44) return // empty WAV (header only)
 
