@@ -45,6 +45,10 @@ const meetingMinutes = ref('')
 const generatingMinutes = ref(false)
 const showMinutes = ref(false)
 
+// Two-column layout: hover highlight
+const hoveredId = ref(null)
+const chronologicalHistory = computed(() => [...transcriptionHistory.value].reverse())
+
 // Sentence-level refinement: dual recorder approach
 let sentenceRecorder = null
 let sentenceChunks = []
@@ -232,7 +236,7 @@ async function submitSegment(blob, seq) {
 
   await nextTick()
   if (historyContainer.value) {
-    historyContainer.value.scrollTop = 0
+    historyContainer.value.scrollTop = historyContainer.value.scrollHeight
   }
 
   try {
@@ -730,8 +734,8 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Results: scrollable history -->
-          <div ref="historyContainer" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 min-h-0">
+          <!-- Results: two-column transcript -->
+          <div ref="historyContainer" class="flex-1 overflow-y-auto custom-scrollbar min-h-0 space-y-3">
             <!-- Meeting minutes card -->
             <div
               v-if="showMinutes"
@@ -763,6 +767,7 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <!-- Empty state -->
             <div v-if="!transcriptionHistory.length && inflight === 0 && !showMinutes" class="h-full flex items-center justify-center">
               <div class="text-center space-y-3 opacity-40">
                 <div class="text-4xl">🎙️</div>
@@ -771,79 +776,57 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div
-              v-for="item in transcriptionHistory"
-              :key="item.id"
-              class="ios-glass rounded-2xl p-5 ring-1 transition-all"
-              :class="item.pending === true ? 'ring-ios-blue/20 animate-pulse' : item.pending === 'translating' ? 'ring-ios-blue/10' : item.pending === 'refining' ? 'ring-purple-500/20' : 'ring-white/5 hover:ring-white/10'"
-            >
-              <!-- Fully pending: transcribing -->
-              <div v-if="item.pending === true" class="flex items-center gap-3">
-                <div class="w-4 h-4 border-2 border-ios-blue border-t-transparent rounded-full animate-spin"></div>
-                <span class="text-[13px] text-white/40">转录中...</span>
-                <span class="text-[11px] text-white/20 ml-auto">{{ item.timestamp }}</span>
+            <!-- Two-column transcript table -->
+            <div v-if="transcriptionHistory.length" class="ios-glass rounded-2xl ring-1 ring-white/10 overflow-hidden">
+              <!-- Column headers -->
+              <div class="grid grid-cols-2 gap-4 px-5 pt-3 pb-2 border-b border-white/5 sticky top-0 bg-black/60 backdrop-blur-md z-10">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-white/30">Original</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-ios-blue/60">Translation</span>
               </div>
-              <!-- Partial: transcription done, translating -->
-              <template v-else-if="item.pending === 'translating'">
-                <div class="flex items-start justify-between mb-3">
-                  <span class="text-[11px] text-white/30 font-medium">{{ item.timestamp }}</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <!-- Rows in chronological order -->
+              <div class="px-3 py-1">
+                <div
+                  v-for="item in chronologicalHistory"
+                  :key="item.id"
+                  @mouseenter="hoveredId = item.id"
+                  @mouseleave="hoveredId = null"
+                  class="grid grid-cols-2 gap-4 py-2.5 px-2 rounded-lg transition-colors duration-100 cursor-default"
+                  :class="hoveredId === item.id ? 'bg-white/[0.04]' : ''"
+                >
+                  <!-- Original (left) -->
                   <div>
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-1.5">Original</div>
-                    <p class="text-[14px] leading-relaxed text-white/80">{{ item.original }}</p>
+                    <div v-if="item.pending === true" class="flex items-center gap-2">
+                      <span class="w-3 h-3 border-2 border-ios-blue border-t-transparent rounded-full animate-spin"></span>
+                      <span class="text-[13px] text-white/30">转录中...</span>
+                    </div>
+                    <p v-else class="text-[14px] leading-relaxed" :class="item.pending === 'refining' ? 'text-white/40' : 'text-white/80'">
+                      {{ item.original }}
+                      <span v-if="item.pending === 'refining'" class="inline-flex items-center ml-1 align-middle">
+                        <span class="w-2.5 h-2.5 border-[1.5px] border-purple-400/50 border-t-transparent rounded-full animate-spin"></span>
+                      </span>
+                    </p>
                   </div>
+
+                  <!-- Translation (right) -->
                   <div>
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-ios-blue/60 mb-1.5">Translation</div>
-                    <div class="flex items-center gap-2">
-                      <div class="w-3 h-3 border-2 border-ios-blue/50 border-t-transparent rounded-full animate-spin"></div>
+                    <div v-if="item.pending === true" class="text-[13px] text-white/[0.06]">&mdash;</div>
+                    <div v-else-if="item.pending === 'translating'" class="flex items-center gap-2">
+                      <span class="w-3 h-3 border-2 border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
                       <span class="text-[13px] text-white/30">翻译中...</span>
                     </div>
+                    <p v-else class="text-[14px] leading-relaxed" :class="item.pending === 'refining' ? 'text-white/40' : 'text-white/90'">
+                      {{ item.translated }}
+                    </p>
                   </div>
                 </div>
-              </template>
-              <!-- Refining: re-transcribing with full sentence audio -->
-              <template v-else-if="item.pending === 'refining'">
-                <div class="flex items-start justify-between mb-3">
-                  <span class="text-[11px] text-white/30 font-medium">{{ item.timestamp }}</span>
-                  <div class="flex items-center gap-1.5">
-                    <div class="w-3 h-3 border-2 border-purple-400/50 border-t-transparent rounded-full animate-spin"></div>
-                    <span class="text-[10px] text-purple-400/60">refining</span>
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-1.5">Original</div>
-                    <p class="text-[14px] leading-relaxed text-white/50">{{ item.original }}</p>
-                  </div>
-                  <div>
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-ios-blue/60 mb-1.5">Translation</div>
-                    <p class="text-[14px] leading-relaxed text-white/50">{{ item.translated }}</p>
-                  </div>
-                </div>
-              </template>
-              <!-- Resolved result -->
-              <template v-else>
-                <div class="flex items-start justify-between mb-3">
-                  <span class="text-[11px] text-white/30 font-medium">{{ item.timestamp }}</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-1.5">Original</div>
-                    <p class="text-[14px] leading-relaxed text-white/80">{{ item.original }}</p>
-                  </div>
-                  <div>
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-ios-blue/60 mb-1.5">Translation</div>
-                    <p class="text-[14px] leading-relaxed text-white/90">{{ item.translated }}</p>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
+              </div>
 
-          <!-- Bottom stats -->
-          <div v-if="transcriptionHistory.length" class="flex-none text-center py-2">
-            <span class="text-[11px] text-white/20">{{ totalEntries }} 条记录</span>
+              <!-- Stats footer -->
+              <div class="px-5 py-2 border-t border-white/5 text-center">
+                <span class="text-[11px] text-white/20">{{ totalEntries }} 条记录</span>
+              </div>
+            </div>
           </div>
         </div>
 
