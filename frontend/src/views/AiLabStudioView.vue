@@ -284,7 +284,8 @@ async function flushSlowPipeline() {
   const blob = float32ToWavBlob(merged)
   if (blob.size <= 44 || entryIds.length === 0) return
 
-  console.log(`[SlowPipeline] Overwriting ${entryIds.length} entries with ${(totalLen / 16000).toFixed(1)}s combined audio`)
+  const t0 = performance.now()
+  console.log(`[SlowPipe] submit: ${(totalLen / 16000).toFixed(1)}s audio, overwriting ${entryIds.length} entries`)
 
   try {
     const formData = new FormData()
@@ -346,9 +347,9 @@ async function flushSlowPipeline() {
       currentParagraphId = null
     }
 
-    console.log(`[SlowPipeline] Overwrite complete`)
+    console.log(`[SlowPipe] done in ${((performance.now() - t0) / 1000).toFixed(2)}s`)
   } catch (e) {
-    console.warn('[SlowPipeline] Overwrite failed:', e)
+    console.warn('[SlowPipe] failed:', e)
   }
 }
 
@@ -516,7 +517,10 @@ async function processNDJSONStream(res, entryId) {
 
 // ── Submit a segment (fast pipeline) ──
 async function submitSegment(blob, seq, paragraphId) {
+  const t0 = performance.now()
+  const audioDur = ((blob.size - 44) / 2 / 16000).toFixed(2)
   const placeholderId = `seg-${Date.now()}-${seq}`
+  console.log(`[FastPipe] #${seq} submit: ${audioDur}s audio`)
   const entry = {
     id: placeholderId,
     seq,
@@ -556,6 +560,7 @@ async function submitSegment(blob, seq, paragraphId) {
     }
 
     await processNDJSONStream(res, placeholderId)
+    console.log(`[FastPipe] #${seq} done in ${((performance.now() - t0) / 1000).toFixed(2)}s`)
   } catch (e) {
     const idx = transcriptionHistory.value.findIndex(h => h.id === placeholderId)
     if (idx !== -1) {
