@@ -126,11 +126,14 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
     # language field (optional)
     lang_code = source_lang.lower() if source_lang else ""
     if lang_code and lang_code in _QWEN3_ASR_LANGS:
+        logger.info("Qwen3-ASR language set to: %s (from source_lang=%s)", lang_code, source_lang)
         parts.append(
             f"--{boundary}\r\n"
             f'Content-Disposition: form-data; name="language"\r\n\r\n'
             f"{lang_code}\r\n"
         )
+    else:
+        logger.info("Qwen3-ASR language: auto-detect (source_lang=%s not in supported set)", source_lang)
     parts.append(f"--{boundary}--\r\n")
 
     # Encode body
