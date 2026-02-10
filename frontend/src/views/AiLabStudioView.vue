@@ -31,7 +31,7 @@ let vadInstance = null
 let currentParagraphId = null
 let forceSegmentTimer = null
 let lastSegmentTime = null
-const MAX_SEGMENT_MS = 15000 // 连续说话超过 15 秒强制切分
+const MAX_SEGMENT_MS = 5000 // 连续说话超过 5 秒强制切分
 
 // File input
 const fileInput = ref(null)
@@ -162,10 +162,10 @@ async function startRecording() {
     vadInstance = await MicVAD.new({
       baseAssetPath: '/vad/',
       onnxWASMBasePath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.1/dist/',
-      positiveSpeechThreshold: 0.5,
-      negativeSpeechThreshold: 0.35,
-      redemptionMs: 500,
-      minSpeechMs: 250,
+      positiveSpeechThreshold: 0.6,
+      negativeSpeechThreshold: 0.45,
+      redemptionMs: 300,
+      minSpeechMs: 150,
       submitUserSpeechOnPause: true,
       onSpeechStart: () => {
         console.log('[VAD] Speech started')
@@ -199,7 +199,7 @@ async function startRecording() {
           console.warn('[VAD] Force split error:', e)
         }
       }
-    }, 3000)
+    }, 2000)
   } catch (e) {
     console.error('VAD init failed:', e)
     if (e.name === 'NotAllowedError' || e.name === 'NotFoundError') {
