@@ -49,6 +49,7 @@ const showMinutes = ref(false)
 const hoveredId = ref(null)
 
 const SENTENCE_END_RE = /[.。!！?？]\s*$/
+const REFINE_EVERY_N = 3 // 每 N 个片段重新翻译一次段落
 
 // ── Float32Array → WAV Blob ──
 function float32ToWavBlob(samples, sampleRate = 16000) {
@@ -270,6 +271,8 @@ async function processNDJSONStream(res, entryId) {
       } else if (event.event === 'translation') {
         transcriptionHistory.value[idx].translated = event.text
         transcriptionHistory.value[idx].pending = false
+        // Check if paragraph has enough completed segments to trigger refinement
+        maybeRefineTranslation(transcriptionHistory.value[idx].paragraphId)
       } else if (event.event === 'done') {
         transcriptionHistory.value[idx].pending = false
       } else if (event.event === 'error') {
@@ -277,6 +280,68 @@ async function processNDJSONStream(res, entryId) {
         transcriptionHistory.value[idx].pending = false
       }
     }
+  }
+}
+
+// ── Paragraph translation refinement ──
+// Track which paragraphs have been refined at which segment count
+const refinedAt = new Map() // paragraphId → last refined count
+
+function maybeRefineTranslation(paragraphId) {
+  if (!paragraphId) return
+  const entries = transcriptionHistory.value.filter(
+    e => e.paragraphId === paragraphId && !e.pending && e.original && !e.original.startsWith('[Error')
+  )
+  const count = entries.length
+  const lastRefined = refinedAt.get(paragraphId) || 0
+  // Trigger when count reaches the next multiple of REFINE_EVERY_N (and at least 3)
+  if (count >= REFINE_EVERY_N && count > lastRefined && count % REFINE_EVERY_N === 0) {
+    refinedAt.set(paragraphId, count)
+    refineParagraphTranslation(paragraphId, entries)
+  }
+}
+
+async function refineParagraphTranslation(paragraphId, entries) {
+  // Sort by seq and join all originals
+  const sorted = [...entries].sort((a, b) => a.seq - b.seq)
+  const combinedOriginal = sorted.map(e => e.original).filter(Boolean).join(' ')
+  if (!combinedOriginal.trim()) return
+
+  console.log(`[Refine] Re-translating paragraph ${paragraphId} (${sorted.length} segments)`)
+
+  try {
+    const res = await fetch(`${API_BASE}/api/interpretation/translate/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: combinedOriginal,
+        source_lang: sourceLang.value,
+        target_lang: targetLang.value,
+      }),
+    })
+
+    if (!res.ok) return
+
+    const data = await res.json()
+    const refinedTranslation = data.translated
+
+    if (!refinedTranslation) return
+
+    // Distribute refined translation across entries
+    // Strategy: put full refined text on first entry, clear the rest
+    // This way paragraphs computed will concatenate correctly
+    for (let i = 0; i < sorted.length; i++) {
+      const idx = transcriptionHistory.value.findIndex(h => h.id === sorted[i].id)
+      if (idx === -1) continue
+      if (i === 0) {
+        transcriptionHistory.value[idx].translated = refinedTranslation
+      } else {
+        transcriptionHistory.value[idx].translated = ''
+      }
+    }
+    console.log(`[Refine] Paragraph ${paragraphId} translation updated`)
+  } catch (e) {
+    console.warn('[Refine] Translation refinement failed:', e)
   }
 }
 
@@ -474,6 +539,7 @@ function clearHistory() {
   meetingMinutes.value = ''
   showMinutes.value = false
   currentParagraphId = null
+  refinedAt.clear()
 }
 
 function copyAll() {
