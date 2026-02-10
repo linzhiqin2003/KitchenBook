@@ -37,8 +37,8 @@ export function useStreamingAsr() {
   let totalSamples = 0
 
   // Silence detection
-  const SILENCE_THRESHOLD = 0.015
-  const SILENCE_TIMEOUT_MS = 500
+  const SILENCE_THRESHOLD = 0.02
+  const SILENCE_TIMEOUT_MS = 300
   const MAX_DURATION_MS = 5000
   const MIN_AUDIO_MS = 300
   let lastSpeechTime = 0
