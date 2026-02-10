@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.request
 import urllib.error
 
@@ -234,15 +235,20 @@ def _groq_transcribe(file_path: str) -> str:
 def _transcribe(file_path: str, source_lang: str = "") -> tuple:
     """Transcribe audio: try Qwen3-ASR first, fall back to Groq Whisper.
     Returns (text, asr_model) tuple."""
+    t0 = time.monotonic()
     # Try Qwen3-ASR (self-hosted, primary)
     try:
         text = _qwen3_asr_transcribe(file_path, source_lang)
+        logger.info("[TIMING] Qwen3-ASR took %.2fs", time.monotonic() - t0)
         return text, "Qwen3-ASR"
     except Exception as e:
-        logger.warning("Qwen3-ASR failed, falling back to Groq Whisper: %s", e)
+        logger.warning("[TIMING] Qwen3-ASR failed after %.2fs, falling back to Groq Whisper: %s",
+                       time.monotonic() - t0, e)
 
     # Fallback to Groq Whisper
+    t1 = time.monotonic()
     text = _groq_transcribe(file_path)
+    logger.info("[TIMING] Groq Whisper took %.2fs", time.monotonic() - t1)
     return text, "Groq Whisper"
 
 
@@ -279,6 +285,8 @@ def transcribe_and_translate_stream(file_path: str, source_lang: str, target_lan
     Streaming pipeline: yield NDJSON lines — transcription first, then translation.
     Each line is a JSON object with an 'event' field.
     """
+    pipeline_start = time.monotonic()
+
     # Step 1: ASR transcription (Qwen3-ASR primary, Groq Whisper fallback)
     text, asr_model = _transcribe(file_path, source_lang)
     yield json.dumps({"event": "transcription", "text": text, "asr_model": asr_model}) + "\n"
@@ -288,9 +296,12 @@ def transcribe_and_translate_stream(file_path: str, source_lang: str, target_lan
         return
 
     # Step 2: Cerebras translation
+    t_trans = time.monotonic()
     translated = _cerebras_translate(text, source_lang, target_lang)
-    logger.info("Cerebras translation done (%d chars)", len(translated))
+    logger.info("[TIMING] Cerebras translation took %.2fs", time.monotonic() - t_trans)
     yield json.dumps({"event": "translation", "text": translated}) + "\n"
+
+    logger.info("[TIMING] Full pipeline took %.2fs (ASR=%s)", time.monotonic() - pipeline_start, asr_model)
     yield json.dumps({"event": "done"}) + "\n"
 
 
