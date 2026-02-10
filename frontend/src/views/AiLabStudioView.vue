@@ -448,7 +448,12 @@ function closeMinutes() {
 // ── Simple markdown renderer for meeting minutes ──
 function renderMinutesMarkdown(text) {
   return text
+    // Strip <think>...</think> blocks (DeepSeek reasoning output)
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<think>[\s\S]*/g, '') // unclosed <think> during streaming
+    .trim()
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^### (.+)$/gm, '<h4 class="text-[14px] font-semibold text-white/80 mt-3 mb-1.5">$1</h4>')
     .replace(/^## (.+)$/gm, '<h3 class="text-[15px] font-semibold text-white/90 mt-4 mb-2 first:mt-0">$1</h3>')
     .replace(/^- \[ \] (.+)$/gm, '<div class="flex items-start gap-2 ml-2 mb-1"><span class="text-white/30 mt-0.5">☐</span><span class="text-[13px] text-white/70">$1</span></div>')
     .replace(/^- (.+)$/gm, '<div class="flex items-start gap-2 ml-2 mb-1"><span class="text-white/40 mt-0.5">•</span><span class="text-[13px] text-white/70">$1</span></div>')
@@ -671,36 +676,6 @@ onUnmounted(() => {
 
           <!-- Results: two-column transcript by paragraphs -->
           <div ref="historyContainer" class="flex-1 overflow-y-auto custom-scrollbar min-h-0 space-y-3">
-            <!-- Meeting minutes card -->
-            <div
-              v-if="showMinutes"
-              class="rounded-2xl p-[1px] bg-gradient-to-br from-purple-500/40 via-blue-500/30 to-cyan-500/20"
-            >
-              <div class="bg-black/80 backdrop-blur-xl rounded-2xl p-5">
-                <div class="flex items-center justify-between mb-4">
-                  <div class="flex items-center gap-2">
-                    <span class="text-[13px] font-semibold text-purple-300">会议纪要</span>
-                    <div v-if="generatingMinutes" class="w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                  <button
-                    @click="closeMinutes"
-                    class="w-6 h-6 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                  </button>
-                </div>
-                <div
-                  v-if="meetingMinutes"
-                  class="text-[13px] leading-relaxed text-white/70"
-                  v-html="renderMinutesMarkdown(meetingMinutes)"
-                ></div>
-                <div v-else-if="generatingMinutes" class="text-[13px] text-white/30">
-                  正在生成会议纪要...
-                </div>
-              </div>
-            </div>
 
             <!-- Empty state -->
             <div v-if="!transcriptionHistory.length && inflight === 0 && !showMinutes" class="h-full flex items-center justify-center">
@@ -728,7 +703,7 @@ onUnmounted(() => {
                       @mouseenter="hoveredId = group.paragraphId"
                       @mouseleave="hoveredId = null"
                       class="transition-colors duration-100 rounded px-0.5 -mx-0.5"
-                      :class="hoveredId === group.paragraphId ? 'bg-white/[0.08]' : ''"
+                      :class="hoveredId === group.paragraphId ? 'bg-yellow-200/15' : ''"
                     >{{ group.original }}</span>{{ ' ' }}
                   </template>
                   <span v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending" class="inline-flex items-center ml-1 align-middle">
@@ -743,7 +718,7 @@ onUnmounted(() => {
                       @mouseenter="hoveredId = group.paragraphId"
                       @mouseleave="hoveredId = null"
                       class="transition-colors duration-100 rounded px-0.5 -mx-0.5"
-                      :class="hoveredId === group.paragraphId ? 'bg-white/[0.08]' : ''"
+                      :class="hoveredId === group.paragraphId ? 'bg-yellow-200/15' : ''"
                     >{{ group.translated }}</span>{{ ' ' }}
                   </template>
                   <span v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending && paragraphs[paragraphs.length - 1].translated" class="inline-flex items-center ml-1 align-middle">
@@ -767,5 +742,81 @@ onUnmounted(() => {
 
       </div>
     </main>
+
+    <!-- Meeting Minutes Modal -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showMinutes" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="closeMinutes">
+          <!-- Backdrop -->
+          <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+          <!-- Modal content -->
+          <div class="relative w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl p-[1px] bg-gradient-to-br from-purple-500/40 via-blue-500/30 to-cyan-500/20">
+            <div class="flex flex-col bg-[#0d0d14]/95 backdrop-blur-xl rounded-2xl overflow-hidden">
+              <!-- Header -->
+              <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-[15px] font-semibold text-purple-300">会议纪要</span>
+                  <div v-if="generatingMinutes" class="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <button
+                  @click="closeMinutes"
+                  class="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <!-- Body -->
+              <div class="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
+                <div
+                  v-if="meetingMinutes"
+                  class="text-[13px] leading-relaxed text-white/70"
+                  v-html="renderMinutesMarkdown(meetingMinutes)"
+                ></div>
+                <div v-else-if="generatingMinutes" class="flex items-center gap-2 text-[13px] text-white/30 py-8 justify-center">
+                  <span class="w-4 h-4 border-2 border-purple-400/50 border-t-transparent rounded-full animate-spin"></span>
+                  正在生成会议纪要...
+                </div>
+              </div>
+              <!-- Footer -->
+              <div v-if="meetingMinutes && !generatingMinutes" class="px-6 py-3 border-t border-white/5 shrink-0 flex justify-end gap-2">
+                <button
+                  @click="navigator.clipboard.writeText(meetingMinutes); closeMinutes()"
+                  class="px-4 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[12px] text-white/60 hover:text-white/80 transition-colors"
+                >复制纪要</button>
+                <button
+                  @click="closeMinutes"
+                  class="px-4 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-[12px] text-purple-300 hover:text-purple-200 transition-colors"
+                >关闭</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-enter-active .relative,
+.modal-leave-active .relative {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-from .relative {
+  transform: scale(0.95) translateY(10px);
+  opacity: 0;
+}
+.modal-leave-to .relative {
+  transform: scale(0.95) translateY(10px);
+  opacity: 0;
+}
+</style>
