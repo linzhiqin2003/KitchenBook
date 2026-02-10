@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, reactive } from 'vue'
+import { useRoute } from 'vue-router'
 import RecordButton from '../components/ailab/RecordButton.vue'
 import TranscriptionPanel from '../components/ailab/TranscriptionPanel.vue'
 import LanguageSelector from '../components/ailab/LanguageSelector.vue'
@@ -9,9 +10,10 @@ import EmojiGenerator from '../components/ailab/EmojiGenerator.vue'
 import { getAiLabApiBase, getAiLabWsBaseUrl } from '../config/aiLab'
 
 const API_BASE = getAiLabApiBase()
+const route = useRoute()
 
 // Current view
-const currentView = ref('interpretation') // 'interpretation' or 'emoji'
+const currentView = ref(route.query.view === 'emoji' ? 'emoji' : 'interpretation')
 
 // State
 const isRecording = ref(false)

@@ -262,8 +262,30 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <!-- 底部返回首页 -->
-    <div class="p-3 border-t border-gray-200">
+    <!-- 底部导航 -->
+    <div class="p-3 border-t border-gray-200 space-y-1">
+      <router-link
+        to="/ai-lab/studio"
+        :class="[
+          'flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-violet-50 transition-colors text-gray-600 hover:text-violet-700',
+          isCollapsed && 'justify-center'
+        ]"
+        :title="isCollapsed ? '同声传译' : ''"
+      >
+        <span class="text-base leading-none shrink-0">🎙️</span>
+        <span v-if="!isCollapsed" class="text-sm">同声传译</span>
+      </router-link>
+      <router-link
+        to="/ai-lab/studio?view=emoji"
+        :class="[
+          'flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-violet-50 transition-colors text-gray-600 hover:text-violet-700',
+          isCollapsed && 'justify-center'
+        ]"
+        :title="isCollapsed ? '表情包生成' : ''"
+      >
+        <span class="text-base leading-none shrink-0">🎭</span>
+        <span v-if="!isCollapsed" class="text-sm">表情包生成</span>
+      </router-link>
       <router-link
         to="/"
         :class="[
