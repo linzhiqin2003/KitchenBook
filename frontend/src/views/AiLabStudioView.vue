@@ -274,9 +274,9 @@ async function startStreamingRecording() {
     recordingTime.value = Math.floor((Date.now() - recordingStartTime) / 1000)
   }, 200)
 
-  await startStreamingAsr(sourceLang.value, (finalText) => {
-    handleStreamingFinal(finalText)
-  })
+  await startStreamingAsr(sourceLang.value, (finalText, translatedText) => {
+    handleStreamingFinal(finalText, translatedText)
+  }, targetLang.value)
 
   // Check for composable-level errors
   if (streamingError.value) {
@@ -293,24 +293,24 @@ function stopStreamingRecording() {
   streamingParagraphId = null
 }
 
-async function handleStreamingFinal(text) {
+async function handleStreamingFinal(text, translatedText) {
   if (!text.trim()) return
 
   const seq = streamingSegSeq++
   const entryId = `stream-${Date.now()}-${seq}`
   const pid = streamingParagraphId || `para-${Date.now()}`
 
+  const isError = text.startsWith('[Error')
   const entry = {
     id: entryId,
     seq,
     paragraphId: pid,
     original: text,
-    translated: '',
+    translated: translatedText || '',
     timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    pending: 'translating',
+    pending: isError ? false : (!translatedText ? 'translating' : false),
   }
   transcriptionHistory.value.unshift(entry)
-  inflight.value++
 
   await nextTick()
   if (historyContainer.value) {
@@ -318,10 +318,18 @@ async function handleStreamingFinal(text) {
   }
 
   // Sentence boundary → new paragraph for next segment
-  if (SENTENCE_END_RE.test(text.trim())) {
+  if (!isError && SENTENCE_END_RE.test(text.trim())) {
     streamingParagraphId = `para-${Date.now()}`
   }
 
+  // If translation was already provided by composable, we're done
+  if (translatedText || isError) {
+    maybeRefineTranslation(pid)
+    return
+  }
+
+  // Fallback: if composable didn't provide translation (shouldn't happen), fetch it
+  inflight.value++
   try {
     const res = await fetch(`${API_BASE}/api/interpretation/translate/`, {
       method: 'POST',
@@ -332,10 +340,8 @@ async function handleStreamingFinal(text) {
         target_lang: targetLang.value,
       }),
     })
-
     if (!res.ok) throw new Error(`Server error (${res.status})`)
     const data = await res.json()
-
     const idx = transcriptionHistory.value.findIndex(h => h.id === entryId)
     if (idx !== -1) {
       transcriptionHistory.value[idx].translated = data.translated || ''
@@ -748,7 +754,7 @@ onUnmounted(() => {
         <div class="flex items-center justify-end gap-2 w-[200px]">
           <span class="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[11px] font-medium text-white/40 uppercase tracking-wider">
             {{ currentView === 'interpretation'
-              ? (asrMode === 'streaming' ? 'Qwen3-ASR Stream' : (asrModel || 'Qwen3-ASR')) + ' + Cerebras'
+              ? (asrMode === 'streaming' ? 'Qwen3-ASR Lite' : (asrModel || 'Qwen3-ASR')) + ' + Cerebras'
               : 'Emoji-v1' }}
           </span>
         </div>
@@ -900,7 +906,7 @@ onUnmounted(() => {
                 <p class="text-[14px] text-white/60">录音或上传音频文件，自动转录并翻译</p>
                 <p class="text-[11px] text-white/30">
                   {{ asrMode === 'streaming'
-                    ? '流式识别，边说边转 · Powered by Qwen3-ASR Stream + Cerebras'
+                    ? '轻量模式，即时启动 · Powered by Qwen3-ASR + Cerebras'
                     : '语音自动检测，停顿时自动切分 · Powered by Silero VAD + Qwen3-ASR + Cerebras' }}
                 </p>
               </div>
