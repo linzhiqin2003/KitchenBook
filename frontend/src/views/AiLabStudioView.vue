@@ -159,8 +159,10 @@ async function startRecording() {
     vadInstance = await MicVAD.new({
       baseAssetPath: '/vad/',
       onnxWASMBasePath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.1/dist/',
-      redemptionMs: 1100,
-      minSpeechMs: 480,
+      positiveSpeechThreshold: 0.5,
+      negativeSpeechThreshold: 0.35,
+      redemptionMs: 500,
+      minSpeechMs: 250,
       submitUserSpeechOnPause: true,
       onSpeechStart: () => {
         console.log('[VAD] Speech started')
