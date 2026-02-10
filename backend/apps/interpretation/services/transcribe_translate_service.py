@@ -45,16 +45,32 @@ def _get_cerebras_key():
     return key
 
 
+_LANG_NAMES = {
+    'en': 'English', 'zh': 'Chinese', 'yue': 'Cantonese', 'ja': 'Japanese',
+    'ko': 'Korean', 'fr': 'French', 'de': 'German', 'es': 'Spanish',
+    'pt': 'Portuguese', 'ru': 'Russian', 'ar': 'Arabic', 'it': 'Italian',
+    'th': 'Thai', 'vi': 'Vietnamese', 'id': 'Indonesian', 'ms': 'Malay',
+    'tr': 'Turkish', 'hi': 'Hindi', 'nl': 'Dutch', 'pl': 'Polish',
+    'sv': 'Swedish', 'da': 'Danish', 'fi': 'Finnish', 'cs': 'Czech',
+    'el': 'Greek', 'hu': 'Hungarian', 'ro': 'Romanian', 'fa': 'Persian',
+    'fil': 'Filipino', 'mk': 'Macedonian',
+}
+
+
 def _cerebras_translate(text: str, source_lang: str, target_lang: str) -> str:
     """Call Cerebras Qwen3-32B for translation."""
     key = _get_cerebras_key()
     if not key:
         raise RuntimeError("CEREBRAS_API_KEY_POOL not configured")
 
+    src_name = _LANG_NAMES.get(source_lang.lower(), source_lang)
+    tgt_name = _LANG_NAMES.get(target_lang.lower(), target_lang)
     system_msg = (
         f"/no_think\nYou are a professional translator. "
-        f"Translate the following {source_lang} text into {target_lang}. "
-        f"Output ONLY the translation, nothing else."
+        f"The source text is in {src_name}. "
+        f"Translate it into {tgt_name}. "
+        f"You MUST output ONLY the {tgt_name} translation, nothing else. "
+        f"Do NOT output any {src_name} text or other languages."
     )
     payload = json.dumps({
         "model": "qwen-3-32b",
