@@ -195,7 +195,7 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=3) as resp:
         data = json.loads(resp.read().decode("utf-8"))
 
     text = (data.get("text") or "").strip()
