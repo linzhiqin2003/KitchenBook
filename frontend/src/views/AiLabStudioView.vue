@@ -182,8 +182,8 @@ async function startRecording() {
       onnxWASMBasePath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.1/dist/',
       // Fast pipeline: more sensitive VAD for quicker segments
       positiveSpeechThreshold: 0.3,
-      negativeSpeechThreshold: 0.35,
-      redemptionMs: 150,
+      negativeSpeechThreshold: 0.55,
+      redemptionMs: 100,
       minSpeechMs: 60,
       submitUserSpeechOnPause: true,
       onSpeechStart: () => {
