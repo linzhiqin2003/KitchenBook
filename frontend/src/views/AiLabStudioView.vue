@@ -709,7 +709,7 @@ function clearHistory() {
 }
 
 function copyAll() {
-  const resolved = paragraphs.value.filter(g => !g.pending)
+  const resolved = paragraphs.value.filter(g => !g.pending && (g.original || g.translated))
   const text = resolved
     .map(g => `[${g.timestamp}]\n原文: ${g.original}\n译文: ${g.translated}`)
     .join('\n\n')
@@ -717,7 +717,7 @@ function copyAll() {
 }
 
 function downloadText() {
-  const resolved = paragraphs.value.filter(g => !g.pending)
+  const resolved = paragraphs.value.filter(g => !g.pending && (g.original || g.translated))
   const text = resolved
     .map(g => `[${g.timestamp}]\n原文: ${g.original}\n译文: ${g.translated}`)
     .join('\n\n')
@@ -730,7 +730,7 @@ function downloadText() {
   URL.revokeObjectURL(url)
 }
 
-const totalEntries = computed(() => paragraphs.value.filter(g => !g.pending).length)
+const totalEntries = computed(() => paragraphs.value.filter(g => !g.pending && (g.original || g.translated)).length)
 const canGenerateMinutes = computed(() => {
   return paragraphs.value.filter(g => !g.pending && !g.original.startsWith('[Error')).length >= 3
 })
