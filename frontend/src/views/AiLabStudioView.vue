@@ -20,6 +20,7 @@ const targetLang = ref('Chinese')
 const errorMsg = ref('')
 const inflight = ref(0)
 const isRecording = ref(false)
+const asrModel = ref('')  // 当前使用的 ASR 模型名称
 const recordingTime = ref(0)
 
 let timerInterval = null
@@ -256,6 +257,7 @@ async function processNDJSONStream(res, entryId) {
       if (idx === -1) continue
 
       if (event.event === 'transcription') {
+        if (event.asr_model) asrModel.value = event.asr_model
         if (!event.text) {
           // Empty transcription (silence) — remove placeholder
           transcriptionHistory.value.splice(idx, 1)
@@ -622,7 +624,7 @@ onUnmounted(() => {
         <!-- Right: Provider badge -->
         <div class="flex items-center justify-end gap-2 w-[200px]">
           <span class="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[11px] font-medium text-white/40 uppercase tracking-wider">
-            {{ currentView === 'interpretation' ? 'Groq + Cerebras' : 'Emoji-v1' }}
+            {{ currentView === 'interpretation' ? (asrModel || 'Qwen3-ASR') + ' + Cerebras' : 'Emoji-v1' }}
           </span>
         </div>
       </div>
@@ -748,7 +750,7 @@ onUnmounted(() => {
               <div class="text-center space-y-3 opacity-40">
                 <div class="text-4xl">🎙️</div>
                 <p class="text-[14px] text-white/60">录音或上传音频文件，自动转录并翻译</p>
-                <p class="text-[11px] text-white/30">语音自动检测，停顿时自动切分 · Powered by Silero VAD + Groq + Cerebras</p>
+                <p class="text-[11px] text-white/30">语音自动检测，停顿时自动切分 · Powered by Silero VAD + Qwen3-ASR + Cerebras</p>
               </div>
             </div>
 

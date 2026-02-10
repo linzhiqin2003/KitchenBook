@@ -182,26 +182,29 @@ def _groq_transcribe(file_path: str) -> str:
     return text
 
 
-def _transcribe(file_path: str, source_lang: str = "") -> str:
-    """Transcribe audio: try Qwen3-ASR first, fall back to Groq Whisper."""
+def _transcribe(file_path: str, source_lang: str = "") -> tuple:
+    """Transcribe audio: try Qwen3-ASR first, fall back to Groq Whisper.
+    Returns (text, asr_model) tuple."""
     # Try Qwen3-ASR (self-hosted, primary)
     try:
-        return _qwen3_asr_transcribe(file_path, source_lang)
+        text = _qwen3_asr_transcribe(file_path, source_lang)
+        return text, "Qwen3-ASR"
     except Exception as e:
         logger.warning("Qwen3-ASR failed, falling back to Groq Whisper: %s", e)
 
     # Fallback to Groq Whisper
-    return _groq_transcribe(file_path)
+    text = _groq_transcribe(file_path)
+    return text, "Groq Whisper"
 
 
 def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str):
     """
-    Full pipeline: Groq Whisper transcription → Cerebras translation.
+    Full pipeline: ASR transcription → Cerebras translation.
 
-    Returns dict: { transcription, translation, source_lang, target_lang }
+    Returns dict: { transcription, translation, source_lang, target_lang, asr_model }
     Raises on failure.
     """
-    text = _transcribe(file_path, source_lang)
+    text, asr_model = _transcribe(file_path, source_lang)
 
     if not text:
         return {
@@ -227,9 +230,9 @@ def transcribe_and_translate_stream(file_path: str, source_lang: str, target_lan
     Streaming pipeline: yield NDJSON lines — transcription first, then translation.
     Each line is a JSON object with an 'event' field.
     """
-    # Step 1: Groq Whisper transcription
-    text = _transcribe(file_path, source_lang)
-    yield json.dumps({"event": "transcription", "text": text}) + "\n"
+    # Step 1: ASR transcription (Qwen3-ASR primary, Groq Whisper fallback)
+    text, asr_model = _transcribe(file_path, source_lang)
+    yield json.dumps({"event": "transcription", "text": text, "asr_model": asr_model}) + "\n"
 
     if not text:
         yield json.dumps({"event": "done"}) + "\n"
