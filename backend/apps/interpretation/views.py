@@ -18,6 +18,7 @@ from django.conf import settings as django_settings
 from rest_framework.decorators import parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from .services.file_asr_service import FileASRService
+from .services.transcribe_translate_service import transcribe_and_translate, transcribe_and_translate_stream
 
 logger = logging.getLogger(__name__)
 
@@ -241,3 +242,94 @@ def submit_file_translation(request):
     except Exception as e:
         logger.error(f"Submit translation error: {e}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def transcribe_translate(request):
+    """
+    Upload audio → Groq Whisper transcription → Cerebras translation.
+
+    POST /api/interpretation/transcribe-translate/
+      - file: audio file (webm, mp3, wav, etc.)
+      - source_lang: e.g. 'en', 'zh'
+      - target_lang: e.g. 'Chinese', 'English'
+    Returns: { transcription, translation, source_lang, target_lang }
+    """
+    if 'file' not in request.FILES:
+        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    uploaded_file = request.FILES['file']
+    source_lang = request.data.get('source_lang', 'en')
+    target_lang = request.data.get('target_lang', 'Chinese')
+
+    ext = Path(uploaded_file.name).suffix.lower() or '.webm'
+    upload_dir = Path(django_settings.MEDIA_ROOT) / 'asr_uploads'
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = upload_dir / f"{uuid.uuid4().hex}{ext}"
+    try:
+        with open(file_path, 'wb+') as dest:
+            for chunk in uploaded_file.chunks():
+                dest.write(chunk)
+
+        result = transcribe_and_translate(str(file_path), source_lang, target_lang)
+        return Response(result)
+
+    except Exception as e:
+        logger.error(f"transcribe_translate error: {e}", exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    finally:
+        if file_path.exists():
+            file_path.unlink()
+
+
+from django.http import StreamingHttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+
+@csrf_exempt
+@require_POST
+def transcribe_translate_stream(request):
+    """
+    POST → StreamingHttpResponse (NDJSON line-by-line).
+    Yields transcription first, then translation, for progressive display.
+    """
+    if 'file' not in request.FILES:
+        import json
+        return StreamingHttpResponse(
+            iter([json.dumps({"event": "error", "text": "No file provided"}) + "\n"]),
+            content_type='application/x-ndjson',
+            status=400,
+        )
+
+    uploaded_file = request.FILES['file']
+    source_lang = request.POST.get('source_lang', 'en')
+    target_lang = request.POST.get('target_lang', 'Chinese')
+
+    ext = Path(uploaded_file.name).suffix.lower() or '.webm'
+    upload_dir = Path(django_settings.MEDIA_ROOT) / 'asr_uploads'
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = upload_dir / f"{uuid.uuid4().hex}{ext}"
+    with open(file_path, 'wb+') as dest:
+        for chunk in uploaded_file.chunks():
+            dest.write(chunk)
+
+    def event_stream():
+        import json
+        try:
+            for line in transcribe_and_translate_stream(str(file_path), source_lang, target_lang):
+                yield line
+        except Exception as e:
+            logger.error(f"transcribe_translate_stream error: {e}", exc_info=True)
+            yield json.dumps({"event": "error", "text": str(e)}) + "\n"
+        finally:
+            if file_path.exists():
+                file_path.unlink()
+
+    return StreamingHttpResponse(
+        event_stream(),
+        content_type='application/x-ndjson',
+    )

@@ -14,4 +14,6 @@ urlpatterns = [
     path('submit-file-asr/', views.submit_file_asr, name='submit_file_asr'),
     path('submit-file-translation/', views.submit_file_translation, name='submit_file_translation'),
     path('get-asr-result/', views.get_asr_result, name='get_asr_result'),
+    path('transcribe-translate/', views.transcribe_translate, name='transcribe_translate'),
+    path('transcribe-translate-stream/', views.transcribe_translate_stream, name='transcribe_translate_stream'),
 ]
