@@ -22,7 +22,6 @@ const inflight = ref(0)
 const isRecording = ref(false)
 const recordingTime = ref(0)
 
-let mediaStream = null
 let timerInterval = null
 let recordingStartTime = null
 let segmentSeq = 0
@@ -142,20 +141,6 @@ const paragraphs = computed(() => {
 
 // ── Recording with VAD ──
 async function startRecording() {
-  // Step 1: Get microphone access
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        noiseSuppression: true,
-        echoCancellation: true,
-        autoGainControl: true,
-      },
-    })
-  } catch (e) {
-    errorMsg.value = '无法访问麦克风，请检查权限设置'
-    return
-  }
-
   segmentSeq = 0
   currentParagraphId = null
   isRecording.value = true
@@ -168,17 +153,20 @@ async function startRecording() {
     recordingTime.value = Math.floor((Date.now() - recordingStartTime) / 1000)
   }, 200)
 
-  // Step 2: Initialize VAD
+  // Initialize VAD — it manages microphone access internally
   try {
     const { MicVAD } = await import('@ricky0123/vad-web')
     vadInstance = await MicVAD.new({
-      stream: mediaStream,
-      baseAssetPath: 'https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/',
+      baseAssetPath: '/vad/',
       onnxWASMBasePath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.1/dist/',
-      redemptionFrames: 12,     // ~1.15s silence to end speech
-      minSpeechFrames: 5,       // ~480ms minimum speech
+      redemptionMs: 1100,
+      minSpeechMs: 480,
       submitUserSpeechOnPause: true,
+      onSpeechStart: () => {
+        console.log('[VAD] Speech started')
+      },
       onSpeechEnd: (audio) => {
+        console.log('[VAD] Speech ended, audio length:', audio.length)
         const blob = float32ToWavBlob(audio)
         if (blob.size <= 44) return // empty WAV (header only)
 
@@ -189,10 +177,13 @@ async function startRecording() {
         submitSegment(blob, seq, currentParagraphId)
       },
     })
-    vadInstance.start()
   } catch (e) {
     console.error('VAD init failed:', e)
-    errorMsg.value = `语音检测模型加载失败: ${e.message}`
+    if (e.name === 'NotAllowedError' || e.name === 'NotFoundError') {
+      errorMsg.value = '无法访问麦克风，请检查权限设置'
+    } else {
+      errorMsg.value = `语音检测模型加载失败: ${e.message}`
+    }
     stopRecording()
   }
 }
@@ -203,17 +194,11 @@ function stopRecording() {
   timerInterval = null
 
   if (vadInstance) {
-    vadInstance.pause()
     vadInstance.destroy()
     vadInstance = null
   }
 
   currentParagraphId = null
-
-  if (mediaStream) {
-    mediaStream.getTracks().forEach(t => t.stop())
-    mediaStream = null
-  }
 }
 
 function toggleRecording() {
