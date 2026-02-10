@@ -45,7 +45,15 @@ let vadInstance = null
 let currentParagraphId = null
 let forceSegmentTimer = null
 let lastSegmentTime = null
-const MAX_SEGMENT_MS = 5000 // 连续说话超过 5 秒强制切分
+const MAX_SEGMENT_MS = 3000 // fast pipeline: force split every 3s
+
+// Slow pipeline: accumulate audio for high-quality overwrite
+let accumulatedAudio = []       // Float32Array segments
+let accumulatedDuration = 0     // seconds
+let accumulatedEntryIds = []    // entry IDs to overwrite
+let slowPipelineTimer = null
+const SLOW_FLUSH_DELAY_MS = 2000 // flush after 2s silence
+const SLOW_MAX_DURATION_S = 5   // or when accumulated audio >= 5s
 
 // File input
 const fileInput = ref(null)
@@ -63,7 +71,6 @@ const showMinutes = ref(false)
 const hoveredId = ref(null)
 
 const SENTENCE_END_RE = /[.。!！?？]\s*$/
-const REFINE_EVERY_N = 3 // 每 N 个片段重新翻译一次段落
 
 // ── Float32Array → WAV Blob ──
 function float32ToWavBlob(samples, sampleRate = 16000) {
@@ -177,10 +184,11 @@ async function startRecording() {
     vadInstance = await MicVAD.new({
       baseAssetPath: '/vad/',
       onnxWASMBasePath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.1/dist/',
-      positiveSpeechThreshold: 0.7,
-      negativeSpeechThreshold: 0.55,
-      redemptionMs: 200,
-      minSpeechMs: 100,
+      // Fast pipeline: more sensitive VAD for quicker segments
+      positiveSpeechThreshold: 0.5,
+      negativeSpeechThreshold: 0.65,
+      redemptionMs: 100,
+      minSpeechMs: 80,
       submitUserSpeechOnPause: true,
       onSpeechStart: () => {
         console.log('[VAD] Speech started')
@@ -195,7 +203,14 @@ async function startRecording() {
           currentParagraphId = `para-${Date.now()}`
         }
         const seq = segmentSeq++
+
+        // Fast pipeline: quick transcription (translation comes but we'll overwrite)
         submitSegment(blob, seq, currentParagraphId)
+
+        // Slow pipeline: accumulate audio for high-quality overwrite
+        accumulatedAudio.push(audio)
+        accumulatedDuration += audio.length / 16000
+        scheduleSlowPipeline()
       },
     })
 
@@ -238,7 +253,125 @@ function stopRecording() {
     vadInstance = null
   }
 
+  // Flush any remaining accumulated audio through slow pipeline
+  if (accumulatedAudio.length > 0) {
+    flushSlowPipeline()
+  }
+  clearTimeout(slowPipelineTimer)
+  slowPipelineTimer = null
+
   currentParagraphId = null
+}
+
+// ── Slow pipeline: accumulate → combined transcription + translation ──
+function scheduleSlowPipeline() {
+  clearTimeout(slowPipelineTimer)
+
+  // Force flush if accumulated enough audio
+  if (accumulatedDuration >= SLOW_MAX_DURATION_S) {
+    flushSlowPipeline()
+    return
+  }
+
+  // Otherwise wait for a real pause
+  slowPipelineTimer = setTimeout(() => {
+    flushSlowPipeline()
+  }, SLOW_FLUSH_DELAY_MS)
+}
+
+async function flushSlowPipeline() {
+  clearTimeout(slowPipelineTimer)
+  slowPipelineTimer = null
+
+  if (accumulatedAudio.length === 0) return
+
+  // Snapshot and reset
+  const audioChunks = accumulatedAudio
+  const entryIds = [...accumulatedEntryIds]
+  const pid = currentParagraphId
+  accumulatedAudio = []
+  accumulatedDuration = 0
+  accumulatedEntryIds = []
+
+  // Merge all Float32 audio
+  let totalLen = 0
+  for (const chunk of audioChunks) totalLen += chunk.length
+  const merged = new Float32Array(totalLen)
+  let offset = 0
+  for (const chunk of audioChunks) {
+    merged.set(chunk, offset)
+    offset += chunk.length
+  }
+
+  const blob = float32ToWavBlob(merged)
+  if (blob.size <= 44 || entryIds.length === 0) return
+
+  console.log(`[SlowPipeline] Overwriting ${entryIds.length} entries with ${(totalLen / 16000).toFixed(1)}s combined audio`)
+
+  try {
+    const formData = new FormData()
+    formData.append('file', blob, 'combined.wav')
+    formData.append('source_lang', sourceLang.value)
+    formData.append('target_lang', targetLang.value)
+
+    const res = await fetch(`${API_BASE}/api/interpretation/transcribe-translate-stream/`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!res.ok) return
+
+    // Parse NDJSON for transcription + translation
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let betterOriginal = ''
+    let betterTranslation = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop()
+      for (const line of lines) {
+        if (!line.trim()) continue
+        const event = JSON.parse(line)
+        if (event.event === 'transcription' && event.text) {
+          betterOriginal = event.text
+          if (event.asr_model) asrModel.value = event.asr_model
+        } else if (event.event === 'translation' && event.text) {
+          betterTranslation = event.text
+        }
+      }
+    }
+
+    if (!betterOriginal) return
+
+    // Overwrite: first entry gets combined result, rest get cleared
+    for (let i = 0; i < entryIds.length; i++) {
+      const idx = transcriptionHistory.value.findIndex(h => h.id === entryIds[i])
+      if (idx === -1) continue
+      if (i === 0) {
+        transcriptionHistory.value[idx].original = betterOriginal
+        transcriptionHistory.value[idx].translated = betterTranslation
+        transcriptionHistory.value[idx].pending = false
+      } else {
+        transcriptionHistory.value[idx].original = ''
+        transcriptionHistory.value[idx].translated = ''
+        transcriptionHistory.value[idx].pending = false
+      }
+    }
+
+    // Sentence boundary → new paragraph
+    if (SENTENCE_END_RE.test(betterOriginal.trim())) {
+      currentParagraphId = null
+    }
+
+    console.log(`[SlowPipeline] Overwrite complete`)
+  } catch (e) {
+    console.warn('[SlowPipeline] Overwrite failed:', e)
+  }
 }
 
 function toggleRecording() {
@@ -326,7 +459,7 @@ async function handleStreamingFinal(text, translatedText) {
 
   // Per-segment translation already provided by composable → trigger paragraph refinement
   if (translatedText) {
-    maybeRefineTranslation(pid)
+    // (refinement handled by slow pipeline in standard mode)
     return
   }
 
@@ -344,7 +477,7 @@ async function handleStreamingFinal(text, translatedText) {
     if (idx !== -1) {
       transcriptionHistory.value[idx].translated = data.translated || ''
       transcriptionHistory.value[idx].pending = false
-      maybeRefineTranslation(pid)
+      // (refinement handled by slow pipeline in standard mode)
     }
   } catch (e) {
     const idx = transcriptionHistory.value.findIndex(h => h.id === entryId)
@@ -393,8 +526,6 @@ async function processNDJSONStream(res, entryId) {
       } else if (event.event === 'translation') {
         transcriptionHistory.value[idx].translated = event.text
         transcriptionHistory.value[idx].pending = false
-        // Check if paragraph has enough completed segments to trigger refinement
-        maybeRefineTranslation(transcriptionHistory.value[idx].paragraphId)
       } else if (event.event === 'done') {
         transcriptionHistory.value[idx].pending = false
       } else if (event.event === 'error') {
@@ -405,69 +536,7 @@ async function processNDJSONStream(res, entryId) {
   }
 }
 
-// ── Paragraph translation refinement ──
-// Track which paragraphs have been refined at which segment count
-const refinedAt = new Map() // paragraphId → last refined count
-
-function maybeRefineTranslation(paragraphId) {
-  if (!paragraphId) return
-  const entries = transcriptionHistory.value.filter(
-    e => e.paragraphId === paragraphId && !e.pending && e.original && !e.original.startsWith('[Error')
-  )
-  const count = entries.length
-  const lastRefined = refinedAt.get(paragraphId) || 0
-  // Trigger when count reaches the next multiple of REFINE_EVERY_N (and at least 3)
-  if (count >= REFINE_EVERY_N && count > lastRefined && count % REFINE_EVERY_N === 0) {
-    refinedAt.set(paragraphId, count)
-    refineParagraphTranslation(paragraphId, entries)
-  }
-}
-
-async function refineParagraphTranslation(paragraphId, entries) {
-  // Sort by seq and join all originals
-  const sorted = [...entries].sort((a, b) => a.seq - b.seq)
-  const combinedOriginal = sorted.map(e => e.original).filter(Boolean).join(' ')
-  if (!combinedOriginal.trim()) return
-
-  console.log(`[Refine] Re-translating paragraph ${paragraphId} (${sorted.length} segments)`)
-
-  try {
-    const res = await fetch(`${API_BASE}/api/interpretation/translate/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: combinedOriginal,
-        source_lang: sourceLang.value,
-        target_lang: targetLang.value,
-      }),
-    })
-
-    if (!res.ok) return
-
-    const data = await res.json()
-    const refinedTranslation = data.translated
-
-    if (!refinedTranslation) return
-
-    // Distribute refined translation across entries
-    // Strategy: put full refined text on first entry, clear the rest
-    // This way paragraphs computed will concatenate correctly
-    for (let i = 0; i < sorted.length; i++) {
-      const idx = transcriptionHistory.value.findIndex(h => h.id === sorted[i].id)
-      if (idx === -1) continue
-      if (i === 0) {
-        transcriptionHistory.value[idx].translated = refinedTranslation
-      } else {
-        transcriptionHistory.value[idx].translated = ''
-      }
-    }
-    console.log(`[Refine] Paragraph ${paragraphId} translation updated`)
-  } catch (e) {
-    console.warn('[Refine] Translation refinement failed:', e)
-  }
-}
-
-// ── Submit a segment ──
+// ── Submit a segment (fast pipeline) ──
 async function submitSegment(blob, seq, paragraphId) {
   const placeholderId = `seg-${Date.now()}-${seq}`
   const entry = {
@@ -481,6 +550,9 @@ async function submitSegment(blob, seq, paragraphId) {
   }
   transcriptionHistory.value.unshift(entry)
   inflight.value++
+
+  // Track for slow pipeline overwrite
+  accumulatedEntryIds.push(placeholderId)
 
   await nextTick()
   if (historyContainer.value) {
@@ -661,7 +733,9 @@ function clearHistory() {
   meetingMinutes.value = ''
   showMinutes.value = false
   currentParagraphId = null
-  refinedAt.clear()
+  accumulatedAudio = []
+  accumulatedDuration = 0
+  accumulatedEntryIds = []
 }
 
 function copyAll() {
