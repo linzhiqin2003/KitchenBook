@@ -927,8 +927,8 @@ onUnmounted(() => {
                 </button>
               </div>
 
-              <!-- Inflight indicator -->
-              <div v-if="inflight > 0" class="flex items-center gap-3 pl-2">
+              <!-- Inflight indicator (only show when not recording) -->
+              <div v-if="inflight > 0 && !isRecording" class="flex items-center gap-3 pl-2">
                 <div class="w-5 h-5 border-2 border-ios-blue border-t-transparent rounded-full animate-spin"></div>
                 <span class="text-[13px] text-ios-blue font-medium">
                   处理中 ({{ inflight }})
