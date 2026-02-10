@@ -51,6 +51,86 @@ let accumulatedEntryIds = []    // entry IDs to overwrite
 let slowPipelineTimer = null
 const SLOW_FLUSH_DELAY_MS = 1000 // flush after 1s silence
 
+// Audio visualization
+const vizCanvas = ref(null)
+let vizAudioCtx = null
+let vizAnalyser = null
+let vizStream = null
+let vizAnimId = null
+
+async function startVisualization() {
+  try {
+    vizStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    vizAudioCtx = new AudioContext()
+    const source = vizAudioCtx.createMediaStreamSource(vizStream)
+    vizAnalyser = vizAudioCtx.createAnalyser()
+    vizAnalyser.fftSize = 128
+    vizAnalyser.smoothingTimeConstant = 0.8
+    source.connect(vizAnalyser)
+    drawVisualization()
+  } catch (e) {
+    console.warn('[Viz] init failed:', e)
+  }
+}
+
+function drawVisualization() {
+  const canvas = vizCanvas.value
+  if (!vizAnalyser || !canvas) return
+  const ctx = canvas.getContext('2d')
+  const dpr = window.devicePixelRatio || 1
+
+  // Size canvas to container
+  const rect = canvas.parentElement.getBoundingClientRect()
+  canvas.width = rect.width * dpr
+  canvas.height = rect.height * dpr
+  ctx.scale(dpr, dpr)
+  const W = rect.width
+  const H = rect.height
+
+  const bufLen = vizAnalyser.frequencyBinCount
+  const dataArray = new Uint8Array(bufLen)
+
+  function draw() {
+    vizAnimId = requestAnimationFrame(draw)
+    vizAnalyser.getByteFrequencyData(dataArray)
+    ctx.clearRect(0, 0, W, H)
+
+    // Draw mirrored bars from center
+    const centerX = W / 2
+    const barCount = Math.min(bufLen, 48)
+    const barW = 3
+    const gap = 2
+    const totalW = barCount * (barW + gap)
+
+    for (let i = 0; i < barCount; i++) {
+      const val = dataArray[i] / 255
+      const barH = Math.max(2, val * H * 0.7)
+      const x = centerX + i * (barW + gap)
+      const xMirror = centerX - (i + 1) * (barW + gap)
+      const y = (H - barH) / 2
+
+      // Gradient from blue to purple based on frequency
+      const alpha = 0.15 + val * 0.35
+      const hue = 220 + i * 1.5
+      ctx.fillStyle = `hsla(${hue}, 80%, 65%, ${alpha})`
+      ctx.beginPath()
+      ctx.roundRect(x, y, barW, barH, 1.5)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.roundRect(xMirror, y, barW, barH, 1.5)
+      ctx.fill()
+    }
+  }
+  draw()
+}
+
+function stopVisualization() {
+  if (vizAnimId) { cancelAnimationFrame(vizAnimId); vizAnimId = null }
+  if (vizStream) { vizStream.getTracks().forEach(t => t.stop()); vizStream = null }
+  if (vizAudioCtx) { vizAudioCtx.close(); vizAudioCtx = null }
+  vizAnalyser = null
+}
+
 // File input
 const fileInput = ref(null)
 
@@ -174,6 +254,10 @@ async function startRecording() {
     recordingTime.value = Math.floor((Date.now() - recordingStartTime) / 1000)
   }, 200)
 
+  // Start audio visualization
+  await nextTick()
+  startVisualization()
+
   // Initialize VAD — it manages microphone access internally
   try {
     const { MicVAD } = await import('@ricky0123/vad-web')
@@ -231,6 +315,7 @@ function stopRecording() {
   isRecording.value = false
   clearInterval(timerInterval)
   timerInterval = null
+  stopVisualization()
 
   if (vadInstance) {
     vadInstance.destroy()
@@ -866,8 +951,10 @@ onUnmounted(() => {
           </div>
 
           <!-- Input area: Record + Upload + Status -->
-          <div class="flex-none ios-glass rounded-[20px] p-5 ring-1 ring-white/10">
-            <div class="flex items-center justify-center gap-4">
+          <div class="flex-none ios-glass rounded-[20px] p-5 ring-1 ring-white/10 relative overflow-hidden">
+            <!-- Waveform visualization canvas (behind everything) -->
+            <canvas v-show="isRecording" ref="vizCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+            <div class="relative flex items-center justify-center gap-4">
               <!-- Recording timer -->
               <div v-if="isRecording" class="text-2xl font-light tabular-nums tracking-tighter text-white/80 font-display w-20 text-center">
                 {{ formatTime(recordingTime) }}
@@ -917,7 +1004,7 @@ onUnmounted(() => {
                   处理中 ({{ inflight }})
                 </span>
               </div>
-            </div>
+            </div> <!-- /relative -->
 
             <!-- Error -->
             <div v-if="errorMsg" class="mt-3 text-center text-[12px] text-red-400">
