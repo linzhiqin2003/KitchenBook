@@ -45,6 +45,12 @@ const meetingMinutes = ref('')
 const generatingMinutes = ref(false)
 const showMinutes = ref(false)
 
+// Sentence-level refinement: dual recorder approach
+let sentenceRecorder = null
+let sentenceChunks = []
+let sentenceGroupIds = [] // entry IDs of current sentence fragments
+const SENTENCE_END_RE = /[.。!！?？]\s*$/
+
 // ── Recording with auto-segmentation ──
 async function startRecording() {
   try {
@@ -56,6 +62,7 @@ async function startRecording() {
       },
     })
     segmentSeq = 0
+    sentenceGroupIds = []
     isRecording.value = true
     recordingTime.value = 0
     recordingStartTime = Date.now()
@@ -67,6 +74,7 @@ async function startRecording() {
     }, 200)
 
     startNewSegment()
+    startSentenceRecorder()
 
     // Auto-split every N seconds
     segmentInterval = setInterval(() => {
@@ -126,6 +134,21 @@ function stopRecording() {
     mediaRecorder.stop()
   }
 
+  // Stop sentence recorder and refine pending group
+  const pendingGroupIds = [...sentenceGroupIds]
+  sentenceGroupIds = []
+  if (sentenceRecorder && sentenceRecorder.state !== 'inactive') {
+    if (pendingGroupIds.length > 1) {
+      const chunks = sentenceChunks
+      sentenceRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' })
+        if (blob.size > 0) refineSentenceGroup(pendingGroupIds, blob)
+      }
+    }
+    sentenceRecorder.stop()
+  }
+  sentenceRecorder = null
+
   if (mediaStream) {
     mediaStream.getTracks().forEach(t => t.stop())
     mediaStream = null
@@ -164,10 +187,22 @@ async function processNDJSONStream(res, entryId) {
         if (!event.text) {
           // Empty transcription (silence) — remove placeholder
           transcriptionHistory.value.splice(idx, 1)
+          const sgIdx = sentenceGroupIds.indexOf(entryId)
+          if (sgIdx !== -1) sentenceGroupIds.splice(sgIdx, 1)
           return
         }
         transcriptionHistory.value[idx].original = event.text
         transcriptionHistory.value[idx].pending = 'translating'
+
+        // Sentence boundary detection for refinement (only during recording)
+        if (isRecording.value) {
+          sentenceGroupIds.push(entryId)
+          if (SENTENCE_END_RE.test(event.text.trim()) && sentenceGroupIds.length > 1) {
+            const groupToRefine = [...sentenceGroupIds]
+            sentenceGroupIds = []
+            triggerSentenceRefinement(groupToRefine)
+          }
+        }
       } else if (event.event === 'translation') {
         transcriptionHistory.value[idx].translated = event.text
         transcriptionHistory.value[idx].pending = false
@@ -285,6 +320,134 @@ async function handleFileSelect(event) {
   }
 }
 
+// ── Sentence-level refinement ──
+function startSentenceRecorder() {
+  if (!mediaStream) return
+  sentenceChunks = []
+  sentenceRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm;codecs=opus' })
+  sentenceRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) sentenceChunks.push(e.data)
+  }
+  sentenceRecorder.start()
+}
+
+async function triggerSentenceRefinement(groupIds) {
+  if (!sentenceRecorder || sentenceRecorder.state === 'inactive') return
+  const oldRecorder = sentenceRecorder
+  const oldChunks = sentenceChunks
+
+  // Start new sentence recorder IMMEDIATELY (no audio gap)
+  startSentenceRecorder()
+
+  // Then stop old recorder and get its blob
+  const blob = await new Promise(resolve => {
+    oldRecorder.onstop = () => {
+      resolve(new Blob(oldChunks, { type: 'audio/webm' }))
+    }
+    oldRecorder.stop()
+  })
+
+  if (blob.size > 0) {
+    refineSentenceGroup(groupIds, blob)
+  }
+}
+
+async function refineSentenceGroup(groupIds, audioBlob) {
+  // Wait for all entries in the group to have transcription text
+  await new Promise(resolve => {
+    const check = () => {
+      const allReady = groupIds.every(id => {
+        const entry = transcriptionHistory.value.find(h => h.id === id)
+        return entry && entry.original && entry.pending !== true
+      })
+      if (allReady) resolve()
+      else setTimeout(check, 200)
+    }
+    check()
+  })
+
+  // Find entries in history
+  const entryIndices = groupIds
+    .map(id => transcriptionHistory.value.findIndex(h => h.id === id))
+    .filter(i => i !== -1)
+  if (entryIndices.length === 0) return
+
+  // Keep the first entry in array (newest, top of display)
+  const keepIdx = Math.min(...entryIndices)
+  const keepId = transcriptionHistory.value[keepIdx].id
+
+  // Collect text chronologically (oldest first = highest array index first)
+  const sortedIndices = [...entryIndices].sort((a, b) => b - a)
+  const mergedOriginal = sortedIndices
+    .map(i => transcriptionHistory.value[i].original).filter(Boolean).join(' ')
+  const mergedTranslated = sortedIndices
+    .map(i => transcriptionHistory.value[i].translated).filter(Boolean).join(' ')
+  const oldestTimestamp = transcriptionHistory.value[Math.max(...entryIndices)].timestamp
+
+  // Remove all entries except kept one (remove from highest index first to avoid shifting)
+  const removeIndices = entryIndices.filter(i => i !== keepIdx).sort((a, b) => b - a)
+  for (const idx of removeIndices) {
+    transcriptionHistory.value.splice(idx, 1)
+  }
+
+  // Update kept entry to "refining" state with merged text
+  const newIdx = transcriptionHistory.value.findIndex(h => h.id === keepId)
+  if (newIdx === -1) return
+  transcriptionHistory.value[newIdx].original = mergedOriginal
+  transcriptionHistory.value[newIdx].translated = mergedTranslated
+  transcriptionHistory.value[newIdx].timestamp = oldestTimestamp
+  transcriptionHistory.value[newIdx].pending = 'refining'
+
+  // Re-transcribe+translate the combined audio
+  inflight.value++
+  try {
+    const formData = new FormData()
+    formData.append('file', audioBlob, 'sentence.webm')
+    formData.append('source_lang', sourceLang.value)
+    formData.append('target_lang', targetLang.value)
+
+    const res = await fetch(`${API_BASE}/api/interpretation/transcribe-translate-stream/`, {
+      method: 'POST',
+      body: formData,
+    })
+    if (!res.ok) throw new Error(`Server error (${res.status})`)
+
+    // Process refined result (same NDJSON protocol)
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop()
+      for (const line of lines) {
+        if (!line.trim()) continue
+        const evt = JSON.parse(line)
+        const idx = transcriptionHistory.value.findIndex(h => h.id === keepId)
+        if (idx === -1) continue
+        if (evt.event === 'transcription' && evt.text) {
+          transcriptionHistory.value[idx].original = evt.text
+          transcriptionHistory.value[idx].pending = 'translating'
+        } else if (evt.event === 'translation') {
+          transcriptionHistory.value[idx].translated = evt.text
+          transcriptionHistory.value[idx].pending = false
+        } else if (evt.event === 'done') {
+          transcriptionHistory.value[idx].pending = false
+        } else if (evt.event === 'error') {
+          transcriptionHistory.value[idx].pending = false
+        }
+      }
+    }
+  } catch (e) {
+    const idx = transcriptionHistory.value.findIndex(h => h.id === keepId)
+    if (idx !== -1) transcriptionHistory.value[idx].pending = false
+  } finally {
+    inflight.value--
+  }
+}
+
 // ── Meeting minutes ──
 async function generateMeetingMinutes() {
   const resolved = transcriptionHistory.value.filter(i => !i.pending && !i.original.startsWith('[Error'))
@@ -366,6 +529,7 @@ function clearHistory() {
   transcriptionHistory.value = []
   meetingMinutes.value = ''
   showMinutes.value = false
+  sentenceGroupIds = []
 }
 
 function copyAll() {
@@ -611,7 +775,7 @@ onUnmounted(() => {
               v-for="item in transcriptionHistory"
               :key="item.id"
               class="ios-glass rounded-2xl p-5 ring-1 transition-all"
-              :class="item.pending === true ? 'ring-ios-blue/20 animate-pulse' : item.pending === 'translating' ? 'ring-ios-blue/10' : 'ring-white/5 hover:ring-white/10'"
+              :class="item.pending === true ? 'ring-ios-blue/20 animate-pulse' : item.pending === 'translating' ? 'ring-ios-blue/10' : item.pending === 'refining' ? 'ring-purple-500/20' : 'ring-white/5 hover:ring-white/10'"
             >
               <!-- Fully pending: transcribing -->
               <div v-if="item.pending === true" class="flex items-center gap-3">
@@ -635,6 +799,26 @@ onUnmounted(() => {
                       <div class="w-3 h-3 border-2 border-ios-blue/50 border-t-transparent rounded-full animate-spin"></div>
                       <span class="text-[13px] text-white/30">翻译中...</span>
                     </div>
+                  </div>
+                </div>
+              </template>
+              <!-- Refining: re-transcribing with full sentence audio -->
+              <template v-else-if="item.pending === 'refining'">
+                <div class="flex items-start justify-between mb-3">
+                  <span class="text-[11px] text-white/30 font-medium">{{ item.timestamp }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <div class="w-3 h-3 border-2 border-purple-400/50 border-t-transparent rounded-full animate-spin"></div>
+                    <span class="text-[10px] text-purple-400/60">refining</span>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-1.5">Original</div>
+                    <p class="text-[14px] leading-relaxed text-white/50">{{ item.original }}</p>
+                  </div>
+                  <div>
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-ios-blue/60 mb-1.5">Translation</div>
+                    <p class="text-[14px] leading-relaxed text-white/50">{{ item.translated }}</p>
                   </div>
                 </div>
               </template>
