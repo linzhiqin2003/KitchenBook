@@ -43,17 +43,13 @@ let segmentSeq = 0
 // VAD
 let vadInstance = null
 let currentParagraphId = null
-let forceSegmentTimer = null
-let lastSegmentTime = null
-const MAX_SEGMENT_MS = 3000 // fast pipeline: force split every 3s
 
 // Slow pipeline: accumulate audio for high-quality overwrite
 let accumulatedAudio = []       // Float32Array segments
 let accumulatedDuration = 0     // seconds
 let accumulatedEntryIds = []    // entry IDs to overwrite
 let slowPipelineTimer = null
-const SLOW_FLUSH_DELAY_MS = 2000 // flush after 2s silence
-const SLOW_MAX_DURATION_S = 5   // or when accumulated audio >= 5s
+const SLOW_FLUSH_DELAY_MS = 1000 // flush after 1s silence
 
 // File input
 const fileInput = ref(null)
@@ -187,7 +183,7 @@ async function startRecording() {
       // Fast pipeline: more sensitive VAD for quicker segments
       positiveSpeechThreshold: 0.5,
       negativeSpeechThreshold: 0.65,
-      redemptionMs: 100,
+      redemptionMs: 300,
       minSpeechMs: 80,
       submitUserSpeechOnPause: true,
       onSpeechStart: () => {
@@ -195,7 +191,6 @@ async function startRecording() {
       },
       onSpeechEnd: (audio) => {
         console.log('[VAD] Speech ended, audio length:', audio.length)
-        lastSegmentTime = Date.now()
         const blob = float32ToWavBlob(audio)
         if (blob.size <= 44) return // empty WAV (header only)
 
@@ -213,23 +208,6 @@ async function startRecording() {
         scheduleSlowPipeline()
       },
     })
-
-    // Force-split timer: if continuous speech exceeds MAX_SEGMENT_MS, pause+resume VAD to flush
-    lastSegmentTime = Date.now()
-    forceSegmentTimer = setInterval(async () => {
-      if (!vadInstance || !vadInstance.listening) return
-      const elapsed = Date.now() - lastSegmentTime
-      if (elapsed >= MAX_SEGMENT_MS) {
-        console.log('[VAD] Force splitting after', Math.round(elapsed / 1000), 's continuous speech')
-        lastSegmentTime = Date.now()
-        try {
-          await vadInstance.pause()
-          if (vadInstance) await vadInstance.start()
-        } catch (e) {
-          console.warn('[VAD] Force split error:', e)
-        }
-      }
-    }, 2000)
   } catch (e) {
     console.error('VAD init failed:', e)
     if (e.name === 'NotAllowedError' || e.name === 'NotFoundError') {
@@ -245,8 +223,6 @@ function stopRecording() {
   isRecording.value = false
   clearInterval(timerInterval)
   timerInterval = null
-  clearInterval(forceSegmentTimer)
-  forceSegmentTimer = null
 
   if (vadInstance) {
     vadInstance.destroy()
@@ -267,13 +243,7 @@ function stopRecording() {
 function scheduleSlowPipeline() {
   clearTimeout(slowPipelineTimer)
 
-  // Force flush if accumulated enough audio
-  if (accumulatedDuration >= SLOW_MAX_DURATION_S) {
-    flushSlowPipeline()
-    return
-  }
-
-  // Otherwise wait for a real pause
+  // Flush after a real pause (silence timeout only, no duration limit)
   slowPipelineTimer = setTimeout(() => {
     flushSlowPipeline()
   }, SLOW_FLUSH_DELAY_MS)
