@@ -18,7 +18,7 @@ from django.conf import settings as django_settings
 from rest_framework.decorators import parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from .services.file_asr_service import FileASRService
-from .services.transcribe_translate_service import transcribe_and_translate, transcribe_and_translate_stream
+from .services.transcribe_translate_service import transcribe_and_translate, transcribe_and_translate_stream, generate_minutes_stream
 
 logger = logging.getLogger(__name__)
 
@@ -331,5 +331,36 @@ def transcribe_translate_stream(request):
 
     return StreamingHttpResponse(
         event_stream(),
+        content_type='application/x-ndjson',
+    )
+
+
+@csrf_exempt
+@require_POST
+def generate_meeting_minutes(request):
+    """
+    POST JSON { "entries": [{ "original": "...", "translated": "..." }] }
+    → StreamingHttpResponse (NDJSON): {"event":"chunk","text":"..."} then {"event":"done"}
+    """
+    import json as json_mod
+    try:
+        body = json_mod.loads(request.body)
+    except (json_mod.JSONDecodeError, ValueError):
+        return StreamingHttpResponse(
+            iter([json_mod.dumps({"event": "error", "text": "Invalid JSON"}) + "\n"]),
+            content_type='application/x-ndjson',
+            status=400,
+        )
+
+    entries = body.get("entries", [])
+    if not entries:
+        return StreamingHttpResponse(
+            iter([json_mod.dumps({"event": "error", "text": "No entries provided"}) + "\n"]),
+            content_type='application/x-ndjson',
+            status=400,
+        )
+
+    return StreamingHttpResponse(
+        generate_minutes_stream(entries),
         content_type='application/x-ndjson',
     )

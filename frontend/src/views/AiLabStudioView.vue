@@ -40,6 +40,11 @@ const fileInput = ref(null)
 const transcriptionHistory = ref([])
 const historyContainer = ref(null)
 
+// Meeting minutes state
+const meetingMinutes = ref('')
+const generatingMinutes = ref(false)
+const showMinutes = ref(false)
+
 // ── Recording with auto-segmentation ──
 async function startRecording() {
   try {
@@ -274,6 +279,76 @@ async function handleFileSelect(event) {
   }
 }
 
+// ── Meeting minutes ──
+async function generateMeetingMinutes() {
+  const resolved = transcriptionHistory.value.filter(i => !i.pending && !i.original.startsWith('[Error'))
+  if (resolved.length < 3) return
+
+  generatingMinutes.value = true
+  meetingMinutes.value = ''
+  showMinutes.value = true
+
+  try {
+    const entries = resolved.map(item => ({
+      original: item.original,
+      translated: item.translated,
+    }))
+
+    const res = await fetch(`${API_BASE}/api/interpretation/meeting-minutes/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries }),
+    })
+
+    if (!res.ok) {
+      throw new Error(`Server error (${res.status})`)
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      const lines = buffer.split('\n')
+      buffer = lines.pop()
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+        const event = JSON.parse(line)
+        if (event.event === 'chunk') {
+          meetingMinutes.value += event.text
+        } else if (event.event === 'error') {
+          meetingMinutes.value += `\n\n[Error: ${event.text}]`
+        }
+      }
+    }
+  } catch (e) {
+    meetingMinutes.value += `\n\n[Error: ${e.message}]`
+  } finally {
+    generatingMinutes.value = false
+  }
+}
+
+function closeMinutes() {
+  showMinutes.value = false
+}
+
+// ── Simple markdown renderer for meeting minutes ──
+function renderMinutesMarkdown(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^## (.+)$/gm, '<h3 class="text-[15px] font-semibold text-white/90 mt-4 mb-2 first:mt-0">$1</h3>')
+    .replace(/^- \[ \] (.+)$/gm, '<div class="flex items-start gap-2 ml-2 mb-1"><span class="text-white/30 mt-0.5">☐</span><span class="text-[13px] text-white/70">$1</span></div>')
+    .replace(/^- (.+)$/gm, '<div class="flex items-start gap-2 ml-2 mb-1"><span class="text-white/40 mt-0.5">•</span><span class="text-[13px] text-white/70">$1</span></div>')
+    .replace(/\n{2,}/g, '<div class="h-2"></div>')
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white/90">$1</strong>')
+}
+
 // ── Utilities ──
 function formatTime(seconds) {
   const mins = Math.floor(seconds / 60)
@@ -283,6 +358,8 @@ function formatTime(seconds) {
 
 function clearHistory() {
   transcriptionHistory.value = []
+  meetingMinutes.value = ''
+  showMinutes.value = false
 }
 
 function copyAll() {
@@ -308,6 +385,9 @@ function downloadText() {
 }
 
 const totalEntries = computed(() => transcriptionHistory.value.filter(i => !i.pending).length)
+const canGenerateMinutes = computed(() => {
+  return transcriptionHistory.value.filter(i => !i.pending && !i.original.startsWith('[Error')).length >= 3
+})
 
 onUnmounted(() => {
   if (isRecording.value) stopRecording()
@@ -391,6 +471,18 @@ onUnmounted(() => {
             <!-- Action buttons -->
             <div class="flex items-center gap-2">
               <button
+                v-if="canGenerateMinutes"
+                @click="generateMeetingMinutes"
+                :disabled="generatingMinutes"
+                class="px-3 py-2 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 border border-purple-500/20 hover:border-purple-500/30 text-[12px] text-purple-300 hover:text-purple-200 transition-all disabled:opacity-50"
+              >
+                <span v-if="generatingMinutes" class="flex items-center gap-1.5">
+                  <span class="w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></span>
+                  生成中...
+                </span>
+                <span v-else>会议纪要</span>
+              </button>
+              <button
                 v-if="transcriptionHistory.length"
                 @click="copyAll"
                 class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[12px] text-white/60 hover:text-white transition-colors"
@@ -410,52 +502,51 @@ onUnmounted(() => {
 
           <!-- Input area: Record + Upload + Status -->
           <div class="flex-none ios-glass rounded-[20px] p-5 ring-1 ring-white/10">
-            <div class="flex items-center justify-center gap-6">
+            <div class="flex items-center justify-center gap-4">
               <!-- Recording timer -->
               <div v-if="isRecording" class="text-2xl font-light tabular-nums tracking-tighter text-white/80 font-display w-20 text-center">
                 {{ formatTime(recordingTime) }}
               </div>
 
-              <!-- Record button -->
-              <button
-                @click="toggleRecording"
-                class="relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 group"
-                :class="isRecording
-                  ? 'bg-ios-red shadow-lg shadow-ios-red/30'
-                  : 'bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30'"
-              >
-                <!-- Pulse ring when recording -->
-                <div v-if="isRecording" class="absolute inset-0 rounded-full bg-ios-red/40 animate-ping"></div>
-                <!-- Mic / Stop icon -->
-                <svg v-if="!isRecording" class="w-7 h-7 text-white/80 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 10v2a7 7 0 01-14 0v-2"/>
-                  <line x1="12" y1="19" x2="12" y2="23" stroke-width="1.5" stroke-linecap="round"/>
-                  <line x1="8" y1="23" x2="16" y2="23" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                <svg v-else class="w-6 h-6 text-white relative z-10" fill="currentColor" viewBox="0 0 24 24">
-                  <rect x="6" y="6" width="12" height="12" rx="2"/>
-                </svg>
-              </button>
+              <!-- Record button with attached upload icon -->
+              <div class="relative">
+                <button
+                  @click="toggleRecording"
+                  class="relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 group"
+                  :class="isRecording
+                    ? 'bg-ios-red shadow-lg shadow-ios-red/30'
+                    : 'bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30'"
+                >
+                  <!-- Pulse ring when recording -->
+                  <div v-if="isRecording" class="absolute inset-0 rounded-full bg-ios-red/40 animate-ping"></div>
+                  <!-- Mic / Stop icon -->
+                  <svg v-if="!isRecording" class="w-7 h-7 text-white/80 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 10v2a7 7 0 01-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="8" y1="23" x2="16" y2="23" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                  <svg v-else class="w-6 h-6 text-white relative z-10" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="2"/>
+                  </svg>
+                </button>
 
-              <!-- Divider -->
-              <div class="w-px h-10 bg-white/10"></div>
-
-              <!-- Upload button -->
-              <input type="file" ref="fileInput" accept="audio/*,video/*" class="hidden" @change="handleFileSelect">
-              <button
-                @click="triggerFileSelect"
-                :disabled="isRecording"
-                class="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all disabled:opacity-40"
-              >
-                <svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                </svg>
-                <span class="text-[13px] text-white/70 font-medium">上传文件</span>
-              </button>
+                <!-- Upload file: small icon at bottom-right of record button -->
+                <input type="file" ref="fileInput" accept="audio/*,video/*" class="hidden" @change="handleFileSelect">
+                <button
+                  v-if="!isRecording"
+                  @click="triggerFileSelect"
+                  class="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 hover:border-white/30 flex items-center justify-center transition-all group/upload"
+                  title="上传音频文件"
+                >
+                  <svg class="w-3.5 h-3.5 text-white/50 group-hover/upload:text-white/80 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                  </svg>
+                </button>
+              </div>
 
               <!-- Inflight indicator -->
-              <div v-if="inflight > 0" class="flex items-center gap-3 pl-4">
+              <div v-if="inflight > 0" class="flex items-center gap-3 pl-2">
                 <div class="w-5 h-5 border-2 border-ios-blue border-t-transparent rounded-full animate-spin"></div>
                 <span class="text-[13px] text-ios-blue font-medium">
                   处理中 ({{ inflight }})
@@ -471,7 +562,38 @@ onUnmounted(() => {
 
           <!-- Results: scrollable history -->
           <div ref="historyContainer" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 min-h-0">
-            <div v-if="!transcriptionHistory.length && inflight === 0" class="h-full flex items-center justify-center">
+            <!-- Meeting minutes card -->
+            <div
+              v-if="showMinutes"
+              class="rounded-2xl p-[1px] bg-gradient-to-br from-purple-500/40 via-blue-500/30 to-cyan-500/20"
+            >
+              <div class="bg-black/80 backdrop-blur-xl rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[13px] font-semibold text-purple-300">会议纪要</span>
+                    <div v-if="generatingMinutes" class="w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                  <button
+                    @click="closeMinutes"
+                    class="w-6 h-6 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+                <div
+                  v-if="meetingMinutes"
+                  class="text-[13px] leading-relaxed text-white/70"
+                  v-html="renderMinutesMarkdown(meetingMinutes)"
+                ></div>
+                <div v-else-if="generatingMinutes" class="text-[13px] text-white/30">
+                  正在生成会议纪要...
+                </div>
+              </div>
+            </div>
+
+            <div v-if="!transcriptionHistory.length && inflight === 0 && !showMinutes" class="h-full flex items-center justify-center">
               <div class="text-center space-y-3 opacity-40">
                 <div class="text-4xl">🎙️</div>
                 <p class="text-[14px] text-white/60">录音或上传音频文件，自动转录并翻译</p>

@@ -146,3 +146,97 @@ def transcribe_and_translate_stream(file_path: str, source_lang: str, target_lan
     logger.info("Cerebras translation done (%d chars)", len(translated))
     yield json.dumps({"event": "translation", "text": translated}) + "\n"
     yield json.dumps({"event": "done"}) + "\n"
+
+
+def _cerebras_summarize_stream(text: str):
+    """Call Cerebras Qwen3-32B to generate meeting minutes, streaming."""
+    key = _get_cerebras_key()
+    if not key:
+        raise RuntimeError("CEREBRAS_API_KEY_POOL not configured")
+
+    system_msg = (
+        "/no_think\n"
+        "你是一位专业的会议记录员。根据以下会议转录内容，生成结构化的中文会议纪要。\n"
+        "格式要求：\n"
+        "## 会议主题\n"
+        "（一句话概括会议主题）\n\n"
+        "## 要点摘要\n"
+        "- 要点1\n"
+        "- 要点2\n\n"
+        "## 行动项\n"
+        "- [ ] 行动项1\n"
+        "- [ ] 行动项2\n\n"
+        "## 结论\n"
+        "（总结会议结论）\n\n"
+        "如果内容不像会议（例如是演讲、访谈等），请相应调整标题和格式。"
+    )
+    payload = json.dumps({
+        "model": "qwen-3-32b",
+        "messages": [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": text},
+        ],
+        "max_tokens": 4096,
+        "temperature": 0.3,
+        "stream": True,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.cerebras.ai/v1/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+        },
+        method="POST",
+    )
+    resp = urllib.request.urlopen(req, timeout=60)
+    try:
+        for raw_line in resp:
+            line = raw_line.decode("utf-8").strip()
+            if not line or not line.startswith("data: "):
+                continue
+            data_str = line[6:]
+            if data_str == "[DONE]":
+                break
+            chunk = json.loads(data_str)
+            delta = chunk.get("choices", [{}])[0].get("delta", {})
+            content = delta.get("content", "")
+            if content:
+                # Strip <think>...</think> fragments
+                content = re.sub(r'<think>[\s\S]*?</think>\s*', '', content)
+                if content:
+                    yield content
+    finally:
+        resp.close()
+
+
+def generate_minutes_stream(entries):
+    """
+    Generate meeting minutes from transcription entries.
+    Yields NDJSON lines: {"event": "chunk", "text": "..."} then {"event": "done"}.
+    entries: list of {"original": str, "translated": str}
+    """
+    # Build combined text from all entries
+    parts = []
+    for i, entry in enumerate(entries, 1):
+        original = entry.get("original", "")
+        translated = entry.get("translated", "")
+        if original and translated:
+            parts.append(f"[{i}] {original}\n    翻译: {translated}")
+        elif original:
+            parts.append(f"[{i}] {original}")
+    combined = "\n\n".join(parts)
+
+    if not combined.strip():
+        yield json.dumps({"event": "error", "text": "没有有效的转录内容"}) + "\n"
+        return
+
+    try:
+        for chunk in _cerebras_summarize_stream(combined):
+            yield json.dumps({"event": "chunk", "text": chunk}) + "\n"
+        yield json.dumps({"event": "done"}) + "\n"
+    except Exception as e:
+        logger.error("generate_minutes_stream error: %s", e, exc_info=True)
+        yield json.dumps({"event": "error", "text": str(e)}) + "\n"
