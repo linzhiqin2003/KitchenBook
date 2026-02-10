@@ -5,6 +5,7 @@ import LanguageSelector from '../components/ailab/LanguageSelector.vue'
 import BackgroundOrbs from '../components/ailab/BackgroundOrbs.vue'
 import EmojiGenerator from '../components/ailab/EmojiGenerator.vue'
 import { getAiLabApiBase } from '../config/aiLab'
+import { useStreamingAsr } from '../composables/useStreamingAsr'
 
 const API_BASE = getAiLabApiBase()
 const route = useRoute()
@@ -16,12 +17,24 @@ const currentView = ref(route.query.view === 'emoji' ? 'emoji' : 'interpretation
 const sourceLang = ref('en')
 const targetLang = ref('Chinese')
 
+// ASR mode: 'standard' (VAD) or 'streaming' (WebSocket)
+const asrMode = ref('streaming')
+
 // State
 const errorMsg = ref('')
 const inflight = ref(0)
 const isRecording = ref(false)
 const asrModel = ref('')  // 当前使用的 ASR 模型名称
 const recordingTime = ref(0)
+
+// Streaming ASR composable
+const {
+  partialText: streamingPartialText,
+  speechActive: streamingSpeechActive,
+  error: streamingError,
+  start: startStreamingAsr,
+  stop: stopStreamingAsr,
+} = useStreamingAsr()
 
 let timerInterval = null
 let recordingStartTime = null
@@ -230,9 +243,113 @@ function stopRecording() {
 
 function toggleRecording() {
   if (isRecording.value) {
-    stopRecording()
+    if (asrMode.value === 'streaming') {
+      stopStreamingRecording()
+    } else {
+      stopRecording()
+    }
   } else {
-    startRecording()
+    if (asrMode.value === 'streaming') {
+      startStreamingRecording()
+    } else {
+      startRecording()
+    }
+  }
+}
+
+// ── Streaming mode recording ──
+let streamingParagraphId = null
+let streamingSegSeq = 0
+
+async function startStreamingRecording() {
+  isRecording.value = true
+  recordingTime.value = 0
+  recordingStartTime = Date.now()
+  errorMsg.value = ''
+  streamingParagraphId = `para-${Date.now()}`
+  streamingSegSeq = 0
+
+  // Timer display
+  timerInterval = setInterval(() => {
+    recordingTime.value = Math.floor((Date.now() - recordingStartTime) / 1000)
+  }, 200)
+
+  await startStreamingAsr(sourceLang.value, (finalText) => {
+    handleStreamingFinal(finalText)
+  })
+
+  // Check for composable-level errors
+  if (streamingError.value) {
+    errorMsg.value = streamingError.value
+    stopStreamingRecording()
+  }
+}
+
+function stopStreamingRecording() {
+  isRecording.value = false
+  clearInterval(timerInterval)
+  timerInterval = null
+  stopStreamingAsr()
+  streamingParagraphId = null
+}
+
+async function handleStreamingFinal(text) {
+  if (!text.trim()) return
+
+  const seq = streamingSegSeq++
+  const entryId = `stream-${Date.now()}-${seq}`
+  const pid = streamingParagraphId || `para-${Date.now()}`
+
+  const entry = {
+    id: entryId,
+    seq,
+    paragraphId: pid,
+    original: text,
+    translated: '',
+    timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    pending: 'translating',
+  }
+  transcriptionHistory.value.unshift(entry)
+  inflight.value++
+
+  await nextTick()
+  if (historyContainer.value) {
+    historyContainer.value.scrollTop = historyContainer.value.scrollHeight
+  }
+
+  // Sentence boundary → new paragraph for next segment
+  if (SENTENCE_END_RE.test(text.trim())) {
+    streamingParagraphId = `para-${Date.now()}`
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/interpretation/translate/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        source_lang: sourceLang.value,
+        target_lang: targetLang.value,
+      }),
+    })
+
+    if (!res.ok) throw new Error(`Server error (${res.status})`)
+    const data = await res.json()
+
+    const idx = transcriptionHistory.value.findIndex(h => h.id === entryId)
+    if (idx !== -1) {
+      transcriptionHistory.value[idx].translated = data.translated || ''
+      transcriptionHistory.value[idx].pending = false
+      maybeRefineTranslation(pid)
+    }
+  } catch (e) {
+    const idx = transcriptionHistory.value.findIndex(h => h.id === entryId)
+    if (idx !== -1) {
+      transcriptionHistory.value[idx].translated = `[Error: ${e.message}]`
+      transcriptionHistory.value[idx].pending = false
+    }
+  } finally {
+    inflight.value--
   }
 }
 
@@ -572,7 +689,13 @@ const canGenerateMinutes = computed(() => {
 })
 
 onUnmounted(() => {
-  if (isRecording.value) stopRecording()
+  if (isRecording.value) {
+    if (asrMode.value === 'streaming') {
+      stopStreamingRecording()
+    } else {
+      stopRecording()
+    }
+  }
 })
 </script>
 
@@ -624,7 +747,9 @@ onUnmounted(() => {
         <!-- Right: Provider badge -->
         <div class="flex items-center justify-end gap-2 w-[200px]">
           <span class="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[11px] font-medium text-white/40 uppercase tracking-wider">
-            {{ currentView === 'interpretation' ? (asrModel || 'Qwen3-ASR') + ' + Cerebras' : 'Emoji-v1' }}
+            {{ currentView === 'interpretation'
+              ? (asrMode === 'streaming' ? 'Qwen3-ASR Stream' : (asrModel || 'Qwen3-ASR')) + ' + Cerebras'
+              : 'Emoji-v1' }}
           </span>
         </div>
       </div>
@@ -690,6 +815,20 @@ onUnmounted(() => {
                 {{ formatTime(recordingTime) }}
               </div>
 
+              <!-- Mode toggle (disabled while recording) -->
+              <div v-if="!isRecording" class="flex bg-white/5 rounded-lg p-0.5 border border-white/10">
+                <button
+                  @click="asrMode = 'streaming'"
+                  class="px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+                  :class="asrMode === 'streaming' ? 'bg-white/15 text-white/90' : 'text-white/40 hover:text-white/60'"
+                >Stream</button>
+                <button
+                  @click="asrMode = 'standard'"
+                  class="px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+                  :class="asrMode === 'standard' ? 'bg-white/15 text-white/90' : 'text-white/40 hover:text-white/60'"
+                >Standard</button>
+              </div>
+
               <!-- Record button with attached upload icon -->
               <div class="relative">
                 <button
@@ -736,9 +875,18 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <!-- Streaming partial text display -->
+            <div v-if="isRecording && asrMode === 'streaming' && (streamingPartialText || streamingSpeechActive)" class="mt-3 flex items-start gap-2 px-2">
+              <span
+                class="w-2 h-2 rounded-full mt-1.5 flex-none transition-colors"
+                :class="streamingSpeechActive ? 'bg-green-400 animate-pulse' : 'bg-white/20'"
+              ></span>
+              <p class="text-[13px] text-white/50 italic min-h-[20px]">{{ streamingPartialText || '等待语音...' }}</p>
+            </div>
+
             <!-- Error -->
-            <div v-if="errorMsg" class="mt-3 text-center text-[12px] text-red-400">
-              {{ errorMsg }}
+            <div v-if="errorMsg || (isRecording && streamingError)" class="mt-3 text-center text-[12px] text-red-400">
+              {{ errorMsg || streamingError }}
             </div>
           </div>
 
@@ -750,7 +898,11 @@ onUnmounted(() => {
               <div class="text-center space-y-3 opacity-40">
                 <div class="text-4xl">🎙️</div>
                 <p class="text-[14px] text-white/60">录音或上传音频文件，自动转录并翻译</p>
-                <p class="text-[11px] text-white/30">语音自动检测，停顿时自动切分 · Powered by Silero VAD + Qwen3-ASR + Cerebras</p>
+                <p class="text-[11px] text-white/30">
+                  {{ asrMode === 'streaming'
+                    ? '流式识别，边说边转 · Powered by Qwen3-ASR Stream + Cerebras'
+                    : '语音自动检测，停顿时自动切分 · Powered by Silero VAD + Qwen3-ASR + Cerebras' }}
+                </p>
               </div>
             </div>
 

@@ -13,6 +13,12 @@ export default defineConfig({
       '/media': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+      },
+      '/ws/asr': {
+        target: 'ws://117.50.185.34:8000',
+        ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ws\/asr/, '/ws'),
       }
     }
   },
