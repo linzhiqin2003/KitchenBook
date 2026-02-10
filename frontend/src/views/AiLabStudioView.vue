@@ -48,7 +48,13 @@ const showMinutes = ref(false)
 // ── Recording with auto-segmentation ──
 async function startRecording() {
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        noiseSuppression: true,
+        echoCancellation: true,
+        autoGainControl: true,
+      },
+    })
     segmentSeq = 0
     isRecording.value = true
     recordingTime.value = 0
