@@ -41,6 +41,5 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['page-flip'],
-    exclude: ['onnxruntime-web'],
   }
 })
