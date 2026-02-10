@@ -38,8 +38,8 @@ export function useStreamingAsr() {
 
   // Silence detection
   const SILENCE_THRESHOLD = 0.015
-  const SILENCE_TIMEOUT_MS = 1200
-  const MAX_DURATION_MS = 6000  // force flush every 6s (similar to VAD's 5s)
+  const SILENCE_TIMEOUT_MS = 500
+  const MAX_DURATION_MS = 5000
   const MIN_AUDIO_MS = 300
   let lastSpeechTime = 0
   let segmentStartTime = 0
