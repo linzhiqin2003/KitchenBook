@@ -322,23 +322,21 @@ async function handleStreamingFinal(text, translatedText) {
     streamingParagraphId = `para-${Date.now()}`
   }
 
-  // If translation was already provided by composable, we're done
-  if (translatedText || isError) {
+  if (isError) return
+
+  // Per-segment translation already provided by composable → trigger paragraph refinement
+  if (translatedText) {
     maybeRefineTranslation(pid)
     return
   }
 
-  // Fallback: if composable didn't provide translation (shouldn't happen), fetch it
+  // Fallback: composable didn't return translation, fetch it
   inflight.value++
   try {
     const res = await fetch(`${API_BASE}/api/interpretation/translate/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        source_lang: sourceLang.value,
-        target_lang: targetLang.value,
-      }),
+      body: JSON.stringify({ text, source_lang: sourceLang.value, target_lang: targetLang.value }),
     })
     if (!res.ok) throw new Error(`Server error (${res.status})`)
     const data = await res.json()
@@ -351,7 +349,6 @@ async function handleStreamingFinal(text, translatedText) {
   } catch (e) {
     const idx = transcriptionHistory.value.findIndex(h => h.id === entryId)
     if (idx !== -1) {
-      transcriptionHistory.value[idx].translated = `[Error: ${e.message}]`
       transcriptionHistory.value[idx].pending = false
     }
   } finally {
