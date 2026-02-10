@@ -84,6 +84,32 @@ def _cerebras_translate(text: str, source_lang: str, target_lang: str) -> str:
     return result
 
 
+def _clean_asr_output(text: str, lang_code: str) -> str:
+    """Remove characters that don't belong to the expected language.
+
+    When source language is non-CJK (e.g. 'en'), strip CJK ideographs that
+    are hallucinated by the ASR model on silence/noise.
+    When source language is CJK, leave the text as-is (English words in
+    Chinese speech are legitimate).
+    """
+    if not text or not lang_code:
+        return text
+
+    _CJK_LANGS = {'zh', 'yue', 'ja', 'ko'}
+    if lang_code in _CJK_LANGS:
+        return text
+
+    # For non-CJK languages: remove CJK Unified Ideographs + common CJK punctuation
+    cleaned = re.sub(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]+', '', text)
+    # Collapse multiple spaces left by removal
+    cleaned = re.sub(r'  +', ' ', cleaned).strip()
+
+    if cleaned != text:
+        logger.info("ASR post-process: stripped CJK from non-CJK lang=%s", lang_code)
+
+    return cleaned
+
+
 def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
     """Transcribe audio using self-hosted Qwen3-ASR-1.7B. Returns transcribed text."""
     base_url = getattr(django_settings, 'QWEN3_ASR_BASE_URL', '')
@@ -157,7 +183,11 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
         data = json.loads(resp.read().decode("utf-8"))
 
     text = (data.get("text") or "").strip()
-    logger.info("Qwen3-ASR transcription done (%d chars)", len(text))
+
+    # Post-process: strip characters that don't belong to the expected language
+    text = _clean_asr_output(text, lang_code)
+
+    logger.info("Qwen3-ASR transcription done (%d chars, lang=%s)", len(text), lang_code)
     return text
 
 
