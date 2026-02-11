@@ -250,7 +250,10 @@ CEREBRAS_API_KEY_POOL = os.environ.get('CEREBRAS_API_KEY_POOL', '')
 # Groq API 配置 (用于 Whisper 语音转录，备选 ASR)
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
-# Qwen3-ASR 配置 (自部署 ASR 模型，主力 ASR)
+# ASR 引擎选择: "groq" (Groq Whisper) 或 "qwen3" (自部署 Qwen3-ASR，Groq 兜底)
+ASR_PROVIDER = os.environ.get('ASR_PROVIDER', 'groq')
+
+# Qwen3-ASR 配置 (自部署 ASR 模型，ASR_PROVIDER=qwen3 时使用)
 # GPU 服务器需开放 8000 端口，Django 后端通过公网直连
 QWEN3_ASR_BASE_URL = os.environ.get('QWEN3_ASR_BASE_URL', 'http://117.50.185.34:8000')
 

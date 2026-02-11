@@ -233,22 +233,30 @@ def _groq_transcribe(file_path: str) -> str:
 
 
 def _transcribe(file_path: str, source_lang: str = "") -> tuple:
-    """Transcribe audio: try Qwen3-ASR first, fall back to Groq Whisper.
-    Returns (text, asr_model) tuple."""
-    t0 = time.monotonic()
-    # Try Qwen3-ASR (self-hosted, primary)
-    try:
-        text = _qwen3_asr_transcribe(file_path, source_lang)
-        logger.info("[TIMING] Qwen3-ASR took %.2fs", time.monotonic() - t0)
-        return text, "Qwen3-ASR"
-    except Exception as e:
-        logger.warning("[TIMING] Qwen3-ASR failed after %.2fs, falling back to Groq Whisper: %s",
-                       time.monotonic() - t0, e)
+    """Transcribe audio using the configured ASR provider.
 
-    # Fallback to Groq Whisper
+    Provider is controlled by the ASR_PROVIDER env var / Django setting:
+      - "groq"  → Groq Whisper directly (default)
+      - "qwen3" → Qwen3-ASR primary, Groq Whisper fallback
+    Returns (text, asr_model) tuple.
+    """
+    provider = getattr(django_settings, 'ASR_PROVIDER', 'groq').lower().strip()
+    t0 = time.monotonic()
+
+    if provider == "qwen3":
+        # Qwen3-ASR primary with Groq fallback
+        try:
+            text = _qwen3_asr_transcribe(file_path, source_lang)
+            logger.info("[TIMING] Qwen3-ASR took %.2fs", time.monotonic() - t0)
+            return text, "Qwen3-ASR"
+        except Exception as e:
+            logger.warning("[TIMING] Qwen3-ASR failed after %.2fs, falling back to Groq Whisper: %s",
+                           time.monotonic() - t0, e)
+
+    # Groq Whisper (default or fallback)
     t1 = time.monotonic()
     text = _groq_transcribe(file_path)
-    logger.info("[TIMING] Groq Whisper took %.2fs", time.monotonic() - t1)
+    logger.info("[TIMING] Groq Whisper took %.2fs (provider=%s)", time.monotonic() - t1, provider)
     return text, "Groq Whisper"
 
 
