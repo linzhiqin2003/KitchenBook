@@ -175,11 +175,29 @@ final class AuthViewModel: ObservableObject {
         guard let url = URL(string: urlString) else { return }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
-            user = try JSONDecoder().decode(UserProfileResponse.self, from: data)
+            guard let http = response as? HTTPURLResponse else { return }
+
+            if http.statusCode == 200 {
+                user = try JSONDecoder().decode(UserProfileResponse.self, from: data)
+                return
+            }
+
+            // Token expired → refresh and retry once
+            if http.statusCode == 401 {
+                let refreshed = await refreshAccessToken()
+                if refreshed, let newToken = KeychainService.load(.accessToken) {
+                    var retryReq = request
+                    retryReq.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                    let (retryData, retryResp) = try await URLSession.shared.data(for: retryReq)
+                    if let retryHttp = retryResp as? HTTPURLResponse, retryHttp.statusCode == 200 {
+                        user = try JSONDecoder().decode(UserProfileResponse.self, from: retryData)
+                    }
+                }
+            }
         } catch {
             print("Failed to fetch profile: \(error)")
         }
