@@ -15,9 +15,10 @@ import urllib.error
 from django.conf import settings as django_settings
 
 try:
-    from groq import Groq
+    from groq import Groq, RateLimitError as GroqRateLimitError
 except ImportError:
     Groq = None
+    GroqRateLimitError = None
 
 logger = logging.getLogger(__name__)
 
@@ -208,8 +209,11 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
     return text
 
 
+_GROQ_WHISPER_MODELS = ["whisper-large-v3", "whisper-large-v3-turbo"]
+
+
 def _groq_transcribe(file_path: str) -> str:
-    """Transcribe audio using Groq Whisper (fallback). Returns transcribed text."""
+    """Transcribe audio using Groq Whisper with automatic model fallback on rate limit."""
     if not Groq:
         raise ImportError("groq package not installed")
 
@@ -220,16 +224,30 @@ def _groq_transcribe(file_path: str) -> str:
         raise RuntimeError("GROQ_API_KEY not configured")
 
     client = Groq(api_key=groq_key)
-    with open(file_path, "rb") as f:
-        transcription = client.audio.transcriptions.create(
-            file=(os.path.basename(file_path), f.read()),
-            model="whisper-large-v3",
-            response_format="json",
-            temperature=0.0,
-        )
-    text = transcription.text.strip()
-    logger.info("Groq transcription done (%d chars)", len(text))
-    return text
+    file_data = open(file_path, "rb").read()
+    filename = os.path.basename(file_path)
+
+    last_err = None
+    for model in _GROQ_WHISPER_MODELS:
+        try:
+            transcription = client.audio.transcriptions.create(
+                file=(filename, file_data),
+                model=model,
+                response_format="json",
+                temperature=0.0,
+            )
+            text = transcription.text.strip()
+            logger.info("Groq transcription done (model=%s, %d chars)", model, len(text))
+            return text
+        except Exception as e:
+            is_rate_limit = GroqRateLimitError and isinstance(e, GroqRateLimitError)
+            if is_rate_limit:
+                logger.warning("Groq %s rate-limited, trying next model: %s", model, e)
+                last_err = e
+                continue
+            raise
+
+    raise last_err
 
 
 def _transcribe(file_path: str, source_lang: str = "") -> tuple:
