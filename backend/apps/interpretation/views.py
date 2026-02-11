@@ -254,10 +254,32 @@ def transcribe_translate(request):
       - file: audio file (webm, mp3, wav, etc.)
       - source_lang: e.g. 'en', 'zh'
       - target_lang: e.g. 'Chinese', 'English'
+
+    Auth: Optional JWT. If JWT present, uses user's Groq API key.
+          If no JWT, uses server key (web frontend compatibility).
     Returns: { transcription, translation, source_lang, target_lang }
     """
     if 'file' not in request.FILES:
         return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Try optional JWT authentication
+    user_groq_key = None
+    from rest_framework_simplejwt.authentication import JWTAuthentication
+    try:
+        auth_result = JWTAuthentication().authenticate(request)
+        if auth_result:
+            user, _ = auth_result
+            profile = getattr(user, 'profile', None)
+            if profile and profile.groq_api_key:
+                user_groq_key = profile.groq_api_key
+            else:
+                return Response(
+                    {'error': 'No Groq API Key configured. Please update in settings.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+    except Exception:
+        # No JWT or invalid JWT → fall through to server key
+        pass
 
     uploaded_file = request.FILES['file']
     source_lang = request.data.get('source_lang', 'en')
@@ -273,7 +295,10 @@ def transcribe_translate(request):
             for chunk in uploaded_file.chunks():
                 dest.write(chunk)
 
-        result = transcribe_and_translate(str(file_path), source_lang, target_lang)
+        result = transcribe_and_translate(
+            str(file_path), source_lang, target_lang,
+            groq_api_key=user_groq_key,
+        )
         return Response(result)
 
     except Exception as e:

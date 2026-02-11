@@ -31,8 +31,18 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"detail": "注册成功"}, status=status.HTTP_201_CREATED)
+        user = serializer.save()
+
+        refresh = RefreshToken.for_user(user)
+        profile = UserProfile.objects.get(user=user)
+        profile_data = UserProfileSerializer(profile, context={"request": request}).data
+
+        return Response({
+            "detail": "注册成功",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": profile_data,
+        }, status=status.HTTP_201_CREATED)
 
 
 class GoogleLoginView(APIView):

@@ -217,7 +217,7 @@ _GROQ_COOLDOWN_SECS = 60  # cooldown before retrying rate-limited model
 _groq_cooldown_until: dict[str, float] = {}
 
 
-def _groq_transcribe(file_path: str) -> str:
+def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
     """Transcribe audio using Groq Whisper with rate-limit-aware model selection.
 
     Strategy: prefer whisper-large-v3, but if rate-limited, remember for 60s
@@ -226,9 +226,12 @@ def _groq_transcribe(file_path: str) -> str:
     if not Groq:
         raise ImportError("groq package not installed")
 
-    from common.config import get_settings
-    api_settings = get_settings()
-    groq_key = api_settings.api.groq_api_key or os.environ.get("GROQ_API_KEY", "")
+    if groq_api_key:
+        groq_key = groq_api_key
+    else:
+        from common.config import get_settings
+        api_settings = get_settings()
+        groq_key = api_settings.api.groq_api_key or os.environ.get("GROQ_API_KEY", "")
     if not groq_key:
         raise RuntimeError("GROQ_API_KEY not configured")
 
@@ -270,7 +273,7 @@ def _groq_transcribe(file_path: str) -> str:
     raise last_err
 
 
-def _transcribe(file_path: str, source_lang: str = "") -> tuple:
+def _transcribe(file_path: str, source_lang: str = "", groq_api_key: str | None = None) -> tuple:
     """Transcribe audio using the configured ASR provider.
 
     Provider is controlled by the ASR_PROVIDER env var / Django setting:
@@ -279,6 +282,9 @@ def _transcribe(file_path: str, source_lang: str = "") -> tuple:
     Returns (text, asr_model) tuple.
     """
     provider = getattr(django_settings, 'ASR_PROVIDER', 'groq').lower().strip()
+    # If user provides their own Groq key, always use Groq directly
+    if groq_api_key:
+        provider = "groq"
     t0 = time.monotonic()
 
     if provider == "qwen3":
@@ -293,19 +299,19 @@ def _transcribe(file_path: str, source_lang: str = "") -> tuple:
 
     # Groq Whisper (default or fallback)
     t1 = time.monotonic()
-    text = _groq_transcribe(file_path)
+    text = _groq_transcribe(file_path, groq_api_key=groq_api_key)
     logger.info("[TIMING] Groq Whisper took %.2fs (provider=%s)", time.monotonic() - t1, provider)
     return text, "Groq Whisper"
 
 
-def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str):
+def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str, groq_api_key: str | None = None):
     """
     Full pipeline: ASR transcription → Cerebras translation.
 
     Returns dict: { transcription, translation, source_lang, target_lang, asr_model }
     Raises on failure.
     """
-    text, asr_model = _transcribe(file_path, source_lang)
+    text, asr_model = _transcribe(file_path, source_lang, groq_api_key=groq_api_key)
 
     if not text:
         return {
