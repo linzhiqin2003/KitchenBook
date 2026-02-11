@@ -26,6 +26,7 @@ final class AuthViewModel: ObservableObject {
     init() {
         if KeychainService.load(.accessToken) != nil {
             isAuthenticated = true
+            Task { await fetchProfile() }
         }
     }
 
@@ -111,11 +112,8 @@ final class AuthViewModel: ObservableObject {
         guard let token = KeychainService.load(.accessToken) else {
             return "Not authenticated"
         }
-        guard let base = URL(string: apiBaseURL) else {
-            return "Invalid API URL"
-        }
-
-        let url = base.appendingPathComponent("api/auth/me/")
+        let urlString = apiBaseURL.hasSuffix("/") ? "\(apiBaseURL)api/auth/me/" : "\(apiBaseURL)/api/auth/me/"
+        guard let url = URL(string: urlString) else { return "Invalid API URL" }
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -172,9 +170,9 @@ final class AuthViewModel: ObservableObject {
 
     private func fetchProfile() async {
         guard let token = KeychainService.load(.accessToken) else { return }
-        guard let base = URL(string: apiBaseURL) else { return }
 
-        let url = base.appendingPathComponent("api/auth/me/")
+        let urlString = apiBaseURL.hasSuffix("/") ? "\(apiBaseURL)api/auth/me/" : "\(apiBaseURL)/api/auth/me/"
+        guard let url = URL(string: urlString) else { return }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
@@ -199,10 +197,11 @@ final class AuthViewModel: ObservableObject {
     }
 
     private func postJSON<T: Encodable>(path: String, body: T) async throws -> Data {
-        guard let base = URL(string: apiBaseURL) else {
+        let baseStr = apiBaseURL.hasSuffix("/") ? apiBaseURL : "\(apiBaseURL)/"
+        let pathStr = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        guard let url = URL(string: "\(baseStr)\(pathStr)") else {
             throw AuthError.serverError("Invalid API URL")
         }
-        let url = base.appendingPathComponent(path)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

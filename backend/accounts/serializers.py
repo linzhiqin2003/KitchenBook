@@ -1,34 +1,12 @@
-import json
-import urllib.request
-import urllib.error
-
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import UserProfile, Organization, OrganizationMember, InviteLink
 
 
 def _validate_groq_key(api_key: str):
-    """Validate Groq API key via OpenAI-compatible /v1/models endpoint."""
-    req = urllib.request.Request(
-        "https://api.groq.com/openai/v1/models",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            if resp.status != 200:
-                raise serializers.ValidationError("Groq API Key 无效")
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        try:
-            detail = json.loads(body).get("error", {}).get("message", body[:200])
-        except Exception:
-            detail = body[:200]
-        raise serializers.ValidationError(f"Groq API Key 无效: {detail}")
-    except urllib.error.URLError as e:
-        raise serializers.ValidationError(f"无法连接 Groq: {e.reason}")
+    """Basic format check for Groq API key."""
+    if not api_key.startswith("gsk_"):
+        raise serializers.ValidationError("Groq API Key 格式无效（应以 gsk_ 开头）")
 
 
 class RegisterSerializer(serializers.Serializer):
