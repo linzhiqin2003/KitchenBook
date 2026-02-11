@@ -324,10 +324,10 @@ def transcribe_translate(request):
                 )
 
         from apps.interpretation.services.transcribe_translate_service import (
-            GroqAllRateLimitedError, GroqKeyInvalidError, get_fallback_groq_keys,
+            GroqAllRateLimitedError, GroqKeyInvalidError,
         )
 
-        # Transcribe with user's key; on 429, try other users' keys from pool
+        # Transcribe with user's key; key pool auto-rotates on 429
         try:
             result = transcribe_and_translate(
                 str(file_path), source_lang, target_lang,
@@ -336,7 +336,6 @@ def transcribe_translate(request):
             )
         except GroqKeyInvalidError:
             if authenticated_user and user_groq_key:
-                # Revoke the invalid key from user's profile
                 profile = getattr(authenticated_user, 'profile', None)
                 if profile:
                     profile.groq_api_key = ""
@@ -346,24 +345,6 @@ def transcribe_translate(request):
                 {'error': 'Your Groq API Key is invalid or revoked. Please update it in Settings.', 'key_revoked': True},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        except GroqAllRateLimitedError:
-            if not user_groq_key:
-                raise
-            fallback_keys = get_fallback_groq_keys(exclude_key=user_groq_key)
-            logger.info("User Groq key rate-limited, trying %d pool keys", len(fallback_keys))
-            result = None
-            for fk in fallback_keys[:3]:
-                try:
-                    result = transcribe_and_translate(
-                        str(file_path), source_lang, target_lang,
-                        groq_api_key=fk,
-                        asr_tier=asr_tier,
-                    )
-                    break
-                except GroqAllRateLimitedError:
-                    continue
-            if result is None:
-                raise
 
         # Premium tier: deduct credits after successful ASR
         if asr_tier == 'premium':

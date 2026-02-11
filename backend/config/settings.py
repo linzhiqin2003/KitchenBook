@@ -248,7 +248,20 @@ GOOGLE_CSE_CX = os.environ.get('GOOGLE_CSE_CX', '')
 # Cerebras API 配置 (用于 AI Lab 快速 AI 提取，极速推理)
 CEREBRAS_API_KEY_POOL = os.environ.get('CEREBRAS_API_KEY_POOL', '')
 
+# Fernet encryption key for sensitive fields (API keys stored in DB)
+# Auto-generated on first run and persisted to .env
+FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
+if not FIELD_ENCRYPTION_KEY:
+    from cryptography.fernet import Fernet as _Fernet
+    FIELD_ENCRYPTION_KEY = _Fernet.generate_key().decode()
+    # Persist to .env so subsequent restarts use the same key
+    _env_path = BASE_DIR / ".env"
+    with open(_env_path, "a") as _f:
+        _f.write(f"\nFIELD_ENCRYPTION_KEY={FIELD_ENCRYPTION_KEY}\n")
+    del _Fernet, _env_path, _f
+
 # Groq API 配置 (用于 Whisper 语音转录，备选 ASR)
+# 用户 key 429 时自动从已注册用户的 key 池中取备用 key
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
 # ASR 引擎选择: "groq" (Groq Whisper) 或 "qwen3" (自部署 Qwen3-ASR，Groq 兜底)

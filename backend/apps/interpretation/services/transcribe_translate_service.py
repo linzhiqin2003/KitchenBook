@@ -7,15 +7,12 @@ Transcribe + Translate pipeline:
 import json
 import logging
 import os
-import random
 import re
 import time
 import urllib.request
 import urllib.error
 
 from django.conf import settings as django_settings
-
-import tempfile
 
 try:
     from groq import Groq, RateLimitError as GroqRateLimitError, BadRequestError as GroqBadRequestError, AuthenticationError as GroqAuthenticationError
@@ -221,12 +218,6 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
 
 _GROQ_WHISPER_PRIMARY = "whisper-large-v3"
 _GROQ_WHISPER_FALLBACK = "whisper-large-v3-turbo"
-_GROQ_COOLDOWN_SECS = 60  # cooldown before retrying rate-limited model
-
-# ── Groq key pool: auto-built from registered users' keys ──
-_groq_pool_cache: list[str] = []
-_groq_pool_cache_time: float = 0
-_GROQ_POOL_CACHE_TTL = 300  # refresh from DB every 5 min
 
 
 def _get_groq_key():
@@ -234,128 +225,63 @@ def _get_groq_key():
     return getattr(django_settings, 'GROQ_API_KEY', '') or os.environ.get("GROQ_API_KEY", "") or None
 
 
-def get_fallback_groq_keys(exclude_key: str | None = None) -> list[str]:
-    """Build shuffled Groq key pool from all registered users + server key.
-
-    Cached for 5 min to avoid hammering the DB. Excludes the given key
-    (the one that just got 429'd).
-    """
-    global _groq_pool_cache, _groq_pool_cache_time
-    now = time.time()
-    if now - _groq_pool_cache_time > _GROQ_POOL_CACHE_TTL:
-        keys = set()
-        # Server-owned key (if configured)
-        server_key = getattr(django_settings, 'GROQ_API_KEY', '')
-        if server_key:
-            keys.add(server_key)
-        # All registered users' keys
-        try:
-            from accounts.models import UserProfile
-            keys.update(
-                UserProfile.objects.exclude(groq_api_key='')
-                .values_list('groq_api_key', flat=True)
-            )
-        except Exception:
-            pass
-        _groq_pool_cache = list(keys)
-        _groq_pool_cache_time = now
-
-    result = [k for k in _groq_pool_cache if k != exclude_key]
-    random.shuffle(result)
-    return result
-
-# Cross-worker cooldown via shared temp files
-_GROQ_COOLDOWN_DIR = os.path.join(tempfile.gettempdir(), "groq_cooldown")
-
-
 class GroqAllRateLimitedError(Exception):
-    """Both Groq Whisper models are rate-limited."""
+    """All Groq keys × models are rate-limited."""
     pass
 
 
-def _get_cooldown_expiry(model: str) -> float:
-    """Read cooldown expiry timestamp from shared file (0 if not set/expired)."""
-    try:
-        path = os.path.join(_GROQ_COOLDOWN_DIR, model.replace("/", "_"))
-        if os.path.exists(path):
-            return float(open(path).read().strip())
-    except (ValueError, OSError):
-        pass
-    return 0
-
-
-def _set_cooldown(model: str) -> None:
-    """Write cooldown expiry timestamp to shared file."""
-    try:
-        os.makedirs(_GROQ_COOLDOWN_DIR, exist_ok=True)
-        path = os.path.join(_GROQ_COOLDOWN_DIR, model.replace("/", "_"))
-        with open(path, "w") as f:
-            f.write(str(time.time() + _GROQ_COOLDOWN_SECS))
-    except OSError:
-        pass
-
-
 def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
-    """Transcribe audio using Groq Whisper with rate-limit-aware model selection.
+    """Transcribe audio using Groq Whisper with key-pool rotation.
 
-    Strategy: prefer whisper-large-v3, but if rate-limited, remember for 60s
-    and go straight to whisper-large-v3-turbo. After cooldown, retry v3.
-    Cooldown is shared across gunicorn workers via temp files.
+    Strategy: iterate over all available keys (user's key first), and for
+    each key try both Whisper models.  On 429, mark the key as rate-limited
+    and move to the next key.  On auth error, raise immediately.
     """
     if not Groq:
         raise ImportError("groq package not installed")
 
-    if groq_api_key:
-        groq_key = groq_api_key
-    else:
-        groq_key = _get_groq_key()
-    if not groq_key:
-        raise RuntimeError("GROQ_API_KEY not configured")
+    from apps.interpretation.services.groq_key_pool import (
+        get_available_keys, mark_key_rate_limited,
+    )
 
-    client = Groq(api_key=groq_key)
+    preferred = groq_api_key or _get_groq_key()
+    keys = get_available_keys(preferred_key=preferred)
+    if not keys:
+        raise RuntimeError("No Groq API key available (none configured)")
+
     file_data = open(file_path, "rb").read()
     filename = os.path.basename(file_path)
+    models = [_GROQ_WHISPER_PRIMARY, _GROQ_WHISPER_FALLBACK]
 
-    now = time.time()
-    # Build model order: skip models still in cooldown
-    models = []
-    for m in [_GROQ_WHISPER_PRIMARY, _GROQ_WHISPER_FALLBACK]:
-        if now >= _get_cooldown_expiry(m):
-            models.append(m)
-    # If all in cooldown, try fallback anyway (cooldown is approximate)
-    if not models:
-        models = [_GROQ_WHISPER_FALLBACK]
+    for key in keys:
+        client = Groq(api_key=key)
+        for model in models:
+            try:
+                transcription = client.audio.transcriptions.create(
+                    file=(filename, file_data),
+                    model=model,
+                    response_format="json",
+                    temperature=0.0,
+                )
+                text = transcription.text.strip()
+                logger.info("Groq transcription done (model=%s, key=%s…%s, %d chars)",
+                            model, key[:8], key[-4:], len(text))
+                return text
+            except Exception as e:
+                if GroqAuthenticationError and isinstance(e, GroqAuthenticationError):
+                    logger.warning("Groq auth failed (key=%s…%s): %s", key[:8], key[-4:], e)
+                    raise GroqKeyInvalidError("Groq API key is invalid or revoked")
+                if GroqBadRequestError and isinstance(e, GroqBadRequestError):
+                    logger.warning("Groq %s bad request (audio too short?): %s", model, e)
+                    return ""
+                if GroqRateLimitError and isinstance(e, GroqRateLimitError):
+                    logger.warning("Groq %s rate-limited (key=%s…%s), trying next key",
+                                   model, key[:8], key[-4:])
+                    mark_key_rate_limited(key)
+                    break  # same key's other model likely also limited
+                raise
 
-    last_err = None
-    for model in models:
-        try:
-            transcription = client.audio.transcriptions.create(
-                file=(filename, file_data),
-                model=model,
-                response_format="json",
-                temperature=0.0,
-            )
-            text = transcription.text.strip()
-            logger.info("Groq transcription done (model=%s, %d chars)", model, len(text))
-            return text
-        except Exception as e:
-            # Auth error (401) → key is invalid/revoked
-            if GroqAuthenticationError and isinstance(e, GroqAuthenticationError):
-                logger.warning("Groq authentication failed (key invalid): %s", e)
-                raise GroqKeyInvalidError("Groq API key is invalid or revoked")
-            # Audio too short or other bad request → return empty
-            if GroqBadRequestError and isinstance(e, GroqBadRequestError):
-                logger.warning("Groq %s bad request (audio too short?): %s", model, e)
-                return ""
-            if GroqRateLimitError and isinstance(e, GroqRateLimitError):
-                _set_cooldown(model)
-                logger.warning("Groq %s rate-limited, cooldown %ds: %s",
-                               model, _GROQ_COOLDOWN_SECS, e)
-                last_err = e
-                continue
-            raise
-
-    raise GroqAllRateLimitedError(f"All Groq models rate-limited, retry in {_GROQ_COOLDOWN_SECS}s")
+    raise GroqAllRateLimitedError("All Groq keys rate-limited, retry later")
 
 
 def _dashscope_asr_transcribe(file_path: str) -> str:

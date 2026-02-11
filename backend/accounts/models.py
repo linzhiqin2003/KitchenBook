@@ -2,6 +2,8 @@ import uuid
 from django.conf import settings
 from django.db import models
 
+from accounts.fields import EncryptedCharField
+
 
 class UserProfile(models.Model):
     user = models.OneToOneField(
@@ -10,7 +12,7 @@ class UserProfile(models.Model):
     nickname = models.CharField(max_length=100, blank=True)
     avatar_url = models.URLField(blank=True)
     avatar = models.ImageField(upload_to="avatars/", blank=True)
-    groq_api_key = models.CharField(max_length=256, blank=True, default="")
+    groq_api_key = EncryptedCharField(max_length=256, blank=True, default="")
 
     def __str__(self) -> str:
         return self.nickname or self.user.username
