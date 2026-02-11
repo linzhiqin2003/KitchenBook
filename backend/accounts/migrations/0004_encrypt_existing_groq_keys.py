@@ -55,7 +55,7 @@ def encrypt_reverse(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("accounts", "0002_userprofile_avatar"),
+        ("accounts", "0003_userprofile_groq_api_key"),
     ]
 
     operations = [
