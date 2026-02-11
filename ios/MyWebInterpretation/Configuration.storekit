@@ -1,0 +1,64 @@
+{
+  "identifier" : "D5F7E8C9-1234-5678-9ABC-DEF012345678",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "001",
+      "localizations" : [
+        {
+          "description" : "1 hour of Premium ASR",
+          "displayName" : "1 Hour",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "org.lzqqq.interpretation.credits.60",
+      "referenceName" : "Credits 1h",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "3.99",
+      "familyShareable" : false,
+      "internalID" : "002",
+      "localizations" : [
+        {
+          "description" : "5 hours of Premium ASR",
+          "displayName" : "5 Hours",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "org.lzqqq.interpretation.credits.300",
+      "referenceName" : "Credits 5h",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "6.99",
+      "familyShareable" : false,
+      "internalID" : "003",
+      "localizations" : [
+        {
+          "description" : "10 hours of Premium ASR",
+          "displayName" : "10 Hours",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "org.lzqqq.interpretation.credits.600",
+      "referenceName" : "Credits 10h",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : ""
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

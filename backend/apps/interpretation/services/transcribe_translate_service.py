@@ -308,6 +308,58 @@ def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
     raise GroqAllRateLimitedError(f"All Groq models rate-limited, retry in {_GROQ_COOLDOWN_SECS}s")
 
 
+def _dashscope_asr_transcribe(file_path: str) -> str:
+    """Transcribe audio using DashScope qwen3-asr-flash (paid tier).
+
+    Uses DashScope's MultiModalConversation API via OSS upload.
+    Returns transcribed text.
+    """
+    from common.config import get_settings
+    settings = get_settings()
+    api_key = settings.api.dashscope_api_key
+    if not api_key:
+        raise RuntimeError("DASHSCOPE_API_KEY not configured")
+
+    from common.utils.dashscope_utils import upload_to_dashscope
+    oss_url = upload_to_dashscope(file_path, api_key, model="qwen3-asr-flash")
+    if not oss_url:
+        raise RuntimeError("Failed to upload audio to DashScope OSS")
+
+    import dashscope
+    from common.utils.dashscope_utils import get_dashscope_http_api_url
+    dashscope.base_http_api_url = get_dashscope_http_api_url()
+
+    response = dashscope.MultiModalConversation.call(
+        api_key=api_key,
+        model="qwen3-asr-flash",
+        messages=[{
+            "role": "user",
+            "content": [{"audio": oss_url}],
+        }],
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"DashScope ASR error: {response.code} {response.message}"
+        )
+
+    # Extract text from response
+    try:
+        content = response.output.choices[0].message.content
+        if isinstance(content, list):
+            text = content[0].get("text", "")
+        elif isinstance(content, str):
+            text = content
+        else:
+            text = str(content)
+    except (IndexError, KeyError, AttributeError) as e:
+        raise RuntimeError(f"Failed to parse DashScope ASR response: {e}")
+
+    text = text.strip()
+    logger.info("DashScope ASR (qwen3-asr-flash) done (%d chars)", len(text))
+    return text
+
+
 def _transcribe(file_path: str, source_lang: str = "", groq_api_key: str | None = None) -> tuple:
     """Transcribe audio using the configured ASR provider.
 
@@ -339,14 +391,30 @@ def _transcribe(file_path: str, source_lang: str = "", groq_api_key: str | None 
     return text, "Groq Whisper"
 
 
-def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str, groq_api_key: str | None = None):
+def transcribe_and_translate(
+    file_path: str,
+    source_lang: str,
+    target_lang: str,
+    groq_api_key: str | None = None,
+    asr_tier: str = "free",
+):
     """
     Full pipeline: ASR transcription → Cerebras translation.
 
-    Returns dict: { transcription, translation, source_lang, target_lang, asr_model }
+    asr_tier:
+      - "free"    → Groq Whisper / Qwen3-ASR (existing behavior)
+      - "premium" → DashScope qwen3-asr-flash (paid)
+
+    Returns dict: { transcription, translation, source_lang, target_lang }
     Raises on failure.
     """
-    text, asr_model = _transcribe(file_path, source_lang, groq_api_key=groq_api_key)
+    t0 = time.monotonic()
+
+    if asr_tier == "premium":
+        text = _dashscope_asr_transcribe(file_path)
+        logger.info("[TIMING] DashScope ASR took %.2fs", time.monotonic() - t0)
+    else:
+        text, _asr_model = _transcribe(file_path, source_lang, groq_api_key=groq_api_key)
 
     if not text:
         return {

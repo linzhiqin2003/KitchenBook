@@ -20,12 +20,13 @@ enum AudioRecorderError: LocalizedError {
 
 final class AudioSegmentRecorder {
     var vadEnabled: Bool = true
-    var vadThresholdDb: Float = -35.0
-    var vadSilenceMs: Int = 400
-    var minSegmentSeconds: TimeInterval = 0.3
+    var vadThresholdDb: Float = -40.0
+    var vadSilenceMs: Int = 300
+    var minSegmentSeconds: TimeInterval = 0.22
     var maxSegmentSeconds: TimeInterval = 5.0
-    var onSegmentReady: ((URL, Int) -> Void)?
+    var onSegmentReady: ((URL, Int, UUID) -> Void)?
     var onPowerUpdate: ((Float) -> Void)?
+    private(set) var isPaused: Bool = false
 
     private var engine: AVAudioEngine?
     private var recording = false
@@ -41,15 +42,19 @@ final class AudioSegmentRecorder {
     private var segmentSampleCount: Int = 0
     private var segmentSpeechPolls: Int = 0
     private var segmentTotalPolls: Int = 0
-    private static let minSegmentRMS: Float = 0.01
-    private static let minSpeechRatio: Float = 0.15  // at least 15% of polls must detect speech
+    private static let minSegmentRMS: Float = 0.006
+    private static let minSpeechRatio: Float = 0.08  // at least 8% of polls must detect speech
+    private static let meterIntervalSeconds: TimeInterval = 0.04
 
     // Dual-file writing: segment file + accumulated file
     private var segmentFile: AVAudioFile?
     private var accumulatedFile: AVAudioFile?
     private var accumulatedURL: URL?
+    private var sessionFile: AVAudioFile?
+    private var sessionURL: URL?
     private var storedOutputSettings: [String: Any]?
     private let audioLock = NSLock()
+    private(set) var sessionID: UUID = UUID()
 
     func start() async throws {
         print("🎙️ [Recorder] start() called, requesting mic permission...")
@@ -62,22 +67,45 @@ final class AudioSegmentRecorder {
         print("🎙️ [Recorder] audio session configured OK")
 
         let newEngine = AVAudioEngine()
+        do {
+            try newEngine.inputNode.setVoiceProcessingEnabled(true)
+            newEngine.inputNode.isVoiceProcessingBypassed = false
+            newEngine.inputNode.isVoiceProcessingAGCEnabled = true
+            print("🎙️ [Recorder] voice processing enabled (AGC=on)")
+        } catch {
+            print("🎙️ [Recorder] voice processing unavailable: \(error)")
+        }
 
         engine = newEngine
         recording = true
-        seq = 0
+        sessionID = UUID()
+        // Keep segment sequence monotonic across start/stop, so UI/export
+        // ordering by seq always reflects timeline order.
 
         // Store output settings for reuse
-        let inputFormat = newEngine.inputNode.outputFormat(forBus: 0)
+        let hwFormat = newEngine.inputNode.outputFormat(forBus: 0)
+        let tapFormat: AVAudioFormat?
+        if hwFormat.sampleRate > 0, hwFormat.channelCount > 0 {
+            tapFormat = hwFormat
+        } else {
+            // inputNode can return invalid format after audio session changes;
+            // pass nil to let the engine use its native format.
+            print("🎙️ [Recorder] inputNode format invalid (sr=\(hwFormat.sampleRate) ch=\(hwFormat.channelCount)), using nil")
+            tapFormat = nil
+        }
+        let sampleRate = tapFormat?.sampleRate ?? AVAudioSession.sharedInstance().sampleRate
         storedOutputSettings = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: inputFormat.sampleRate,
+            AVSampleRateKey: sampleRate,
             AVNumberOfChannelsKey: 1,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
         ]
 
         // Install tap once — runs for entire recording session
-        installTap(node: newEngine.inputNode, format: inputFormat)
+        installTap(node: newEngine.inputNode, format: tapFormat)
+
+        // Start session audio file for local archive
+        startNewSessionFile()
 
         // Start accumulated audio file for slow pipeline
         startNewAccumulatedFile()
@@ -102,6 +130,7 @@ final class AudioSegmentRecorder {
 
     func stop() {
         recording = false
+        isPaused = false
         DispatchQueue.main.async { [weak self] in
             self?.meterTimer?.invalidate()
             self?.meterTimer = nil
@@ -118,9 +147,51 @@ final class AudioSegmentRecorder {
         // Close accumulated file but keep URL for slow pipeline flush
         audioLock.lock()
         accumulatedFile = nil
+        sessionFile = nil  // close session file, keep URL for local persistence
         audioLock.unlock()
 
         try? AVAudioSession.sharedInstance().setActive(false, options: [])
+    }
+
+    func pause() {
+        guard recording, !isPaused else { return }
+        isPaused = true
+
+        // Finalize current segment so it enters the pipeline
+        finishCurrentSegment(discard: false)
+
+        // Pause engine — tap stays installed but we skip writes via isPaused flag
+        engine?.pause()
+
+        DispatchQueue.main.async { [weak self] in
+            self?.meterTimer?.invalidate()
+            self?.meterTimer = nil
+        }
+        print("🎙️ [Recorder] paused")
+    }
+
+    func resume() {
+        guard recording, isPaused else { return }
+        isPaused = false
+
+        do {
+            try engine?.start()
+        } catch {
+            print("🎙️ [Recorder] resume engine failed: \(error)")
+            return
+        }
+
+        do {
+            try openNewSegmentFile()
+        } catch {
+            print("🎙️ [Recorder] resume segment failed: \(error)")
+            return
+        }
+
+        if vadEnabled {
+            startMetering()
+        }
+        print("🎙️ [Recorder] resumed")
     }
 
     /// Flush accumulated audio for slow pipeline. Returns file URL or nil.
@@ -139,11 +210,24 @@ final class AudioSegmentRecorder {
         return url
     }
 
+    /// Returns completed full-session audio URL once and clears internal reference.
+    func takeCompletedSessionAudioURL() -> URL? {
+        audioLock.lock()
+        let url = sessionURL
+        sessionURL = nil
+        audioLock.unlock()
+        return url
+    }
+
     // MARK: - Tap & File Management
 
-    private func installTap(node: AVAudioInputNode, format: AVAudioFormat) {
-        node.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
+    private func installTap(node: AVAudioInputNode, format: AVAudioFormat?) {
+        // 1024 gives lower end-to-end latency while still being stable for VAD.
+        node.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self = self else { return }
+
+            // Skip all processing while paused
+            if self.isPaused { return }
 
             // Compute RMS power from audio samples
             if let channelData = buffer.floatChannelData?[0] {
@@ -166,6 +250,7 @@ final class AudioSegmentRecorder {
             self.audioLock.lock()
             let sf = self.segmentFile
             let af = self.accumulatedFile
+            let full = self.sessionFile
             self.audioLock.unlock()
 
             if let sf = sf {
@@ -176,6 +261,11 @@ final class AudioSegmentRecorder {
             if let af = af {
                 do { try af.write(from: buffer) } catch {
                     print("[Recorder] accumulated write error: \(error)")
+                }
+            }
+            if let full = full {
+                do { try full.write(from: buffer) } catch {
+                    print("[Recorder] session write error: \(error)")
                 }
             }
         }
@@ -212,6 +302,12 @@ final class AudioSegmentRecorder {
         audioLock.unlock()
     }
 
+    private func startNewSessionFile() {
+        audioLock.lock()
+        startNewSessionFileUnlocked()
+        audioLock.unlock()
+    }
+
     /// Must be called with audioLock held.
     private func startNewAccumulatedFileUnlocked() {
         guard let settings = storedOutputSettings else { return }
@@ -221,12 +317,26 @@ final class AudioSegmentRecorder {
         accumulatedFile = try? AVAudioFile(forWriting: url, settings: settings)
     }
 
+    /// Must be called with audioLock held.
+    private func startNewSessionFileUnlocked() {
+        guard let settings = storedOutputSettings else { return }
+
+        if let oldURL = sessionURL {
+            try? FileManager.default.removeItem(at: oldURL)
+        }
+
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let url = dir.appendingPathComponent("session-\(sessionID.uuidString)-\(UUID().uuidString).m4a")
+        sessionURL = url
+        sessionFile = try? AVAudioFile(forWriting: url, settings: settings)
+    }
+
     // MARK: - VAD Metering
 
     private func startMetering() {
         DispatchQueue.main.async { [weak self] in
             self?.meterTimer?.invalidate()
-            self?.meterTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            self?.meterTimer = Timer.scheduledTimer(withTimeInterval: Self.meterIntervalSeconds, repeats: true) { [weak self] _ in
                 self?.pollMeters()
             }
         }
@@ -252,7 +362,8 @@ final class AudioSegmentRecorder {
         if isSpeech { segmentSpeechPolls += 1 }
 
         // Log every ~0.5s
-        if Int(elapsed * 20) % 10 == 0 {
+        let logEveryPolls = max(1, Int((0.5 / Self.meterIntervalSeconds).rounded()))
+        if segmentTotalPolls % logEveryPolls == 0 {
             let ratio = segmentTotalPolls > 0 ? Float(segmentSpeechPolls) / Float(segmentTotalPolls) : 0
             print("[VAD] power=\(String(format: "%.1f", power))dB threshold=\(vadThresholdDb)dB speech=\(segmentHasSpeech) silence=\(segmentSilenceMs)ms elapsed=\(String(format: "%.1f", elapsed))s isSpeech=\(isSpeech) ratio=\(String(format: "%.0f", ratio * 100))%")
         }
@@ -265,7 +376,7 @@ final class AudioSegmentRecorder {
 
         // Silence after speech
         if segmentHasSpeech {
-            segmentSilenceMs += 50
+            segmentSilenceMs += Int((Self.meterIntervalSeconds * 1000).rounded())
             if elapsed >= minSegmentSeconds && segmentSilenceMs >= vadSilenceMs {
                 print("[VAD] Segment #\(seq) stopped: speech+silence threshold")
                 stopCurrentSegment()
@@ -304,6 +415,7 @@ final class AudioSegmentRecorder {
         guard let url = currentSegmentURL else { return }
         currentSegmentURL = nil
         let currentSeq = seq
+        let currentSessionID = sessionID
 
         // Compute segment-level RMS to filter out near-silent segments
         let segmentRMS = segmentSampleCount > 0
@@ -325,7 +437,7 @@ final class AudioSegmentRecorder {
             try? FileManager.default.removeItem(at: url)
         } else {
             print("[Recorder] Segment #\(currentSeq) ready (RMS=\(String(format: "%.4f", segmentRMS)), speech=\(String(format: "%.0f", speechRatio * 100))%), sending to API")
-            onSegmentReady?(url, currentSeq)
+            onSegmentReady?(url, currentSeq, currentSessionID)
         }
     }
 
@@ -334,12 +446,54 @@ final class AudioSegmentRecorder {
     private func configureAudioSession() throws {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothA2DP])
-            try session.setPreferredIOBufferDuration(0.02)
+            try session.setCategory(
+                .playAndRecord,
+                mode: .voiceChat,
+                options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP]
+            )
+            try session.setPreferredSampleRate(48_000)
+            try session.setPreferredIOBufferDuration(0.01)
+            try configurePreferredInputRoute(session)
             try session.setActive(true, options: [])
+            try maximizeInputGainIfPossible(session)
+            logCurrentAudioRoute(session)
         } catch {
             throw AudioRecorderError.failedToConfigureAudioSession
         }
+    }
+
+    private func configurePreferredInputRoute(_ session: AVAudioSession) throws {
+        guard let availableInputs = session.availableInputs else { return }
+        guard let builtInMic = availableInputs.first(where: { $0.portType == .builtInMic }) else { return }
+
+        try session.setPreferredInput(builtInMic)
+
+        guard let dataSources = builtInMic.dataSources, !dataSources.isEmpty else { return }
+        let preferred = dataSources.first(where: { $0.orientation == .front })
+            ?? dataSources.first(where: { $0.orientation == .bottom })
+            ?? dataSources.first(where: { $0.orientation == .back })
+            ?? dataSources.first
+
+        if let preferred {
+            try builtInMic.setPreferredDataSource(preferred)
+            print("🎙️ [Recorder] preferred mic data source: \(preferred.dataSourceName)")
+        }
+    }
+
+    private func maximizeInputGainIfPossible(_ session: AVAudioSession) throws {
+        guard session.isInputGainSettable else { return }
+        let targetGain: Float = 1.0
+        if abs(session.inputGain - targetGain) > 0.001 {
+            try session.setInputGain(targetGain)
+            print("🎙️ [Recorder] input gain boosted to \(targetGain)")
+        }
+    }
+
+    private func logCurrentAudioRoute(_ session: AVAudioSession) {
+        let inputs = session.currentRoute.inputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ", ")
+        let outputs = session.currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ", ")
+        print("🎙️ [Recorder] audio route in=[\(inputs)] out=[\(outputs)]")
+        print("🎙️ [Recorder] audio config sampleRate=\(session.sampleRate) ioBuffer=\(session.ioBufferDuration)s")
     }
 
     private func requestMicPermission() async -> Bool {

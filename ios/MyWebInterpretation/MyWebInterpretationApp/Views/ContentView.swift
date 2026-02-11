@@ -128,6 +128,19 @@ struct LangPickerButton: View {
 
 // MARK: - Recording Pulse
 
+struct PausedLabel: View {
+    @State private var visible = true
+
+    var body: some View {
+        Text("暂停")
+            .font(.caption2)
+            .fontWeight(.medium)
+            .foregroundStyle(.orange.opacity(visible ? 0.9 : 0.2))
+            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: visible)
+            .onAppear { visible = false }
+    }
+}
+
 struct PulseRing: View {
     @State private var scale: CGFloat = 1.0
     @State private var opacity: Double = 0.5
@@ -180,6 +193,8 @@ struct ContentView: View {
     @State private var highlightedSegmentId: UUID? = nil
     @State private var displayMode: DisplayMode = .both
     @State private var layoutMode: LayoutMode = .text
+    @State private var longPressProgress: CGFloat = 0
+    @State private var showingCreditStore = false
 
     enum DisplayMode: CaseIterable {
         case original
@@ -199,6 +214,14 @@ struct ContentView: View {
             case .original: return "text.alignleft"
             case .translation: return "text.alignright"
             case .both: return "text.justify"
+            }
+        }
+
+        var shortcutKey: KeyEquivalent {
+            switch self {
+            case .original: return "1"
+            case .translation: return "2"
+            case .both: return "3"
             }
         }
     }
@@ -242,9 +265,17 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear { vm.authViewModel = authVM }
+        .onAppear {
+            vm.authViewModel = authVM
+            if vm.asrTier == "premium" {
+                Task { await vm.fetchCreditBalance() }
+            }
+        }
         .sheet(isPresented: $showingSettings) {
-            SettingsView(apiBaseURL: vm.apiBaseURLBinding, authVM: authVM)
+            SettingsView(apiBaseURL: vm.apiBaseURLBinding, authVM: authVM, vm: vm)
+        }
+        .sheet(isPresented: $showingCreditStore) {
+            CreditStoreView(vm: vm, baseURLString: vm.apiBaseURL)
         }
         .sheet(isPresented: $showingLocalRecordings) {
             LocalRecordingsView(vm: vm)
@@ -293,13 +324,26 @@ struct ContentView: View {
                 .foregroundStyle(.white.opacity(0.45))
 
             Button {
+                showingSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .keyboardShortcut(",", modifiers: [.command])
+            .help("⌘, 设置")
+            .padding(.leading, 10)
+
+            Button {
                 showingLocalRecordings = true
             } label: {
                 Image(systemName: "list.bullet.rectangle")
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.5))
             }
-            .padding(.leading, 10)
+            .keyboardShortcut("l", modifiers: [.command, .shift])
+            .help("⇧⌘L 本地录音")
+            .padding(.leading, 8)
 
             Button {
                 authVM.logout()
@@ -327,6 +371,7 @@ struct ContentView: View {
             VStack {
                 ipadLayoutContent
                     .animation(.easeInOut(duration: 0.3), value: vm.isRecording)
+                    .animation(.easeInOut(duration: 0.3), value: vm.isPaused)
                     .frame(maxWidth: mainContentMaxWidth, alignment: .top)
                     .padding(.horizontal, 28)
                     .padding(.top, 22)
@@ -338,6 +383,7 @@ struct ContentView: View {
             ScrollView {
                 phoneLayoutContent
                     .animation(.easeInOut(duration: 0.3), value: vm.isRecording)
+                    .animation(.easeInOut(duration: 0.3), value: vm.isPaused)
                     .frame(maxWidth: mainContentMaxWidth, alignment: .top)
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
@@ -348,7 +394,7 @@ struct ContentView: View {
 
     private var phoneLayoutContent: some View {
         VStack(spacing: 24) {
-            if !vm.isRecording {
+            if !vm.isRecording && !vm.isPaused {
                 languageSelectors
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -399,24 +445,127 @@ struct ContentView: View {
                         .strokeBorder(.white.opacity(0.08))
                 )
         )
+        .contextMenu {
+            resultsContextMenu
+        }
     }
 
     // MARK: - Language Selectors
 
     private var languageSelectors: some View {
-        HStack(spacing: 12) {
-            LangPickerButton(label: "From", options: allSourceLanguages, selection: $vm.sourceLang)
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                LangPickerButton(label: "From", options: allSourceLanguages, selection: $vm.sourceLang)
 
-            Image(systemName: "arrow.right")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.25))
-                .padding(.top, 22)
+                Image(systemName: "arrow.right")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.25))
+                    .padding(.top, 22)
 
-            LangPickerButton(label: "To", options: allTargetLanguages, selection: $vm.targetLang)
+                LangPickerButton(label: "To", options: allTargetLanguages, selection: $vm.targetLang)
+            }
+
+            // ASR Tier Picker
+            asrTierPicker
+        }
+    }
+
+    private var asrTierPicker: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { vm.asrTier = "free" }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bolt.fill")
+                            .font(.caption2)
+                        Text("Free")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(vm.asrTier == "free" ? .white : .white.opacity(0.4))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(vm.asrTier == "free" ? Color.iosBlue.opacity(0.6) : .white.opacity(0.06))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    // Premium requires login
+                    if authVM.user == nil {
+                        vm.lastError = "请先登录后使用 Premium ASR"
+                        return
+                    }
+                    withAnimation(.easeInOut(duration: 0.2)) { vm.asrTier = "premium" }
+                    Task { await vm.fetchCreditBalance() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.caption2)
+                        Text("Premium")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(vm.asrTier == "premium" ? .white : .white.opacity(0.4))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(vm.asrTier == "premium" ? Color.purple.opacity(0.6) : .white.opacity(0.06))
+                }
+                .buttonStyle(.plain)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(.white.opacity(0.1))
+            )
+
+            if vm.asrTier == "premium" {
+                HStack(spacing: 6) {
+                    Image(systemName: "clock")
+                        .font(.caption2)
+                    Text("\(vm.creditBalance / 60) min")
+                        .font(.caption.monospacedDigit())
+
+                    Spacer()
+
+                    Button {
+                        showingCreditStore = true
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.caption2)
+                            Text("Buy")
+                                .font(.caption)
+                        }
+                    }
+                }
+                .foregroundStyle(.white.opacity(0.5))
+                .padding(.horizontal, 4)
+            }
         }
     }
 
     // MARK: - Input Area
+
+    private var isPremiumNoCredits: Bool {
+        vm.asrTier == "premium" && vm.creditBalance <= 0 && !vm.isRecording && !vm.isPaused
+    }
+
+    private var isActiveRecording: Bool {
+        vm.isRecording && !vm.isPaused
+    }
+
+    private var recordingButtonColor: Color {
+        if vm.isPaused { return .orange }
+        if vm.isRecording { return Color.iosRed }
+        return .white.opacity(0.1)
+    }
+
+    private var recordingButtonBorderColor: Color {
+        if vm.isPaused { return .orange.opacity(0.5) }
+        if vm.isRecording { return Color.iosRed.opacity(0.5) }
+        return .white.opacity(0.2)
+    }
 
     private var inputArea: some View {
         ZStack {
@@ -428,65 +577,172 @@ struct ContentView: View {
                 )
 
             VStack(spacing: 14) {
-                ZStack {
-                    // Waveform behind the button (only visible when recording)
-                    if vm.isRecording {
-                        WaveformView(levels: vm.waveformLevels, isActive: true)
-                    }
+                if isPremiumNoCredits {
+                    // No credits prompt
+                    VStack(spacing: 12) {
+                        Image(systemName: "clock.badge.exclamationmark")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.white.opacity(0.2))
 
-                    if vm.isRecording {
-                        PulseRing()
-                    }
+                        Text("Premium 额度已用完")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.white.opacity(0.6))
 
-                    Button {
-                        if vm.isRecording { vm.stop() } else { vm.start() }
-                    } label: {
+                        Text("购买额度继续使用，或切换到 Free 模式")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.3))
+                            .multilineTextAlignment(.center)
+
+                        HStack(spacing: 12) {
+                            Button {
+                                showingCreditStore = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.caption)
+                                    Text("购买额度")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.purple.opacity(0.6))
+                                .clipShape(Capsule())
+                            }
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    vm.asrTier = "free"
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "bolt.fill")
+                                        .font(.caption)
+                                    Text("Free 模式")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundStyle(.white.opacity(0.7))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(.white.opacity(0.08))
+                                .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                } else {
+                    // Normal recording controls
+                    ZStack {
+                        // Waveform behind the button (only visible when actively recording)
+                        if isActiveRecording {
+                            WaveformView(levels: vm.waveformLevels, isActive: true)
+                        }
+
+                        if isActiveRecording {
+                            PulseRing()
+                        }
+
+                        // Main recording button — tap to start/pause/resume, long-press to stop
                         ZStack {
                             Circle()
-                                .fill(vm.isRecording ? Color.iosRed : .white.opacity(0.1))
+                                .fill(recordingButtonColor)
                                 .frame(width: 64, height: 64)
                                 .overlay(
                                     Circle().strokeBorder(
-                                        vm.isRecording ? Color.iosRed.opacity(0.5) : .white.opacity(0.2),
+                                        recordingButtonBorderColor,
                                         lineWidth: 2
                                     )
                                 )
-                                .shadow(color: vm.isRecording ? Color.iosRed.opacity(0.35) : .clear, radius: 16)
+                                .shadow(color: isActiveRecording ? Color.iosRed.opacity(0.35) : (vm.isPaused ? .orange.opacity(0.25) : .clear), radius: 16)
 
-                            if vm.isRecording {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(.white)
-                                    .frame(width: 20, height: 20)
+                            // Long press progress ring
+                            if longPressProgress > 0 {
+                                Circle()
+                                    .trim(from: 0, to: longPressProgress)
+                                    .stroke(
+                                        Color.white.opacity(0.9),
+                                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                                    )
+                                    .frame(width: 72, height: 72)
+                                    .rotationEffect(.degrees(-90))
+                            }
+
+                            if vm.isPaused {
+                                Image(systemName: "play.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(.white)
+                            } else if vm.isRecording {
+                                Image(systemName: "pause.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(.white)
                             } else {
                                 Image(systemName: "mic.fill")
                                     .font(.title2)
                                     .foregroundStyle(.white)
                             }
                         }
-                    }
+                        .contentShape(Circle())
+                        .onTapGesture {
+                            if vm.isRecording || vm.isPaused {
+                                vm.togglePause()
+                            } else {
+                                vm.start()
+                            }
+                        }
+                        .onLongPressGesture(minimumDuration: 0.6, pressing: { isPressing in
+                            if vm.isRecording || vm.isPaused {
+                                withAnimation(isPressing ? .linear(duration: 0.6) : .easeOut(duration: 0.15)) {
+                                    longPressProgress = isPressing ? 1.0 : 0
+                                }
+                            }
+                        }) {
+                            if vm.isRecording || vm.isPaused {
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                vm.stopAndSave()
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    longPressProgress = 0
+                                }
+                            }
+                        }
 
-                    // Upload button (hidden when recording)
-                    if !vm.isRecording {
-                    Button { showingFilePicker = true } label: {
-                        ZStack {
-                            Circle()
-                                .fill(.white.opacity(0.08))
-                                .frame(width: 30, height: 30)
-                                .overlay(Circle().strokeBorder(.white.opacity(0.12)))
+                        // Upload button (hidden when recording or paused)
+                        if !vm.isRecording && !vm.isPaused {
+                            Button { showingFilePicker = true } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(.white.opacity(0.08))
+                                        .frame(width: 30, height: 30)
+                                        .overlay(Circle().strokeBorder(.white.opacity(0.12)))
 
-                            Image(systemName: "paperclip")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.white.opacity(0.5))
+                                    Image(systemName: "paperclip")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(.white.opacity(0.5))
+                                }
+                            }
+                            .keyboardShortcut("u", modifiers: [.command])
+                            .help("⌘U 上传音频")
+                            .offset(x: 32, y: 24)
                         }
                     }
-                    .offset(x: 32, y: 24)
-                    }
-                }
 
-                if vm.isRecording {
-                    Text(String(format: "%02d:%02d", vm.recordingSeconds / 60, vm.recordingSeconds % 60))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(Color.iosRed.opacity(0.9))
+                    if vm.isRecording || vm.isPaused {
+                        HStack(spacing: 6) {
+                            Text(String(format: "%02d:%02d", vm.recordingSeconds / 60, vm.recordingSeconds % 60))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(vm.isPaused ? .orange.opacity(0.9) : Color.iosRed.opacity(0.9))
+
+                            if vm.isPaused {
+                                PausedLabel()
+                            }
+                        }
+
+                        Text("长按停止")
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.25))
+                    }
                 }
 
                 if let err = vm.lastError {
@@ -566,13 +822,30 @@ struct ContentView: View {
         VStack(spacing: 0) {
             HStack {
                 if isPadLayout {
-                    Picker("Display Mode", selection: $displayMode) {
+                    HStack(spacing: 8) {
                         ForEach(DisplayMode.allCases, id: \.self) { mode in
-                            Text(mode.title).tag(mode)
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    displayMode = mode
+                                }
+                            } label: {
+                                Text(mode.title)
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(displayMode == mode ? .white : .white.opacity(0.58))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        displayMode == mode
+                                            ? Color.white.opacity(0.14)
+                                            : Color.white.opacity(0.06)
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .keyboardShortcut(mode.shortcutKey, modifiers: [.command])
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
                     .frame(maxWidth: 340)
                 } else {
                     Menu {
@@ -617,15 +890,30 @@ struct ContentView: View {
                         .background(.white.opacity(0.08))
                         .clipShape(Circle())
                 }
+                .keyboardShortcut("l", modifiers: [.command])
+                .help("⌘L 切换文本/分段布局")
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, isPadLayout ? 4 : 8)
+
+            if isPadLayout {
+                HStack {
+                    Text("⌘1/2/3 切换显示  ·  ⌘L 切换布局  ·  左右滑动切换列")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.28))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            }
 
             // Content columns
             resultsContent
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
+                .contentShape(Rectangle())
+                .simultaneousGesture(displayModeSwipeGesture)
 
             Rectangle()
                 .fill(.white.opacity(0.06))
@@ -648,6 +936,7 @@ struct ContentView: View {
                     }
                     .foregroundStyle(.white.opacity(0.75))
                     .disabled(vm.segments.isEmpty)
+                    .keyboardShortcut("p", modifiers: [.command])
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(.white.opacity(0.05))
@@ -661,6 +950,7 @@ struct ContentView: View {
                     }
                     .foregroundStyle(.white.opacity(0.75))
                     .disabled(vm.segments.isEmpty)
+                    .keyboardShortcut("t", modifiers: [.command])
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(.white.opacity(0.05))
@@ -685,6 +975,7 @@ struct ContentView: View {
                     .background(.white.opacity(0.05))
                     .clipShape(Capsule())
                 }
+                .keyboardShortcut(.delete, modifiers: [.command])
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -697,6 +988,9 @@ struct ContentView: View {
                         .strokeBorder(.white.opacity(0.08))
                 )
         )
+        .contextMenu {
+            resultsContextMenu
+        }
     }
 
     @ViewBuilder
@@ -793,11 +1087,16 @@ struct ContentView: View {
     @ViewBuilder
     private func segmentCard(_ seg: SegmentResult) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header: timestamp + refined badge
+            // Header: timestamp + offline/refined badges
             HStack(spacing: 6) {
                 Text(Self.segmentTimeFormatter.string(from: seg.createdAt))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.white.opacity(0.35))
+                if seg.isOffline {
+                    Image(systemName: "wifi.slash")
+                        .font(.caption2)
+                        .foregroundStyle(.orange.opacity(0.7))
+                }
                 if seg.isRefined {
                     Text("refined")
                         .font(.caption2)
@@ -898,6 +1197,11 @@ struct ContentView: View {
                 attr.backgroundColor = Color.yellow.opacity(0.15)
             }
 
+            // Offline segments get a subtle orange tint
+            if seg.isOffline {
+                attr.foregroundColor = .orange.opacity(0.7)
+            }
+
             if !result.characters.isEmpty {
                 result += AttributedString(" ")
             }
@@ -985,6 +1289,76 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var resultsContextMenu: some View {
+        Button {
+            copyToPasteboard(combinedTranscription)
+        } label: {
+            Label("复制原文", systemImage: "doc.on.doc")
+        }
+        .disabled(combinedTranscription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+        Button {
+            copyToPasteboard(combinedTranslation)
+        } label: {
+            Label("复制译文", systemImage: "doc.on.doc")
+        }
+        .disabled(combinedTranslation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+        Divider()
+
+        Button {
+            exportAndShare(format: .pdf)
+        } label: {
+            Label("导出 PDF", systemImage: "doc.richtext")
+        }
+        .disabled(vm.segments.isEmpty)
+
+        Button {
+            exportAndShare(format: .txt)
+        } label: {
+            Label("导出 TXT", systemImage: "square.and.arrow.up")
+        }
+        .disabled(vm.segments.isEmpty)
+    }
+
+    private var displayModeSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 28, coordinateSpace: .local)
+            .onEnded { value in
+                guard isPadLayout else { return }
+
+                let dx = value.translation.width
+                let dy = value.translation.height
+                guard abs(dx) > abs(dy), abs(dx) > 44 else { return }
+
+                let nextMode = dx < 0
+                    ? nextDisplayMode(from: displayMode)
+                    : previousDisplayMode(from: displayMode)
+                guard nextMode != displayMode else { return }
+
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    displayMode = nextMode
+                }
+            }
+    }
+
+    private func nextDisplayMode(from mode: DisplayMode) -> DisplayMode {
+        let modes = DisplayMode.allCases
+        guard let index = modes.firstIndex(of: mode) else { return mode }
+        let nextIndex = modes.index(after: index)
+        return nextIndex < modes.endIndex ? modes[nextIndex] : modes[modes.startIndex]
+    }
+
+    private func previousDisplayMode(from mode: DisplayMode) -> DisplayMode {
+        let modes = DisplayMode.allCases
+        guard let index = modes.firstIndex(of: mode) else { return mode }
+        if index == modes.startIndex {
+            return modes[modes.index(before: modes.endIndex)]
+        }
+        return modes[modes.index(before: index)]
+    }
+
     private func exportAndShare(format: InterpretationExportFormat) {
         let segments = vm.segments
         let sourceLang = vm.sourceLang
@@ -1031,6 +1405,7 @@ struct ContentView: View {
 struct SettingsView: View {
     @Binding var apiBaseURL: String
     @ObservedObject var authVM: AuthViewModel
+    @ObservedObject var vm: InterpretationViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var healthText: String?
     @State private var isTestingHealth = false
@@ -1039,6 +1414,7 @@ struct SettingsView: View {
     @State private var isSavingKey = false
     @State private var showDevOptions = false
     @State private var devTapCount = 0
+    @State private var showingCreditStore = false
     @AppStorage("vadEnabled") private var vadEnabled: Bool = true
     @AppStorage("vadThresholdDb") private var vadThresholdDb: Double = -40.0
     @AppStorage("vadSilenceMs") private var vadSilenceMs: Int = 300
@@ -1047,6 +1423,31 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section(header: Text("ASR Mode")) {
+                    Picker("Engine", selection: $vm.asrTier) {
+                        Text("Free (Groq)").tag("free")
+                        Text("Premium (Qwen3)").tag("premium")
+                    }
+
+                    if vm.asrTier == "premium" {
+                        HStack {
+                            Text("Balance")
+                            Spacer()
+                            Text("\(vm.creditBalance / 60) min \(vm.creditBalance % 60)s")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Button {
+                            showingCreditStore = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "cart")
+                                Text("Buy Credits")
+                            }
+                        }
+                    }
+                }
+
                 Section(header: Text("Account")) {
                     if let user = authVM.user {
                         HStack {
@@ -1183,6 +1584,14 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showingCreditStore) {
+                CreditStoreView(vm: vm, baseURLString: apiBaseURL)
+            }
+            .onAppear {
+                if vm.asrTier == "premium" {
+                    Task { await vm.fetchCreditBalance() }
                 }
             }
         }

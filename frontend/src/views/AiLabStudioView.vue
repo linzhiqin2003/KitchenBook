@@ -214,11 +214,12 @@ const paragraphs = computed(() => {
         translated: entry.translated,
         timestamp: entry.timestamp,
         pending: entry.pending,
+        isFinal: entry.isFinal ?? !entry.pending,
       })
       continue
     }
     if (!map.has(pid)) {
-      const group = { paragraphId: pid, entries: [], original: '', translated: '', timestamp: '', pending: false }
+      const group = { paragraphId: pid, entries: [], original: '', translated: '', timestamp: '', pending: false, isFinal: false }
       map.set(pid, group)
       groups.push(group)
     }
@@ -235,6 +236,8 @@ const paragraphs = computed(() => {
     // pending if any entry is still pending
     const pendingEntry = g.entries.find(e => e.pending)
     g.pending = pendingEntry ? pendingEntry.pending : false
+    // final if all non-empty entries are final
+    g.isFinal = g.entries.filter(e => e.original).every(e => e.isFinal)
   }
 
   return groups
@@ -420,10 +423,12 @@ async function flushSlowPipeline() {
         transcriptionHistory.value[idx].original = betterOriginal
         transcriptionHistory.value[idx].translated = betterTranslation
         transcriptionHistory.value[idx].pending = false
+        transcriptionHistory.value[idx].isFinal = true
       } else {
         transcriptionHistory.value[idx].original = ''
         transcriptionHistory.value[idx].translated = ''
         transcriptionHistory.value[idx].pending = false
+        transcriptionHistory.value[idx].isFinal = true
       }
     }
 
@@ -614,6 +619,7 @@ async function submitSegment(blob, seq, paragraphId) {
     translated: '',
     timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     pending: true,
+    isFinal: false,
   }
   transcriptionHistory.value.unshift(entry)
   inflight.value++
@@ -1035,13 +1041,16 @@ onUnmounted(() => {
               <!-- Continuous text flow -->
               <div class="grid grid-cols-2 gap-4 px-5 py-3">
                 <!-- Original (left) -->
-                <p class="text-[14px] leading-relaxed text-white/80">
+                <p class="text-[14px] leading-relaxed">
                   <template v-for="group in paragraphs" :key="'o-' + group.paragraphId">
                     <span
                       @mouseenter="hoveredId = group.paragraphId"
                       @mouseleave="hoveredId = null"
-                      class="transition-colors duration-100 rounded px-0.5 -mx-0.5"
-                      :class="hoveredId === group.paragraphId ? 'bg-yellow-200/15' : ''"
+                      class="transition-colors duration-200 rounded px-0.5 -mx-0.5"
+                      :class="[
+                        hoveredId === group.paragraphId ? 'bg-yellow-200/15' : '',
+                        group.isFinal ? 'text-white/80' : 'text-white/35 shimmer-text'
+                      ]"
                     >{{ group.original }}</span>{{ ' ' }}
                   </template>
                   <span v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending" class="inline-flex items-center ml-1 align-middle">
@@ -1050,13 +1059,16 @@ onUnmounted(() => {
                 </p>
 
                 <!-- Translation (right) -->
-                <p class="text-[14px] leading-relaxed text-white/90">
+                <p class="text-[14px] leading-relaxed">
                   <template v-for="group in paragraphs" :key="'t-' + group.paragraphId">
                     <span
                       @mouseenter="hoveredId = group.paragraphId"
                       @mouseleave="hoveredId = null"
-                      class="transition-colors duration-100 rounded px-0.5 -mx-0.5"
-                      :class="hoveredId === group.paragraphId ? 'bg-yellow-200/15' : ''"
+                      class="transition-colors duration-200 rounded px-0.5 -mx-0.5"
+                      :class="[
+                        hoveredId === group.paragraphId ? 'bg-yellow-200/15' : '',
+                        group.isFinal ? 'text-white/90' : 'text-white/30 shimmer-text'
+                      ]"
                     >{{ group.translated }}</span>{{ ' ' }}
                   </template>
                   <span v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending && paragraphs[paragraphs.length - 1].translated" class="inline-flex items-center ml-1 align-middle">
@@ -1137,6 +1149,25 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Shimmer effect for fast pipeline preliminary text */
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity 0.2s ease;

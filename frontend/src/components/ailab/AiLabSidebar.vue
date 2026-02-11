@@ -270,10 +270,10 @@ onUnmounted(() => {
           'flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-violet-50 transition-colors text-gray-600 hover:text-violet-700',
           isCollapsed && 'justify-center'
         ]"
-        :title="isCollapsed ? '同声传译' : ''"
+        :title="isCollapsed ? '转录翻译' : ''"
       >
         <span class="text-base leading-none shrink-0">🎙️</span>
-        <span v-if="!isCollapsed" class="text-sm">同声传译</span>
+        <span v-if="!isCollapsed" class="text-sm">转录翻译</span>
       </router-link>
       <router-link
         to="/ai-lab/studio?view=emoji"

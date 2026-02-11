@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class InterpretationViewModel: ObservableObject {
     @Published var isRecording: Bool = false
+    @Published var isPaused: Bool = false
     @Published var sourceLang: String = "en"
     @Published var targetLang: String = "Chinese"
     @Published var segments: [SegmentResult] = []
@@ -11,11 +12,13 @@ final class InterpretationViewModel: ObservableObject {
     @Published var waveformLevels: [CGFloat] = Array(repeating: 0.04, count: 40)
     @Published var recordingSeconds: Int = 0
     @Published var localRecordings: [LocalInterpretationRecording] = []
+    @Published var creditBalance: Int = 0
     private var recordingTimer: Timer?
 
     var authViewModel: AuthViewModel?
 
     @AppStorage("apiBaseURL") private var userBaseURL: String = ""
+    @AppStorage("selectedAsrTier") var asrTier: String = "free"
     @AppStorage("vadEnabled") private var vadEnabled: Bool = true
     @AppStorage("vadThresholdDb") private var vadThresholdDb: Double = -40.0
     @AppStorage("vadSilenceMs") private var vadSilenceMs: Int = 300
@@ -92,7 +95,7 @@ final class InterpretationViewModel: ObservableObject {
             let normalized = CGFloat(max(0, min(1, (power + 60) / 60)))
             let level = max(0.04, normalized)
             Task { @MainActor in
-                guard let self = self, self.isRecording else { return }
+                guard let self = self, self.isRecording, !self.isPaused else { return }
                 self.waveformLevels.append(level)
                 if self.waveformLevels.count > 40 {
                     self.waveformLevels.removeFirst(self.waveformLevels.count - 40)
@@ -126,14 +129,34 @@ final class InterpretationViewModel: ObservableObject {
                 }
             } catch {
                 print("🎙️ [VM] recorder.start() FAILED: \(error)")
-                lastError = error.localizedDescription
+                lastError = error.friendlyMessage
                 isRecording = false
             }
         }
     }
 
-    func stop() {
-        print("🎙️ [VM] stop()")
+    func togglePause() {
+        if !isPaused {
+            print("🎙️ [VM] pause")
+            recorder.pause()
+            isPaused = true
+            recordingTimer?.invalidate()
+            recordingTimer = nil
+            waveformLevels = Array(repeating: 0.04, count: 40)
+            // Flush slow pipeline for segments accumulated so far
+            flushSlowPipeline()
+        } else {
+            print("🎙️ [VM] resume")
+            recorder.resume()
+            isPaused = false
+            self.recordingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.recordingSeconds += 1 }
+            }
+        }
+    }
+
+    func stopAndSave() {
+        print("🎙️ [VM] stopAndSave()")
         let stoppingSessionID = currentRecorderSessionID
         let stoppingDuration = TimeInterval(recordingSeconds)
         let stoppingSourceLang = sourceLang
@@ -144,6 +167,7 @@ final class InterpretationViewModel: ObservableObject {
         let completedSessionAudioURL = recorder.takeCompletedSessionAudioURL()
 
         isRecording = false
+        isPaused = false
         currentRecorderSessionID = nil
         waveformLevels = Array(repeating: 0.04, count: 40)
         recordingTimer?.invalidate()
@@ -187,7 +211,7 @@ final class InterpretationViewModel: ObservableObject {
         do {
             try FileManager.default.copyItem(at: url, to: tmpURL)
         } catch {
-            lastError = error.localizedDescription
+            lastError = error.friendlyMessage
             url.stopAccessingSecurityScopedResource()
             return
         }
@@ -219,6 +243,7 @@ final class InterpretationViewModel: ObservableObject {
 
         let isCurrentRecorderSession =
             isRecording &&
+            !isPaused &&
             recorderSessionID != nil &&
             recorderSessionID == currentRecorderSessionID
         let shouldEnterSlowPipeline = isCurrentRecorderSession
@@ -232,6 +257,7 @@ final class InterpretationViewModel: ObservableObject {
         let baseURLString = self.apiBaseURL
         let token = KeychainService.load(.accessToken)
         let authVM = self.authViewModel
+        let currentAsrTier = self.asrTier
 
         Task.detached {
             do {
@@ -241,7 +267,8 @@ final class InterpretationViewModel: ObservableObject {
                     sourceLang: sourceLang,
                     targetLang: targetLang,
                     token: token,
-                    authVM: authVM
+                    authVM: authVM,
+                    asrTier: currentAsrTier
                 )
                 print("[Fast] Got result: \(result.transcription.prefix(50))...")
 
@@ -256,15 +283,40 @@ final class InterpretationViewModel: ObservableObject {
                             seg.isFinal = true
                         }
                     }
+                    // Clear any previous error (e.g. 502) now that API is responding
+                    if self.lastError != nil {
+                        self.lastError = nil
+                    }
                 }
             } catch {
-                print("[Fast] Error for segment #\(seq): \(error)")
-                await MainActor.run {
-                    self.updateSegment(id: segmentId) { seg in
-                        seg.status = .error
-                        seg.errorMessage = error.localizedDescription
+                print("[Fast] Network error for segment #\(seq): \(error), trying local fallback...")
+
+                // Attempt local offline fallback
+                let localResult = await self.attemptLocalFallback(
+                    fileURL: fileURL, sourceLang: sourceLang, targetLang: targetLang
+                )
+                if let local = localResult {
+                    print("[Fast] Local fallback succeeded: \(local.transcription.prefix(50))...")
+                    await MainActor.run {
+                        self.updateSegment(id: segmentId) { seg in
+                            seg.transcription = local.transcription
+                            seg.translation = local.translation
+                            seg.status = .done
+                            seg.isOffline = true
+                            if !shouldEnterSlowPipeline {
+                                seg.isFinal = true
+                            }
+                        }
                     }
-                    self.lastError = error.localizedDescription
+                } else {
+                    print("[Fast] Local fallback unavailable for segment #\(seq)")
+                    await MainActor.run {
+                        self.updateSegment(id: segmentId) { seg in
+                            seg.status = .error
+                            seg.errorMessage = error.friendlyMessage
+                        }
+                        self.lastError = error.friendlyMessage
+                    }
                 }
             }
             try? FileManager.default.removeItem(at: fileURL)
@@ -283,29 +335,55 @@ final class InterpretationViewModel: ObservableObject {
         sourceLang: String,
         targetLang: String,
         token: String?,
-        authVM: AuthViewModel?
+        authVM: AuthViewModel?,
+        asrTier: String = "free"
     ) async throws -> TranscribeTranslateResponse {
         let client = try APIClient(baseURLString: baseURLString, accessToken: token)
         do {
-            return try await client.transcribeTranslate(
+            let result = try await client.transcribeTranslate(
                 fileURL: fileURL,
                 sourceLang: sourceLang,
-                targetLang: targetLang
+                targetLang: targetLang,
+                asrTier: asrTier
             )
+            // Update balance if returned
+            if let balance = result.balance_seconds {
+                await MainActor.run { self.creditBalance = balance }
+            }
+            return result
         } catch APIError.unauthorized {
             // Try refreshing the token
             if let authVM = authVM {
                 let refreshed = await authVM.refreshAccessToken()
                 if refreshed, let newToken = KeychainService.load(.accessToken) {
                     let retryClient = try APIClient(baseURLString: baseURLString, accessToken: newToken)
-                    return try await retryClient.transcribeTranslate(
+                    let result = try await retryClient.transcribeTranslate(
                         fileURL: fileURL,
                         sourceLang: sourceLang,
-                        targetLang: targetLang
+                        targetLang: targetLang,
+                        asrTier: asrTier
                     )
+                    if let balance = result.balance_seconds {
+                        await MainActor.run { self.creditBalance = balance }
+                    }
+                    return result
                 }
             }
             throw APIError.unauthorized
+        } catch APIError.insufficientCredits(let balance, _) {
+            await MainActor.run { self.creditBalance = balance }
+            throw APIError.insufficientCredits(balance: balance, required: 0)
+        }
+    }
+
+    func fetchCreditBalance() async {
+        guard let token = KeychainService.load(.accessToken) else { return }
+        do {
+            let service = try CreditService(baseURLString: apiBaseURL, accessToken: token)
+            let response = try await service.getBalance()
+            self.creditBalance = response.balance_seconds
+        } catch {
+            print("[Credits] fetchBalance error: \(error)")
         }
     }
 
@@ -344,6 +422,7 @@ final class InterpretationViewModel: ObservableObject {
         let baseURLString = self.apiBaseURL
         let token = KeychainService.load(.accessToken)
         let authVM = self.authViewModel
+        let currentAsrTier = self.asrTier
 
         Task.detached {
             defer { try? FileManager.default.removeItem(at: accumulatedURL) }
@@ -355,7 +434,8 @@ final class InterpretationViewModel: ObservableObject {
                     sourceLang: sourceLang,
                     targetLang: targetLang,
                     token: token,
-                    authVM: authVM
+                    authVM: authVM,
+                    asrTier: currentAsrTier
                 )
 
                 print("[Slow] Got result: \(result.transcription.prefix(80))...")
@@ -393,7 +473,41 @@ final class InterpretationViewModel: ObservableObject {
                     )
                 }
             } catch {
-                print("[Slow] Error: \(error)")
+                print("[Slow] Network error: \(error), trying local fallback...")
+
+                let localResult = await self.attemptLocalFallback(
+                    fileURL: accumulatedURL, sourceLang: sourceLang, targetLang: targetLang
+                )
+                if let local = localResult {
+                    print("[Slow] Local fallback succeeded")
+                    await MainActor.run {
+                        for (i, entryId) in entryIds.enumerated() {
+                            self.updateSegment(id: entryId) { seg in
+                                if i == 0 {
+                                    seg.transcription = local.transcription
+                                    seg.translation = local.translation
+                                    seg.status = .done
+                                    seg.isFinal = true
+                                    seg.isOffline = true
+                                } else {
+                                    seg.transcription = ""
+                                    seg.translation = ""
+                                    seg.status = .done
+                                    seg.isFinal = true
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    print("[Slow] Local fallback also unavailable, marking segments as final with fast results")
+                    await MainActor.run {
+                        for entryId in entryIds {
+                            self.updateSegment(id: entryId) { seg in
+                                seg.isFinal = true
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -431,6 +545,30 @@ final class InterpretationViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Local Offline Fallback
+
+    /// Attempt local on-device transcription + translation. Returns nil if unavailable.
+    private nonisolated func attemptLocalFallback(
+        fileURL: URL,
+        sourceLang: String,
+        targetLang: String
+    ) async -> LocalPipelineResult? {
+        guard #available(iOS 26, *) else { return nil }
+        guard LocalPipelineService.isAvailable(sourceLang: sourceLang, targetLang: targetLang) else {
+            return nil
+        }
+        do {
+            return try await LocalPipelineService.transcribeAndTranslate(
+                fileURL: fileURL,
+                sourceLang: sourceLang,
+                targetLang: targetLang
+            )
+        } catch {
+            print("[LocalFallback] Error: \(error)")
+            return nil
+        }
+    }
+
     // MARK: - Helpers
 
     private func updateSegment(id: UUID, mutate: (inout SegmentResult) -> Void) {
@@ -447,7 +585,7 @@ final class InterpretationViewModel: ObservableObject {
             try LocalRecordingStore.deleteRecording(id: recording.id)
             localRecordings.removeAll(where: { $0.id == recording.id })
         } catch {
-            lastError = error.localizedDescription
+            lastError = error.friendlyMessage
         }
     }
 
@@ -551,7 +689,7 @@ final class InterpretationViewModel: ObservableObject {
                     try? FileManager.default.removeItem(at: audioURL)
                 }
                 guard let self else { return }
-                self.lastError = error.localizedDescription
+                self.lastError = error.friendlyMessage
             }
         }
     }

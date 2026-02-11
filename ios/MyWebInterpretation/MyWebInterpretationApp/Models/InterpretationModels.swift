@@ -5,6 +5,7 @@ struct TranscribeTranslateResponse: Decodable, Sendable {
     let translation: String
     let source_lang: String?
     let target_lang: String?
+    let balance_seconds: Int?
 }
 
 struct SegmentResult: Identifiable, Sendable {
@@ -25,6 +26,7 @@ struct SegmentResult: Identifiable, Sendable {
     var errorMessage: String?
     var isFinal: Bool
     var isRefined: Bool
+    var isOffline: Bool
 
     init(seq: Int) {
         self.id = UUID()
@@ -36,6 +38,7 @@ struct SegmentResult: Identifiable, Sendable {
         self.errorMessage = nil
         self.isFinal = false
         self.isRefined = false
+        self.isOffline = false
     }
 }
 

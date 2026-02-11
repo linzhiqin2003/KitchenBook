@@ -5,8 +5,6 @@ import UniformTypeIdentifiers
 
 enum InterpretationExportFormat: String, CaseIterable, Sendable {
     case txt
-    case csv
-    case json
     case pdf
 
     var fileExtension: String { rawValue }
@@ -15,10 +13,6 @@ enum InterpretationExportFormat: String, CaseIterable, Sendable {
         switch self {
         case .txt:
             return .plainText
-        case .csv:
-            return .commaSeparatedText
-        case .json:
-            return .json
         case .pdf:
             return .pdf
         }
@@ -80,15 +74,6 @@ struct InterpretationExporter {
                 throw InterpretationExportError.encodingFailed
             }
             try data.write(to: fileURL, options: [.atomic])
-        case .csv:
-            let text = renderCSV(payload: payload)
-            guard let data = text.data(using: .utf8) else {
-                throw InterpretationExportError.encodingFailed
-            }
-            try data.write(to: fileURL, options: [.atomic])
-        case .json:
-            let data = try renderJSON(payload: payload)
-            try data.write(to: fileURL, options: [.atomic])
         case .pdf:
             let data = try renderPDF(payload: payload)
             try data.write(to: fileURL, options: [.atomic])
@@ -123,12 +108,6 @@ struct InterpretationExporter {
         )
     }
 
-    static func renderJSON(payload: InterpretationExportPayload) throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(payload)
-    }
-
     static func renderPlainText(payload: InterpretationExportPayload) -> String {
         let originals = payload.segments
             .map { $0.transcription.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -156,7 +135,7 @@ struct InterpretationExporter {
         lines.append("")
         lines.append("=== Segments (details) ===")
 
-        for seg in payload.segments.sorted(by: { $0.seq < $1.seq }) {
+        for seg in payload.segments {
             lines.append("#\(seg.seq) [\(seg.created_at)] status=\(seg.status)")
             if let err = seg.error_message, !err.isEmpty {
                 lines.append("error: \(err)")
@@ -171,37 +150,6 @@ struct InterpretationExporter {
         }
 
         return lines.joined(separator: "\n")
-    }
-
-    static func renderCSV(payload: InterpretationExportPayload) -> String {
-        func csvField(_ s: String?) -> String {
-            let value = s ?? ""
-            let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
-            return "\"\(escaped)\""
-        }
-
-        var rows: [String] = []
-        rows.append([
-            "seq",
-            "created_at",
-            "status",
-            "transcription",
-            "translation",
-            "error_message",
-        ].joined(separator: ","))
-
-        for seg in payload.segments.sorted(by: { $0.seq < $1.seq }) {
-            rows.append([
-                "\(seg.seq)",
-                csvField(seg.created_at),
-                csvField(seg.status),
-                csvField(seg.transcription),
-                csvField(seg.translation),
-                csvField(seg.error_message),
-            ].joined(separator: ","))
-        }
-
-        return rows.joined(separator: "\n")
     }
 
     static func renderPDF(payload: InterpretationExportPayload) throws -> Data {
@@ -392,7 +340,7 @@ struct InterpretationExporter {
         detailP.lineSpacing = 2
         detailP.paragraphSpacing = 8
 
-        for seg in payload.segments.sorted(by: { $0.seq < $1.seq }) {
+        for seg in payload.segments {
             var lines: [String] = []
             lines.append("#\(seg.seq)  [\(seg.created_at)]  status=\(seg.status)")
             if let err = seg.error_message, !err.isEmpty {

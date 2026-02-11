@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "apps.games",
     "accounts",
     "receipts",
+    "credits",
 ]
 
 SITE_ID = 1

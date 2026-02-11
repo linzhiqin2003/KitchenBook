@@ -19,3 +19,5 @@ pydantic>=2.6,<3
 yfinance>=0.2.36
 django-allauth[socialaccount]>=65.0,<66
 google-auth>=2.27,<3
+mutagen>=1.47,<2
+PyJWT[crypto]>=2.8,<3

@@ -248,38 +248,49 @@ def submit_file_translation(request):
 @parser_classes([MultiPartParser, FormParser])
 def transcribe_translate(request):
     """
-    Upload audio → Groq Whisper transcription → Cerebras translation.
+    Upload audio → ASR transcription → Cerebras translation.
 
     POST /api/interpretation/transcribe-translate/
       - file: audio file (webm, mp3, wav, etc.)
       - source_lang: e.g. 'en', 'zh'
       - target_lang: e.g. 'Chinese', 'English'
+      - asr_tier: 'free' (default) or 'premium' (DashScope, requires JWT + credits)
 
-    Auth: Optional JWT. If JWT present, uses user's Groq API key.
-          If no JWT, uses server key (web frontend compatibility).
-    Returns: { transcription, translation, source_lang, target_lang }
+    Auth: Optional JWT for free tier, required JWT for premium tier.
+    Returns: { transcription, translation, source_lang, target_lang, balance_seconds? }
     """
     if 'file' not in request.FILES:
         return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
 
+    asr_tier = request.data.get('asr_tier', 'free')
+
     # Try optional JWT authentication
     user_groq_key = None
+    authenticated_user = None
     from rest_framework_simplejwt.authentication import JWTAuthentication
     try:
         auth_result = JWTAuthentication().authenticate(request)
         if auth_result:
-            user, _ = auth_result
-            profile = getattr(user, 'profile', None)
-            if profile and profile.groq_api_key:
-                user_groq_key = profile.groq_api_key
-            else:
-                return Response(
-                    {'error': 'No Groq API Key configured. Please update in settings.'},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            authenticated_user, _ = auth_result
+            if asr_tier == 'free':
+                profile = getattr(authenticated_user, 'profile', None)
+                if profile and profile.groq_api_key:
+                    user_groq_key = profile.groq_api_key
+                else:
+                    return Response(
+                        {'error': 'No Groq API Key configured. Please update in settings.'},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
     except Exception:
         # No JWT or invalid JWT → fall through to server key
         pass
+
+    # Premium tier requires authentication
+    if asr_tier == 'premium' and authenticated_user is None:
+        return Response(
+            {'error': 'Authentication required for premium ASR'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
 
     uploaded_file = request.FILES['file']
     source_lang = request.data.get('source_lang', 'en')
@@ -295,10 +306,38 @@ def transcribe_translate(request):
             for chunk in uploaded_file.chunks():
                 dest.write(chunk)
 
+        # Premium tier: check credits before processing
+        if asr_tier == 'premium':
+            from credits.services import get_balance, get_audio_duration, deduct_for_audio, InsufficientCreditsError
+            import math
+            duration = get_audio_duration(str(file_path))
+            required = math.ceil(duration)
+            balance = get_balance(authenticated_user)
+            if balance < required:
+                return Response(
+                    {
+                        'error': 'Insufficient credits',
+                        'balance_seconds': balance,
+                        'required_seconds': required,
+                    },
+                    status=status.HTTP_402_PAYMENT_REQUIRED,
+                )
+
         result = transcribe_and_translate(
             str(file_path), source_lang, target_lang,
             groq_api_key=user_groq_key,
+            asr_tier=asr_tier,
         )
+
+        # Premium tier: deduct credits after successful ASR
+        if asr_tier == 'premium':
+            try:
+                deduct_for_audio(authenticated_user, duration)
+                result['balance_seconds'] = get_balance(authenticated_user)
+            except InsufficientCreditsError:
+                # Shouldn't happen since we checked above, but handle gracefully
+                result['balance_seconds'] = get_balance(authenticated_user)
+
         return Response(result)
 
     except Exception as e:

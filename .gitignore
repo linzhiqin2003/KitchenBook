@@ -46,3 +46,12 @@ Thumbs.db
 # Docs (local notes)
 # docs/
 backend/=1.0.0
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
