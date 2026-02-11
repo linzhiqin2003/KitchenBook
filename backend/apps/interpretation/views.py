@@ -264,10 +264,12 @@ def transcribe_translate(request):
 
     asr_tier = request.data.get('asr_tier', 'free')
 
-    # Try optional JWT authentication
+    # Try JWT authentication
     user_groq_key = None
     authenticated_user = None
     from rest_framework_simplejwt.authentication import JWTAuthentication
+    from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+    has_auth_header = 'HTTP_AUTHORIZATION' in request.META
     try:
         auth_result = JWTAuthentication().authenticate(request)
         if auth_result:
@@ -276,9 +278,20 @@ def transcribe_translate(request):
                 profile = getattr(authenticated_user, 'profile', None)
                 if profile and profile.groq_api_key:
                     user_groq_key = profile.groq_api_key
-                # If no user key, fall through to server key
+                else:
+                    return Response(
+                        {'error': 'No API Key configured. Please update in settings.'},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+    except (InvalidToken, TokenError):
+        # JWT expired or invalid — return 401 so client can refresh
+        if has_auth_header:
+            return Response(
+                {'error': 'Token expired or invalid'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
     except Exception:
-        # No JWT or invalid JWT → fall through to server key
+        # No JWT header at all → fall through to server key
         pass
 
     # Premium tier requires authentication
