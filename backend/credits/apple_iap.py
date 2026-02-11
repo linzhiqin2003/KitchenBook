@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 # Product ID → seconds mapping
 PRODUCT_CREDITS = {
-    "org.lzqqq.interpretation.credits.60": 3600,     # 60 min
-    "org.lzqqq.interpretation.credits.300": 18000,    # 300 min
-    "org.lzqqq.interpretation.credits.600": 36000,    # 600 min
+    "org.lzqqq.interpretation.credits.10h": 36000,     # 10 hours
+    "org.lzqqq.interpretation.credits.50h": 180000,    # 50 hours
+    "org.lzqqq.interpretation.credits.100h": 360000,   # 100 hours
 }
 
 
