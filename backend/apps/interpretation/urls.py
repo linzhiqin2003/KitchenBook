@@ -15,6 +15,7 @@ urlpatterns = [
     path('submit-file-translation/', views.submit_file_translation, name='submit_file_translation'),
     path('get-asr-result/', views.get_asr_result, name='get_asr_result'),
     path('transcribe-translate/', views.transcribe_translate, name='transcribe_translate'),
+    path('refine/', views.refine_transcription, name='refine_transcription'),
     path('transcribe-translate-stream/', views.transcribe_translate_stream, name='transcribe_translate_stream'),
     path('meeting-minutes/', views.generate_meeting_minutes, name='generate_meeting_minutes'),
 ]

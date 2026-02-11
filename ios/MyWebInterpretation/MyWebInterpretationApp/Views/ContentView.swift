@@ -16,37 +16,29 @@ struct ShimmerText: View {
     let text: String
     let font: Font
     let baseOpacity: Double
-    @State private var phase: CGFloat = 0
+    @State private var pulse = false
 
     var body: some View {
         Text(text)
             .font(font)
-            .foregroundStyle(.white.opacity(baseOpacity))
-            .overlay(
-                GeometryReader { geo in
-                    let w = geo.size.width
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.clear, .white.opacity(0.45), .clear],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: w * 0.4)
-                        .offset(x: -w * 0.2 + phase * w * 1.4)
-                }
-                .mask(
-                    Text(text)
-                        .font(font)
-                        .foregroundStyle(.white)
-                )
-            )
-            .onAppear {
-                withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
-                    phase = 1
-                }
-            }
+            .foregroundStyle(.white.opacity(pulse ? baseOpacity + 0.15 : baseOpacity - 0.05))
+            .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
+    }
+}
+
+struct PendingFlowText: View {
+    let text: String
+    let font: Font
+    let baseOpacity: Double
+    @State private var pulse = false
+
+    var body: some View {
+        Text(text)
+            .font(font)
+            .foregroundStyle(.white.opacity(pulse ? baseOpacity + 0.12 : baseOpacity - 0.05))
+            .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
     }
 }
 
@@ -178,19 +170,29 @@ struct WaveformView: View {
 
 struct ContentView: View {
     @ObservedObject var authVM: AuthViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var vm = InterpretationViewModel()
     @State private var showingSettings = false
     @State private var showingFilePicker = false
-    @State private var showingShareSheet = false
-    @State private var shareItems: [Any] = []
+    @State private var showingLocalRecordings = false
+    @State private var sharePayload: ShareSheetPayload?
     @State private var toastMessage: String?
     @State private var highlightedSegmentId: UUID? = nil
     @State private var displayMode: DisplayMode = .both
+    @State private var layoutMode: LayoutMode = .text
 
-    enum DisplayMode: String, CaseIterable {
-        case original = "Original"
-        case translation = "Translation"
-        case both = "Both"
+    enum DisplayMode: CaseIterable {
+        case original
+        case translation
+        case both
+
+        var title: String {
+            switch self {
+            case .original: return "Original"
+            case .translation: return "Translation"
+            case .both: return "Both"
+            }
+        }
 
         var icon: String {
             switch self {
@@ -199,6 +201,33 @@ struct ContentView: View {
             case .both: return "text.justify"
             }
         }
+    }
+
+    enum LayoutMode {
+        case text      // 文本追加：连续段落
+        case segments  // 逐列：每段独立卡片
+
+        var icon: String {
+            switch self {
+            case .text: return "text.justify.leading"
+            case .segments: return "list.bullet.rectangle"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .text: return "Text"
+            case .segments: return "Segments"
+            }
+        }
+    }
+
+    private var isPadLayout: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad || horizontalSizeClass == .regular
+    }
+
+    private var mainContentMaxWidth: CGFloat {
+        isPadLayout ? 1120 : 760
     }
 
     var body: some View {
@@ -217,8 +246,11 @@ struct ContentView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView(apiBaseURL: vm.apiBaseURLBinding, authVM: authVM)
         }
-        .sheet(isPresented: $showingShareSheet) {
-            ShareSheet(items: shareItems)
+        .sheet(isPresented: $showingLocalRecordings) {
+            LocalRecordingsView(vm: vm)
+        }
+        .sheet(item: $sharePayload) { payload in
+            ShareSheet(items: payload.items)
         }
         .fileImporter(
             isPresented: $showingFilePicker,
@@ -261,6 +293,15 @@ struct ContentView: View {
                 .foregroundStyle(.white.opacity(0.45))
 
             Button {
+                showingLocalRecordings = true
+            } label: {
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .padding(.leading, 10)
+
+            Button {
                 authVM.logout()
             } label: {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
@@ -280,26 +321,84 @@ struct ContentView: View {
 
     // MARK: - Scroll Content
 
+    @ViewBuilder
     private var scrollContent: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                if !vm.isRecording {
-                    languageSelectors
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+        if isPadLayout {
+            VStack {
+                ipadLayoutContent
+                    .animation(.easeInOut(duration: 0.3), value: vm.isRecording)
+                    .frame(maxWidth: mainContentMaxWidth, alignment: .top)
+                    .padding(.horizontal, 28)
+                    .padding(.top, 22)
+                    .padding(.bottom, 24)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        } else {
+            ScrollView {
+                phoneLayoutContent
+                    .animation(.easeInOut(duration: 0.3), value: vm.isRecording)
+                    .frame(maxWidth: mainContentMaxWidth, alignment: .top)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 40)
+            }
+        }
+    }
+
+    private var phoneLayoutContent: some View {
+        VStack(spacing: 24) {
+            if !vm.isRecording {
+                languageSelectors
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            inputArea
+
+            if vm.segments.isEmpty {
+                emptyState
+            } else {
+                resultsList
+            }
+        }
+    }
+
+    private var ipadLayoutContent: some View {
+        VStack(spacing: 20) {
+            if !vm.isRecording {
+                languageSelectors
+                    .frame(maxWidth: 820)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            HStack(alignment: .top, spacing: 20) {
                 inputArea
+                    .frame(width: 360)
+                    .frame(maxHeight: .infinity, alignment: .top)
 
                 if vm.segments.isEmpty {
-                    emptyState
+                    emptyResultsCard
                 } else {
                     resultsList
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: vm.isRecording)
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 40)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private var emptyResultsCard: some View {
+        VStack {
+            emptyState
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(.white.opacity(0.08))
+                )
+        )
     }
 
     // MARK: - Language Selectors
@@ -400,7 +499,7 @@ struct ContentView: View {
             }
             .padding(.vertical, 28)
         }
-        .frame(minHeight: 150)
+        .frame(minHeight: isPadLayout ? 220 : 150)
     }
 
     // MARK: - Empty State
@@ -461,40 +560,70 @@ struct ContentView: View {
     private var displaySegments: [SegmentResult] {
         vm.segments
             .filter { !$0.transcription.isEmpty || !$0.translation.isEmpty }
-            .sorted { $0.seq < $1.seq }
     }
 
     private var resultsList: some View {
         VStack(spacing: 0) {
-            // Mode toggle bar
-            HStack(spacing: 0) {
-                ForEach(DisplayMode.allCases, id: \.self) { mode in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            displayMode = mode
+            HStack {
+                if isPadLayout {
+                    Picker("Display Mode", selection: $displayMode) {
+                        ForEach(DisplayMode.allCases, id: \.self) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: 340)
+                } else {
+                    Menu {
+                        ForEach(DisplayMode.allCases, id: \.self) { mode in
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    displayMode = mode
+                                }
+                            } label: {
+                                Label(mode.title, systemImage: mode.icon)
+                            }
                         }
                     } label: {
-                        Text(mode.rawValue)
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundStyle(displayMode == mode ? .white : .white.opacity(0.35))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                displayMode == mode
-                                    ? Capsule().fill(.white.opacity(0.12))
-                                    : Capsule().fill(.clear)
-                            )
+                        HStack(spacing: 6) {
+                            Image(systemName: displayMode.icon)
+                                .font(.caption2)
+                            Text(displayMode.title)
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.white.opacity(0.75))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.white.opacity(0.08))
+                        .clipShape(Capsule())
                     }
                 }
                 Spacer()
+
+                // Layout mode toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        layoutMode = layoutMode == .text ? .segments : .text
+                    }
+                } label: {
+                    Image(systemName: layoutMode.icon)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .padding(7)
+                        .background(.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 8)
 
             // Content columns
-            resultsColumns
+            resultsContent
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
 
@@ -510,7 +639,35 @@ struct ContentView: View {
 
                 Spacer()
 
-                exportMenu
+                if isPadLayout {
+                    Button {
+                        exportAndShare(format: .pdf)
+                    } label: {
+                        Label("PDF", systemImage: "doc.richtext")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.white.opacity(0.75))
+                    .disabled(vm.segments.isEmpty)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.white.opacity(0.05))
+                    .clipShape(Capsule())
+
+                    Button {
+                        exportAndShare(format: .txt)
+                    } label: {
+                        Label("TXT", systemImage: "square.and.arrow.up")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.white.opacity(0.75))
+                    .disabled(vm.segments.isEmpty)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.white.opacity(0.05))
+                    .clipShape(Capsule())
+                } else {
+                    exportMenu
+                }
 
                 Button {
                     vm.clear()
@@ -543,8 +700,21 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private var resultsColumns: some View {
-        let maxH: CGFloat = displayMode == .both ? 240 : 360
+    private var resultsContent: some View {
+        if layoutMode == .text {
+            resultsFlowView
+        } else {
+            resultsSegmentListView
+        }
+    }
+
+    // MARK: - Text Flow Layout (文本追加)
+
+    @ViewBuilder
+    private var resultsFlowView: some View {
+        let maxH: CGFloat = isPadLayout
+            ? (displayMode == .both ? 520 : 650)
+            : (displayMode == .both ? 240 : 360)
 
         switch displayMode {
         case .original:
@@ -590,20 +760,113 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Segment List Layout (逐列)
+
+    @ViewBuilder
+    private var resultsSegmentListView: some View {
+        let maxH: CGFloat = isPadLayout ? 650 : 360
+        let isLoading: (SegmentResult) -> Bool = { $0.status == .uploading || $0.status == .transcribed || $0.status == .translated }
+        let segs = vm.segments.filter { seg in
+            switch displayMode {
+            case .original: return !seg.transcription.isEmpty || isLoading(seg)
+            case .translation: return !seg.translation.isEmpty || isLoading(seg)
+            case .both: return !seg.transcription.isEmpty || !seg.translation.isEmpty || isLoading(seg)
+            }
+        }
+
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                ForEach(segs) { seg in
+                    segmentCard(seg)
+                }
+            }
+        }
+        .frame(maxHeight: maxH)
+    }
+
+    private static let segmentTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
+    @ViewBuilder
+    private func segmentCard(_ seg: SegmentResult) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Header: timestamp + refined badge
+            HStack(spacing: 6) {
+                Text(Self.segmentTimeFormatter.string(from: seg.createdAt))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.35))
+                if seg.isRefined {
+                    Text("refined")
+                        .font(.caption2)
+                        .foregroundStyle(.cyan.opacity(0.6))
+                }
+                Spacer()
+                if seg.status == .uploading || seg.status == .transcribed || seg.status == .translated {
+                    ProgressView()
+                        .tint(.white.opacity(0.3))
+                        .scaleEffect(0.6)
+                }
+            }
+
+            if seg.status == .uploading || seg.status == .transcribed || seg.status == .translated {
+                if !seg.transcription.isEmpty {
+                    Text(seg.transcription)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.3))
+                        .lineLimit(2)
+                }
+            } else {
+                if displayMode != .translation && !seg.transcription.isEmpty {
+                    Text(seg.transcription)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(seg.isFinal ? 0.9 : 0.4))
+                }
+                if displayMode != .original && !seg.translation.isEmpty {
+                    Text(seg.translation)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(seg.isFinal ? 0.6 : 0.25))
+                }
+                if let err = seg.errorMessage {
+                    Text(err)
+                        .font(.caption2)
+                        .foregroundStyle(.red.opacity(0.7))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.white.opacity(highlightedSegmentId == seg.id ? 0.08 : 0.04))
+        )
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                highlightedSegmentId = highlightedSegmentId == seg.id ? nil : seg.id
+            }
+        }
+    }
+
     @ViewBuilder
     private func segmentFlowColumn(keyPath: KeyPath<SegmentResult, String>, isFinalOpacity: Double, pendingOpacity: Double) -> some View {
         let finalSegs = displaySegments.filter { $0.isFinal }
         let pendingSegs = displaySegments.filter { !$0.isFinal }
+        let pendingText = pendingSegs.compactMap { seg -> String? in
+            let t = seg[keyPath: keyPath]
+            return t.isEmpty ? nil : t
+        }.joined(separator: " ")
 
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             // Show loading if nothing yet
-            if finalSegs.isEmpty && pendingSegs.isEmpty && hasPending {
+            if finalSegs.isEmpty && pendingText.isEmpty && hasPending {
                 ProgressView()
                     .tint(.white.opacity(0.3))
                     .scaleEffect(0.8)
             }
 
-            // Final segments as continuous tappable text
+            // Final segments as continuous tappable text (white)
             if !finalSegs.isEmpty {
                 Text(buildFlowText(segments: finalSegs, keyPath: keyPath, opacity: isFinalOpacity))
                     .font(.subheadline)
@@ -614,12 +877,9 @@ struct ContentView: View {
                     })
             }
 
-            // Pending segments with shimmer
-            ForEach(pendingSegs) { seg in
-                let text = seg[keyPath: keyPath]
-                if !text.isEmpty {
-                    ShimmerText(text: text, font: .subheadline, baseOpacity: pendingOpacity)
-                }
+            // All pending segments combined as single gray pulsing text
+            if !pendingText.isEmpty {
+                PendingFlowText(text: pendingText, font: .subheadline, baseOpacity: pendingOpacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -627,7 +887,7 @@ struct ContentView: View {
 
     private func buildFlowText(segments: [SegmentResult], keyPath: KeyPath<SegmentResult, String>, opacity: Double) -> AttributedString {
         var result = AttributedString()
-        for (index, seg) in segments.enumerated() {
+        for seg in segments {
             let text = seg[keyPath: keyPath]
             if text.isEmpty { continue }
 
@@ -710,20 +970,6 @@ struct ContentView: View {
                 Label("导出 TXT", systemImage: "square.and.arrow.up")
             }
             .disabled(vm.segments.isEmpty)
-
-            Button {
-                exportAndShare(format: .csv)
-            } label: {
-                Label("导出 CSV", systemImage: "square.and.arrow.up")
-            }
-            .disabled(vm.segments.isEmpty)
-
-            Button {
-                exportAndShare(format: .json)
-            } label: {
-                Label("导出 JSON", systemImage: "square.and.arrow.up")
-            }
-            .disabled(vm.segments.isEmpty)
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "square.and.arrow.up")
@@ -745,25 +991,20 @@ struct ContentView: View {
         let targetLang = vm.targetLang
         let apiBaseURL = vm.apiBaseURL
 
-        Task.detached {
+        Task {
             do {
-                let url = try InterpretationExporter.exportToTemporaryFile(
-                    segments: segments,
-                    sourceLang: sourceLang,
-                    targetLang: targetLang,
-                    apiBaseURL: apiBaseURL,
-                    format: format
-                )
-                await MainActor.run {
-                    self.shareItems = [url]
-                    withAnimation(.easeInOut(duration: 0.12)) {
-                        self.showingShareSheet = true
-                    }
-                }
+                let url = try await Task.detached(priority: .utility) {
+                    try InterpretationExporter.exportToTemporaryFile(
+                        segments: segments,
+                        sourceLang: sourceLang,
+                        targetLang: targetLang,
+                        apiBaseURL: apiBaseURL,
+                        format: format
+                    )
+                }.value
+                self.sharePayload = ShareSheetPayload(items: [url])
             } catch {
-                await MainActor.run {
-                    self.vm.lastError = error.localizedDescription
-                }
+                self.vm.lastError = error.localizedDescription
             }
         }
     }
@@ -796,10 +1037,12 @@ struct SettingsView: View {
     @State private var groqKeyInput = ""
     @State private var groqKeyMessage: String?
     @State private var isSavingKey = false
+    @State private var showDevOptions = false
+    @State private var devTapCount = 0
     @AppStorage("vadEnabled") private var vadEnabled: Bool = true
-    @AppStorage("vadThresholdDb") private var vadThresholdDb: Double = -35.0
-    @AppStorage("vadSilenceMs") private var vadSilenceMs: Int = 400
-    @AppStorage("maxSegmentSeconds") private var maxSegmentSeconds: Double = 5.0
+    @AppStorage("vadThresholdDb") private var vadThresholdDb: Double = -40.0
+    @AppStorage("vadSilenceMs") private var vadSilenceMs: Int = 300
+    @AppStorage("maxSegmentSeconds") private var maxSegmentSeconds: Double = 4.0
 
     var body: some View {
         NavigationStack {
@@ -869,50 +1112,70 @@ struct SettingsView: View {
                     }
                 }
 
-                Section(header: Text("Backend")) {
-                    TextField("API Base URL", text: $apiBaseURL)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
+                // Developer options: hidden by default, tap version 5 times to reveal
+                if showDevOptions {
+                    Section(header: Text("Backend")) {
+                        TextField("API Base URL", text: $apiBaseURL)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
 
-                Section(header: Text("Connection")) {
-                    Button(isTestingHealth ? "Testing..." : "Test /health") {
-                        healthText = nil
-                        isTestingHealth = true
-                        Task {
-                            do {
-                                let client = try APIClient(baseURLString: apiBaseURL)
-                                let health = try await client.health()
-                                healthText = "status=\(health.status), api_key_configured=\(health.api_key_configured)"
-                            } catch {
-                                healthText = error.localizedDescription
+                    Section(header: Text("Connection")) {
+                        Button(isTestingHealth ? "Testing..." : "Test /health") {
+                            healthText = nil
+                            isTestingHealth = true
+                            Task {
+                                do {
+                                    let client = try APIClient(baseURLString: apiBaseURL)
+                                    let health = try await client.health()
+                                    healthText = "status=\(health.status), api_key_configured=\(health.api_key_configured)"
+                                } catch {
+                                    healthText = error.localizedDescription
+                                }
+                                isTestingHealth = false
                             }
-                            isTestingHealth = false
+                        }
+                        .disabled(isTestingHealth)
+
+                        if let healthText {
+                            Text(healthText)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .disabled(isTestingHealth)
 
-                    if let healthText {
-                        Text(healthText)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                    Section(header: Text("Segmentation (VAD)")) {
+                        Toggle("VAD enabled", isOn: $vadEnabled)
+
+                        Stepper(value: $maxSegmentSeconds, in: 2...10, step: 0.5) {
+                            Text("Max segment: \(String(format: "%.1f", maxSegmentSeconds))s")
+                        }
+
+                        Stepper(value: $vadSilenceMs, in: 150...1500, step: 50) {
+                            Text("Silence: \(vadSilenceMs)ms")
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Threshold: \(String(format: "%.0f", vadThresholdDb)) dB")
+                            Slider(value: $vadThresholdDb, in: (-60)...(-20), step: 1)
+                        }
                     }
                 }
 
-                Section(header: Text("Segmentation (VAD)")) {
-                    Toggle("VAD enabled", isOn: $vadEnabled)
-
-                    Stepper(value: $maxSegmentSeconds, in: 2...10, step: 0.5) {
-                        Text("Max segment: \(String(format: "%.1f", maxSegmentSeconds))s")
-                    }
-
-                    Stepper(value: $vadSilenceMs, in: 150...1500, step: 50) {
-                        Text("Silence: \(vadSilenceMs)ms")
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Threshold: \(String(format: "%.0f", vadThresholdDb)) dB")
-                        Slider(value: $vadThresholdDb, in: (-60)...(-20), step: 1)
+                Section {
+                    HStack {
+                        Spacer()
+                        Text("v1.0")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .onTapGesture {
+                                devTapCount += 1
+                                if devTapCount >= 5 {
+                                    showDevOptions.toggle()
+                                    devTapCount = 0
+                                }
+                            }
+                        Spacer()
                     }
                 }
             }

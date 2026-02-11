@@ -10,15 +10,16 @@ final class InterpretationViewModel: ObservableObject {
     @Published var lastError: String?
     @Published var waveformLevels: [CGFloat] = Array(repeating: 0.04, count: 40)
     @Published var recordingSeconds: Int = 0
+    @Published var localRecordings: [LocalInterpretationRecording] = []
     private var recordingTimer: Timer?
 
     var authViewModel: AuthViewModel?
 
     @AppStorage("apiBaseURL") private var userBaseURL: String = ""
     @AppStorage("vadEnabled") private var vadEnabled: Bool = true
-    @AppStorage("vadThresholdDb") private var vadThresholdDb: Double = -35.0
-    @AppStorage("vadSilenceMs") private var vadSilenceMs: Int = 400
-    @AppStorage("maxSegmentSeconds") private var maxSegmentSeconds: Double = 5.0
+    @AppStorage("vadThresholdDb") private var vadThresholdDb: Double = -40.0
+    @AppStorage("vadSilenceMs") private var vadSilenceMs: Int = 300
+    @AppStorage("maxSegmentSeconds") private var maxSegmentSeconds: Double = 4.0
 
     private let recorder = AudioSegmentRecorder()
 
@@ -26,6 +27,19 @@ final class InterpretationViewModel: ObservableObject {
     private var currentParagraphSegmentIds: [UUID] = []
     private var slowPipelineTimer: Timer?
     private static let slowFlushDelay: TimeInterval = 1.0
+    private var currentRecorderSessionID: UUID?
+    private var segmentSessionMap: [UUID: UUID] = [:]
+    private var pendingLocalArchives: [UUID: PendingLocalArchive] = [:]
+    private var pendingLocalArchiveTasks: [UUID: Task<Void, Never>] = [:]
+
+    private struct PendingLocalArchive {
+        let sessionID: UUID
+        let createdAt: Date
+        let durationSeconds: TimeInterval
+        let sourceLang: String
+        let targetLang: String
+        let audioURL: URL?
+    }
 
     var apiBaseURL: String {
         if !userBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -42,14 +56,35 @@ final class InterpretationViewModel: ObservableObject {
     }
 
     init() {
-        // Migrate: reset to current default if stored value is from old configs
+        // Migrate old defaults and guard against out-of-range values.
         if vadThresholdDb <= -50.0 || vadThresholdDb >= -20.0 {
-            vadThresholdDb = -35.0
+            vadThresholdDb = -40.0
+        } else if abs(vadThresholdDb - (-35.0)) < 0.01 {
+            vadThresholdDb = -40.0
         }
 
-        recorder.onSegmentReady = { [weak self] fileURL, seq in
+        if vadSilenceMs < 150 || vadSilenceMs > 1500 {
+            vadSilenceMs = 300
+        } else if vadSilenceMs == 400 {
+            vadSilenceMs = 300
+        }
+
+        if maxSegmentSeconds < 2.0 || maxSegmentSeconds > 10.0 {
+            maxSegmentSeconds = 4.0
+        } else if abs(maxSegmentSeconds - 5.0) < 0.01 {
+            maxSegmentSeconds = 4.0
+        }
+
+        do {
+            localRecordings = try LocalRecordingStore.loadRecordings()
+        } catch {
+            localRecordings = []
+            print("[LocalArchive] load failed: \(error)")
+        }
+
+        recorder.onSegmentReady = { [weak self] fileURL, seq, recorderSessionID in
             Task { @MainActor in
-                self?.handleSegment(fileURL: fileURL, seq: seq)
+                self?.handleSegment(fileURL: fileURL, seq: seq, recorderSessionID: recorderSessionID)
             }
         }
 
@@ -84,6 +119,7 @@ final class InterpretationViewModel: ObservableObject {
                 try await recorder.start()
                 print("🎙️ [VM] recorder started OK")
                 isRecording = true
+                currentRecorderSessionID = recorder.sessionID
                 self.recordingSeconds = 0
                 self.recordingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
                     Task { @MainActor in self?.recordingSeconds += 1 }
@@ -98,25 +134,46 @@ final class InterpretationViewModel: ObservableObject {
 
     func stop() {
         print("🎙️ [VM] stop()")
+        let stoppingSessionID = currentRecorderSessionID
+        let stoppingDuration = TimeInterval(recordingSeconds)
+        let stoppingSourceLang = sourceLang
+        let stoppingTargetLang = targetLang
+        let stoppingAt = Date()
+
         recorder.stop()
+        let completedSessionAudioURL = recorder.takeCompletedSessionAudioURL()
+
         isRecording = false
+        currentRecorderSessionID = nil
         waveformLevels = Array(repeating: 0.04, count: 40)
         recordingTimer?.invalidate()
         recordingTimer = nil
+
+        if let stoppingSessionID {
+            queueLocalArchive(
+                sessionID: stoppingSessionID,
+                createdAt: stoppingAt,
+                durationSeconds: stoppingDuration,
+                sourceLang: stoppingSourceLang,
+                targetLang: stoppingTargetLang,
+                audioURL: completedSessionAudioURL
+            )
+        }
 
         // Flush slow pipeline on stop
         flushSlowPipeline()
     }
 
     func clear() {
+        for seg in segments {
+            segmentSessionMap.removeValue(forKey: seg.id)
+        }
         segments.removeAll()
         lastError = nil
         currentParagraphSegmentIds.removeAll()
         slowPipelineTimer?.invalidate()
         slowPipelineTimer = nil
     }
-
-    private var uploadSeq: Int = 0
 
     func uploadFile(url: URL) {
         guard url.startAccessingSecurityScopedResource() else {
@@ -137,23 +194,37 @@ final class InterpretationViewModel: ObservableObject {
         url.stopAccessingSecurityScopedResource()
 
         // Upload clears previous results and slow pipeline state
+        for seg in segments {
+            segmentSessionMap.removeValue(forKey: seg.id)
+        }
         segments.removeAll()
         currentParagraphSegmentIds.removeAll()
         slowPipelineTimer?.invalidate()
         slowPipelineTimer = nil
         lastError = nil
 
-        uploadSeq += 1
-        handleSegment(fileURL: tmpURL, seq: 10000 + uploadSeq)
+        handleSegment(fileURL: tmpURL, seq: 1, recorderSessionID: nil)
     }
 
     // MARK: - Fast Pipeline
 
-    private func handleSegment(fileURL: URL, seq: Int) {
+    private func handleSegment(fileURL: URL, seq: Int, recorderSessionID: UUID?) {
         print("[Fast] handleSegment #\(seq)")
         let segment = SegmentResult(seq: seq)
         segments.append(segment)
-        currentParagraphSegmentIds.append(segment.id)
+
+        if let recorderSessionID {
+            segmentSessionMap[segment.id] = recorderSessionID
+        }
+
+        let isCurrentRecorderSession =
+            isRecording &&
+            recorderSessionID != nil &&
+            recorderSessionID == currentRecorderSessionID
+        let shouldEnterSlowPipeline = isCurrentRecorderSession
+        if shouldEnterSlowPipeline {
+            currentParagraphSegmentIds.append(segment.id)
+        }
 
         let segmentId = segment.id
         let sourceLang = self.sourceLang
@@ -163,8 +234,6 @@ final class InterpretationViewModel: ObservableObject {
         let authVM = self.authViewModel
 
         Task.detached {
-            // Don't delete file on first attempt if we may retry
-            var shouldDeleteFile = true
             do {
                 let result = try await self.callTranscribeTranslate(
                     fileURL: fileURL,
@@ -181,6 +250,11 @@ final class InterpretationViewModel: ObservableObject {
                         seg.transcription = result.transcription
                         seg.translation = result.translation
                         seg.status = .done
+                        // Non-recording uploads and tail segments after stop
+                        // have no slow pipeline pass, so fast result is final.
+                        if !shouldEnterSlowPipeline {
+                            seg.isFinal = true
+                        }
                     }
                 }
             } catch {
@@ -196,8 +270,10 @@ final class InterpretationViewModel: ObservableObject {
             try? FileManager.default.removeItem(at: fileURL)
         }
 
-        // Schedule slow pipeline flush after silence
-        scheduleSlowPipeline()
+        // Schedule slow pipeline flush only for live recording segments.
+        if shouldEnterSlowPipeline {
+            scheduleSlowPipeline()
+        }
     }
 
     /// Calls transcribeTranslate with auto-retry on 401 (token refresh).
@@ -284,6 +360,9 @@ final class InterpretationViewModel: ObservableObject {
 
                 print("[Slow] Got result: \(result.transcription.prefix(80))...")
 
+                let primaryId = entryIds[0]
+                let slowTranscription = result.transcription
+
                 await MainActor.run {
                     for (i, entryId) in entryIds.enumerated() {
                         self.updateSegment(id: entryId) { seg in
@@ -301,9 +380,54 @@ final class InterpretationViewModel: ObservableObject {
                         }
                     }
                 }
+
+                // Trigger refine pipeline for this paragraph
+                if !slowTranscription.isEmpty {
+                    await self.triggerRefine(
+                        segmentId: primaryId,
+                        text: slowTranscription,
+                        sourceLang: sourceLang,
+                        targetLang: targetLang,
+                        baseURLString: baseURLString,
+                        token: token
+                    )
+                }
             } catch {
                 print("[Slow] Error: \(error)")
             }
+        }
+    }
+
+    // MARK: - Refine Pipeline
+
+    private func triggerRefine(
+        segmentId: UUID,
+        text: String,
+        sourceLang: String,
+        targetLang: String,
+        baseURLString: String,
+        token: String?
+    ) async {
+        print("[Refine] Starting for segment, text: \(text.prefix(60))...")
+        do {
+            let client = try APIClient(baseURLString: baseURLString, accessToken: token)
+            let result = try await client.refineTranscription(
+                text: text,
+                sourceLang: sourceLang,
+                targetLang: targetLang
+            )
+            print("[Refine] Done: \(result.refined_transcription.prefix(60))...")
+
+            await MainActor.run {
+                self.updateSegment(id: segmentId) { seg in
+                    seg.transcription = result.refined_transcription
+                    seg.translation = result.translation
+                    seg.isRefined = true
+                }
+            }
+        } catch {
+            print("[Refine] Error: \(error)")
+            // Refinement failure is non-critical, keep slow pipeline result
         }
     }
 
@@ -314,5 +438,178 @@ final class InterpretationViewModel: ObservableObject {
         var seg = segments[idx]
         mutate(&seg)
         segments[idx] = seg
+    }
+
+    // MARK: - Local Archive
+
+    func deleteLocalRecording(_ recording: LocalInterpretationRecording) {
+        do {
+            try LocalRecordingStore.deleteRecording(id: recording.id)
+            localRecordings.removeAll(where: { $0.id == recording.id })
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func audioURL(for recording: LocalInterpretationRecording) -> URL? {
+        LocalRecordingStore.audioURL(for: recording)
+    }
+
+    private func queueLocalArchive(
+        sessionID: UUID,
+        createdAt: Date,
+        durationSeconds: TimeInterval,
+        sourceLang: String,
+        targetLang: String,
+        audioURL: URL?
+    ) {
+        let pending = PendingLocalArchive(
+            sessionID: sessionID,
+            createdAt: createdAt,
+            durationSeconds: durationSeconds,
+            sourceLang: sourceLang,
+            targetLang: targetLang,
+            audioURL: audioURL
+        )
+        pendingLocalArchives[sessionID] = pending
+
+        pendingLocalArchiveTasks[sessionID]?.cancel()
+        pendingLocalArchiveTasks[sessionID] = Task { [weak self] in
+            await self?.waitAndFinalizeLocalArchive(sessionID: sessionID)
+        }
+    }
+
+    private func waitAndFinalizeLocalArchive(sessionID: UUID) async {
+        // Wait up to 60s for async fast/slow pipeline to settle for this session.
+        for _ in 0..<120 {
+            if Task.isCancelled { return }
+
+            let hasPending = segments.contains { seg in
+                guard segmentSessionMap[seg.id] == sessionID else { return false }
+                return seg.status != .done && seg.status != .error
+            }
+            if !hasPending {
+                break
+            }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+
+        finalizeLocalArchive(sessionID: sessionID)
+    }
+
+    private func finalizeLocalArchive(sessionID: UUID) {
+        pendingLocalArchiveTasks[sessionID] = nil
+        guard let pending = pendingLocalArchives.removeValue(forKey: sessionID) else { return }
+
+        let sessionSegments = segments.filter { seg in
+            segmentSessionMap[seg.id] == sessionID
+        }
+
+        let transcription = sessionSegments
+            .map { $0.transcription.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        let translation = sessionSegments
+            .map { $0.translation.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        if transcription.isEmpty, translation.isEmpty, pending.audioURL == nil {
+            return
+        }
+
+        let title = localRecordingTitle(
+            transcription: transcription,
+            translation: translation
+        )
+
+        let createdAt = pending.createdAt
+        let durationSeconds = pending.durationSeconds
+        let sourceLang = pending.sourceLang
+        let targetLang = pending.targetLang
+        let audioURL = pending.audioURL
+
+        Task { [weak self] in
+            do {
+                let saved = try await Task.detached(priority: .utility) {
+                    try LocalRecordingStore.addRecording(
+                        createdAt: createdAt,
+                        title: title,
+                        durationSeconds: durationSeconds,
+                        sourceLang: sourceLang,
+                        targetLang: targetLang,
+                        transcription: transcription,
+                        translation: translation,
+                        audioTempURL: audioURL
+                    )
+                }.value
+                guard let self else { return }
+                self.localRecordings.insert(saved, at: 0)
+            } catch {
+                if let audioURL {
+                    try? FileManager.default.removeItem(at: audioURL)
+                }
+                guard let self else { return }
+                self.lastError = error.localizedDescription
+            }
+        }
+    }
+
+    private func localRecordingTitle(
+        transcription: String,
+        translation: String
+    ) -> String {
+        let preferred = !translation.isEmpty ? translation : transcription
+        let normalized = normalizeTitleSource(preferred)
+        let base = firstPhraseTitle(from: normalized) ?? "新录音"
+        return uniquedLocalRecordingTitle(base)
+    }
+
+    private func normalizeTitleSource(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\n", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func firstPhraseTitle(from text: String) -> String? {
+        guard !text.isEmpty else { return nil }
+
+        let splitSet = CharacterSet(charactersIn: "。！？!?；;：:\u{2026}")
+        let rawPhrase = text.components(separatedBy: splitSet).first ?? text
+        let trimmed = rawPhrase.trimmingCharacters(
+            in: CharacterSet(charactersIn: " \t\r\n\"'“”‘’()[]{}<>，,、.。！？!?;:：-—_")
+        )
+        guard !trimmed.isEmpty else { return nil }
+
+        let hasCJK = trimmed.unicodeScalars.contains(where: { scalar in
+            (0x4E00...0x9FFF).contains(scalar.value)
+        })
+        let maxLength = hasCJK ? 14 : 24
+        var candidate = String(trimmed.prefix(maxLength))
+
+        // Prefer whole words for Latin scripts when truncating.
+        if !hasCJK, trimmed.count > maxLength, let cut = candidate.lastIndex(of: " "), cut > candidate.startIndex {
+            candidate = String(candidate[..<cut])
+        }
+
+        let validChars = candidate.unicodeScalars.filter { scalar in
+            CharacterSet.alphanumerics.contains(scalar) || (0x4E00...0x9FFF).contains(scalar.value)
+        }
+        guard validChars.count >= 2 else { return nil }
+        return candidate
+    }
+
+    private func uniquedLocalRecordingTitle(_ base: String) -> String {
+        let existing = Set(localRecordings.map(\.title))
+        guard existing.contains(base) else { return base }
+
+        var index = 2
+        while existing.contains("\(base) \(index)") {
+            index += 1
+        }
+        return "\(base) \(index)"
     }
 }

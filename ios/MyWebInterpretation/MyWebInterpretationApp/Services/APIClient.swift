@@ -80,6 +80,47 @@ struct APIClient: Sendable {
         return try JSONDecoder().decode(TranscribeTranslateResponse.self, from: data)
     }
 
+    func refineTranscription(
+        text: String,
+        sourceLang: String,
+        targetLang: String
+    ) async throws -> RefineResponse {
+        let baseStr = baseURL.absoluteString
+        let urlStr = baseStr.hasSuffix("/") ? "\(baseStr)api/interpretation/refine/" : "\(baseStr)/api/interpretation/refine/"
+        guard let endpoint = URL(string: urlStr) else {
+            throw APIError.invalidBaseURL(baseStr)
+        }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let body: [String: String] = [
+            "text": text,
+            "source_lang": sourceLang,
+            "target_lang": targetLang,
+        ]
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.unexpectedResponse
+        }
+        if http.statusCode == 401 {
+            throw APIError.unauthorized
+        }
+        if http.statusCode >= 400 {
+            print("[API] refine HTTP \(http.statusCode), body: \(String(data: data, encoding: .utf8) ?? "")")
+            throw APIError.httpError(http.statusCode)
+        }
+
+        return try JSONDecoder().decode(RefineResponse.self, from: data)
+    }
+
     func health() async throws -> HealthResponse {
         let endpoint = baseURL
             .appendingPathComponent("api")

@@ -332,6 +332,78 @@ def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str,
     }
 
 
+def refine_and_translate(text: str, source_lang: str, target_lang: str):
+    """
+    Refine transcription with Cerebras LLM (light fixes only), then translate.
+
+    Returns dict: { refined_transcription, translation, source_lang, target_lang }
+    """
+    if not text or not text.strip():
+        return {
+            "refined_transcription": "",
+            "translation": "",
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+        }
+
+    refined = _cerebras_refine(text, source_lang)
+    translated = _cerebras_translate(refined, source_lang, target_lang)
+    logger.info("Refine+translate done: %d→%d chars transcription, %d chars translation",
+                len(text), len(refined), len(translated))
+
+    return {
+        "refined_transcription": refined,
+        "translation": translated,
+        "source_lang": source_lang,
+        "target_lang": target_lang,
+    }
+
+
+def _cerebras_refine(text: str, source_lang: str) -> str:
+    """Use Cerebras to lightly fix ASR transcription errors."""
+    key = _get_cerebras_key()
+    if not key:
+        raise RuntimeError("CEREBRAS_API_KEY_POOL not configured")
+
+    src_name = _LANG_NAMES.get(source_lang.lower(), source_lang)
+    system_msg = (
+        f"/no_think\nYou are an ASR post-processor. The following text is a speech-to-text "
+        f"transcription in {src_name}. It may contain minor errors from the ASR system.\n"
+        f"Fix ONLY obvious errors:\n"
+        f"- Misheard words (e.g. homophones)\n"
+        f"- Missing or wrong punctuation\n"
+        f"- Broken words or fragments\n"
+        f"Do NOT paraphrase, summarize, or change the meaning. "
+        f"Keep the original wording as much as possible. "
+        f"Output ONLY the corrected {src_name} text, nothing else."
+    )
+    payload = json.dumps({
+        "model": "qwen-3-32b",
+        "messages": [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": text},
+        ],
+        "max_tokens": 4096,
+        "temperature": 0.1,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.cerebras.ai/v1/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    result = (data["choices"][0]["message"].get("content") or "").strip()
+    result = re.sub(r'<think>[\s\S]*?</think>\s*', '', result).strip()
+    return result
+
+
 def transcribe_and_translate_stream(file_path: str, source_lang: str, target_lang: str):
     """
     Streaming pipeline: yield NDJSON lines — transcription first, then translation.

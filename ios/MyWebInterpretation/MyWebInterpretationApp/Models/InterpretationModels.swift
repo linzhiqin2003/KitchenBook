@@ -24,6 +24,7 @@ struct SegmentResult: Identifiable, Sendable {
     var status: Status
     var errorMessage: String?
     var isFinal: Bool
+    var isRefined: Bool
 
     init(seq: Int) {
         self.id = UUID()
@@ -34,6 +35,7 @@ struct SegmentResult: Identifiable, Sendable {
         self.status = .uploading
         self.errorMessage = nil
         self.isFinal = false
+        self.isRefined = false
     }
 }
 
@@ -145,6 +147,11 @@ struct RegisterRequest: Encodable {
 struct LoginRequest: Encodable {
     let username: String
     let password: String
+}
+
+struct RefineResponse: Decodable, Sendable {
+    let refined_transcription: String
+    let translation: String
 }
 
 struct APIErrorResponse: Decodable {
