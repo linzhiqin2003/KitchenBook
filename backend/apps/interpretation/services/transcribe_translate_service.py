@@ -209,11 +209,20 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
     return text
 
 
-_GROQ_WHISPER_MODELS = ["whisper-large-v3", "whisper-large-v3-turbo"]
+_GROQ_WHISPER_PRIMARY = "whisper-large-v3"
+_GROQ_WHISPER_FALLBACK = "whisper-large-v3-turbo"
+_GROQ_COOLDOWN_SECS = 60  # cooldown before retrying rate-limited model
+
+# {model: monotonic timestamp when cooldown expires}
+_groq_cooldown_until: dict[str, float] = {}
 
 
 def _groq_transcribe(file_path: str) -> str:
-    """Transcribe audio using Groq Whisper with automatic model fallback on rate limit."""
+    """Transcribe audio using Groq Whisper with rate-limit-aware model selection.
+
+    Strategy: prefer whisper-large-v3, but if rate-limited, remember for 60s
+    and go straight to whisper-large-v3-turbo. After cooldown, retry v3.
+    """
     if not Groq:
         raise ImportError("groq package not installed")
 
@@ -227,8 +236,18 @@ def _groq_transcribe(file_path: str) -> str:
     file_data = open(file_path, "rb").read()
     filename = os.path.basename(file_path)
 
+    now = time.monotonic()
+    # Build model order: skip models still in cooldown
+    models = []
+    for m in [_GROQ_WHISPER_PRIMARY, _GROQ_WHISPER_FALLBACK]:
+        if now >= _groq_cooldown_until.get(m, 0):
+            models.append(m)
+    # If all in cooldown, try fallback anyway (cooldown is approximate)
+    if not models:
+        models = [_GROQ_WHISPER_FALLBACK]
+
     last_err = None
-    for model in _GROQ_WHISPER_MODELS:
+    for model in models:
         try:
             transcription = client.audio.transcriptions.create(
                 file=(filename, file_data),
@@ -240,9 +259,10 @@ def _groq_transcribe(file_path: str) -> str:
             logger.info("Groq transcription done (model=%s, %d chars)", model, len(text))
             return text
         except Exception as e:
-            is_rate_limit = GroqRateLimitError and isinstance(e, GroqRateLimitError)
-            if is_rate_limit:
-                logger.warning("Groq %s rate-limited, trying next model: %s", model, e)
+            if GroqRateLimitError and isinstance(e, GroqRateLimitError):
+                _groq_cooldown_until[model] = time.monotonic() + _GROQ_COOLDOWN_SECS
+                logger.warning("Groq %s rate-limited, cooldown %ds: %s",
+                               model, _GROQ_COOLDOWN_SECS, e)
                 last_err = e
                 continue
             raise
