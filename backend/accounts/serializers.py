@@ -4,29 +4,9 @@ from .models import UserProfile, Organization, OrganizationMember, InviteLink
 
 
 def _validate_groq_key(api_key: str):
-    """Validate Groq API key format and test against Groq API."""
+    """Validate Groq API key format (prefix check only; live validation is done client-side)."""
     if not api_key.startswith("gsk_"):
         raise serializers.ValidationError("Groq API Key should start with gsk_")
-
-    import urllib.request
-    import json
-    req = urllib.request.Request(
-        "https://api.groq.com/openai/v1/models",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            if resp.status != 200:
-                raise serializers.ValidationError("Invalid Groq API Key")
-    except urllib.error.HTTPError as e:
-        if e.code == 401:
-            raise serializers.ValidationError("Invalid Groq API Key (authentication failed)")
-        raise serializers.ValidationError(f"Groq API error: HTTP {e.code}")
-    except Exception:
-        raise serializers.ValidationError("Could not verify Groq API Key (network error)")
 
 
 class RegisterSerializer(serializers.Serializer):
