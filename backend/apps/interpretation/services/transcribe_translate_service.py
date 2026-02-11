@@ -14,11 +14,14 @@ import urllib.error
 
 from django.conf import settings as django_settings
 
+import tempfile
+
 try:
-    from groq import Groq, RateLimitError as GroqRateLimitError
+    from groq import Groq, RateLimitError as GroqRateLimitError, BadRequestError as GroqBadRequestError
 except ImportError:
     Groq = None
     GroqRateLimitError = None
+    GroqBadRequestError = None
 
 logger = logging.getLogger(__name__)
 
@@ -213,8 +216,35 @@ _GROQ_WHISPER_PRIMARY = "whisper-large-v3"
 _GROQ_WHISPER_FALLBACK = "whisper-large-v3-turbo"
 _GROQ_COOLDOWN_SECS = 60  # cooldown before retrying rate-limited model
 
-# {model: monotonic timestamp when cooldown expires}
-_groq_cooldown_until: dict[str, float] = {}
+# Cross-worker cooldown via shared temp files
+_GROQ_COOLDOWN_DIR = os.path.join(tempfile.gettempdir(), "groq_cooldown")
+
+
+class GroqAllRateLimitedError(Exception):
+    """Both Groq Whisper models are rate-limited."""
+    pass
+
+
+def _get_cooldown_expiry(model: str) -> float:
+    """Read cooldown expiry timestamp from shared file (0 if not set/expired)."""
+    try:
+        path = os.path.join(_GROQ_COOLDOWN_DIR, model.replace("/", "_"))
+        if os.path.exists(path):
+            return float(open(path).read().strip())
+    except (ValueError, OSError):
+        pass
+    return 0
+
+
+def _set_cooldown(model: str) -> None:
+    """Write cooldown expiry timestamp to shared file."""
+    try:
+        os.makedirs(_GROQ_COOLDOWN_DIR, exist_ok=True)
+        path = os.path.join(_GROQ_COOLDOWN_DIR, model.replace("/", "_"))
+        with open(path, "w") as f:
+            f.write(str(time.time() + _GROQ_COOLDOWN_SECS))
+    except OSError:
+        pass
 
 
 def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
@@ -222,6 +252,7 @@ def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
 
     Strategy: prefer whisper-large-v3, but if rate-limited, remember for 60s
     and go straight to whisper-large-v3-turbo. After cooldown, retry v3.
+    Cooldown is shared across gunicorn workers via temp files.
     """
     if not Groq:
         raise ImportError("groq package not installed")
@@ -239,11 +270,11 @@ def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
     file_data = open(file_path, "rb").read()
     filename = os.path.basename(file_path)
 
-    now = time.monotonic()
+    now = time.time()
     # Build model order: skip models still in cooldown
     models = []
     for m in [_GROQ_WHISPER_PRIMARY, _GROQ_WHISPER_FALLBACK]:
-        if now >= _groq_cooldown_until.get(m, 0):
+        if now >= _get_cooldown_expiry(m):
             models.append(m)
     # If all in cooldown, try fallback anyway (cooldown is approximate)
     if not models:
@@ -262,15 +293,19 @@ def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
             logger.info("Groq transcription done (model=%s, %d chars)", model, len(text))
             return text
         except Exception as e:
+            # Audio too short or other bad request → return empty
+            if GroqBadRequestError and isinstance(e, GroqBadRequestError):
+                logger.warning("Groq %s bad request (audio too short?): %s", model, e)
+                return ""
             if GroqRateLimitError and isinstance(e, GroqRateLimitError):
-                _groq_cooldown_until[model] = time.monotonic() + _GROQ_COOLDOWN_SECS
+                _set_cooldown(model)
                 logger.warning("Groq %s rate-limited, cooldown %ds: %s",
                                model, _GROQ_COOLDOWN_SECS, e)
                 last_err = e
                 continue
             raise
 
-    raise last_err
+    raise GroqAllRateLimitedError(f"All Groq models rate-limited, retry in {_GROQ_COOLDOWN_SECS}s")
 
 
 def _transcribe(file_path: str, source_lang: str = "", groq_api_key: str | None = None) -> tuple:

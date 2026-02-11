@@ -302,6 +302,13 @@ def transcribe_translate(request):
         return Response(result)
 
     except Exception as e:
+        from apps.interpretation.services.transcribe_translate_service import GroqAllRateLimitedError
+        if isinstance(e, GroqAllRateLimitedError):
+            logger.warning("transcribe_translate rate-limited: %s", e)
+            return Response(
+                {'error': 'Rate limited, please slow down', 'retry_after': 5},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
         logger.error(f"transcribe_translate error: {e}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     finally:
