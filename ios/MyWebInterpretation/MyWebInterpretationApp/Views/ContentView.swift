@@ -1459,35 +1459,16 @@ struct SettingsView: View {
                         HStack {
                             Text("Groq API Key")
                             Spacer()
-                            Text(user.has_groq_key == true ? "Configured" : "Not set")
-                                .foregroundStyle(user.has_groq_key == true ? .green : .red)
+                            if groqKeyInput.isEmpty {
+                                Text(user.has_groq_key == true ? "Configured" : "Not set")
+                                    .foregroundStyle(user.has_groq_key == true ? .green : .red)
+                            }
                         }
 
                         TextField("gsk_...", text: $groqKeyInput)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                             .font(.footnote)
-
-                        Button {
-                            isSavingKey = true
-                            groqKeyMessage = nil
-                            Task {
-                                let result = await authVM.updateGroqKey(groqKeyInput)
-                                groqKeyMessage = result
-                                if result.contains("success") || result.contains("成功") {
-                                    groqKeyInput = ""
-                                }
-                                isSavingKey = false
-                            }
-                        } label: {
-                            HStack {
-                                if isSavingKey {
-                                    ProgressView().scaleEffect(0.8)
-                                }
-                                Text(isSavingKey ? "Saving..." : "Update Groq Key")
-                            }
-                        }
-                        .disabled(groqKeyInput.isEmpty || isSavingKey)
 
                         if let msg = groqKeyMessage {
                             Text(msg)
@@ -1583,7 +1564,24 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    if isSavingKey {
+                        ProgressView().scaleEffect(0.8)
+                    } else if !groqKeyInput.isEmpty {
+                        Button("Update") {
+                            isSavingKey = true
+                            groqKeyMessage = nil
+                            Task {
+                                let result = await authVM.updateGroqKey(groqKeyInput)
+                                groqKeyMessage = result
+                                if result.contains("success") || result.contains("成功") {
+                                    groqKeyInput = ""
+                                }
+                                isSavingKey = false
+                            }
+                        }
+                    } else {
+                        Button("Done") { dismiss() }
+                    }
                 }
             }
             .sheet(isPresented: $showingCreditStore) {

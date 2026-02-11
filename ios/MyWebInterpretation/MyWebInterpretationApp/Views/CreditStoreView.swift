@@ -101,7 +101,8 @@ struct CreditStoreView: View {
                 Task {
                     purchaseMessage = nil
                     let success = await store.purchase(product)
-                    if success {
+                    if success && purchaseMessage == nil {
+                        // Fallback: onPurchaseVerified should have set the message
                         purchaseMessage = "Purchase successful!"
                         isPurchaseSuccess = true
                     }
@@ -128,13 +129,18 @@ struct CreditStoreView: View {
 
     private func configurePurchaseCallback() {
         store.onPurchaseVerified = { jwsRepresentation in
+            print("[CreditStore] onPurchaseVerified called, JWS length=\(jwsRepresentation.count)")
+
             guard let token = KeychainService.load(.accessToken) else {
+                print("[CreditStore] No access token in keychain")
                 await MainActor.run {
-                    purchaseMessage = "Not logged in, credits will be added after login"
+                    purchaseMessage = "Not logged in, please login first"
                     isPurchaseSuccess = false
                 }
                 return
             }
+
+            print("[CreditStore] Token found, verifying with backend: \(baseURLString)")
 
             do {
                 let service = try CreditService(
@@ -142,6 +148,7 @@ struct CreditStoreView: View {
                     accessToken: token
                 )
                 let response = try await service.verifyPurchase(jwsTransaction: jwsRepresentation)
+                print("[CreditStore] Backend response: status=\(response.status) balance=\(response.balance_seconds ?? -1) added=\(response.credits_added ?? -1)")
                 await MainActor.run {
                     if let balance = response.balance_seconds {
                         vm.creditBalance = balance
@@ -160,6 +167,7 @@ struct CreditStoreView: View {
                     }
                 }
             } catch {
+                print("[CreditStore] Verification error: \(error)")
                 await MainActor.run {
                     purchaseMessage = "Verification failed: \(error.localizedDescription)"
                     isPurchaseSuccess = false
