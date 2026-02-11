@@ -18,7 +18,7 @@ from django.conf import settings as django_settings
 from rest_framework.decorators import parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from .services.file_asr_service import FileASRService
-from .services.transcribe_translate_service import transcribe_and_translate, transcribe_and_translate_stream, generate_minutes_stream, refine_and_translate
+from .services.transcribe_translate_service import transcribe_and_translate, transcribe_and_translate_stream, generate_minutes_stream, refine_and_translate, refine_text
 
 logger = logging.getLogger(__name__)
 
@@ -405,6 +405,26 @@ def refine_transcription(request):
         return Response(result)
     except Exception as e:
         logger.error(f"refine_transcription error: {e}", exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def refine_text_view(request):
+    """
+    POST /api/interpretation/refine-text/
+      - text: text to refine
+      - lang: language code (e.g. 'en', 'zh')
+    Returns: { refined_text }
+    """
+    text = request.data.get('text', '').strip()
+    lang = request.data.get('lang', 'en').strip()
+    if not text:
+        return Response({'error': 'No text provided'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        refined = refine_text(text, lang)
+        return Response({'refined_text': refined})
+    except Exception as e:
+        logger.error(f"refine_text error: {e}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

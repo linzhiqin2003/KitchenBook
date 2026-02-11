@@ -451,7 +451,7 @@ def refine_and_translate(text: str, source_lang: str, target_lang: str):
     }
 
 
-def _cerebras_refine(text: str, source_lang: str) -> str:
+def _cerebras_refine(text: str, source_lang: str, max_tokens: int = 8192) -> str:
     """Use Cerebras to lightly fix ASR transcription errors."""
     key = _get_cerebras_key()
     if not key:
@@ -475,7 +475,7 @@ def _cerebras_refine(text: str, source_lang: str) -> str:
             {"role": "system", "content": system_msg},
             {"role": "user", "content": text},
         ],
-        "max_tokens": 4096,
+        "max_tokens": max_tokens,
         "temperature": 0.1,
     }).encode("utf-8")
 
@@ -489,11 +489,18 @@ def _cerebras_refine(text: str, source_lang: str) -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     result = (data["choices"][0]["message"].get("content") or "").strip()
     result = re.sub(r'<think>[\s\S]*?</think>\s*', '', result).strip()
     return result
+
+
+def refine_text(text: str, lang: str) -> str:
+    """Public API: refine a single text chunk. Returns refined text."""
+    if not text or not text.strip():
+        return ""
+    return _cerebras_refine(text, lang)
 
 
 def generate_title(text: str) -> str:
