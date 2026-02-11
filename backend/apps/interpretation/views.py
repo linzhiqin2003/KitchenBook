@@ -278,7 +278,7 @@ def transcribe_translate(request):
                     user_groq_key = profile.groq_api_key
                 else:
                     return Response(
-                        {'error': 'No Groq API Key configured. Please update in settings.'},
+                        {'error': 'No API Key configured. Please update in settings.'},
                         status=status.HTTP_403_FORBIDDEN,
                     )
     except Exception:
@@ -396,6 +396,25 @@ def refine_transcription(request):
         return Response(result)
     except Exception as e:
         logger.error(f"refine_transcription error: {e}", exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def gen_title(request):
+    """
+    POST /api/interpretation/generate-title/
+      - text: transcription or translation text
+    Returns: { title }
+    """
+    text = request.data.get('text', '').strip()
+    if not text:
+        return Response({'error': 'No text provided'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        from .services.transcribe_translate_service import generate_title
+        title = generate_title(text)
+        return Response({'title': title})
+    except Exception as e:
+        logger.error(f"gen_title error: {e}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

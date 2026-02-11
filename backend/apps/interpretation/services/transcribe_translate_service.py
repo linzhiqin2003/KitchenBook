@@ -62,7 +62,13 @@ _LANG_NAMES = {
     'tr': 'Turkish', 'hi': 'Hindi', 'nl': 'Dutch', 'pl': 'Polish',
     'sv': 'Swedish', 'da': 'Danish', 'fi': 'Finnish', 'cs': 'Czech',
     'el': 'Greek', 'hu': 'Hungarian', 'ro': 'Romanian', 'fa': 'Persian',
-    'fil': 'Filipino', 'mk': 'Macedonian',
+    'tl': 'Filipino', 'fil': 'Filipino', 'mk': 'Macedonian',
+}
+
+# Whisper uses ISO 639-1 codes; Qwen3-ASR uses some ISO 639-2 codes.
+# Map Whisper codes → Qwen3 codes where they differ.
+_WHISPER_TO_QWEN3_LANG = {
+    'tl': 'fil',
 }
 
 
@@ -174,8 +180,9 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
         f'Content-Disposition: form-data; name="response_format"\r\n\r\n'
         f"json\r\n"
     )
-    # language field (optional)
+    # language field (optional) — map Whisper codes to Qwen3 codes
     lang_code = source_lang.lower() if source_lang else ""
+    lang_code = _WHISPER_TO_QWEN3_LANG.get(lang_code, lang_code)
     if lang_code and lang_code in _QWEN3_ASR_LANGS:
         logger.info("Qwen3-ASR language set to: %s (from source_lang=%s)", lang_code, source_lang)
         parts.append(
@@ -230,7 +237,7 @@ class GroqAllRateLimitedError(Exception):
     pass
 
 
-def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
+def _groq_transcribe(file_path: str, groq_api_key: str | None = None, source_lang: str = "") -> str:
     """Transcribe audio using Groq Whisper with key-pool rotation.
 
     Strategy: iterate over all available keys (user's key first), and for
@@ -253,6 +260,11 @@ def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
     filename = os.path.basename(file_path)
     models = [_GROQ_WHISPER_PRIMARY, _GROQ_WHISPER_FALLBACK]
 
+    # Build optional kwargs for Whisper language hint
+    extra_kwargs = {}
+    if source_lang:
+        extra_kwargs["language"] = source_lang
+
     for key in keys:
         client = Groq(api_key=key)
         for model in models:
@@ -262,6 +274,7 @@ def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
                     model=model,
                     response_format="json",
                     temperature=0.0,
+                    **extra_kwargs,
                 )
                 text = transcription.text.strip()
                 logger.info("Groq transcription done (model=%s, key=%s…%s, %d chars)",
@@ -362,7 +375,7 @@ def _transcribe(file_path: str, source_lang: str = "", groq_api_key: str | None 
 
     # Groq Whisper (default or fallback)
     t1 = time.monotonic()
-    text = _groq_transcribe(file_path, groq_api_key=groq_api_key)
+    text = _groq_transcribe(file_path, groq_api_key=groq_api_key, source_lang=source_lang)
     logger.info("[TIMING] Groq Whisper took %.2fs (provider=%s)", time.monotonic() - t1, provider)
     return text, "Groq Whisper"
 
@@ -481,6 +494,47 @@ def _cerebras_refine(text: str, source_lang: str) -> str:
     result = (data["choices"][0]["message"].get("content") or "").strip()
     result = re.sub(r'<think>[\s\S]*?</think>\s*', '', result).strip()
     return result
+
+
+def generate_title(text: str) -> str:
+    """Use Cerebras to generate a very short title from transcription/translation text."""
+    key = _get_cerebras_key()
+    if not key:
+        raise RuntimeError("CEREBRAS_API_KEY_POOL not configured")
+
+    snippet = text[:500]
+    system_msg = (
+        "/no_think\nGenerate a very short title (max 6 words) for the following text. "
+        "If the text is in Chinese, output a Chinese title (max 8 characters). "
+        "Output ONLY the title, nothing else. No quotes, no punctuation at the end."
+    )
+    payload = json.dumps({
+        "model": "qwen-3-32b",
+        "messages": [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": snippet},
+        ],
+        "max_tokens": 64,
+        "temperature": 0.3,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.cerebras.ai/v1/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    result = (data["choices"][0]["message"].get("content") or "").strip()
+    result = re.sub(r'<think>[\s\S]*?</think>\s*', '', result).strip()
+    # Strip surrounding quotes
+    result = result.strip('"\'""''')
+    return result or "新录音"
 
 
 def transcribe_and_translate_stream(file_path: str, source_lang: str, target_lang: str):

@@ -18,4 +18,5 @@ urlpatterns = [
     path('refine/', views.refine_transcription, name='refine_transcription'),
     path('transcribe-translate-stream/', views.transcribe_translate_stream, name='transcribe_translate_stream'),
     path('meeting-minutes/', views.generate_meeting_minutes, name='generate_meeting_minutes'),
+    path('generate-title/', views.gen_title, name='gen_title'),
 ]
