@@ -276,11 +276,7 @@ def transcribe_translate(request):
                 profile = getattr(authenticated_user, 'profile', None)
                 if profile and profile.groq_api_key:
                     user_groq_key = profile.groq_api_key
-                else:
-                    return Response(
-                        {'error': 'No API Key configured. Please update in settings.'},
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
+                # If no user key, fall through to server key
     except Exception:
         # No JWT or invalid JWT → fall through to server key
         pass
