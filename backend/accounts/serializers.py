@@ -47,7 +47,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     avatar_display = serializers.SerializerMethodField()
     groq_api_key = serializers.CharField(
-        max_length=256, required=False, write_only=True
+        max_length=256, required=False, allow_blank=True
     )
     has_groq_key = serializers.SerializerMethodField()
 
