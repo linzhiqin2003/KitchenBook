@@ -7,6 +7,7 @@ Transcribe + Translate pipeline:
 import json
 import logging
 import os
+import random
 import re
 import time
 import urllib.request
@@ -17,13 +18,19 @@ from django.conf import settings as django_settings
 import tempfile
 
 try:
-    from groq import Groq, RateLimitError as GroqRateLimitError, BadRequestError as GroqBadRequestError
+    from groq import Groq, RateLimitError as GroqRateLimitError, BadRequestError as GroqBadRequestError, AuthenticationError as GroqAuthenticationError
 except ImportError:
     Groq = None
     GroqRateLimitError = None
     GroqBadRequestError = None
+    GroqAuthenticationError = None
 
 logger = logging.getLogger(__name__)
+
+
+class GroqKeyInvalidError(Exception):
+    """Raised when a user's Groq API key is rejected (401/403)."""
+    pass
 
 # ── Source language code mapping for Qwen3-ASR ──
 # Qwen3-ASR supports: zh, en, yue, ar, de, fr, es, pt, id, it, ko, ru, th, vi, ja, tr, hi, ms, nl, sv, da, fi, pl, cs, fil, fa, el, hu, mk, ro
@@ -216,6 +223,47 @@ _GROQ_WHISPER_PRIMARY = "whisper-large-v3"
 _GROQ_WHISPER_FALLBACK = "whisper-large-v3-turbo"
 _GROQ_COOLDOWN_SECS = 60  # cooldown before retrying rate-limited model
 
+# ── Groq key pool: auto-built from registered users' keys ──
+_groq_pool_cache: list[str] = []
+_groq_pool_cache_time: float = 0
+_GROQ_POOL_CACHE_TTL = 300  # refresh from DB every 5 min
+
+
+def _get_groq_key():
+    """Get Groq API key from server settings (for unauthenticated requests)."""
+    return getattr(django_settings, 'GROQ_API_KEY', '') or os.environ.get("GROQ_API_KEY", "") or None
+
+
+def get_fallback_groq_keys(exclude_key: str | None = None) -> list[str]:
+    """Build shuffled Groq key pool from all registered users + server key.
+
+    Cached for 5 min to avoid hammering the DB. Excludes the given key
+    (the one that just got 429'd).
+    """
+    global _groq_pool_cache, _groq_pool_cache_time
+    now = time.time()
+    if now - _groq_pool_cache_time > _GROQ_POOL_CACHE_TTL:
+        keys = set()
+        # Server-owned key (if configured)
+        server_key = getattr(django_settings, 'GROQ_API_KEY', '')
+        if server_key:
+            keys.add(server_key)
+        # All registered users' keys
+        try:
+            from accounts.models import UserProfile
+            keys.update(
+                UserProfile.objects.exclude(groq_api_key='')
+                .values_list('groq_api_key', flat=True)
+            )
+        except Exception:
+            pass
+        _groq_pool_cache = list(keys)
+        _groq_pool_cache_time = now
+
+    result = [k for k in _groq_pool_cache if k != exclude_key]
+    random.shuffle(result)
+    return result
+
 # Cross-worker cooldown via shared temp files
 _GROQ_COOLDOWN_DIR = os.path.join(tempfile.gettempdir(), "groq_cooldown")
 
@@ -260,9 +308,7 @@ def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
     if groq_api_key:
         groq_key = groq_api_key
     else:
-        from common.config import get_settings
-        api_settings = get_settings()
-        groq_key = api_settings.api.groq_api_key or os.environ.get("GROQ_API_KEY", "")
+        groq_key = _get_groq_key()
     if not groq_key:
         raise RuntimeError("GROQ_API_KEY not configured")
 
@@ -293,6 +339,10 @@ def _groq_transcribe(file_path: str, groq_api_key: str | None = None) -> str:
             logger.info("Groq transcription done (model=%s, %d chars)", model, len(text))
             return text
         except Exception as e:
+            # Auth error (401) → key is invalid/revoked
+            if GroqAuthenticationError and isinstance(e, GroqAuthenticationError):
+                logger.warning("Groq authentication failed (key invalid): %s", e)
+                raise GroqKeyInvalidError("Groq API key is invalid or revoked")
             # Audio too short or other bad request → return empty
             if GroqBadRequestError and isinstance(e, GroqBadRequestError):
                 logger.warning("Groq %s bad request (audio too short?): %s", model, e)

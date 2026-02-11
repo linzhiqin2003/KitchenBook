@@ -132,7 +132,7 @@ struct UserProfileResponse: Decodable {
     let id: Int
     let email: String
     let nickname: String?
-    let has_groq_key: Bool?
+    var has_groq_key: Bool?
 }
 
 struct TokenRefreshResponse: Decodable {

@@ -323,11 +323,47 @@ def transcribe_translate(request):
                     status=status.HTTP_402_PAYMENT_REQUIRED,
                 )
 
-        result = transcribe_and_translate(
-            str(file_path), source_lang, target_lang,
-            groq_api_key=user_groq_key,
-            asr_tier=asr_tier,
+        from apps.interpretation.services.transcribe_translate_service import (
+            GroqAllRateLimitedError, GroqKeyInvalidError, get_fallback_groq_keys,
         )
+
+        # Transcribe with user's key; on 429, try other users' keys from pool
+        try:
+            result = transcribe_and_translate(
+                str(file_path), source_lang, target_lang,
+                groq_api_key=user_groq_key,
+                asr_tier=asr_tier,
+            )
+        except GroqKeyInvalidError:
+            if authenticated_user and user_groq_key:
+                # Revoke the invalid key from user's profile
+                profile = getattr(authenticated_user, 'profile', None)
+                if profile:
+                    profile.groq_api_key = ""
+                    profile.save(update_fields=["groq_api_key"])
+                    logger.warning("Revoked invalid Groq key for user=%s", authenticated_user.pk)
+            return Response(
+                {'error': 'Your Groq API Key is invalid or revoked. Please update it in Settings.', 'key_revoked': True},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        except GroqAllRateLimitedError:
+            if not user_groq_key:
+                raise
+            fallback_keys = get_fallback_groq_keys(exclude_key=user_groq_key)
+            logger.info("User Groq key rate-limited, trying %d pool keys", len(fallback_keys))
+            result = None
+            for fk in fallback_keys[:3]:
+                try:
+                    result = transcribe_and_translate(
+                        str(file_path), source_lang, target_lang,
+                        groq_api_key=fk,
+                        asr_tier=asr_tier,
+                    )
+                    break
+                except GroqAllRateLimitedError:
+                    continue
+            if result is None:
+                raise
 
         # Premium tier: deduct credits after successful ASR
         if asr_tier == 'premium':
@@ -341,9 +377,9 @@ def transcribe_translate(request):
         return Response(result)
 
     except Exception as e:
-        from apps.interpretation.services.transcribe_translate_service import GroqAllRateLimitedError
-        if isinstance(e, GroqAllRateLimitedError):
-            logger.warning("transcribe_translate rate-limited: %s", e)
+        from apps.interpretation.services.transcribe_translate_service import GroqAllRateLimitedError as _RLE
+        if isinstance(e, _RLE):
+            logger.warning("transcribe_translate rate-limited (all keys exhausted): %s", e)
             return Response(
                 {'error': 'Rate limited, please slow down', 'retry_after': 5},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,

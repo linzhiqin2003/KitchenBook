@@ -257,7 +257,10 @@ final class InterpretationViewModel: ObservableObject {
         let baseURLString = self.apiBaseURL
         let token = KeychainService.load(.accessToken)
         let authVM = self.authViewModel
-        let currentAsrTier = self.asrTier
+
+        // Fast pipeline always uses free tier (Groq Whisper) for speed.
+        // Premium DashScope ASR is only used in the slow pipeline.
+        let fastAsrTier = "free"
 
         Task.detached {
             do {
@@ -268,7 +271,7 @@ final class InterpretationViewModel: ObservableObject {
                     targetLang: targetLang,
                     token: token,
                     authVM: authVM,
-                    asrTier: currentAsrTier
+                    asrTier: fastAsrTier
                 )
                 print("[Fast] Got result: \(result.transcription.prefix(50))...")
 
@@ -287,6 +290,12 @@ final class InterpretationViewModel: ObservableObject {
                     if self.lastError != nil {
                         self.lastError = nil
                     }
+                }
+            } catch let error as APIError where error.isGroqKeyRevoked {
+                print("[Fast] Groq key revoked, stopping recording")
+                await MainActor.run {
+                    self.lastError = error.friendlyMessage
+                    self.stopAndSave()
                 }
             } catch {
                 print("[Fast] Network error for segment #\(seq): \(error), trying local fallback...")
@@ -351,6 +360,12 @@ final class InterpretationViewModel: ObservableObject {
                 await MainActor.run { self.creditBalance = balance }
             }
             return result
+        } catch APIError.groqKeyRevoked {
+            // Key was revoked server-side, refresh user profile and stop
+            await MainActor.run {
+                authVM?.user?.has_groq_key = false
+            }
+            throw APIError.groqKeyRevoked
         } catch APIError.unauthorized {
             // Try refreshing the token
             if let authVM = authVM {

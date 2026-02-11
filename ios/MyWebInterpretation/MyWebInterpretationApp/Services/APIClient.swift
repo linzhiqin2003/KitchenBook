@@ -5,6 +5,7 @@ enum APIError: LocalizedError {
     case unexpectedResponse
     case httpError(Int, String?)  // (statusCode, server error message)
     case unauthorized
+    case groqKeyRevoked
     case rateLimited
     case insufficientCredits(balance: Int, required: Int)
 
@@ -25,6 +26,8 @@ enum APIError: LocalizedError {
             }
         case .unauthorized:
             return "登录已过期，请重新登录"
+        case .groqKeyRevoked:
+            return "Groq API Key 已失效，请在设置中更新"
         case .rateLimited:
             return "请求过于频繁，请稍等几秒再试"
         case .insufficientCredits(let balance, let required):
@@ -32,6 +35,11 @@ enum APIError: LocalizedError {
             let reqMin = max(1, required / 60)
             return "余额不足：剩余 \(balMin) 分钟，需要 \(reqMin) 分钟"
         }
+    }
+
+    var isGroqKeyRevoked: Bool {
+        if case .groqKeyRevoked = self { return true }
+        return false
     }
 }
 
@@ -87,6 +95,10 @@ struct APIClient: Sendable {
             throw APIError.unexpectedResponse
         }
         if http.statusCode == 401 {
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               json["key_revoked"] as? Bool == true {
+                throw APIError.groqKeyRevoked
+            }
             throw APIError.unauthorized
         }
         if http.statusCode == 402 {
