@@ -273,7 +273,27 @@ class TingwuRealtimeService:
     def _on_error(self, message, *args):
         logger.error(f"Tingwu error: {message}")
         from .asr_service import ASREvent, ASREventType
-        self._put_event(ASREvent(ASREventType.ERROR, str(message)))
+        friendly = self._parse_nls_error(message)
+        self._put_event(ASREvent(ASREventType.ERROR, friendly))
+
+    @staticmethod
+    def _parse_nls_error(message) -> str:
+        """Extract a user-friendly message from NLS SDK error JSON."""
+        try:
+            data = json.loads(message) if isinstance(message, str) else message
+            if isinstance(data, dict):
+                header = data.get("header", {})
+                status_text = header.get("status_text", "")
+                status = header.get("status", 0)
+                if "IDLE_TIMEOUT" in status_text:
+                    return "听悟会话超时，请重新开始"
+                if status_text:
+                    return f"听悟错误: {status_text}"
+                if status:
+                    return f"听悟错误 ({status})"
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            pass
+        return str(message)[:200]
 
     def _on_close(self, *args):
         logger.info("Tingwu connection closed")
