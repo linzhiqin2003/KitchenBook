@@ -358,13 +358,18 @@ class ASRConsumer(AsyncWebsocketConsumer):
             }
         })
 
+    _audio_count = 0
+
     async def handle_audio(self, audio_bytes):
         """Handle incoming audio data"""
         if not self._running:
             return
-            
+
         if self.provider == 'tingwu' and self.tingwu_service:
             # === TINGWU MODE: Stream audio directly ===
+            self._audio_count += 1
+            if self._audio_count <= 3 or self._audio_count % 50 == 0:
+                logger.info(f"[Tingwu] forwarding audio #{self._audio_count}, {len(audio_bytes)} bytes, connected={self.tingwu_service.is_connected}")
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self.tingwu_service.send_audio, audio_bytes)
             return

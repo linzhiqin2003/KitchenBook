@@ -358,14 +358,19 @@ class TingwuRealtimeService:
         logger.info("Tingwu realtime service connected")
         return self.event_queue
 
+    _send_count = 0
+
     def send_audio(self, audio_data: bytes):
         """Send raw audio bytes (PCM) to Tingwu."""
         with self._lock:
             if not self._is_connected or not self._meeting:
-                logger.warning("Tingwu not connected, dropping audio")
+                logger.warning("Tingwu not connected, dropping audio (%d bytes)", len(audio_data))
                 return
             try:
+                self._send_count += 1
                 self._meeting.send_audio(audio_data)
+                if self._send_count <= 3 or self._send_count % 50 == 0:
+                    logger.info(f"[Tingwu] send_audio #{self._send_count}: {len(audio_data)} bytes sent to NLS")
             except Exception as e:
                 logger.error(f"Error sending audio to Tingwu: {e}")
                 from .asr_service import ASREvent, ASREventType
