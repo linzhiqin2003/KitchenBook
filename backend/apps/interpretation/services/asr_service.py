@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 class ASREventType(Enum):
     """Types of ASR events"""
     TRANSCRIPTION = "transcription"
+    TRANSLATION = "translation"
     SPEECH_START = "speech_start"
     SPEECH_STOP = "speech_stop"
     ERROR = "error"
@@ -51,6 +52,16 @@ class TranscriptionResult:
     is_final: bool
     language: Optional[str] = None
     timestamp: Optional[float] = None
+
+
+@dataclass
+class TranslationResult:
+    """Represents a translation result from Tingwu's built-in translation"""
+    original_text: str
+    translated_text: str
+    source_lang: Optional[str] = None
+    target_lang: Optional[str] = None
+    is_final: bool = True
 
 
 class ASRCallback(OmniRealtimeCallback):

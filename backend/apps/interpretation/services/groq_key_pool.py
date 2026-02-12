@@ -8,11 +8,13 @@ persisted as a temp file so all gunicorn workers see it.
 from __future__ import annotations
 
 import hashlib
+import io
 import logging
 import os
 import tempfile
 import threading
 import time
+import wave
 
 from django.conf import settings as django_settings
 
@@ -128,3 +130,76 @@ def get_available_keys(preferred_key: str | None = None) -> list[str]:
         available = [preferred_key]
 
     return available
+
+
+# ── Probe: send silent WAV to Whisper to detect rate limiting ──
+
+def _make_silent_wav() -> bytes:
+    """Generate a minimal 0.5s 16kHz mono silent WAV in memory."""
+    sample_rate = 16000
+    n_samples = sample_rate // 2  # 0.5 seconds
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(b"\x00\x00" * n_samples)
+    return buf.getvalue()
+
+
+_PROBE_WAV = _make_silent_wav()
+
+
+def probe_key(api_key: str) -> bool:
+    """Send a silent WAV to Groq Whisper to check if the key is usable.
+
+    - 200 (success) → True (key works)
+    - 400 (bad request / audio too short) → True (key works, audio was just bad)
+    - 429 (rate limited) → False
+    - 401 (auth error) → False
+    """
+    try:
+        from groq import (
+            Groq,
+            RateLimitError,
+            AuthenticationError,
+            BadRequestError,
+        )
+    except ImportError:
+        return False
+
+    try:
+        client = Groq(api_key=api_key)
+        client.audio.transcriptions.create(
+            file=("probe.wav", _PROBE_WAV),
+            model="whisper-large-v3-turbo",
+            response_format="json",
+            temperature=0.0,
+        )
+        return True
+    except RateLimitError:
+        return False
+    except AuthenticationError:
+        return False
+    except BadRequestError:
+        return True  # key works, audio was just too short
+    except Exception:
+        return False
+
+
+def find_working_key(exclude_key: str | None = None, max_probes: int = 5) -> str | None:
+    """Probe pool keys with a silent WAV and return the first usable one.
+
+    Skips cooled-down keys, probes up to ``max_probes`` candidates.
+    """
+    all_keys = _refresh_pool()
+    candidates = [k for k in all_keys if k != exclude_key and not _is_cooled_down(k)]
+
+    for key in candidates[:max_probes]:
+        if probe_key(key):
+            logger.info("Probe found working key %s…%s", key[:8], key[-4:])
+            return key
+        else:
+            mark_key_rate_limited(key)
+
+    return None

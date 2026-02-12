@@ -6,6 +6,7 @@ import BackgroundOrbs from '../components/ailab/BackgroundOrbs.vue'
 import EmojiGenerator from '../components/ailab/EmojiGenerator.vue'
 import { getAiLabApiBase } from '../config/aiLab'
 import { useStreamingAsr } from '../composables/useStreamingAsr'
+import { useTingwuAsr } from '../composables/useTingwuAsr'
 
 const API_BASE = getAiLabApiBase()
 const route = useRoute()
@@ -19,6 +20,9 @@ const targetLang = ref('Chinese')
 
 // ASR mode: 'standard' (VAD) only — streaming disabled
 const asrMode = ref('standard')
+
+// Provider: 'standard' (VAD + REST) or 'tingwu' (WebSocket real-time)
+const asrProvider = ref('standard')
 
 // State
 const errorMsg = ref('')
@@ -35,6 +39,14 @@ const {
   start: startStreamingAsr,
   stop: stopStreamingAsr,
 } = useStreamingAsr()
+
+// Tingwu composable
+const {
+  connected: tingwuConnected,
+  error: tingwuError,
+  start: startTingwu,
+  stop: stopTingwu,
+} = useTingwuAsr()
 
 let timerInterval = null
 let recordingStartTime = null
@@ -445,17 +457,166 @@ async function flushSlowPipeline() {
 
 function toggleRecording() {
   if (isRecording.value) {
-    if (asrMode.value === 'streaming') {
+    if (asrProvider.value === 'tingwu') {
+      stopTingwuRecording()
+    } else if (asrMode.value === 'streaming') {
       stopStreamingRecording()
     } else {
       stopRecording()
     }
   } else {
-    if (asrMode.value === 'streaming') {
+    if (asrProvider.value === 'tingwu') {
+      startTingwuRecording()
+    } else if (asrMode.value === 'streaming') {
       startStreamingRecording()
     } else {
       startRecording()
     }
+  }
+}
+
+// ── Tingwu mode recording ──
+let tingwuParagraphId = null
+let tingwuSegSeq = 0
+// Tingwu sends partial transcription (is_final=false) then final + translation
+// We keep a "current" entry that gets updated incrementally
+let tingwuCurrentEntryId = null
+
+async function startTingwuRecording() {
+  isRecording.value = true
+  recordingTime.value = 0
+  recordingStartTime = Date.now()
+  errorMsg.value = ''
+  tingwuParagraphId = `para-${Date.now()}`
+  tingwuSegSeq = 0
+  tingwuCurrentEntryId = null
+  asrModel.value = 'Tingwu'
+
+  // Timer display
+  timerInterval = setInterval(() => {
+    recordingTime.value = Math.floor((Date.now() - recordingStartTime) / 1000)
+  }, 200)
+
+  // Start visualization
+  await nextTick()
+  startVisualization()
+
+  try {
+    await startTingwu(sourceLang.value, targetLang.value, {
+      onTranscription: handleTingwuTranscription,
+      onTranslation: handleTingwuTranslation,
+      onSpeechStart: () => { console.log('[Tingwu] Speech started') },
+      onError: (msg) => { errorMsg.value = msg },
+    })
+  } catch (e) {
+    console.error('[Tingwu] Start failed:', e)
+    errorMsg.value = `听悟启动失败: ${e.message}`
+    stopTingwuRecording()
+  }
+}
+
+function stopTingwuRecording() {
+  isRecording.value = false
+  clearInterval(timerInterval)
+  timerInterval = null
+  stopVisualization()
+  stopTingwu()
+  tingwuParagraphId = null
+  tingwuCurrentEntryId = null
+}
+
+function handleTingwuTranscription({ text, is_final }) {
+  if (!text || !text.trim()) return
+
+  if (!is_final) {
+    // Intermediate result: update or create current entry
+    if (tingwuCurrentEntryId) {
+      const idx = transcriptionHistory.value.findIndex(h => h.id === tingwuCurrentEntryId)
+      if (idx !== -1) {
+        transcriptionHistory.value[idx].original = text
+        return
+      }
+    }
+    // Create new entry for partial
+    const entryId = `tw-${Date.now()}-${tingwuSegSeq}`
+    tingwuCurrentEntryId = entryId
+    transcriptionHistory.value.unshift({
+      id: entryId,
+      seq: tingwuSegSeq,
+      paragraphId: tingwuParagraphId,
+      original: text,
+      translated: '',
+      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      pending: 'translating',
+      isFinal: false,
+    })
+    nextTick(() => {
+      if (historyContainer.value) {
+        historyContainer.value.scrollTop = historyContainer.value.scrollHeight
+      }
+    })
+  } else {
+    // Final result: update current entry or create new one
+    if (tingwuCurrentEntryId) {
+      const idx = transcriptionHistory.value.findIndex(h => h.id === tingwuCurrentEntryId)
+      if (idx !== -1) {
+        transcriptionHistory.value[idx].original = text
+        transcriptionHistory.value[idx].isFinal = true
+        // Translation will come via separate event; keep pending
+      }
+    } else {
+      // No partial existed — create fresh entry
+      const entryId = `tw-${Date.now()}-${tingwuSegSeq}`
+      tingwuCurrentEntryId = entryId
+      transcriptionHistory.value.unshift({
+        id: entryId,
+        seq: tingwuSegSeq,
+        paragraphId: tingwuParagraphId,
+        original: text,
+        translated: '',
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        pending: 'translating',
+        isFinal: true,
+      })
+      nextTick(() => {
+        if (historyContainer.value) {
+          historyContainer.value.scrollTop = historyContainer.value.scrollHeight
+        }
+      })
+    }
+
+    // Prepare for next sentence
+    tingwuSegSeq++
+    // Sentence boundary → new paragraph
+    if (SENTENCE_END_RE.test(text.trim())) {
+      tingwuParagraphId = `para-${Date.now()}`
+    }
+    tingwuCurrentEntryId = null
+  }
+}
+
+function handleTingwuTranslation({ original, translated, target_lang }) {
+  if (!translated) return
+
+  // Find the most recent entry that matches and needs translation
+  // Strategy: find entry whose original text best matches
+  const candidates = transcriptionHistory.value.filter(
+    h => h.pending && h.paragraphId && h.paragraphId.startsWith('para-')
+  )
+
+  // Try exact match first
+  let idx = transcriptionHistory.value.findIndex(
+    h => h.pending && h.original === original
+  )
+
+  // Fallback: most recent pending entry
+  if (idx === -1) {
+    idx = transcriptionHistory.value.findIndex(h => h.pending)
+  }
+
+  if (idx !== -1) {
+    transcriptionHistory.value[idx].translated = translated
+    transcriptionHistory.value[idx].pending = false
   }
 }
 
@@ -841,7 +1002,9 @@ const canGenerateMinutes = computed(() => {
 
 onUnmounted(() => {
   if (isRecording.value) {
-    if (asrMode.value === 'streaming') {
+    if (asrProvider.value === 'tingwu') {
+      stopTingwuRecording()
+    } else if (asrMode.value === 'streaming') {
       stopStreamingRecording()
     } else {
       stopRecording()
@@ -898,7 +1061,9 @@ onUnmounted(() => {
         <!-- Right: Provider badge -->
         <div class="flex items-center justify-end gap-2 w-[200px]">
           <span class="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[11px] font-medium text-white/40 uppercase tracking-wider">
-            {{ currentView === 'interpretation' ? (asrModel || 'Qwen3-ASR') + ' + Cerebras' : 'Emoji-v1' }}
+            {{ currentView === 'interpretation'
+              ? (asrProvider === 'tingwu' ? 'Tingwu ASR+Trans' : (asrModel || 'Qwen3-ASR') + ' + Cerebras')
+              : 'Emoji-v1' }}
           </span>
         </div>
       </div>
@@ -922,6 +1087,27 @@ onUnmounted(() => {
               </div>
               <div class="w-40">
                 <LanguageSelector v-model="targetLang" label="To" :disabled="isRecording || inflight > 0" :is-target="true" />
+              </div>
+              <!-- Provider toggle -->
+              <div class="pt-5 ml-2">
+                <div class="bg-white/5 p-0.5 rounded-lg flex text-[11px]">
+                  <button
+                    @click="asrProvider = 'standard'"
+                    :disabled="isRecording"
+                    class="px-2.5 py-1 rounded-md transition-all"
+                    :class="asrProvider === 'standard'
+                      ? 'bg-white/15 text-white/90 shadow-sm'
+                      : 'text-white/40 hover:text-white/60'"
+                  >Standard</button>
+                  <button
+                    @click="asrProvider = 'tingwu'"
+                    :disabled="isRecording"
+                    class="px-2.5 py-1 rounded-md transition-all"
+                    :class="asrProvider === 'tingwu'
+                      ? 'bg-emerald-500/20 text-emerald-300 shadow-sm'
+                      : 'text-white/40 hover:text-white/60'"
+                  >Tingwu</button>
+                </div>
               </div>
             </div>
             <!-- Action buttons -->
@@ -1026,7 +1212,11 @@ onUnmounted(() => {
               <div class="text-center space-y-3 opacity-40">
                 <div class="text-4xl">🎙️</div>
                 <p class="text-[14px] text-white/60">录音或上传音频文件，自动转录并翻译</p>
-                <p class="text-[11px] text-white/30">语音自动检测，停顿时自动切分 · Powered by Silero VAD + Qwen3-ASR + Cerebras</p>
+                <p class="text-[11px] text-white/30">
+                  {{ asrProvider === 'tingwu'
+                    ? '实时流式识别+翻译 · Powered by 通义听悟'
+                    : '语音自动检测，停顿时自动切分 · Powered by Silero VAD + Qwen3-ASR + Cerebras' }}
+                </p>
               </div>
             </div>
 

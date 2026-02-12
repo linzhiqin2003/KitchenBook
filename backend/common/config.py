@@ -80,6 +80,23 @@ class APIConfig:
 
 
 @dataclass
+class TingwuConfig:
+    """Tingwu (通义听悟) configuration"""
+    access_key_id: str = field(
+        default_factory=lambda: os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_ID", "")
+    )
+    access_key_secret: str = field(
+        default_factory=lambda: os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_SECRET", "")
+    )
+    app_key: str = field(
+        default_factory=lambda: os.environ.get("TINGWU_APP_KEY", "")
+    )
+    region: str = field(
+        default_factory=lambda: os.environ.get("TINGWU_REGION", "cn-beijing")
+    )
+
+
+@dataclass
 class ASRConfig:
     """ASR (Speech Recognition) configuration"""
     model: str = "qwen3-asr-flash-realtime"
@@ -146,6 +163,7 @@ class AppSettings:
     """
     api: APIConfig = field(default_factory=APIConfig)
     asr: ASRConfig = field(default_factory=ASRConfig)
+    tingwu: TingwuConfig = field(default_factory=TingwuConfig)
     translation: TranslationConfig = field(default_factory=TranslationConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     server: ServerConfig = field(default_factory=ServerConfig)

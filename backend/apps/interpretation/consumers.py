@@ -13,10 +13,11 @@ import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 # Use relative imports within the app
-from .services.asr_service import RealtimeASRService, ASREvent, ASREventType, TranscriptionResult
+from .services.asr_service import RealtimeASRService, ASREvent, ASREventType, TranscriptionResult, TranslationResult
 from .services.translation_service import TranslationService
 from .services.tts_service import TTSService, TTSConfig
 from .services.groq_realtime_service import GroqRealtimeASRService, GroqTranslationService
+from .services.tingwu_service import TingwuTaskManager, TingwuRealtimeService
 
 # Use common config
 from common.config import get_settings
@@ -45,6 +46,8 @@ class ASRConsumer(AsyncWebsocketConsumer):
         self.asr_service = None
         self.groq_asr_service = None  # For Groq high-speed mode
         self.groq_translation_service = None
+        self.tingwu_service = None  # For Tingwu mode
+        self.tingwu_task_id = None
         self.translation_service = None
         self.tts_service = None
         self.source_lang = 'en'
@@ -52,7 +55,7 @@ class ASRConsumer(AsyncWebsocketConsumer):
         self.translation_enabled = True
         self.tts_enabled = False  # TTS is off by default
         self.tts_voice = 'Cherry'  # Default voice
-        self.provider = 'dashscope'  # 'dashscope' or 'groq'
+        self.provider = 'dashscope'  # 'dashscope', 'groq', or 'tingwu'
         self._running = False
         self._poll_task = None
 
@@ -118,12 +121,74 @@ class ASRConsumer(AsyncWebsocketConsumer):
             self.translation_enabled = config.get('translation_enabled', True)
             self.tts_enabled = config.get('tts_enabled', False)
             self.tts_voice = config.get('tts_voice', 'Cherry')
-            self.provider = config.get('provider', 'dashscope')  # 'dashscope' or 'groq'
-            
+            self.provider = config.get('provider', 'dashscope')  # 'dashscope', 'groq', or 'tingwu'
+
             # Get app settings
             settings = get_settings()
-            
-            if self.provider == 'groq':
+
+            if self.provider == 'tingwu':
+                # === TINGWU MODE ===
+                logger.info("Starting Tingwu mode")
+
+                # Map language codes for Tingwu (cn, en, ja, yue, fspk)
+                tingwu_lang_map = {
+                    'zh': 'cn', 'en': 'en', 'ja': 'ja', 'yue': 'yue',
+                }
+                tingwu_source = tingwu_lang_map.get(self.source_lang, self.source_lang)
+
+                # Map target language for Tingwu translation (cn, en, ja, yue)
+                tingwu_target_map = {
+                    'Chinese': 'cn', 'English': 'en', 'Japanese': 'ja', 'Cantonese': 'yue',
+                    'zh': 'cn', 'en': 'en', 'ja': 'ja', 'yue': 'yue',
+                }
+                tingwu_target = tingwu_target_map.get(self.target_lang, 'en')
+
+                # Create real-time task via REST API
+                task_manager = TingwuTaskManager()
+                task_result = await asyncio.get_running_loop().run_in_executor(
+                    None,
+                    lambda: task_manager.create_realtime_task(
+                        source_lang=tingwu_source,
+                        enable_translation=self.translation_enabled,
+                        target_languages=[tingwu_target] if self.translation_enabled else None,
+                        sample_rate=16000,
+                        audio_format='pcm',
+                    )
+                )
+
+                meeting_join_url = task_result.get('meeting_join_url', '')
+                self.tingwu_task_id = task_result.get('task_id', '')
+
+                if not meeting_join_url:
+                    raise RuntimeError(f"Tingwu task creation failed: {task_result}")
+
+                # Connect to WebSocket via NLS SDK
+                self.tingwu_service = TingwuRealtimeService(meeting_join_url)
+                await asyncio.get_running_loop().run_in_executor(
+                    None, self.tingwu_service.connect
+                )
+
+                self._running = True
+
+                # Start event polling (same pattern as DashScope)
+                self._poll_task = asyncio.create_task(self._poll_tingwu_events())
+
+                await self.send_json({
+                    'type': 'started',
+                    'message': 'Tingwu real-time services started',
+                    'config': {
+                        'source_lang': self.source_lang,
+                        'target_lang': self.target_lang,
+                        'translation_enabled': self.translation_enabled,
+                        'tts_enabled': False,
+                        'provider': 'tingwu',
+                        'task_id': self.tingwu_task_id,
+                    }
+                })
+
+                logger.info(f"Tingwu services started: task_id={self.tingwu_task_id}")
+
+            elif self.provider == 'groq':
                 # === GROQ HIGH-SPEED MODE ===
                 logger.info("Starting Groq high-speed mode")
                 
@@ -234,6 +299,20 @@ class ASRConsumer(AsyncWebsocketConsumer):
             self.groq_asr_service.reset()
             self.groq_asr_service = None
         self.groq_translation_service = None
+
+        # Clean up Tingwu services
+        if self.tingwu_service:
+            self.tingwu_service.stop()
+            self.tingwu_service = None
+        if self.tingwu_task_id:
+            try:
+                task_manager = TingwuTaskManager()
+                await asyncio.get_running_loop().run_in_executor(
+                    None, task_manager.stop_task, self.tingwu_task_id
+                )
+            except Exception as e:
+                logger.warning(f"Error stopping Tingwu task: {e}")
+            self.tingwu_task_id = None
         
         self.translation_service = None
         self.tts_service = None
@@ -284,6 +363,12 @@ class ASRConsumer(AsyncWebsocketConsumer):
         if not self._running:
             return
             
+        if self.provider == 'tingwu' and self.tingwu_service:
+            # === TINGWU MODE: Stream audio directly ===
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self.tingwu_service.send_audio, audio_bytes)
+            return
+
         if self.provider == 'groq' and self.groq_asr_service:
             # === GROQ MODE: Chunk-based processing ===
             result = await self.groq_asr_service.add_audio_async(audio_bytes)
@@ -344,11 +429,33 @@ class ASRConsumer(AsyncWebsocketConsumer):
         
         logger.info("ASR event polling stopped")
 
+    async def _poll_tingwu_events(self):
+        """Poll the Tingwu event queue and process events."""
+        logger.info("Started Tingwu event polling")
+
+        while self._running:
+            try:
+                if self.tingwu_service:
+                    events = self.tingwu_service.get_all_events()
+                    for event in events:
+                        await self._handle_asr_event(event)
+                await asyncio.sleep(0.05)
+            except asyncio.CancelledError:
+                logger.info("Tingwu event polling cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in Tingwu event polling: {e}")
+                await asyncio.sleep(0.1)
+
+        logger.info("Tingwu event polling stopped")
+
     async def _handle_asr_event(self, event: ASREvent):
         """Handle an ASR event"""
         try:
             if event.event_type == ASREventType.TRANSCRIPTION:
                 await self.on_transcription(event.data)
+            elif event.event_type == ASREventType.TRANSLATION:
+                await self.on_translation(event.data)
             elif event.event_type == ASREventType.SPEECH_START:
                 await self.on_speech_start()
             elif event.event_type == ASREventType.SPEECH_STOP:
@@ -371,13 +478,26 @@ class ASRConsumer(AsyncWebsocketConsumer):
                 'text': result.text,
                 'is_final': result.is_final,
             })
-            
+
             # Translate if enabled and is final result
-            if self.translation_enabled and result.is_final and result.text.strip():
+            # Skip for Tingwu — it sends translation via separate TRANSLATION events
+            if self.provider != 'tingwu' and self.translation_enabled and result.is_final and result.text.strip():
                 await self.translate_and_send(result.text)
-                
+
         except Exception as e:
             logger.error(f"Error in on_transcription: {e}")
+
+    async def on_translation(self, result: TranslationResult):
+        """Handle built-in translation from Tingwu (no extra LLM call needed)."""
+        try:
+            await self.send_json({
+                'type': 'translation',
+                'original': result.original_text,
+                'translated': result.translated_text,
+                'target_lang': result.target_lang or self.target_lang,
+            })
+        except Exception as e:
+            logger.error(f"Error in on_translation: {e}")
 
     async def translate_and_send(self, text):
         """Translate text, synthesize speech, and send results"""

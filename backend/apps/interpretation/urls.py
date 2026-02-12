@@ -20,4 +20,8 @@ urlpatterns = [
     path('meeting-minutes/', views.generate_meeting_minutes, name='generate_meeting_minutes'),
     path('generate-title/', views.gen_title, name='gen_title'),
     path('refine-text/', views.refine_text_view, name='refine_text'),
+    # Tingwu real-time task management
+    path('tingwu/create-task/', views.create_tingwu_task, name='create_tingwu_task'),
+    path('tingwu/stop-task/', views.stop_tingwu_task, name='stop_tingwu_task'),
+    path('tingwu/task-status/', views.get_tingwu_task_status, name='get_tingwu_task_status'),
 ]
