@@ -184,15 +184,11 @@ struct LangPickerButton: View {
 // MARK: - Recording Pulse
 
 struct PausedLabel: View {
-    @State private var visible = true
-
     var body: some View {
         Text("暂停")
             .font(.caption2)
             .fontWeight(.medium)
-            .foregroundStyle(.orange.opacity(visible ? 0.9 : 0.2))
-            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: visible)
-            .onAppear { visible = false }
+            .foregroundStyle(.orange.opacity(0.9))
     }
 }
 

@@ -406,7 +406,11 @@ def _dashscope_asr_transcribe(file_path: str) -> str:
     try:
         content = response.output.choices[0].message.content
         if isinstance(content, list):
-            text = content[0].get("text", "")
+            if not content:
+                # Empty content list = no recognizable speech
+                text = ""
+            else:
+                text = content[0].get("text", "")
         elif isinstance(content, str):
             text = content
         else:
