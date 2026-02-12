@@ -15,10 +15,11 @@ enum APIError: LocalizedError {
             return "服务器地址无效，请在设置中检查"
         case .unexpectedResponse:
             return "服务器响应异常，请稍后重试"
-        case .httpError(let code, _):
+        case .httpError(let code, let serverMsg):
+            if let msg = serverMsg { return msg }
             switch code {
-            case 400: return "音频格式有误，请重试"
-            case 403: return "未配置 Groq API Key，请在设置中添加"
+            case 400: return "请求有误，请重试"
+            case 403: return "权限不足 (\(code))"
             case 500: return "服务器内部错误，请稍后重试"
             case 502, 503: return "服务器暂时不可用，请稍后重试"
             case 504: return "服务器响应超时，请重试"
@@ -27,7 +28,7 @@ enum APIError: LocalizedError {
         case .unauthorized:
             return "登录已过期，请重新登录"
         case .groqKeyRevoked:
-            return "Groq API Key 已失效，请在设置中更新"
+            return "API Key 已失效，请在设置中更新"
         case .rateLimited:
             return "请求过于频繁，请稍等几秒再试"
         case .insufficientCredits(let balance, let required):
@@ -59,7 +60,8 @@ struct APIClient: Sendable {
         fileURL: URL,
         sourceLang: String,
         targetLang: String,
-        asrTier: String = "free"
+        asrTier: String = "free",
+        sessionId: String? = nil
     ) async throws -> TranscribeTranslateResponse {
         let endpoint = baseURL
             .appendingPathComponent("api")
@@ -81,6 +83,9 @@ struct APIClient: Sendable {
         form.addField(name: "source_lang", value: sourceLang)
         form.addField(name: "target_lang", value: targetLang)
         form.addField(name: "asr_tier", value: asrTier)
+        if let sessionId, !sessionId.isEmpty {
+            form.addField(name: "session_id", value: sessionId)
+        }
         try form.addFile(
             name: "file",
             fileURL: fileURL,
@@ -164,6 +169,114 @@ struct APIClient: Sendable {
         return try JSONDecoder().decode(RefineResponse.self, from: data)
     }
 
+    func generateTitle(text: String) async throws -> String {
+        let endpoint = baseURL
+            .appendingPathComponent("api")
+            .appendingPathComponent("interpretation")
+            .appendingPathComponent("generate-title")
+            .appendingPathComponent("")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 15
+        if let accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        let body: [String: String] = ["text": String(text.prefix(500))]
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw APIError.unexpectedResponse
+        }
+
+        struct TitleResponse: Decodable { let title: String }
+        return try JSONDecoder().decode(TitleResponse.self, from: data).title
+    }
+
+    func refineText(text: String, lang: String) async throws -> String {
+        let endpoint = baseURL
+            .appendingPathComponent("api")
+            .appendingPathComponent("interpretation")
+            .appendingPathComponent("refine-text")
+            .appendingPathComponent("")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60
+        if let accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        let body: [String: String] = ["text": text, "lang": lang]
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.unexpectedResponse
+        }
+        if http.statusCode >= 400 {
+            throw APIError.httpError(http.statusCode, Self.parseErrorMessage(from: data))
+        }
+
+        struct RefineTextResponse: Decodable { let refined_text: String }
+        return try JSONDecoder().decode(RefineTextResponse.self, from: data).refined_text
+    }
+
+    /// Refine a long text by splitting into chunks at sentence boundaries (~5000 words each).
+    func refineTextChunked(text: String, lang: String) async throws -> String {
+        let chunks = Self.splitAtSentenceBoundary(text: text, maxWords: 5000)
+        if chunks.count <= 1 {
+            return try await refineText(text: text, lang: lang)
+        }
+        // Process chunks concurrently
+        return try await withThrowingTaskGroup(of: (Int, String).self) { group in
+            for (i, chunk) in chunks.enumerated() {
+                group.addTask {
+                    let refined = try await self.refineText(text: chunk, lang: lang)
+                    return (i, refined)
+                }
+            }
+            var results = [(Int, String)]()
+            for try await result in group {
+                results.append(result)
+            }
+            return results.sorted(by: { $0.0 < $1.0 }).map(\.1).joined(separator: " ")
+        }
+    }
+
+    /// Split text into chunks of approximately `maxWords` words, cutting at the nearest sentence boundary.
+    static func splitAtSentenceBoundary(text: String, maxWords: Int) -> [String] {
+        let words = text.split(separator: " ", omittingEmptySubsequences: true)
+        guard words.count > maxWords else { return [text] }
+
+        var chunks = [String]()
+        var start = 0
+
+        while start < words.count {
+            var end = min(start + maxWords, words.count)
+            if end < words.count {
+                // Search backward from `end` for a sentence-ending punctuation
+                var best = end
+                for i in stride(from: end - 1, through: max(start, end - 500), by: -1) {
+                    let word = words[i]
+                    if let last = word.last, ".!?。！？".contains(last) {
+                        best = i + 1
+                        break
+                    }
+                }
+                end = best
+            }
+            let chunk = words[start..<end].joined(separator: " ")
+            chunks.append(chunk)
+            start = end
+        }
+        return chunks
+    }
+
     func health() async throws -> HealthResponse {
         let endpoint = baseURL
             .appendingPathComponent("api")
@@ -182,7 +295,7 @@ struct APIClient: Sendable {
     }
 
     /// Parse {"error": "..."} from server JSON response
-    private static func parseErrorMessage(from data: Data) -> String? {
+    static func parseErrorMessage(from data: Data) -> String? {
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let msg = json["error"] as? String {
             return msg

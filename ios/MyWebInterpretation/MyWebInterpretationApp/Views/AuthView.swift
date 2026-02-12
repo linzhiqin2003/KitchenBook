@@ -60,7 +60,7 @@ struct AuthView: View {
 
                             AuthTextField(
                                 icon: "key",
-                                placeholder: "Groq API Key",
+                                placeholder: "API Key",
                                 text: $authVM.groqApiKey
                             )
 
@@ -72,7 +72,7 @@ struct AuthView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "questionmark.circle")
                                         .font(.caption)
-                                    Text("如何获取 Groq API Key?")
+                                    Text("如何获取 API Key?")
                                         .font(.caption)
                                 }
                                 .foregroundStyle(.blue.opacity(0.8))

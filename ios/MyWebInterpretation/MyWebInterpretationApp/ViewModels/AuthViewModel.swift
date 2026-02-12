@@ -66,7 +66,7 @@ final class AuthViewModel: ObservableObject {
 
     func register() {
         guard !email.isEmpty, !password.isEmpty, !groqApiKey.isEmpty else {
-            errorMessage = "Please fill in email, password, and Groq API Key"
+            errorMessage = "请填写邮箱、密码和 API Key"
             return
         }
         isLoading = true

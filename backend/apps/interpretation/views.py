@@ -22,6 +22,9 @@ from .services.transcribe_translate_service import transcribe_and_translate, tra
 
 logger = logging.getLogger(__name__)
 
+# All ASR tiers that require premium authentication and credits
+PREMIUM_TIERS = {"premium", "speaker_gpu", "speaker_tingwu"}
+
 
 @api_view(['GET'])
 def health_check(request):
@@ -254,7 +257,7 @@ def transcribe_translate(request):
       - file: audio file (webm, mp3, wav, etc.)
       - source_lang: e.g. 'en', 'zh'
       - target_lang: e.g. 'Chinese', 'English'
-      - asr_tier: 'free' (default) or 'premium' (DashScope, requires JWT + credits)
+      - asr_tier: 'free' | 'premium' | 'speaker_gpu' | 'speaker_tingwu' (premium tiers require JWT + credits)
 
     Auth: Optional JWT for free tier, required JWT for premium tier.
     Returns: { transcription, translation, source_lang, target_lang, balance_seconds? }
@@ -290,12 +293,20 @@ def transcribe_translate(request):
                 {'error': 'Token expired or invalid'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-    except Exception:
+    except Exception as auth_exc:
+        # If the request carried an auth header, treat unexpected auth
+        # errors the same as invalid-token so the client retries properly
+        # instead of silently dropping the user's Groq key.
+        if has_auth_header:
+            logger.warning("JWT auth unexpected error: %s", auth_exc, exc_info=True)
+            return Response(
+                {'error': 'Token expired or invalid'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
         # No JWT header at all → fall through to server key
-        pass
 
-    # Premium tier requires authentication
-    if asr_tier == 'premium' and authenticated_user is None:
+    # Premium tiers require authentication
+    if asr_tier in PREMIUM_TIERS and authenticated_user is None:
         return Response(
             {'error': 'Authentication required for premium ASR'},
             status=status.HTTP_401_UNAUTHORIZED,
@@ -315,8 +326,8 @@ def transcribe_translate(request):
             for chunk in uploaded_file.chunks():
                 dest.write(chunk)
 
-        # Premium tier: check credits before processing
-        if asr_tier == 'premium':
+        # Premium tiers: check credits before processing
+        if asr_tier in PREMIUM_TIERS:
             from credits.services import get_balance, get_audio_duration, deduct_for_audio, InsufficientCreditsError
             import math
             duration = get_audio_duration(str(file_path))
@@ -358,8 +369,8 @@ def transcribe_translate(request):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        # Premium tier: deduct credits after successful ASR
-        if asr_tier == 'premium':
+        # Premium tiers: deduct credits after successful ASR
+        if asr_tier in PREMIUM_TIERS:
             try:
                 deduct_for_audio(authenticated_user, duration)
                 result['balance_seconds'] = get_balance(authenticated_user)
@@ -377,8 +388,25 @@ def transcribe_translate(request):
                 {'error': 'Rate limited, please slow down', 'retry_after': 5},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
-        logger.error(f"transcribe_translate error: {e}", exc_info=True)
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error("transcribe_translate error (tier=%s): %s", asr_tier, e, exc_info=True)
+        # Don't leak internal error details to the client
+        err_str = str(e)
+        if "No Groq API key" in err_str:
+            return Response(
+                {'error': 'No API Key available. Please configure in settings.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if "DASHSCOPE_API_KEY not configured" in err_str:
+            return Response(
+                {'error': 'Premium ASR service not configured on server'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if "DashScope" in err_str:
+            return Response(
+                {'error': f'Premium ASR error: {err_str[:200]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response({'error': '转录服务暂时不可用，请稍后重试'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     finally:
         if file_path.exists():
             file_path.unlink()

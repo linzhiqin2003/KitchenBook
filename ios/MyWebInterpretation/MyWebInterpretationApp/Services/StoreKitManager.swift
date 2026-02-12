@@ -5,12 +5,13 @@ import StoreKit
 final class StoreKitManager: ObservableObject {
     @Published var products: [Product] = []
     @Published var purchaseInProgress = false
+    @Published var isLoadingProducts = true
     @Published var lastError: String?
 
     static let productIDs: Set<String> = [
-        "org.lzqqq.interpretation.credits.60",
-        "org.lzqqq.interpretation.credits.300",
-        "org.lzqqq.interpretation.credits.600",
+        "org.lzqqq.interpretation.credits.10h",
+        "org.lzqqq.interpretation.credits.50h",
+        "org.lzqqq.interpretation.credits.100h",
     ]
 
     /// Called after successful purchase verification with backend.
@@ -28,13 +29,22 @@ final class StoreKitManager: ObservableObject {
     }
 
     func loadProducts() async {
+        isLoadingProducts = true
+        lastError = nil
         do {
             let storeProducts = try await Product.products(for: Self.productIDs)
             products = storeProducts.sorted { $0.price < $1.price }
+            if storeProducts.isEmpty {
+                lastError = "No products found. Please check App Store Connect configuration."
+                print("[StoreKit] Product.products returned empty for IDs: \(Self.productIDs)")
+            } else {
+                print("[StoreKit] Loaded \(storeProducts.count) products")
+            }
         } catch {
             print("[StoreKit] Failed to load products: \(error)")
-            lastError = "Failed to load products"
+            lastError = "Failed to load products: \(error.localizedDescription)"
         }
+        isLoadingProducts = false
     }
 
     func purchase(_ product: Product) async -> Bool {
@@ -102,9 +112,9 @@ final class StoreKitManager: ObservableObject {
     // Product display helpers
     static func creditHours(for productID: String) -> Int {
         switch productID {
-        case "org.lzqqq.interpretation.credits.60": return 1
-        case "org.lzqqq.interpretation.credits.300": return 5
-        case "org.lzqqq.interpretation.credits.600": return 10
+        case "org.lzqqq.interpretation.credits.10h": return 10
+        case "org.lzqqq.interpretation.credits.50h": return 50
+        case "org.lzqqq.interpretation.credits.100h": return 100
         default: return 0
         }
     }

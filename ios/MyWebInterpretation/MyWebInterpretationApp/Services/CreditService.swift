@@ -45,7 +45,7 @@ struct CreditService {
             throw APIError.unauthorized
         }
         if http.statusCode >= 400 {
-            throw APIError.httpError(http.statusCode, nil)
+            throw APIError.httpError(http.statusCode, APIClient.parseErrorMessage(from: data))
         }
         return try JSONDecoder().decode(CreditBalanceResponse.self, from: data)
     }
@@ -74,7 +74,7 @@ struct CreditService {
             throw APIError.unauthorized
         }
         if http.statusCode >= 400 {
-            throw APIError.httpError(http.statusCode, nil)
+            throw APIError.httpError(http.statusCode, APIClient.parseErrorMessage(from: data))
         }
         return try JSONDecoder().decode(VerifyPurchaseResponse.self, from: data)
     }

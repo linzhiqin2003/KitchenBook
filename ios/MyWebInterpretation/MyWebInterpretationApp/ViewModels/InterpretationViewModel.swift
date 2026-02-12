@@ -5,6 +5,7 @@ import SwiftUI
 final class InterpretationViewModel: ObservableObject {
     @Published var isRecording: Bool = false
     @Published var isPaused: Bool = false
+    @Published var isBroadcasting: Bool = false
     @Published var sourceLang: String = "en"
     @Published var targetLang: String = "Chinese"
     @Published var segments: [SegmentResult] = []
@@ -19,12 +20,17 @@ final class InterpretationViewModel: ObservableObject {
 
     @AppStorage("apiBaseURL") private var userBaseURL: String = ""
     @AppStorage("selectedAsrTier") var asrTier: String = "free"
+    @AppStorage("speakerEnabled") var speakerEnabled: Bool = false
+    @AppStorage("speakerProvider") var speakerProvider: String = "gpu"
+    var translationSession: Any? = nil
     @AppStorage("vadEnabled") private var vadEnabled: Bool = true
-    @AppStorage("vadThresholdDb") private var vadThresholdDb: Double = -40.0
+    @AppStorage("vadThresholdDb") private var vadThresholdDb: Double = -50.0
     @AppStorage("vadSilenceMs") private var vadSilenceMs: Int = 300
     @AppStorage("maxSegmentSeconds") private var maxSegmentSeconds: Double = 4.0
 
     private let recorder = AudioSegmentRecorder()
+    private let broadcastReceiver = BroadcastReceiver()
+    private var broadcastSegmentSeq: Int = 0
 
     // Slow pipeline state
     private var currentParagraphSegmentIds: [UUID] = []
@@ -34,6 +40,7 @@ final class InterpretationViewModel: ObservableObject {
     private var segmentSessionMap: [UUID: UUID] = [:]
     private var pendingLocalArchives: [UUID: PendingLocalArchive] = [:]
     private var pendingLocalArchiveTasks: [UUID: Task<Void, Never>] = [:]
+    private var speakerSessionId: String?
 
     private struct PendingLocalArchive {
         let sessionID: UUID
@@ -58,12 +65,32 @@ final class InterpretationViewModel: ObservableObject {
         )
     }
 
+    /// Fast pipeline tier: Groq for speed, or GPU/TingWu when speaker identification enabled
+    var fastPipelineTier: String {
+        guard asrTier == "premium" else { return "free" }
+        guard speakerEnabled else { return "free" }
+        return speakerProvider == "tingwu" ? "speaker_tingwu" : "speaker_gpu"
+    }
+
+    /// Slow pipeline tier: matches user's selected tier (free or premium/DashScope)
+    var slowPipelineTier: String { asrTier }
+
+    /// Whether slow pipeline should run (only when fast ≠ slow, i.e. premium mode)
+    var hasSlowPipeline: Bool { asrTier == "premium" }
+
+    /// Whether the current configuration needs a speaker session ID
+    var needsSpeakerSession: Bool {
+        asrTier == "premium" && speakerEnabled && speakerProvider == "gpu"
+    }
+
     init() {
         // Migrate old defaults and guard against out-of-range values.
-        if vadThresholdDb <= -50.0 || vadThresholdDb >= -20.0 {
-            vadThresholdDb = -40.0
-        } else if abs(vadThresholdDb - (-35.0)) < 0.01 {
-            vadThresholdDb = -40.0
+        // .voiceChat mode suppresses volume: speech ~-37 to -50 dB, silence ~-55 to -78 dB.
+        // Threshold of -50 dB works for both iPhone (with VPIO) and iPad (without VPIO).
+        if vadThresholdDb < -60.0 || vadThresholdDb >= -20.0 {
+            vadThresholdDb = -50.0
+        } else if abs(vadThresholdDb - (-35.0)) < 0.01 || abs(vadThresholdDb - (-40.0)) < 0.01 {
+            vadThresholdDb = -50.0
         }
 
         if vadSilenceMs < 150 || vadSilenceMs > 1500 {
@@ -102,6 +129,7 @@ final class InterpretationViewModel: ObservableObject {
                 }
             }
         }
+
     }
 
     func start() {
@@ -123,6 +151,7 @@ final class InterpretationViewModel: ObservableObject {
                 print("🎙️ [VM] recorder started OK")
                 isRecording = true
                 currentRecorderSessionID = recorder.sessionID
+                speakerSessionId = needsSpeakerSession ? UUID().uuidString : nil
                 self.recordingSeconds = 0
                 self.recordingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
                     Task { @MainActor in self?.recordingSeconds += 1 }
@@ -169,6 +198,7 @@ final class InterpretationViewModel: ObservableObject {
         isRecording = false
         isPaused = false
         currentRecorderSessionID = nil
+        speakerSessionId = nil
         waveformLevels = Array(repeating: 0.04, count: 40)
         recordingTimer?.invalidate()
         recordingTimer = nil
@@ -188,6 +218,22 @@ final class InterpretationViewModel: ObservableObject {
         flushSlowPipeline()
     }
 
+    func stopAndDiscard() {
+        print("🎙️ [VM] stopAndDiscard()")
+        recorder.stop()
+        isRecording = false
+        isPaused = false
+        currentRecorderSessionID = nil
+        speakerSessionId = nil
+        waveformLevels = Array(repeating: 0.04, count: 40)
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        slowPipelineTimer?.invalidate()
+        slowPipelineTimer = nil
+        currentParagraphSegmentIds.removeAll()
+        clear()
+    }
+
     func clear() {
         for seg in segments {
             segmentSessionMap.removeValue(forKey: seg.id)
@@ -197,6 +243,40 @@ final class InterpretationViewModel: ObservableObject {
         currentParagraphSegmentIds.removeAll()
         slowPipelineTimer?.invalidate()
         slowPipelineTimer = nil
+    }
+
+    // MARK: - Broadcast (System Audio)
+
+    func startBroadcastListening() {
+        isBroadcasting = true
+        broadcastSegmentSeq = 0
+        segments.removeAll()
+        lastError = nil
+
+        broadcastReceiver.onSegmentReady = { [weak self] fileURL in
+            Task { @MainActor in
+                self?.handleBroadcastSegment(fileURL: fileURL)
+            }
+        }
+        broadcastReceiver.onBroadcastStopped = { [weak self] in
+            Task { @MainActor in
+                self?.isBroadcasting = false
+                self?.broadcastReceiver.stopListening()
+            }
+        }
+        broadcastReceiver.startListening()
+    }
+
+    func stopBroadcastListening() {
+        isBroadcasting = false
+        broadcastReceiver.stopListening()
+        broadcastReceiver.cleanupSegments()
+    }
+
+    private func handleBroadcastSegment(fileURL: URL) {
+        broadcastSegmentSeq += 1
+        // Reuse fast pipeline only (no slow pipeline / local archive for broadcast)
+        handleSegment(fileURL: fileURL, seq: broadcastSegmentSeq, recorderSessionID: nil)
     }
 
     func uploadFile(url: URL) {
@@ -246,7 +326,7 @@ final class InterpretationViewModel: ObservableObject {
             !isPaused &&
             recorderSessionID != nil &&
             recorderSessionID == currentRecorderSessionID
-        let shouldEnterSlowPipeline = isCurrentRecorderSession
+        let shouldEnterSlowPipeline = isCurrentRecorderSession && hasSlowPipeline
         if shouldEnterSlowPipeline {
             currentParagraphSegmentIds.append(segment.id)
         }
@@ -258,9 +338,12 @@ final class InterpretationViewModel: ObservableObject {
         let token = KeychainService.load(.accessToken)
         let authVM = self.authViewModel
 
-        // Fast pipeline always uses free tier (Groq Whisper) for speed.
-        // Premium DashScope ASR is only used in the slow pipeline.
-        let fastAsrTier = "free"
+        // Fast pipeline: Groq for speed, GPU/TingWu only when speaker enabled
+        let fastAsrTier = self.fastPipelineTier
+        let currentSpeakerSessionId = self.needsSpeakerSession ? self.speakerSessionId : nil
+        // When slow pipeline follows, fast result is preliminary (shows shimmer);
+        // otherwise fast result is already final.
+        let fastIsFinal = !shouldEnterSlowPipeline
 
         Task.detached {
             do {
@@ -271,24 +354,36 @@ final class InterpretationViewModel: ObservableObject {
                     targetLang: targetLang,
                     token: token,
                     authVM: authVM,
-                    asrTier: fastAsrTier
+                    asrTier: fastAsrTier,
+                    sessionId: currentSpeakerSessionId
                 )
-                print("[Fast] Got result: \(result.transcription.prefix(50))...")
+                print("[Fast] Got result: \(result.transcription.prefix(50))... speaker=\(result.speaker_id ?? "nil")")
 
-                await MainActor.run {
-                    self.updateSegment(id: segmentId) { seg in
-                        seg.transcription = result.transcription
-                        seg.translation = result.translation
-                        seg.status = .done
-                        // Non-recording uploads and tail segments after stop
-                        // have no slow pipeline pass, so fast result is final.
-                        if !shouldEnterSlowPipeline {
+                // Filter ASR hallucinations (common phantom outputs on low-energy audio)
+                if Self.isHallucination(result.transcription) {
+                    print("[Fast] Filtered hallucination: \"\(result.transcription)\"")
+                    await MainActor.run {
+                        self.updateSegment(id: segmentId) { seg in
+                            seg.transcription = ""
+                            seg.translation = ""
+                            seg.status = .done
                             seg.isFinal = true
                         }
                     }
-                    // Clear any previous error (e.g. 502) now that API is responding
-                    if self.lastError != nil {
-                        self.lastError = nil
+                } else {
+                    await MainActor.run {
+                        self.updateSegment(id: segmentId) { seg in
+                            seg.transcription = result.transcription
+                            seg.translation = result.translation
+                            seg.status = .done
+                            seg.speakerId = result.speaker_id
+                            seg.isFinal = fastIsFinal
+                        }
+                        // Clear fast-pipeline errors now that API is responding,
+                        // but preserve slow-pipeline errors (prefixed with [慢管道])
+                        if let err = self.lastError, !err.hasPrefix("[慢管道]") {
+                            self.lastError = nil
+                        }
                     }
                 }
             } catch let error as APIError where error.isGroqKeyRevoked {
@@ -312,9 +407,7 @@ final class InterpretationViewModel: ObservableObject {
                             seg.translation = local.translation
                             seg.status = .done
                             seg.isOffline = true
-                            if !shouldEnterSlowPipeline {
-                                seg.isFinal = true
-                            }
+                            seg.isFinal = true
                         }
                     }
                 } else {
@@ -345,7 +438,8 @@ final class InterpretationViewModel: ObservableObject {
         targetLang: String,
         token: String?,
         authVM: AuthViewModel?,
-        asrTier: String = "free"
+        asrTier: String = "free",
+        sessionId: String? = nil
     ) async throws -> TranscribeTranslateResponse {
         let client = try APIClient(baseURLString: baseURLString, accessToken: token)
         do {
@@ -353,7 +447,8 @@ final class InterpretationViewModel: ObservableObject {
                 fileURL: fileURL,
                 sourceLang: sourceLang,
                 targetLang: targetLang,
-                asrTier: asrTier
+                asrTier: asrTier,
+                sessionId: sessionId
             )
             // Update balance if returned
             if let balance = result.balance_seconds {
@@ -376,7 +471,8 @@ final class InterpretationViewModel: ObservableObject {
                         fileURL: fileURL,
                         sourceLang: sourceLang,
                         targetLang: targetLang,
-                        asrTier: asrTier
+                        asrTier: asrTier,
+                        sessionId: sessionId
                     )
                     if let balance = result.balance_seconds {
                         await MainActor.run { self.creditBalance = balance }
@@ -386,7 +482,12 @@ final class InterpretationViewModel: ObservableObject {
             }
             throw APIError.unauthorized
         } catch APIError.insufficientCredits(let balance, _) {
-            await MainActor.run { self.creditBalance = balance }
+            await MainActor.run {
+                self.creditBalance = balance
+                if balance <= 0 {
+                    self.asrTier = "free"
+                }
+            }
             throw APIError.insufficientCredits(balance: balance, required: 0)
         }
     }
@@ -397,6 +498,20 @@ final class InterpretationViewModel: ObservableObject {
             let service = try CreditService(baseURLString: apiBaseURL, accessToken: token)
             let response = try await service.getBalance()
             self.creditBalance = response.balance_seconds
+        } catch APIError.unauthorized {
+            // Token expired — try refresh and retry once
+            if let authVM = authViewModel {
+                let refreshed = await authVM.refreshAccessToken()
+                if refreshed, let newToken = KeychainService.load(.accessToken) {
+                    do {
+                        let retryService = try CreditService(baseURLString: apiBaseURL, accessToken: newToken)
+                        let response = try await retryService.getBalance()
+                        self.creditBalance = response.balance_seconds
+                    } catch {
+                        print("[Credits] fetchBalance retry error: \(error)")
+                    }
+                }
+            }
         } catch {
             print("[Credits] fetchBalance error: \(error)")
         }
@@ -430,14 +545,32 @@ final class InterpretationViewModel: ObservableObject {
             return
         }
 
-        print("[Slow] Flushing \(entryIds.count) segments")
+        // Validate accumulated audio file before sending
+        let fileSize: Int
+        do {
+            let attrs = try FileManager.default.attributesOfItem(atPath: accumulatedURL.path)
+            fileSize = (attrs[.size] as? Int) ?? 0
+        } catch {
+            print("[Slow] Cannot read accumulated file attributes: \(error)")
+            for entryId in entryIds { updateSegment(id: entryId) { $0.isFinal = true } }
+            return
+        }
+        if fileSize < 100 {
+            print("[Slow] Accumulated audio too small (\(fileSize) bytes), skipping")
+            try? FileManager.default.removeItem(at: accumulatedURL)
+            for entryId in entryIds { updateSegment(id: entryId) { $0.isFinal = true } }
+            return
+        }
 
         let sourceLang = self.sourceLang
         let targetLang = self.targetLang
         let baseURLString = self.apiBaseURL
         let token = KeychainService.load(.accessToken)
         let authVM = self.authViewModel
-        let currentAsrTier = self.asrTier
+        // Slow pipeline: use DashScope (premium) for quality, no speaker session
+        let slowAsrTier = self.slowPipelineTier
+
+        print("[Slow] Flushing \(entryIds.count) segments, tier=\(slowAsrTier), audioSize=\(fileSize)B, hasToken=\(token != nil)")
 
         Task.detached {
             defer { try? FileManager.default.removeItem(at: accumulatedURL) }
@@ -450,7 +583,7 @@ final class InterpretationViewModel: ObservableObject {
                     targetLang: targetLang,
                     token: token,
                     authVM: authVM,
-                    asrTier: currentAsrTier
+                    asrTier: slowAsrTier
                 )
 
                 print("[Slow] Got result: \(result.transcription.prefix(80))...")
@@ -487,41 +620,27 @@ final class InterpretationViewModel: ObservableObject {
                         token: token
                     )
                 }
+            } catch let apiError as APIError {
+                print("[Slow] API error (tier=\(slowAsrTier)): \(apiError)")
+                // Fast pipeline already has results in these segments;
+                // just promote them to final instead of overwriting.
+                await MainActor.run {
+                    for entryId in entryIds {
+                        self.updateSegment(id: entryId) { seg in
+                            seg.isFinal = true
+                        }
+                    }
+                    self.lastError = "[慢管道] \(apiError.friendlyMessage)"
+                }
             } catch {
-                print("[Slow] Network error: \(error), trying local fallback...")
-
-                let localResult = await self.attemptLocalFallback(
-                    fileURL: accumulatedURL, sourceLang: sourceLang, targetLang: targetLang
-                )
-                if let local = localResult {
-                    print("[Slow] Local fallback succeeded")
-                    await MainActor.run {
-                        for (i, entryId) in entryIds.enumerated() {
-                            self.updateSegment(id: entryId) { seg in
-                                if i == 0 {
-                                    seg.transcription = local.transcription
-                                    seg.translation = local.translation
-                                    seg.status = .done
-                                    seg.isFinal = true
-                                    seg.isOffline = true
-                                } else {
-                                    seg.transcription = ""
-                                    seg.translation = ""
-                                    seg.status = .done
-                                    seg.isFinal = true
-                                }
-                            }
+                print("[Slow] Unexpected error (tier=\(slowAsrTier)): \(error)")
+                await MainActor.run {
+                    for entryId in entryIds {
+                        self.updateSegment(id: entryId) { seg in
+                            seg.isFinal = true
                         }
                     }
-                } else {
-                    print("[Slow] Local fallback also unavailable, marking segments as final with fast results")
-                    await MainActor.run {
-                        for entryId in entryIds {
-                            self.updateSegment(id: entryId) { seg in
-                                seg.isFinal = true
-                            }
-                        }
-                    }
+                    self.lastError = "[慢管道] \(error.friendlyMessage)"
                 }
             }
         }
@@ -558,6 +677,33 @@ final class InterpretationViewModel: ObservableObject {
             print("[Refine] Error: \(error)")
             // Refinement failure is non-critical, keep slow pipeline result
         }
+    }
+
+    // MARK: - ASR Hallucination Filter
+
+    /// Known ASR hallucination phrases produced on low-energy or near-silent audio.
+    private nonisolated static let hallucinationPatterns: Set<String> = [
+        "thank you", "thank you.", "thank you!", "thanks.",
+        "thanks for watching", "thanks for watching.",
+        "thanks for listening", "thanks for listening.",
+        "subscribe", "like and subscribe",
+        "bye", "bye.", "bye bye", "goodbye",
+        "you", "the end", "the end.",
+        "字幕由amara.org社区提供",
+        "谢谢观看", "谢谢", "感谢收看",
+        "请订阅", "再见",
+    ]
+
+    private nonisolated static func isHallucination(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        // Exact match against known patterns
+        if hallucinationPatterns.contains(trimmed.lowercased()) { return true }
+        // Very short text (≤3 chars) is likely noise
+        if trimmed.count <= 3 { return true }
+        // Repeated punctuation or whitespace only
+        if trimmed.allSatisfy({ $0.isPunctuation || $0.isWhitespace }) { return true }
+        return false
     }
 
     // MARK: - Local Offline Fallback
@@ -658,37 +804,54 @@ final class InterpretationViewModel: ObservableObject {
             segmentSessionMap[seg.id] == sessionID
         }
 
-        let transcription = sessionSegments
-            .map { $0.transcription.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-
-        let translation = sessionSegments
-            .map { $0.translation.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+        let transcription = Self.joinWithSpeakerLabels(sessionSegments, keyPath: \.transcription)
+        let translation = Self.joinWithSpeakerLabels(sessionSegments, keyPath: \.translation)
 
         if transcription.isEmpty, translation.isEmpty, pending.audioURL == nil {
             return
         }
-
-        let title = localRecordingTitle(
-            transcription: transcription,
-            translation: translation
-        )
 
         let createdAt = pending.createdAt
         let durationSeconds = pending.durationSeconds
         let sourceLang = pending.sourceLang
         let targetLang = pending.targetLang
         let audioURL = pending.audioURL
+        let baseURLString = self.apiBaseURL
+        let token = KeychainService.load(.accessToken)
+
+        // Prefer Cerebras-generated title, fall back to local extraction
+        let localTitle = localRecordingTitle(
+            transcription: transcription,
+            translation: translation
+        )
 
         Task { [weak self] in
+            // Try remote title generation first
+            var title = localTitle
             do {
+                let client = try APIClient(baseURLString: baseURLString, accessToken: token)
+                let preferred = !translation.isEmpty ? translation : transcription
+                if !preferred.isEmpty {
+                    let generated = try await client.generateTitle(text: preferred)
+                    if !generated.isEmpty {
+                        title = generated
+                        print("[LocalArchive] Cerebras title: \(title)")
+                    }
+                }
+            } catch {
+                print("[LocalArchive] generateTitle failed, using local: \(error)")
+            }
+
+            // Ensure uniqueness
+            guard let self else { return }
+            title = self.uniquedLocalRecordingTitle(title)
+
+            do {
+                let finalTitle = title
                 let saved = try await Task.detached(priority: .utility) {
                     try LocalRecordingStore.addRecording(
                         createdAt: createdAt,
-                        title: title,
+                        title: finalTitle,
                         durationSeconds: durationSeconds,
                         sourceLang: sourceLang,
                         targetLang: targetLang,
@@ -697,16 +860,45 @@ final class InterpretationViewModel: ObservableObject {
                         audioTempURL: audioURL
                     )
                 }.value
-                guard let self else { return }
                 self.localRecordings.insert(saved, at: 0)
             } catch {
                 if let audioURL {
                     try? FileManager.default.removeItem(at: audioURL)
                 }
-                guard let self else { return }
                 self.lastError = error.friendlyMessage
             }
         }
+    }
+
+    /// Join segment texts with 【S1】/【S2】 labels on speaker change.
+    private static func joinWithSpeakerLabels(
+        _ segments: [SegmentResult],
+        keyPath: KeyPath<SegmentResult, String>
+    ) -> String {
+        var parts: [String] = []
+        var lastSpeakerId: String? = nil
+
+        for seg in segments {
+            let text = seg[keyPath: keyPath].trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.isEmpty { continue }
+
+            if let currentSpeaker = seg.speakerId, currentSpeaker != lastSpeakerId {
+                // Extract short label: "speaker_0" → "S1", "speaker_1" → "S2"
+                let label: String
+                if let numStr = currentSpeaker.split(separator: "_").last,
+                   let num = Int(numStr) {
+                    label = "S\(num + 1)"
+                } else {
+                    label = currentSpeaker
+                }
+                parts.append("\n【\(label)】\(text)")
+                lastSpeakerId = currentSpeaker
+            } else {
+                parts.append(text)
+            }
+        }
+
+        return parts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func localRecordingTitle(
@@ -720,7 +912,15 @@ final class InterpretationViewModel: ObservableObject {
     }
 
     private func normalizeTitleSource(_ text: String) -> String {
-        text
+        // Strip speaker labels like 【S1】before extracting title
+        var cleaned = text
+        let labelPattern = try? NSRegularExpression(pattern: "【S\\d+】", options: [])
+        if let regex = labelPattern {
+            cleaned = regex.stringByReplacingMatches(
+                in: cleaned, range: NSRange(cleaned.startIndex..., in: cleaned), withTemplate: ""
+            )
+        }
+        return cleaned
             .replacingOccurrences(of: "\n", with: " ")
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")

@@ -6,6 +6,8 @@ struct TranscribeTranslateResponse: Decodable, Sendable {
     let source_lang: String?
     let target_lang: String?
     let balance_seconds: Int?
+    let speaker_id: String?
+    let speaker_confidence: Double?
 }
 
 struct SegmentResult: Identifiable, Sendable {
@@ -27,6 +29,7 @@ struct SegmentResult: Identifiable, Sendable {
     var isFinal: Bool
     var isRefined: Bool
     var isOffline: Bool
+    var speakerId: String?
 
     init(seq: Int) {
         self.id = UUID()
@@ -39,6 +42,7 @@ struct SegmentResult: Identifiable, Sendable {
         self.isFinal = false
         self.isRefined = false
         self.isOffline = false
+        self.speakerId = nil
     }
 }
 
@@ -83,7 +87,7 @@ let allSourceLanguages: [LangOption] = [
     .init(id: "hu", name: "Magyar"),
     .init(id: "ro", name: "Română"),
     .init(id: "fa", name: "فارسی"),
-    .init(id: "fil", name: "Filipino"),
+    .init(id: "tl", name: "Filipino"),
     .init(id: "mk", name: "Македонски"),
 ]
 
@@ -133,6 +137,7 @@ struct UserProfileResponse: Decodable {
     let email: String
     let nickname: String?
     var has_groq_key: Bool?
+    var groq_api_key: String?
 }
 
 struct TokenRefreshResponse: Decodable {

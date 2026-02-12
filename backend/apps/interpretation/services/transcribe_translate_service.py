@@ -369,25 +369,35 @@ def _dashscope_asr_transcribe(file_path: str) -> str:
     if not api_key:
         raise RuntimeError("DASHSCOPE_API_KEY not configured")
 
+    t0 = time.monotonic()
     from common.utils.dashscope_utils import upload_to_dashscope
     oss_url = upload_to_dashscope(file_path, api_key, model="qwen3-asr-flash")
     if not oss_url:
         raise RuntimeError("Failed to upload audio to DashScope OSS")
+    logger.info("[DashScope] OSS upload took %.2fs", time.monotonic() - t0)
 
     import dashscope
     from common.utils.dashscope_utils import get_dashscope_http_api_url
     dashscope.base_http_api_url = get_dashscope_http_api_url()
 
-    response = dashscope.MultiModalConversation.call(
-        api_key=api_key,
-        model="qwen3-asr-flash",
-        messages=[{
-            "role": "user",
-            "content": [{"audio": oss_url}],
-        }],
-    )
+    t1 = time.monotonic()
+    try:
+        response = dashscope.MultiModalConversation.call(
+            api_key=api_key,
+            model="qwen3-asr-flash",
+            messages=[{
+                "role": "user",
+                "content": [{"audio": oss_url}],
+            }],
+        )
+    except Exception as e:
+        logger.error("[DashScope] MultiModalConversation.call exception after %.2fs: %s",
+                     time.monotonic() - t1, e, exc_info=True)
+        raise RuntimeError(f"DashScope ASR call failed: {e}")
+    logger.info("[DashScope] ASR call took %.2fs", time.monotonic() - t1)
 
     if response.status_code != 200:
+        logger.error("[DashScope] ASR error: code=%s msg=%s", response.code, response.message)
         raise RuntimeError(
             f"DashScope ASR error: {response.code} {response.message}"
         )
@@ -402,10 +412,12 @@ def _dashscope_asr_transcribe(file_path: str) -> str:
         else:
             text = str(content)
     except (IndexError, KeyError, AttributeError) as e:
+        logger.error("[DashScope] Failed to parse response: %s, raw output: %s", e, response.output)
         raise RuntimeError(f"Failed to parse DashScope ASR response: {e}")
 
     text = text.strip()
-    logger.info("DashScope ASR (qwen3-asr-flash) done (%d chars)", len(text))
+    logger.info("DashScope ASR (qwen3-asr-flash) done (%d chars, total %.2fs)",
+                len(text), time.monotonic() - t0)
     return text
 
 
@@ -453,11 +465,13 @@ def transcribe_and_translate(
     Full pipeline: ASR transcription → Cerebras translation.
 
     asr_tier:
-      - "free"    → Groq Whisper / Qwen3-ASR (existing behavior)
-      - "premium" → DashScope qwen3-asr-flash (paid)
+      - "free"           → Groq Whisper / Qwen3-ASR (existing behavior)
+      - "premium"        → DashScope qwen3-asr-flash (quality tier)
+      - "speaker_gpu"    → GPU server Qwen3-ASR + CAM++ speaker identification
+      - "speaker_tingwu" → TingWu speaker transcription (coming soon)
 
     session_id: optional speaker session ID for speaker identification
-      (only effective when ASR_PROVIDER=qwen3 and GPU server supports it)
+      (only effective when asr_tier="speaker_gpu")
 
     Returns dict: { transcription, translation, source_lang, target_lang,
                     speaker_id, speaker_confidence }
@@ -467,13 +481,19 @@ def transcribe_and_translate(
     speaker_id = None
     speaker_confidence = None
 
-    if asr_tier == "premium":
-        # Premium: GPU server Qwen3-ASR + speaker identification
+    if asr_tier == "speaker_gpu":
+        # GPU server: Qwen3-ASR + CAM++ speaker identification
         result = _gpu_server_transcribe(file_path, source_lang, session_id=session_id)
         text = result["text"]
         speaker_id = result["speaker_id"]
         speaker_confidence = result["speaker_confidence"]
-        logger.info("[TIMING] GPU server ASR (premium) took %.2fs", time.monotonic() - t0)
+        logger.info("[TIMING] GPU server ASR (speaker_gpu) took %.2fs", time.monotonic() - t0)
+    elif asr_tier == "speaker_tingwu":
+        raise NotImplementedError("TingWu speaker transcription coming soon")
+    elif asr_tier == "premium":
+        # Premium: DashScope qwen3-asr-flash (quality tier)
+        text = _dashscope_asr_transcribe(file_path)
+        logger.info("[TIMING] DashScope ASR (premium) took %.2fs", time.monotonic() - t0)
     else:
         # Free: Groq Whisper or Qwen3-ASR fallback, no speaker identification
         text, _asr_model, _, _ = _transcribe(

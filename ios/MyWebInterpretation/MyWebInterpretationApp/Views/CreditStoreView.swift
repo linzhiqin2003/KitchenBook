@@ -35,12 +35,24 @@ struct CreditStoreView: View {
                 }
 
                 Section(header: Text("Buy Credits")) {
-                    if store.products.isEmpty {
+                    if store.isLoadingProducts {
                         HStack {
                             Spacer()
                             ProgressView("Loading products...")
                             Spacer()
                         }
+                        .padding(.vertical, 12)
+                    } else if store.products.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("无法加载商品")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Button("重试") {
+                                Task { await store.loadProducts() }
+                            }
+                            .font(.subheadline)
+                        }
+                        .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                     } else {
                         ForEach(store.products, id: \.id) { product in
@@ -66,7 +78,7 @@ struct CreditStoreView: View {
                 }
 
                 Section {
-                    Text("Premium ASR uses Qwen3-ASR-Flash for higher accuracy. Credits are deducted based on audio duration.")
+                    Text("高级模式提供更高精度的语音识别。额度按音频时长扣除。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -152,6 +164,10 @@ struct CreditStoreView: View {
                 await MainActor.run {
                     if let balance = response.balance_seconds {
                         vm.creditBalance = balance
+                        // Auto-switch to premium after purchasing credits
+                        if balance > 0 && vm.asrTier == "free" {
+                            vm.asrTier = "premium"
+                        }
                     }
                     if response.status == "duplicate" {
                         purchaseMessage = "Already processed"

@@ -29,10 +29,30 @@ targets:
         excludes:
           - Resources/Info-Debug.plist
           - Resources/Info-Release.plist
+      - path: Shared
     settings:
       base:
         PRODUCT_NAME: Interpretation
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: MyWebInterpretationApp/MyWebInterpretationApp.entitlements
+    dependencies:
+      - target: MyWebBroadcastExtension
     scheme:
       testTargets: []
       storeKitConfiguration: Configuration.storekit
+
+  MyWebBroadcastExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: BroadcastExtension
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_NAME: BroadcastExtension
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: BroadcastExtension/BroadcastExtension.entitlements
+    configFiles:
+      Debug: Configs/Debug-Extension.xcconfig
+      Release: Configs/Release-Extension.xcconfig

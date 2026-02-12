@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import UIKit
 
 enum AudioRecorderError: LocalizedError {
     case microphonePermissionDenied
@@ -22,7 +23,7 @@ final class AudioSegmentRecorder {
     var vadEnabled: Bool = true
     var vadThresholdDb: Float = -40.0
     var vadSilenceMs: Int = 300
-    var minSegmentSeconds: TimeInterval = 0.22
+    var minSegmentSeconds: TimeInterval = 0.5
     var maxSegmentSeconds: TimeInterval = 5.0
     var onSegmentReady: ((URL, Int, UUID) -> Void)?
     var onPowerUpdate: ((Float) -> Void)?
@@ -42,7 +43,7 @@ final class AudioSegmentRecorder {
     private var segmentSampleCount: Int = 0
     private var segmentSpeechPolls: Int = 0
     private var segmentTotalPolls: Int = 0
-    private static let minSegmentRMS: Float = 0.006
+    private static let minSegmentRMS: Float = 0.002
     private static let minSpeechRatio: Float = 0.08  // at least 8% of polls must detect speech
     private static let meterIntervalSeconds: TimeInterval = 0.04
 
@@ -55,6 +56,7 @@ final class AudioSegmentRecorder {
     private var storedOutputSettings: [String: Any]?
     private let audioLock = NSLock()
     private(set) var sessionID: UUID = UUID()
+    private var interruptionObserver: NSObjectProtocol?
 
     func start() async throws {
         print("🎙️ [Recorder] start() called, requesting mic permission...")
@@ -67,13 +69,21 @@ final class AudioSegmentRecorder {
         print("🎙️ [Recorder] audio session configured OK")
 
         let newEngine = AVAudioEngine()
-        do {
-            try newEngine.inputNode.setVoiceProcessingEnabled(true)
-            newEngine.inputNode.isVoiceProcessingBypassed = false
-            newEngine.inputNode.isVoiceProcessingAGCEnabled = true
-            print("🎙️ [Recorder] voice processing enabled (AGC=on)")
-        } catch {
-            print("🎙️ [Recorder] voice processing unavailable: \(error)")
+        // Voice processing (VPIO) is already partially handled by .voiceChat mode
+        // at the audio session level. Explicitly enabling it on the input node
+        // causes VPIO render errors on iPad. Only enable on iPhone.
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        if isPhone {
+            do {
+                try newEngine.inputNode.setVoiceProcessingEnabled(true)
+                newEngine.inputNode.isVoiceProcessingBypassed = false
+                newEngine.inputNode.isVoiceProcessingAGCEnabled = true
+                print("🎙️ [Recorder] voice processing enabled (AGC=on)")
+            } catch {
+                print("🎙️ [Recorder] voice processing unavailable: \(error)")
+            }
+        } else {
+            print("🎙️ [Recorder] skipping explicit VPIO on iPad (.voiceChat mode handles it)")
         }
 
         engine = newEngine
@@ -126,11 +136,21 @@ final class AudioSegmentRecorder {
         if vadEnabled {
             startMetering()
         }
+
+        registerInterruptionHandler()
     }
 
     func stop() {
         recording = false
         isPaused = false
+
+        // Remove interruption observer
+        if let observer = interruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+            interruptionObserver = nil
+        }
+
+        // Invalidate timer
         DispatchQueue.main.async { [weak self] in
             self?.meterTimer?.invalidate()
             self?.meterTimer = nil
@@ -157,16 +177,18 @@ final class AudioSegmentRecorder {
         guard recording, !isPaused else { return }
         isPaused = true
 
-        // Finalize current segment so it enters the pipeline
+        // Invalidate timer first
+        DispatchQueue.main.async { [weak self] in
+            self?.meterTimer?.invalidate()
+            self?.meterTimer = nil
+        }
+
+        // Finalize current segment so it enters the fast pipeline
         finishCurrentSegment(discard: false)
 
         // Pause engine — tap stays installed but we skip writes via isPaused flag
         engine?.pause()
 
-        DispatchQueue.main.async { [weak self] in
-            self?.meterTimer?.invalidate()
-            self?.meterTimer = nil
-        }
         print("🎙️ [Recorder] paused")
     }
 
@@ -181,6 +203,7 @@ final class AudioSegmentRecorder {
             return
         }
 
+        // Start a fresh segment — resume is new content
         do {
             try openNewSegmentFile()
         } catch {
@@ -352,6 +375,7 @@ final class AudioSegmentRecorder {
 
         // Max segment duration
         if elapsed >= maxSegmentSeconds {
+            print("[VAD] Segment #\(seq) reached maxDuration (\(String(format: "%.1f", elapsed))s), speech=\(segmentHasSpeech)")
             stopCurrentSegment()
             return
         }
@@ -386,6 +410,11 @@ final class AudioSegmentRecorder {
 
     private func stopCurrentSegment() {
         segmentStopRequested = true
+
+        // Invalidate timer synchronously — we're on the main thread (timer callback)
+        meterTimer?.invalidate()
+        meterTimer = nil
+
         finishCurrentSegment(discard: false)
 
         // Chain to next segment (engine keeps running, tap stays)
@@ -393,7 +422,11 @@ final class AudioSegmentRecorder {
             do {
                 try openNewSegmentFile()
                 if vadEnabled {
-                    startMetering()
+                    // Create new timer synchronously (already on main thread)
+                    meterTimer = Timer.scheduledTimer(withTimeInterval: Self.meterIntervalSeconds, repeats: true) { [weak self] _ in
+                        self?.pollMeters()
+                    }
+                    print("[Recorder] New meter timer created for segment #\(seq)")
                 }
             } catch {
                 print("[Recorder] next segment failed: \(error)")
@@ -403,10 +436,8 @@ final class AudioSegmentRecorder {
     }
 
     private func finishCurrentSegment(discard: Bool) {
-        DispatchQueue.main.async { [weak self] in
-            self?.meterTimer?.invalidate()
-            self?.meterTimer = nil
-        }
+        // Note: caller is responsible for timer management
+        // (stopCurrentSegment does it synchronously, stop/pause do it via async)
 
         audioLock.lock()
         segmentFile = nil  // close segment file
@@ -501,6 +532,61 @@ final class AudioSegmentRecorder {
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 continuation.resume(returning: granted)
             }
+        }
+    }
+
+    // MARK: - Audio Session Interruption Handling
+
+    private func registerInterruptionHandler() {
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleAudioInterruption(notification)
+        }
+    }
+
+    private func handleAudioInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+
+        switch type {
+        case .began:
+            print("🎙️ [Recorder] Audio session INTERRUPTED (began)")
+            // Engine is automatically paused by the system
+
+        case .ended:
+            print("🎙️ [Recorder] Audio session interruption ENDED")
+            guard recording, !isPaused else {
+                print("🎙️ [Recorder] Not recording or paused, skipping restart")
+                return
+            }
+
+            let shouldResume: Bool
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                shouldResume = AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume)
+            } else {
+                shouldResume = true
+            }
+
+            if shouldResume {
+                do {
+                    try AVAudioSession.sharedInstance().setActive(true, options: [])
+                    try engine?.start()
+                    print("🎙️ [Recorder] Engine restarted after interruption")
+                } catch {
+                    print("🎙️ [Recorder] Failed to restart engine after interruption: \(error)")
+                }
+            } else {
+                print("🎙️ [Recorder] System says should NOT resume")
+            }
+
+        @unknown default:
+            break
         }
     }
 }

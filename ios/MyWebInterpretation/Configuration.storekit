@@ -5,39 +5,9 @@
   ],
   "products" : [
     {
-      "displayPrice" : "0.99",
+      "displayPrice" : "10",
       "familyShareable" : false,
       "internalID" : "001",
-      "localizations" : [
-        {
-          "description" : "1 hour of Premium ASR",
-          "displayName" : "1 Hour",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "org.lzqqq.interpretation.credits.60",
-      "referenceName" : "Credits 1h",
-      "type" : "Consumable"
-    },
-    {
-      "displayPrice" : "3.99",
-      "familyShareable" : false,
-      "internalID" : "002",
-      "localizations" : [
-        {
-          "description" : "5 hours of Premium ASR",
-          "displayName" : "5 Hours",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "org.lzqqq.interpretation.credits.300",
-      "referenceName" : "Credits 5h",
-      "type" : "Consumable"
-    },
-    {
-      "displayPrice" : "6.99",
-      "familyShareable" : false,
-      "internalID" : "003",
       "localizations" : [
         {
           "description" : "10 hours of Premium ASR",
@@ -45,8 +15,38 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "org.lzqqq.interpretation.credits.600",
+      "productID" : "org.lzqqq.interpretation.credits.10h",
       "referenceName" : "Credits 10h",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "50",
+      "familyShareable" : false,
+      "internalID" : "002",
+      "localizations" : [
+        {
+          "description" : "50 hours of Premium ASR",
+          "displayName" : "50 Hours",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "org.lzqqq.interpretation.credits.50h",
+      "referenceName" : "Credits 50h",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "100",
+      "familyShareable" : false,
+      "internalID" : "003",
+      "localizations" : [
+        {
+          "description" : "100 hours of Premium ASR",
+          "displayName" : "100 Hours",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "org.lzqqq.interpretation.credits.100h",
+      "referenceName" : "Credits 100h",
       "type" : "Consumable"
     }
   ],

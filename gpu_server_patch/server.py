@@ -44,7 +44,7 @@ spk_model = None
 # ── Speaker Session Store (cross-segment speaker tracking) ──
 
 class SpeakerSessionStore:
-    SIMILARITY_THRESHOLD = 0.75
+    SIMILARITY_THRESHOLD = 0.55
     SESSION_TTL = 3600  # 1 hour
 
     def __init__(self):
