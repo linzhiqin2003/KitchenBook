@@ -141,15 +141,8 @@ def _clean_asr_output(text: str, lang_code: str) -> str:
     return cleaned
 
 
-def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
-    """Transcribe audio using self-hosted Qwen3-ASR-1.7B. Returns transcribed text."""
-    base_url = getattr(django_settings, 'QWEN3_ASR_BASE_URL', '')
-    if not base_url:
-        raise RuntimeError("QWEN3_ASR_BASE_URL not configured")
-
-    url = f"{base_url.rstrip('/')}/v1/audio/transcriptions"
-
-    # Build multipart/form-data manually using urllib (no requests dependency)
+def _build_multipart_body(file_path: str, fields: dict) -> tuple:
+    """Build multipart/form-data body. Returns (body_bytes, boundary)."""
     import mimetypes
     boundary = f"----WebKitFormBoundary{os.urandom(8).hex()}"
 
@@ -168,33 +161,18 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
     )
     parts.append(file_data)
     parts.append(b"\r\n")
-    # model field
-    parts.append(
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="model"\r\n\r\n'
-        f"Qwen/Qwen3-ASR-1.7B\r\n"
-    )
-    # response_format field
-    parts.append(
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="response_format"\r\n\r\n'
-        f"json\r\n"
-    )
-    # language field (optional) — map Whisper codes to Qwen3 codes
-    lang_code = source_lang.lower() if source_lang else ""
-    lang_code = _WHISPER_TO_QWEN3_LANG.get(lang_code, lang_code)
-    if lang_code and lang_code in _QWEN3_ASR_LANGS:
-        logger.info("Qwen3-ASR language set to: %s (from source_lang=%s)", lang_code, source_lang)
-        parts.append(
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="language"\r\n\r\n'
-            f"{lang_code}\r\n"
-        )
-    else:
-        logger.info("Qwen3-ASR language: auto-detect (source_lang=%s not in supported set)", source_lang)
+
+    # Additional form fields
+    for name, value in fields.items():
+        if value:
+            parts.append(
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                f"{value}\r\n"
+            )
+
     parts.append(f"--{boundary}--\r\n")
 
-    # Encode body
     body = b""
     for part in parts:
         if isinstance(part, str):
@@ -202,25 +180,107 @@ def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
         else:
             body += part
 
+    return body, boundary
+
+
+def _qwen3_asr_transcribe(file_path: str, source_lang: str = "") -> str:
+    """Transcribe audio using self-hosted Qwen3-ASR-1.7B (no speaker diarization).
+    Returns transcribed text."""
+    base_url = getattr(django_settings, 'QWEN3_ASR_BASE_URL', '')
+    if not base_url:
+        raise RuntimeError("QWEN3_ASR_BASE_URL not configured")
+
+    url = f"{base_url.rstrip('/')}/transcribe"
+
+    lang_code = source_lang.lower() if source_lang else ""
+    lang_code = _WHISPER_TO_QWEN3_LANG.get(lang_code, lang_code)
+    lang_name = _LANG_NAMES.get(lang_code, "")
+
+    if lang_name:
+        logger.info("Qwen3-ASR language: %s (from source_lang=%s)", lang_name, source_lang)
+    else:
+        logger.info("Qwen3-ASR language: auto-detect (source_lang=%s)", source_lang)
+
+    fields = {"diarize": "false"}
+    if lang_name:
+        fields["language"] = lang_name
+
+    body, boundary = _build_multipart_body(file_path, fields)
+
     req = urllib.request.Request(
         url,
         data=body,
         headers={
             "Content-Type": f"multipart/form-data; boundary={boundary}",
-            "Authorization": "Bearer EMPTY",
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=3) as resp:
+    with urllib.request.urlopen(req, timeout=10) as resp:
         data = json.loads(resp.read().decode("utf-8"))
 
     text = (data.get("text") or "").strip()
-
-    # Post-process: strip characters that don't belong to the expected language
     text = _clean_asr_output(text, lang_code)
 
     logger.info("Qwen3-ASR transcription done (%d chars, lang=%s)", len(text), lang_code)
     return text
+
+
+def _gpu_server_transcribe(file_path: str, source_lang: str = "", session_id: str = "") -> dict:
+    """Transcribe audio using GPU server (Qwen3-ASR + CAM++ speaker identification).
+
+    Uses /transcribe-with-speaker when session_id is provided (speaker tracking),
+    otherwise falls back to /transcribe (ASR only).
+
+    Returns dict: {"text": str, "speaker_id": str|None, "speaker_confidence": float|None}
+    """
+    base_url = getattr(django_settings, 'QWEN3_ASR_BASE_URL', '')
+    if not base_url:
+        raise RuntimeError("QWEN3_ASR_BASE_URL not configured")
+
+    lang_code = source_lang.lower() if source_lang else ""
+    lang_code = _WHISPER_TO_QWEN3_LANG.get(lang_code, lang_code)
+    lang_name = _LANG_NAMES.get(lang_code, "")
+
+    if session_id:
+        url = f"{base_url.rstrip('/')}/transcribe-with-speaker"
+        fields = {}
+        if lang_name:
+            fields["language"] = lang_name
+        fields["session_id"] = session_id
+    else:
+        url = f"{base_url.rstrip('/')}/transcribe"
+        fields = {"diarize": "false"}
+        if lang_name:
+            fields["language"] = lang_name
+
+    body, boundary = _build_multipart_body(file_path, fields)
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    text = (data.get("text") or "").strip()
+    text = _clean_asr_output(text, lang_code)
+
+    speaker_id = data.get("speaker_id")
+    speaker_confidence = data.get("speaker_confidence")
+
+    logger.info(
+        "GPU server transcription done (%d chars, lang=%s, speaker=%s, conf=%.2f)",
+        len(text), lang_code, speaker_id, speaker_confidence or 0,
+    )
+    return {
+        "text": text,
+        "speaker_id": speaker_id,
+        "speaker_confidence": speaker_confidence,
+    }
 
 
 _GROQ_WHISPER_PRIMARY = "whisper-large-v3"
@@ -350,12 +410,13 @@ def _dashscope_asr_transcribe(file_path: str) -> str:
 
 
 def _transcribe(file_path: str, source_lang: str = "", groq_api_key: str | None = None) -> tuple:
-    """Transcribe audio using the configured ASR provider.
+    """Transcribe audio using the configured ASR provider (free tier).
 
     Provider is controlled by the ASR_PROVIDER env var / Django setting:
       - "groq"  → Groq Whisper directly (default)
       - "qwen3" → Qwen3-ASR primary, Groq Whisper fallback
-    Returns (text, asr_model) tuple.
+    Returns (text, asr_model, speaker_id, speaker_confidence) tuple.
+    Speaker fields are always None for free tier.
     """
     provider = getattr(django_settings, 'ASR_PROVIDER', 'groq').lower().strip()
     # If user provides their own Groq key, always use Groq directly
@@ -364,11 +425,11 @@ def _transcribe(file_path: str, source_lang: str = "", groq_api_key: str | None 
     t0 = time.monotonic()
 
     if provider == "qwen3":
-        # Qwen3-ASR primary with Groq fallback
+        # Qwen3-ASR primary with Groq fallback (no speaker identification for free tier)
         try:
             text = _qwen3_asr_transcribe(file_path, source_lang)
             logger.info("[TIMING] Qwen3-ASR took %.2fs", time.monotonic() - t0)
-            return text, "Qwen3-ASR"
+            return text, "Qwen3-ASR", None, None
         except Exception as e:
             logger.warning("[TIMING] Qwen3-ASR failed after %.2fs, falling back to Groq Whisper: %s",
                            time.monotonic() - t0, e)
@@ -377,7 +438,7 @@ def _transcribe(file_path: str, source_lang: str = "", groq_api_key: str | None 
     t1 = time.monotonic()
     text = _groq_transcribe(file_path, groq_api_key=groq_api_key, source_lang=source_lang)
     logger.info("[TIMING] Groq Whisper took %.2fs (provider=%s)", time.monotonic() - t1, provider)
-    return text, "Groq Whisper"
+    return text, "Groq Whisper", None, None
 
 
 def transcribe_and_translate(
@@ -386,6 +447,7 @@ def transcribe_and_translate(
     target_lang: str,
     groq_api_key: str | None = None,
     asr_tier: str = "free",
+    session_id: str = "",
 ):
     """
     Full pipeline: ASR transcription → Cerebras translation.
@@ -394,16 +456,29 @@ def transcribe_and_translate(
       - "free"    → Groq Whisper / Qwen3-ASR (existing behavior)
       - "premium" → DashScope qwen3-asr-flash (paid)
 
-    Returns dict: { transcription, translation, source_lang, target_lang }
+    session_id: optional speaker session ID for speaker identification
+      (only effective when ASR_PROVIDER=qwen3 and GPU server supports it)
+
+    Returns dict: { transcription, translation, source_lang, target_lang,
+                    speaker_id, speaker_confidence }
     Raises on failure.
     """
     t0 = time.monotonic()
+    speaker_id = None
+    speaker_confidence = None
 
     if asr_tier == "premium":
-        text = _dashscope_asr_transcribe(file_path)
-        logger.info("[TIMING] DashScope ASR took %.2fs", time.monotonic() - t0)
+        # Premium: GPU server Qwen3-ASR + speaker identification
+        result = _gpu_server_transcribe(file_path, source_lang, session_id=session_id)
+        text = result["text"]
+        speaker_id = result["speaker_id"]
+        speaker_confidence = result["speaker_confidence"]
+        logger.info("[TIMING] GPU server ASR (premium) took %.2fs", time.monotonic() - t0)
     else:
-        text, _asr_model = _transcribe(file_path, source_lang, groq_api_key=groq_api_key)
+        # Free: Groq Whisper or Qwen3-ASR fallback, no speaker identification
+        text, _asr_model, _, _ = _transcribe(
+            file_path, source_lang, groq_api_key=groq_api_key,
+        )
 
     if not text:
         return {
@@ -411,6 +486,8 @@ def transcribe_and_translate(
             "translation": "",
             "source_lang": source_lang,
             "target_lang": target_lang,
+            "speaker_id": None,
+            "speaker_confidence": None,
         }
 
     translated = _cerebras_translate(text, source_lang, target_lang)
@@ -421,6 +498,8 @@ def transcribe_and_translate(
         "translation": translated,
         "source_lang": source_lang,
         "target_lang": target_lang,
+        "speaker_id": speaker_id,
+        "speaker_confidence": speaker_confidence,
     }
 
 
@@ -552,7 +631,7 @@ def transcribe_and_translate_stream(file_path: str, source_lang: str, target_lan
     pipeline_start = time.monotonic()
 
     # Step 1: ASR transcription (Qwen3-ASR primary, Groq Whisper fallback)
-    text, asr_model = _transcribe(file_path, source_lang)
+    text, asr_model, _, _ = _transcribe(file_path, source_lang)
     yield json.dumps({"event": "transcription", "text": text, "asr_model": asr_model}) + "\n"
 
     if not text:

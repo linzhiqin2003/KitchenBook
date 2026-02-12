@@ -269,7 +269,7 @@ ASR_PROVIDER = os.environ.get('ASR_PROVIDER', 'groq')
 
 # Qwen3-ASR 配置 (自部署 ASR 模型，ASR_PROVIDER=qwen3 时使用)
 # GPU 服务器需开放 8000 端口，Django 后端通过公网直连
-QWEN3_ASR_BASE_URL = os.environ.get('QWEN3_ASR_BASE_URL', 'http://117.50.185.34:8000')
+QWEN3_ASR_BASE_URL = os.environ.get('QWEN3_ASR_BASE_URL', 'http://117.50.218.176:8000')
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",

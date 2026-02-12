@@ -336,12 +336,15 @@ def transcribe_translate(request):
             GroqAllRateLimitedError, GroqKeyInvalidError,
         )
 
+        session_id = request.data.get('session_id', '')
+
         # Transcribe with user's key; key pool auto-rotates on 429
         try:
             result = transcribe_and_translate(
                 str(file_path), source_lang, target_lang,
                 groq_api_key=user_groq_key,
                 asr_tier=asr_tier,
+                session_id=session_id,
             )
         except GroqKeyInvalidError:
             if authenticated_user and user_groq_key:
@@ -444,6 +447,90 @@ def gen_title(request):
         return Response({'title': title})
     except Exception as e:
         logger.error(f"gen_title error: {e}", exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+from .services.tingwu_service import TingwuTaskManager
+
+
+@api_view(['POST'])
+def create_tingwu_task(request):
+    """
+    Create a Tingwu real-time recording task.
+
+    POST /api/interpretation/tingwu/create-task/
+      - source_lang: e.g. 'cn', 'en', 'ja', 'yue' (default: 'cn')
+      - enable_translation: bool (default: true)
+      - target_languages: list of language codes, e.g. ['en'] (default: ['en'])
+      - sample_rate: 8000 or 16000 (default: 16000)
+
+    Returns: { task_id, meeting_join_url, task_status }
+    """
+    source_lang = request.data.get('source_lang', 'cn')
+    enable_translation = request.data.get('enable_translation', True)
+    target_languages = request.data.get('target_languages', ['en'])
+    sample_rate = request.data.get('sample_rate', 16000)
+
+    try:
+        manager = TingwuTaskManager()
+        result = manager.create_realtime_task(
+            source_lang=source_lang,
+            enable_translation=enable_translation,
+            target_languages=target_languages,
+            sample_rate=sample_rate,
+        )
+        return Response({
+            'task_id': result['task_id'],
+            'meeting_join_url': result['meeting_join_url'],
+            'task_status': result['task_status'],
+        })
+    except Exception as e:
+        logger.error(f"create_tingwu_task error: {e}", exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def stop_tingwu_task(request):
+    """
+    Stop a running Tingwu real-time task.
+
+    POST /api/interpretation/tingwu/stop-task/
+      - task_id: The task ID to stop
+
+    Returns: raw Tingwu API response
+    """
+    task_id = request.data.get('task_id', '')
+    if not task_id:
+        return Response({'error': 'task_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        manager = TingwuTaskManager()
+        result = manager.stop_task(task_id)
+        return Response(result)
+    except Exception as e:
+        logger.error(f"stop_tingwu_task error: {e}", exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def get_tingwu_task_status(request):
+    """
+    Query Tingwu task status.
+
+    GET /api/interpretation/tingwu/task-status/?task_id=xxx
+
+    Returns: raw Tingwu API response with TaskStatus
+    """
+    task_id = request.GET.get('task_id', '')
+    if not task_id:
+        return Response({'error': 'task_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        manager = TingwuTaskManager()
+        result = manager.get_task_status(task_id)
+        return Response(result)
+    except Exception as e:
+        logger.error(f"get_tingwu_task_status error: {e}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
