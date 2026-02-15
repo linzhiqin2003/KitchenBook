@@ -54,7 +54,6 @@
     <div class="panel chart-panel trend-panel">
       <div class="trend-header">
         <h2>{{ trendMode === 'month' ? '月度趋势' : '日度趋势' }}</h2>
-        <button v-if="isZoomed" class="zoom-filter-btn" @click="applyTrendZoom">筛选此范围</button>
         <div class="trend-toggle">
           <button :class="{ active: trendMode === 'month' }" @click="trendMode = 'month'">月度</button>
           <button :class="{ active: trendMode === 'day' }" @click="trendMode = 'day'">日度</button>
@@ -192,8 +191,8 @@ const selectedCategory = ref<string | null>(null);
 const selectedMerchant = ref<string | null>(null);
 const selectedPayer = ref<string | null>(null);
 const selectedPeriod = ref<{ type: "day" | "month" | "range"; label: string; start: string; end: string } | null>(null);
-const trendZoomRange = ref<{ startIdx: number; endIdx: number } | null>(null);
-const isZoomed = computed(() => trendZoomRange.value !== null);
+let ignoreZoom = false;
+let zoomDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const sortKey = ref<"total_spent" | "last_purchased">("last_purchased");
 const sortDir = ref<"asc" | "desc">("desc");
 
@@ -258,6 +257,7 @@ const rangeLabel = computed(() => {
 });
 
 async function loadStats() {
+  ignoreZoom = true;
   try {
     let { start, end } = dateRange.value;
     // 趋势图点击筛选：覆盖日期范围
@@ -273,6 +273,8 @@ async function loadStats() {
   } catch (err: any) {
     if (err?.response?.status === 401) return;
     console.error("Failed to load stats:", err);
+  } finally {
+    setTimeout(() => { ignoreZoom = false; }, 300);
   }
 }
 
@@ -348,8 +350,11 @@ const visiblePages = computed(() => {
   return pages;
 });
 
-// 切换趋势模式时重置 zoom
-watch(trendMode, () => { trendZoomRange.value = null; });
+// 切换趋势模式时清除范围筛选
+watch(trendMode, () => {
+  if (zoomDebounceTimer) clearTimeout(zoomDebounceTimer);
+  if (selectedPeriod.value?.type === "range") selectedPeriod.value = null;
+});
 
 // 维度/时间段筛选变化 → 重新请求后端数据
 watch([selectedCategory, selectedMerchant, selectedPayer, selectedPeriod], () => {
@@ -401,36 +406,37 @@ const onTrendClick = (params: any) => {
 };
 
 const onTrendZoom = (params: any) => {
-  if (trendMode.value !== "day") return;
+  if (ignoreZoom || trendMode.value !== "day") return;
   const batch = params.batch ? params.batch[0] : params;
   const start = batch.start ?? 0;
   const end = batch.end ?? 100;
 
+  if (zoomDebounceTimer) clearTimeout(zoomDebounceTimer);
+
+  // 滑块恢复全范围 → 清除范围筛选
   if (start <= 0.5 && end >= 99.5) {
-    trendZoomRange.value = null;
+    if (selectedPeriod.value?.type === "range") {
+      selectedPeriod.value = null;
+    }
     return;
   }
 
-  const data = stats.value.by_day || [];
-  if (!data.length) return;
+  zoomDebounceTimer = setTimeout(() => {
+    const data = stats.value.by_day || [];
+    if (!data.length) return;
 
-  const startIdx = Math.max(0, Math.round((data.length - 1) * start / 100));
-  const endIdx = Math.min(data.length - 1, Math.round((data.length - 1) * end / 100));
-  trendZoomRange.value = { startIdx, endIdx };
-};
+    const startIdx = Math.max(0, Math.round((data.length - 1) * start / 100));
+    const endIdx = Math.min(data.length - 1, Math.round((data.length - 1) * end / 100));
+    const startDate = data[startIdx]?.day?.slice(0, 10) || "";
+    const endDate = data[endIdx]?.day?.slice(0, 10) || "";
 
-const applyTrendZoom = () => {
-  if (!trendZoomRange.value) return;
-  const data = stats.value.by_day || [];
-  const { startIdx, endIdx } = trendZoomRange.value;
-  const startDate = data[startIdx]?.day?.slice(0, 10) || "";
-  const endDate = data[endIdx]?.day?.slice(0, 10) || "";
-
-  if (startDate && endDate) {
-    const label = `${startDate.slice(5)} ~ ${endDate.slice(5)}`;
-    selectedPeriod.value = { type: "range", label, start: startDate, end: endDate };
-  }
-  trendZoomRange.value = null;
+    if (startDate && endDate) {
+      const label = `${startDate.slice(5)} ~ ${endDate.slice(5)}`;
+      activePreset.value = "custom";
+      dateRange.value = { start: startDate, end: endDate };
+      selectedPeriod.value = { type: "range", label, start: startDate, end: endDate };
+    }
+  }, 500);
 };
 
 const onPayerClick = (params: any) => {
@@ -918,24 +924,6 @@ onMounted(() => {
   background: #fff;
   color: var(--accent);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.zoom-filter-btn {
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  color: #fff;
-  background: rgba(82,132,240,0.8);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  animation: fadeIn 0.3s ease;
-}
-
-.zoom-filter-btn:hover {
-  background: rgba(82,132,240,1);
 }
 
 .trend-chart-inner {
