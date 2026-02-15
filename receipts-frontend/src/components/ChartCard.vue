@@ -7,7 +7,10 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as echarts from "echarts";
 
 const props = defineProps<{ options: echarts.EChartsOption }>();
-const emit = defineEmits<{ (e: "chartClick", params: any): void }>();
+const emit = defineEmits<{
+  (e: "chartClick", params: any): void;
+  (e: "chartDatazoom", params: any): void;
+}>();
 const chartEl = ref<HTMLDivElement | null>(null);
 let chart: echarts.ECharts | null = null;
 
@@ -52,6 +55,7 @@ onMounted(() => {
   render();
   if (chart) {
     chart.on("click", (params: any) => emit("chartClick", params));
+    chart.on("datazoom", (params: any) => emit("chartDatazoom", params));
   }
   window.addEventListener("resize", handleResize);
 });
