@@ -776,8 +776,6 @@ class StatsOverviewView(APIView):
                 items_qs_pre = items_qs_pre.filter(category_main__isnull=True)
             else:
                 items_qs_pre = items_qs_pre.filter(category_main__name=filter_category)
-            # 缩小 receipts 范围，让 by_day/by_month/by_merchant/by_payer 也跟随过滤
-            receipts = receipts.filter(id__in=items_qs_pre.values("receipt_id"))
 
         if filter_category:
             totals = {
@@ -801,40 +799,74 @@ class StatsOverviewView(APIView):
             .order_by("-total")
         )
 
-        by_month = (
-            receipts.annotate(month=TruncMonth("purchased_at"))
-            .values("month")
-            .annotate(total=Coalesce(models.Sum("total"), Decimal("0")))
-            .order_by("month")
-        )
-
-        by_day = (
-            receipts
-            .annotate(day=TruncDate("purchased_at"))
-            .values("day")
-            .annotate(total=Coalesce(models.Sum("total"), Decimal("0")))
-            .order_by("day")
-        )
-
-        by_merchant = (
-            receipts
-            .annotate(
-                merchant_name=Coalesce(
-                    models.Case(
-                        models.When(merchant="", then=Value("未知店铺")),
-                        default=models.F("merchant"),
-                        output_field=models.CharField(),
-                    ),
-                    Value("未知店铺"),
+        # category 筛选时：所有图表基于明细级 total_price 聚合，而非收据级 total
+        if filter_category:
+            by_month = (
+                items_qs
+                .annotate(month=TruncMonth("receipt__purchased_at"))
+                .values("month")
+                .annotate(total=Coalesce(models.Sum("total_price"), Decimal("0")))
+                .order_by("month")
+            )
+            by_day = (
+                items_qs
+                .annotate(day=TruncDate("receipt__purchased_at"))
+                .values("day")
+                .annotate(total=Coalesce(models.Sum("total_price"), Decimal("0")))
+                .order_by("day")
+            )
+            by_merchant = (
+                items_qs
+                .annotate(
+                    merchant_name=Coalesce(
+                        models.Case(
+                            models.When(receipt__merchant="", then=Value("未知店铺")),
+                            default=models.F("receipt__merchant"),
+                            output_field=models.CharField(),
+                        ),
+                        Value("未知店铺"),
+                    )
                 )
+                .values("merchant_name")
+                .annotate(
+                    total=Coalesce(models.Sum("total_price"), Decimal("0")),
+                    count=models.Count("receipt", distinct=True),
+                )
+                .order_by("-total")
             )
-            .values("merchant_name")
-            .annotate(
-                total=Coalesce(models.Sum("total"), Decimal("0")),
-                count=models.Count("id"),
+        else:
+            by_month = (
+                receipts.annotate(month=TruncMonth("purchased_at"))
+                .values("month")
+                .annotate(total=Coalesce(models.Sum("total"), Decimal("0")))
+                .order_by("month")
             )
-            .order_by("-total")
-        )
+            by_day = (
+                receipts
+                .annotate(day=TruncDate("purchased_at"))
+                .values("day")
+                .annotate(total=Coalesce(models.Sum("total"), Decimal("0")))
+                .order_by("day")
+            )
+            by_merchant = (
+                receipts
+                .annotate(
+                    merchant_name=Coalesce(
+                        models.Case(
+                            models.When(merchant="", then=Value("未知店铺")),
+                            default=models.F("merchant"),
+                            output_field=models.CharField(),
+                        ),
+                        Value("未知店铺"),
+                    )
+                )
+                .values("merchant_name")
+                .annotate(
+                    total=Coalesce(models.Sum("total"), Decimal("0")),
+                    count=models.Count("id"),
+                )
+                .order_by("-total")
+            )
 
         recent_items = (
             items_qs
@@ -861,25 +893,46 @@ class StatsOverviewView(APIView):
 
         # by_payer aggregation (only in org mode)
         if org_id:
-            by_payer = (
-                receipts
-                .annotate(
-                    payer_name=Coalesce(
-                        models.Case(
-                            models.When(payer="", then=Value("未指定")),
-                            default=models.F("payer"),
-                            output_field=models.CharField(),
-                        ),
-                        Value("未指定"),
+            if filter_category:
+                by_payer = (
+                    items_qs
+                    .annotate(
+                        payer_name=Coalesce(
+                            models.Case(
+                                models.When(receipt__payer="", then=Value("未指定")),
+                                default=models.F("receipt__payer"),
+                                output_field=models.CharField(),
+                            ),
+                            Value("未指定"),
+                        )
                     )
+                    .values("payer_name")
+                    .annotate(
+                        total=Coalesce(models.Sum("total_price"), Decimal("0")),
+                        count=models.Count("receipt", distinct=True),
+                    )
+                    .order_by("-total")
                 )
-                .values("payer_name")
-                .annotate(
-                    total=Coalesce(models.Sum("total"), Decimal("0")),
-                    count=models.Count("id"),
+            else:
+                by_payer = (
+                    receipts
+                    .annotate(
+                        payer_name=Coalesce(
+                            models.Case(
+                                models.When(payer="", then=Value("未指定")),
+                                default=models.F("payer"),
+                                output_field=models.CharField(),
+                            ),
+                            Value("未指定"),
+                        )
+                    )
+                    .values("payer_name")
+                    .annotate(
+                        total=Coalesce(models.Sum("total"), Decimal("0")),
+                        count=models.Count("id"),
+                    )
+                    .order_by("-total")
                 )
-                .order_by("-total")
-            )
             data["by_payer"] = list(by_payer)
             members = OrganizationMember.objects.filter(
                 org_id=org_id
