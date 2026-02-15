@@ -280,6 +280,7 @@ async function loadStats() {
 
 function applyPreset(key: PresetKey) {
   activePreset.value = key;
+  selectedPeriod.value = null;
   if (key === "custom") return; // 等用户选日期
   dateRange.value = calcPresetRange(key);
   loadStats();
@@ -287,11 +288,13 @@ function applyPreset(key: PresetKey) {
 
 function onCustomStart(e: Event) {
   dateRange.value.start = (e.target as HTMLInputElement).value;
+  selectedPeriod.value = null;
   loadStats();
 }
 
 function onCustomEnd(e: Event) {
   dateRange.value.end = (e.target as HTMLInputElement).value;
+  selectedPeriod.value = null;
   loadStats();
 }
 
