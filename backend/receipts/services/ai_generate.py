@@ -1,10 +1,28 @@
 import json
-import os
 from datetime import datetime
 
 from cerebras.cloud.sdk import Cerebras
+from django.conf import settings
 
 from .doubao import _build_prompt, _strip_json_fences
+
+
+# ── Cerebras key pool (mirrors api/tools.py) ──
+_cerebras_key_index = 0
+
+
+def _get_cerebras_key():
+    """从 key pool 中轮询取一个 Cerebras API key"""
+    global _cerebras_key_index
+    pool_str = getattr(settings, 'CEREBRAS_API_KEY_POOL', '')
+    if not pool_str:
+        return None
+    keys = [k.strip() for k in pool_str.split(',') if k.strip()]
+    if not keys:
+        return None
+    key = keys[_cerebras_key_index % len(keys)]
+    _cerebras_key_index += 1
+    return key
 
 
 CHAT_INSTRUCTIONS = """
@@ -64,9 +82,9 @@ def chat_or_generate(messages: list[dict]) -> dict:
         {"type": "chat", "message": "..."} — AI asks a question
         {"type": "receipt", "content": "..."} — AI outputs receipt JSON
     """
-    api_key = os.environ.get("CEREBRAS_API_KEY")
+    api_key = _get_cerebras_key()
     if not api_key:
-        raise RuntimeError("Missing CEREBRAS_API_KEY")
+        raise RuntimeError("Missing CEREBRAS_API_KEY_POOL")
 
     client = Cerebras(api_key=api_key)
     system_prompt = _build_chat_prompt()
@@ -78,7 +96,8 @@ def chat_or_generate(messages: list[dict]) -> dict:
         messages=api_messages,
         temperature=0.3,
     )
-    raw = completion.choices[0].message.content.strip()
+    msg = completion.choices[0].message
+    raw = (msg.content or getattr(msg, 'reasoning', '') or '').strip()
 
     # Try to detect if the response is receipt JSON
     cleaned = _strip_json_fences(raw)
