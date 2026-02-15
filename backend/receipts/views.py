@@ -776,6 +776,8 @@ class StatsOverviewView(APIView):
                 items_qs_pre = items_qs_pre.filter(category_main__isnull=True)
             else:
                 items_qs_pre = items_qs_pre.filter(category_main__name=filter_category)
+            # 缩小 receipts 范围，让 by_day/by_month/by_merchant/by_payer 也跟随过滤
+            receipts = receipts.filter(id__in=items_qs_pre.values("receipt_id"))
 
         if filter_category:
             totals = {
