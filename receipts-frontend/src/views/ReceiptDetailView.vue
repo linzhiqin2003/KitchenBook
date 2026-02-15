@@ -294,9 +294,13 @@ const load = async () => {
       && !data.total && !data.notes && loadedItems.length === 0;
     await nextTick();
     recalcReady.value = true;
-  } catch (err) {
+  } catch (err: any) {
     console.error("加载收据失败:", err);
     recalcReady.value = true;
+    // 收据不存在或无权访问（切换组织后常见），跳回列表
+    if (err?.response?.status === 404 || err?.response?.status === 403) {
+      router.replace("/receipts");
+    }
   }
 };
 
