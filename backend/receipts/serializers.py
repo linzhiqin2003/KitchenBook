@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django.db import models
 from rest_framework import serializers
-from .models import CategoryMain, CategorySub, Receipt, ReceiptItem
+from .models import CategoryMain, CategorySub, Receipt, ReceiptImage, ReceiptItem
 
 
 def _normalize_text(value: str) -> str:
@@ -18,6 +18,12 @@ def _get_or_create_categories(main_name: str | None, sub_name: str | None) -> tu
         if sub_name:
             sub, _ = CategorySub.objects.get_or_create(main=main, name=sub_name)
     return main, sub
+
+
+class ReceiptImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReceiptImage
+        fields = ["id", "image", "order"]
 
 
 class ReceiptItemSerializer(serializers.ModelSerializer):
@@ -53,6 +59,7 @@ class ReceiptItemSerializer(serializers.ModelSerializer):
 
 class ReceiptSerializer(serializers.ModelSerializer):
     items = ReceiptItemSerializer(many=True, required=False)
+    images = ReceiptImageSerializer(many=True, read_only=True)
     uploader_name = serializers.SerializerMethodField()
     organization_id = serializers.UUIDField(source="organization.id", read_only=True, default=None)
     organization_name = serializers.CharField(source="organization.name", read_only=True, default="")
@@ -82,6 +89,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "items",
+            "images",
         ]
         read_only_fields = ["user_id", "status", "image", "raw_model_output", "raw_model_json", "created_at", "updated_at"]
 

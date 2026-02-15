@@ -84,6 +84,11 @@ JSON 结构要求：
 - 如果收据同时有中英文，以中文为准识别商品，忽略英文
 - merchant(商店名)和 address(地址)保留原文，不翻译
 - tags 中的规格信息保留原始标注(如 "130g", "310ml")
+
+多图说明：
+- 如果收到多张图片，它们属于同一张收据（正反面或分段拍摄）
+- 请综合所有图片信息，合并去重后输出一份完整的收据 JSON
+- 商品不要重复列出，如果多张图片有重叠部分请去重
 """.strip()
 
 _MERCHANTS_WITH_EXISTING = (
@@ -178,21 +183,30 @@ def _get_provider() -> str:
     return "ark"
 
 
-def _build_payload(image_path: str) -> tuple[dict, dict]:
-    """Build the API payload and connection info."""
+def _build_payload(image_paths: str | list[str]) -> tuple[dict, dict]:
+    """Build the API payload and connection info. Accepts single path or list of paths."""
     provider = _get_provider()
     prompt = _build_prompt()
-    image_url = _encode_image_to_data_url(image_path)
+
+    if isinstance(image_paths, str):
+        image_paths = [image_paths]
+
+    user_content: list[dict] = []
+    if len(image_paths) == 1:
+        user_content.append({"type": "text", "text": "请解析这张收据"})
+    else:
+        user_content.append({
+            "type": "text",
+            "text": f"以下 {len(image_paths)} 张图片属于同一张收据（可能是正反面或分段拍摄），请综合所有图片解析出一份完整账单。",
+        })
+
+    for path in image_paths:
+        image_url = _encode_image_to_data_url(path)
+        user_content.append({"type": "image_url", "image_url": {"url": image_url}})
 
     messages = [
         {"role": "system", "content": prompt},
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "请解析这张收据"},
-                {"type": "image_url", "image_url": {"url": image_url}},
-            ],
-        },
+        {"role": "user", "content": user_content},
     ]
 
     if provider == "openrouter":
@@ -243,8 +257,8 @@ def _strip_json_fences(text: str) -> str:
     return s.strip()
 
 
-def analyze_receipt(image_path: str) -> tuple[str, dict[str, Any]]:
-    payload, conn = _build_payload(image_path)
+def analyze_receipt(image_paths: str | list[str]) -> tuple[str, dict[str, Any]]:
+    payload, conn = _build_payload(image_paths)
     response = requests.post(conn["url"], json=payload, headers=conn["headers"], timeout=360)
     response.raise_for_status()
     data = response.json()
@@ -252,9 +266,9 @@ def analyze_receipt(image_path: str) -> tuple[str, dict[str, Any]]:
     return content, data
 
 
-def analyze_receipt_stream(image_path: str):
+def analyze_receipt_stream(image_paths: str | list[str]):
     """Stream analysis, yielding phase events: thinking / generating / done."""
-    payload, conn = _build_payload(image_path)
+    payload, conn = _build_payload(image_paths)
     payload["stream"] = True
 
     response = requests.post(

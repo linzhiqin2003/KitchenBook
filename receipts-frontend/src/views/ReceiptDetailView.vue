@@ -6,7 +6,7 @@
     </button>
   </div>
 
-  <div v-if="receipt && receipt.image" class="panel image-panel" style="margin-bottom: 20px;">
+  <div v-if="receipt && imageUrls.length" class="panel image-panel" style="margin-bottom: 20px;">
     <div class="image-header">
       <h2>原始收据</h2>
       <button class="button ghost" @click="showImage = !showImage">
@@ -14,13 +14,27 @@
         {{ showImage ? '收起' : '查看图片' }}
       </button>
     </div>
-    <div v-if="showImage" class="image-viewer">
-      <img :src="imageUrl" alt="收据原始图片" class="receipt-image" @click="fullscreen = true" />
+    <div v-if="showImage" class="image-gallery">
+      <img
+        v-for="(url, idx) in imageUrls"
+        :key="idx"
+        :src="url"
+        alt="收据原始图片"
+        class="receipt-image"
+        @click="lightboxIndex = idx"
+      />
     </div>
     <Teleport to="body">
-      <div v-if="fullscreen" class="lightbox" @click="fullscreen = false">
-        <img :src="imageUrl" alt="收据原始图片" class="lightbox-img" />
-        <button class="lightbox-close" @click.stop="fullscreen = false">
+      <div v-if="lightboxIndex !== null" class="lightbox" @click="lightboxIndex = null">
+        <button v-if="imageUrls.length > 1" class="lightbox-nav lightbox-prev" @click.stop="lightboxPrev">
+          <ChevronLeft :size="28" />
+        </button>
+        <img :src="imageUrls[lightboxIndex]" alt="收据原始图片" class="lightbox-img" @click.stop />
+        <button v-if="imageUrls.length > 1" class="lightbox-nav lightbox-next" @click.stop="lightboxNext">
+          <ChevronRight :size="28" />
+        </button>
+        <div v-if="imageUrls.length > 1" class="lightbox-counter">{{ lightboxIndex + 1 }} / {{ imageUrls.length }}</div>
+        <button class="lightbox-close" @click.stop="lightboxIndex = null">
           <X :size="24" />
         </button>
       </div>
@@ -181,7 +195,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-vue-next";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, X } from "lucide-vue-next";
 import { confirmReceipt, confirmReceiptWithSplit, deleteReceipt, getExchangeRate, getReceipt, moveReceiptItems, updateReceipt } from "../api/receipts";
 import ReceiptItemTable from "../components/ReceiptItemTable.vue";
 import { useAuthStore } from "../stores/auth";
@@ -198,7 +212,7 @@ const items = ref<any[]>([]);
 const message = ref<string | null>(null);
 const moveMessage = ref<string | null>(null);
 const showImage = ref(false);
-const fullscreen = ref(false);
+const lightboxIndex = ref<number | null>(null);
 const isEmptyOnLoad = ref(false);
 const isOwner = computed(() => receipt.value?.user_id === authStore.user?.id);
 const moveTargets = reactive<Record<number, string>>({});
@@ -211,12 +225,39 @@ const baselineTax = ref(0);
 const baselineDiscount = ref(0);
 let programmaticUpdate = false;
 
-const imageUrl = computed(() => {
-  if (!receipt.value?.image) return "";
-  const img = receipt.value.image;
+const resolveImageUrl = (img: string) => {
+  if (!img) return "";
   if (img.startsWith("http")) return img;
   return MEDIA_BASE + (img.startsWith("/") ? img : "/" + img);
+};
+
+const imageUrls = computed(() => {
+  if (!receipt.value) return [];
+  const imgs = receipt.value.images;
+  if (imgs && imgs.length > 0) {
+    return imgs.map((ri: any) => resolveImageUrl(ri.image));
+  }
+  if (receipt.value.image) {
+    return [resolveImageUrl(receipt.value.image)];
+  }
+  return [];
 });
+
+const lightboxPrev = () => {
+  if (lightboxIndex.value !== null && lightboxIndex.value > 0) {
+    lightboxIndex.value--;
+  } else if (lightboxIndex.value === 0) {
+    lightboxIndex.value = imageUrls.value.length - 1;
+  }
+};
+
+const lightboxNext = () => {
+  if (lightboxIndex.value !== null && lightboxIndex.value < imageUrls.value.length - 1) {
+    lightboxIndex.value++;
+  } else if (lightboxIndex.value === imageUrls.value.length - 1) {
+    lightboxIndex.value = 0;
+  }
+};
 
 // ISO string ↔ datetime-local format
 const toLocalDatetime = (iso: string | null) => {
@@ -661,7 +702,7 @@ onMounted(async () => {
   }
 }
 
-/* Image viewer */
+/* Image gallery */
 .image-header {
   display: flex;
   align-items: center;
@@ -681,14 +722,17 @@ onMounted(async () => {
   min-height: auto;
 }
 
-.image-viewer {
+.image-gallery {
   margin-top: 14px;
-  text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
 }
 
 .receipt-image {
   max-width: 100%;
-  max-height: 400px;
+  max-height: 300px;
   object-fit: contain;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -713,10 +757,11 @@ onMounted(async () => {
 }
 
 .lightbox-img {
-  max-width: 90vw;
-  max-height: 90vh;
+  max-width: 85vw;
+  max-height: 85vh;
   object-fit: contain;
   border-radius: 8px;
+  cursor: default;
 }
 
 .lightbox-close {
@@ -738,6 +783,48 @@ onMounted(async () => {
 
 .lightbox-close:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.lightbox-prev {
+  left: 20px;
+}
+
+.lightbox-next {
+  right: 20px;
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 14px;
+  border-radius: 20px;
 }
 
 </style>

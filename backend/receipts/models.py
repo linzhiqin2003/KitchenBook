@@ -67,6 +67,19 @@ class Receipt(models.Model):
         return f"Receipt {self.id}"
 
 
+class ReceiptImage(models.Model):
+    receipt = models.ForeignKey(Receipt, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to="receipts/%Y/%m/")
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "created_at"]
+
+    def __str__(self) -> str:
+        return f"ReceiptImage {self.id} (receipt={self.receipt_id})"
+
+
 class ReceiptItem(models.Model):
     receipt = models.ForeignKey(Receipt, on_delete=models.CASCADE, related_name="items")
     category_main = models.ForeignKey(

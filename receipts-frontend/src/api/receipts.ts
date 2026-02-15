@@ -61,9 +61,12 @@ export async function createReceipt(payload?: ReceiptPayload) {
   return data;
 }
 
-export async function uploadReceipt(file: File, payer?: string) {
+export async function uploadReceipt(files: File | File[], payer?: string) {
   const form = new FormData();
-  form.append("image", file);
+  const fileList = Array.isArray(files) ? files : [files];
+  for (const f of fileList) {
+    form.append("images", f);
+  }
   if (payer) form.append("payer", payer);
   const { data } = await api.post("/receipts/", form, {
     headers: { "Content-Type": "multipart/form-data" },
@@ -76,7 +79,7 @@ export async function uploadReceipt(file: File, payer?: string) {
 }
 
 export async function uploadReceiptStream(
-  file: File,
+  files: File | File[],
   payer: string,
   onPhase: (phase: string) => void,
 ): Promise<any> {
@@ -85,7 +88,10 @@ export async function uploadReceiptStream(
   const orgId = localStorage.getItem("active_org_id");
 
   const form = new FormData();
-  form.append("image", file);
+  const fileList = Array.isArray(files) ? files : [files];
+  for (const f of fileList) {
+    form.append("images", f);
+  }
   if (payer) form.append("payer", payer);
 
   const headers: Record<string, string> = {};

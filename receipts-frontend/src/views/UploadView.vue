@@ -2,11 +2,11 @@
   <!-- ─── 上传区域：解析完成后隐藏 ─── -->
   <div v-if="!receipt" class="panel upload-panel">
     <h2>上传收据照片</h2>
-    <p class="desc">上传后将自动调用视觉大模型解析，并生成可编辑账单。</p>
+    <p class="desc">上传后将自动调用视觉大模型解析，并生成可编辑账单。支持多张图片（最多 5 张）。</p>
 
     <div
       class="drop-zone"
-      :class="{ 'drop-zone--active': isDragging, 'drop-zone--has-file': !!preview }"
+      :class="{ 'drop-zone--active': isDragging, 'drop-zone--has-file': files.length > 0 }"
       @dragenter.prevent="isDragging = true"
       @dragover.prevent="isDragging = true"
       @dragleave.prevent="isDragging = false"
@@ -17,26 +17,35 @@
         ref="fileInput"
         type="file"
         accept="image/*"
+        multiple
         style="display: none"
         @change="onFileChange"
       />
 
-      <template v-if="!preview">
+      <template v-if="files.length === 0">
         <ImagePlus :size="44" class="drop-zone__icon" />
         <div class="drop-zone__title">拖拽图片到此处，或点击选择文件</div>
-        <div class="drop-zone__subtitle">支持 JPG / PNG / HEIC 格式</div>
+        <div class="drop-zone__subtitle">支持 JPG / PNG / HEIC 格式，最多 5 张</div>
       </template>
 
       <template v-else>
-        <div class="preview-wrapper">
-          <img :src="preview" alt="preview" class="preview-img" />
-          <div class="preview-info">
-            <div class="preview-name">{{ file?.name }}</div>
-            <div class="preview-size">{{ formatSize(file?.size || 0) }}</div>
-            <button class="button ghost" style="margin-top: 8px; padding: 6px 14px; font-size: 12px;" @click.stop="clearFile">
-              重新选择
+        <div class="thumbs-grid" @click.stop>
+          <div v-for="(p, idx) in previews" :key="idx" class="thumb-item">
+            <img :src="p" alt="preview" class="thumb-img" />
+            <span class="thumb-index">{{ idx + 1 }}</span>
+            <button class="thumb-remove" @click.stop="removeFile(idx)">
+              <X :size="14" />
             </button>
           </div>
+          <div v-if="files.length < 5" class="thumb-add" @click.stop="triggerFileInput">
+            <Plus :size="24" />
+          </div>
+        </div>
+        <div class="thumbs-summary">
+          {{ files.length }} 张图片，共 {{ formatSize(totalSize) }}
+          <button class="button ghost" style="margin-left: 12px; padding: 4px 10px; font-size: 12px;" @click.stop="clearFiles">
+            全部清除
+          </button>
         </div>
       </template>
     </div>
@@ -45,7 +54,7 @@
       <button
         class="button"
         :class="{ 'button--loading': loading }"
-        :disabled="!file || loading"
+        :disabled="files.length === 0 || loading"
         @click="submit"
       >
         <Loader2 v-if="loading" :size="16" class="spinner-icon" />
@@ -61,7 +70,7 @@
   <!-- ─── 解析结果：内联展示 ─── -->
   <template v-if="receipt">
     <!-- 原始图片 -->
-    <div v-if="receipt.image" class="panel image-panel" style="margin-bottom: 20px;">
+    <div v-if="imageUrls.length" class="panel image-panel" style="margin-bottom: 20px;">
       <div class="image-header">
         <h2>原始收据</h2>
         <button class="button ghost" @click="showImage = !showImage">
@@ -69,13 +78,27 @@
           {{ showImage ? '收起' : '查看图片' }}
         </button>
       </div>
-      <div v-if="showImage" class="image-viewer">
-        <img :src="imageUrl" alt="收据原始图片" class="receipt-image" @click="fullscreen = true" />
+      <div v-if="showImage" class="image-gallery">
+        <img
+          v-for="(url, idx) in imageUrls"
+          :key="idx"
+          :src="url"
+          alt="收据原始图片"
+          class="receipt-image"
+          @click="lightboxIndex = idx"
+        />
       </div>
       <Teleport to="body">
-        <div v-if="fullscreen" class="lightbox" @click="fullscreen = false">
-          <img :src="imageUrl" alt="收据原始图片" class="lightbox-img" />
-          <button class="lightbox-close" @click.stop="fullscreen = false">
+        <div v-if="lightboxIndex !== null" class="lightbox" @click="lightboxIndex = null">
+          <button v-if="imageUrls.length > 1" class="lightbox-nav lightbox-prev" @click.stop="lightboxPrev">
+            <ChevronLeft :size="28" />
+          </button>
+          <img :src="imageUrls[lightboxIndex]" alt="收据原始图片" class="lightbox-img" @click.stop />
+          <button v-if="imageUrls.length > 1" class="lightbox-nav lightbox-next" @click.stop="lightboxNext">
+            <ChevronRight :size="28" />
+          </button>
+          <div v-if="imageUrls.length > 1" class="lightbox-counter">{{ lightboxIndex + 1 }} / {{ imageUrls.length }}</div>
+          <button class="lightbox-close" @click.stop="lightboxIndex = null">
             <X :size="24" />
           </button>
         </div>
@@ -151,7 +174,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { ChevronDown, ChevronUp, X, ImagePlus, Loader2, CheckCircle2 } from "lucide-vue-next";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, X, Plus, ImagePlus, Loader2, CheckCircle2 } from "lucide-vue-next";
 import { uploadReceiptStream, updateReceipt, confirmReceipt, confirmReceiptWithSplit, deleteReceipt } from "../api/receipts";
 import ReceiptItemTable from "../components/ReceiptItemTable.vue";
 import { useAuthStore } from "../stores/auth";
@@ -160,11 +183,12 @@ import { useOrgStore } from "../stores/org";
 const authStore = useAuthStore();
 const orgStore = useOrgStore();
 
+const MAX_FILES = 5;
 const MEDIA_BASE = (import.meta.env.VITE_MEDIA_BASE || "/media").replace(/\/$/, "");
 
 const fileInput = ref<HTMLInputElement | null>(null);
-const file = ref<File | null>(null);
-const preview = ref<string | null>(null);
+const files = ref<File[]>([]);
+const previews = ref<string[]>([]);
 const loading = ref(false);
 const phase = ref<"uploading" | "thinking" | "generating">("uploading");
 const error = ref<string | null>(null);
@@ -173,14 +197,45 @@ const items = ref<any[]>([]);
 const isDragging = ref(false);
 const message = ref<string | null>(null);
 const showImage = ref(false);
-const fullscreen = ref(false);
+const lightboxIndex = ref<number | null>(null);
 
-const imageUrl = computed(() => {
-  if (!receipt.value?.image) return "";
-  const img = receipt.value.image;
+const totalSize = computed(() => files.value.reduce((sum, f) => sum + f.size, 0));
+
+const resolveImageUrl = (img: string) => {
+  if (!img) return "";
   if (img.startsWith("http")) return img;
   return MEDIA_BASE + (img.startsWith("/") ? img : "/" + img);
+};
+
+const imageUrls = computed(() => {
+  if (!receipt.value) return [];
+  // Prefer images[] (ReceiptImage records)
+  const imgs = receipt.value.images;
+  if (imgs && imgs.length > 0) {
+    return imgs.map((ri: any) => resolveImageUrl(ri.image));
+  }
+  // Fallback to legacy image field
+  if (receipt.value.image) {
+    return [resolveImageUrl(receipt.value.image)];
+  }
+  return [];
 });
+
+const lightboxPrev = () => {
+  if (lightboxIndex.value !== null && lightboxIndex.value > 0) {
+    lightboxIndex.value--;
+  } else if (lightboxIndex.value === 0) {
+    lightboxIndex.value = imageUrls.value.length - 1;
+  }
+};
+
+const lightboxNext = () => {
+  if (lightboxIndex.value !== null && lightboxIndex.value < imageUrls.value.length - 1) {
+    lightboxIndex.value++;
+  } else if (lightboxIndex.value === imageUrls.value.length - 1) {
+    lightboxIndex.value = 0;
+  }
+};
 
 // ISO string ↔ datetime-local format
 const toLocalDatetime = (iso: string | null) => {
@@ -203,29 +258,42 @@ const triggerFileInput = () => {
   fileInput.value?.click();
 };
 
-const handleFile = (f: File) => {
-  file.value = f;
-  preview.value = URL.createObjectURL(f);
+const addFiles = (newFiles: File[]) => {
+  const remaining = MAX_FILES - files.value.length;
+  const toAdd = newFiles.slice(0, remaining);
+  for (const f of toAdd) {
+    files.value.push(f);
+    previews.value.push(URL.createObjectURL(f));
+  }
   error.value = null;
+};
+
+const removeFile = (idx: number) => {
+  URL.revokeObjectURL(previews.value[idx]);
+  files.value.splice(idx, 1);
+  previews.value.splice(idx, 1);
 };
 
 const onFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (!target.files?.length) return;
-  handleFile(target.files[0]);
+  addFiles(Array.from(target.files));
+  // Reset input so the same file can be re-selected
+  target.value = "";
 };
 
 const onDrop = (event: DragEvent) => {
   isDragging.value = false;
-  const files = event.dataTransfer?.files;
-  if (files?.length) {
-    handleFile(files[0]);
+  const droppedFiles = event.dataTransfer?.files;
+  if (droppedFiles?.length) {
+    addFiles(Array.from(droppedFiles));
   }
 };
 
-const clearFile = () => {
-  file.value = null;
-  preview.value = null;
+const clearFiles = () => {
+  previews.value.forEach(p => URL.revokeObjectURL(p));
+  files.value = [];
+  previews.value = [];
   if (fileInput.value) fileInput.value.value = "";
 };
 
@@ -246,11 +314,9 @@ const resetPage = async (shouldDelete = false) => {
   receipt.value = null;
   items.value = [];
   message.value = null;
-  file.value = null;
-  preview.value = null;
+  clearFiles();
   showImage.value = false;
-  fullscreen.value = false;
-  if (fileInput.value) fileInput.value.value = "";
+  lightboxIndex.value = null;
 };
 
 const phaseLabel = computed(() => {
@@ -263,14 +329,14 @@ const phaseLabel = computed(() => {
 });
 
 const submit = async () => {
-  if (!file.value) return;
+  if (files.value.length === 0) return;
   loading.value = true;
   phase.value = "uploading";
   error.value = null;
   receipt.value = null;
   try {
     const data = await uploadReceiptStream(
-      file.value,
+      files.value.length === 1 ? files.value[0] : files.value,
       authStore.displayName || "",
       (p) => { phase.value = p as any; },
     );
@@ -400,6 +466,7 @@ onMounted(async () => {
   padding: 20px;
   border-style: solid;
   border-color: rgba(0, 122, 255, 0.15);
+  cursor: default;
 }
 
 .drop-zone__icon {
@@ -419,31 +486,92 @@ onMounted(async () => {
   margin-top: 6px;
 }
 
-.preview-wrapper {
+/* ─── Thumbnails grid ─── */
+.thumbs-grid {
   display: flex;
-  align-items: center;
-  gap: 20px;
-  text-align: left;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
 }
 
-.preview-img {
-  width: 120px;
-  height: 120px;
-  object-fit: cover;
+.thumb-item {
+  position: relative;
+  width: 100px;
+  height: 100px;
   border-radius: var(--radius);
+  overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
 
-.preview-name {
-  font-weight: 600;
-  font-size: 14px;
-  word-break: break-all;
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.preview-size {
+.thumb-index {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 59, 48, 0.85);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.thumb-item:hover .thumb-remove {
+  opacity: 1;
+}
+
+.thumb-add {
+  width: 100px;
+  height: 100px;
+  border-radius: var(--radius);
+  border: 2px dashed rgba(0, 122, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.thumb-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.thumbs-summary {
+  margin-top: 12px;
   font-size: 13px;
-  margin-top: 4px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .upload-actions {
@@ -492,7 +620,7 @@ onMounted(async () => {
   gap: 12px;
 }
 
-/* Image viewer */
+/* Image gallery */
 .image-header {
   display: flex;
   align-items: center;
@@ -512,14 +640,17 @@ onMounted(async () => {
   min-height: auto;
 }
 
-.image-viewer {
+.image-gallery {
   margin-top: 14px;
-  text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
 }
 
 .receipt-image {
   max-width: 100%;
-  max-height: 400px;
+  max-height: 300px;
   object-fit: contain;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -544,10 +675,11 @@ onMounted(async () => {
 }
 
 .lightbox-img {
-  max-width: 90vw;
-  max-height: 90vh;
+  max-width: 85vw;
+  max-height: 85vh;
   object-fit: contain;
   border-radius: 8px;
+  cursor: default;
 }
 
 .lightbox-close {
@@ -571,19 +703,65 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.lightbox-prev {
+  left: 20px;
+}
+
+.lightbox-next {
+  right: 20px;
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 14px;
+  border-radius: 20px;
+}
+
 @media (max-width: 640px) {
   .drop-zone {
     padding: 28px 16px;
   }
 
-  .preview-wrapper {
-    flex-wrap: wrap;
-    justify-content: center;
+  .thumb-item {
+    width: 80px;
+    height: 80px;
   }
 
-  .preview-img {
-    width: 100px;
-    height: 100px;
+  .thumb-add {
+    width: 80px;
+    height: 80px;
+  }
+
+  .thumb-remove {
+    opacity: 1;
   }
 
   .action-bar {
@@ -593,6 +771,10 @@ onMounted(async () => {
   .action-bar .button {
     flex: 1;
     text-align: center;
+  }
+
+  .receipt-image {
+    max-height: 220px;
   }
 }
 </style>

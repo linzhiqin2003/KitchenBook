@@ -18,7 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from accounts.models import OrganizationMember
-from .models import CategoryMain, CategorySub, Receipt, ReceiptItem
+from .models import CategoryMain, CategorySub, Receipt, ReceiptImage, ReceiptItem
 from .serializers import ReceiptSerializer
 from .services.doubao import analyze_receipt, analyze_receipt_stream
 from .services.ai_generate import chat_or_generate
@@ -174,9 +174,17 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         self._check_owner(self.get_object())
         return super().destroy(request, *args, **kwargs)
 
+    @staticmethod
+    def _get_image_paths(receipt):
+        """Return list of image file paths: prefer ReceiptImage records, fallback to legacy image."""
+        paths = [ri.image.path for ri in receipt.images.all() if ri.image]
+        if not paths and receipt.image:
+            paths = [receipt.image.path]
+        return paths
+
     def get_queryset(self):
         qs = Receipt.objects.all().prefetch_related(
-            "items", "items__category_main", "items__category_sub"
+            "items", "items__category_main", "items__category_sub", "images"
         ).order_by("-created_at")
 
         # Data scoping: org mode vs personal mode
@@ -205,10 +213,15 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             receipt.payer = payer or _get_payer_default(request)
 
     def create(self, request, *args, **kwargs):
-        image = request.FILES.get("image")
+        # Support both "images" (multi) and "image" (legacy single)
+        images = request.FILES.getlist("images")
+        if not images:
+            legacy = request.FILES.get("image")
+            if legacy:
+                images = [legacy]
 
         # 无图片 + JSON 请求：手动创建空账单
-        if not image and request.content_type and "json" in request.content_type:
+        if not images and request.content_type and "json" in request.content_type:
             default_currency = getattr(settings, "DEFAULT_CURRENCY", "GBP")
             receipt = Receipt.objects.create(
                 merchant=request.data.get("merchant", ""),
@@ -222,19 +235,24 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(receipt)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        if not image:
+        if not images:
             return Response({"detail": "image is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         receipt = Receipt.objects.create(
-            image=image,
+            image=images[0] if len(images) == 1 else "",
             status=Receipt.STATUS_PROCESSING,
             currency=getattr(settings, "DEFAULT_CURRENCY", "GBP"),
         )
         self._set_ownership(receipt, request)
         receipt.save()
 
+        # Create ReceiptImage records
+        for order, img_file in enumerate(images):
+            ReceiptImage.objects.create(receipt=receipt, image=img_file, order=order)
+
         try:
-            raw_text, raw_json = analyze_receipt(receipt.image.path)
+            image_paths = self._get_image_paths(receipt)
+            raw_text, raw_json = analyze_receipt(image_paths)
             parsed = parse_receipt_payload(raw_text)
             _apply_parsed_result(receipt, parsed, raw_text, raw_json)
         except NotReceiptError as exc:
@@ -253,25 +271,35 @@ class ReceiptViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="upload-stream")
     def upload_stream(self, request):
-        """SSE endpoint: upload image + stream thinking/generating phases."""
-        image = request.FILES.get("image")
-        if not image:
+        """SSE endpoint: upload image(s) + stream thinking/generating phases."""
+        images = request.FILES.getlist("images")
+        if not images:
+            legacy = request.FILES.get("image")
+            if legacy:
+                images = [legacy]
+        if not images:
             return Response({"detail": "image is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         receipt = Receipt.objects.create(
-            image=image,
+            image=images[0] if len(images) == 1 else "",
             status=Receipt.STATUS_PROCESSING,
             currency=getattr(settings, "DEFAULT_CURRENCY", "GBP"),
         )
         self._set_ownership(receipt, request)
         receipt.save()
 
+        # Create ReceiptImage records
+        for order, img_file in enumerate(images):
+            ReceiptImage.objects.create(receipt=receipt, image=img_file, order=order)
+
+        image_paths = self._get_image_paths(receipt)
+
         def event_stream():
             def sse(data):
                 return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
             try:
-                for event in analyze_receipt_stream(receipt.image.path):
+                for event in analyze_receipt_stream(image_paths):
                     phase = event["phase"]
                     if phase in ("thinking", "generating"):
                         yield sse({"phase": phase})
@@ -395,7 +423,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             # Simple confirm — no split
             receipt.status = Receipt.STATUS_CONFIRMED
             if receipt.image:
-                self._archive_image(receipt)
+                self._archive_images(receipt)
             receipt.save(update_fields=["status", "image"])
             return Response(ReceiptSerializer(receipt).data)
 
@@ -487,7 +515,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
 
                 receipt.status = Receipt.STATUS_CONFIRMED
                 if receipt.image:
-                    self._archive_image(receipt)
+                    self._archive_images(receipt)
                 receipt.save(update_fields=["status", "image", "subtotal", "tax", "discount", "total"])
             else:
                 receipt.delete()
@@ -613,17 +641,12 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         return Response(ReceiptSerializer(receipt).data)
 
     @staticmethod
-    def _archive_image(receipt):
+    def _archive_images(receipt):
+        """Archive all images (ReceiptImage records + legacy image field)."""
         import os
         import re
         from pathlib import Path
         from django.conf import settings
-
-        old_path = Path(receipt.image.path)
-        if not old_path.exists():
-            return
-
-        ext = old_path.suffix.lower() or ".jpg"
 
         # 日期部分
         if receipt.purchased_at:
@@ -641,24 +664,44 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         # 金额
         total_str = f"{receipt.total:.2f}" if receipt.total is not None else "0.00"
 
-        new_name = f"{date_str}_{merchant}_{total_str}{ext}"
-
-        # 归档目录: media/receipts/archived/
         archive_dir = Path(settings.MEDIA_ROOT) / "receipts" / "archived"
         archive_dir.mkdir(parents=True, exist_ok=True)
-        new_path = archive_dir / new_name
 
-        # 重名处理
-        counter = 1
-        stem = new_path.stem
-        while new_path.exists():
-            new_path = archive_dir / f"{stem}_{counter}{ext}"
-            counter += 1
+        def _do_archive(old_path_obj, suffix=""):
+            if not old_path_obj.exists():
+                return None
+            ext = old_path_obj.suffix.lower() or ".jpg"
+            new_name = f"{date_str}_{merchant}_{total_str}{suffix}{ext}"
+            new_path = archive_dir / new_name
+            counter = 1
+            stem = new_path.stem
+            while new_path.exists():
+                new_path = archive_dir / f"{stem}_{counter}{ext}"
+                counter += 1
+            os.rename(str(old_path_obj), str(new_path))
+            return str(new_path.relative_to(Path(settings.MEDIA_ROOT)))
 
-        os.rename(str(old_path), str(new_path))
+        # Archive ReceiptImage records
+        receipt_images = list(receipt.images.all())
+        multi = len(receipt_images) > 1
+        for idx, ri in enumerate(receipt_images):
+            if ri.image:
+                old_path = Path(ri.image.path)
+                suffix = f"_img{idx}" if multi else ""
+                new_rel = _do_archive(old_path, suffix)
+                if new_rel:
+                    ri.image.name = new_rel
+                    ri.save(update_fields=["image"])
 
-        # 更新 image 字段为相对于 MEDIA_ROOT 的路径
-        receipt.image.name = str(new_path.relative_to(Path(settings.MEDIA_ROOT)))
+        # Archive legacy image field
+        if receipt.image:
+            old_path = Path(receipt.image.path)
+            # Only archive if not already handled by ReceiptImage
+            if old_path.exists():
+                suffix = "_legacy" if receipt_images else ""
+                new_rel = _do_archive(old_path, suffix)
+                if new_rel:
+                    receipt.image.name = new_rel
 
 
 class ExchangeRateView(APIView):
