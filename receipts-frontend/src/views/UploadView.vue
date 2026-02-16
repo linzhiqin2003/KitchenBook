@@ -173,7 +173,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, X, Plus, ImagePlus, Loader2, CheckCircle2 } from "lucide-vue-next";
 import { uploadReceiptStream, updateReceipt, confirmReceipt, confirmReceiptWithSplit, deleteReceipt } from "../api/receipts";
 import ReceiptItemTable from "../components/ReceiptItemTable.vue";
@@ -328,6 +328,13 @@ const phaseLabel = computed(() => {
   }
 });
 
+// 明细增删改时重算总计
+watch(items, (rows) => {
+  if (!receipt.value) return;
+  const sum = rows.reduce((s: number, r: any) => s + (parseFloat(r.total_price) || 0), 0);
+  receipt.value.total = sum.toFixed(2);
+}, { deep: true });
+
 const submit = async () => {
   if (files.value.length === 0) return;
   loading.value = true;
@@ -344,7 +351,11 @@ const submit = async () => {
     items.value = data.items || [];
     message.value = null;
   } catch (err: any) {
-    if (err?.message?.includes("timeout")) {
+    if (err?.message?.includes("登录已过期")) {
+      authStore.clearTokens();
+      window.location.href = `${import.meta.env.BASE_URL}login`.replace(/\/+/g, "/");
+      return;
+    } else if (err?.message?.includes("timeout")) {
       error.value = "请求超时，图片可能已上传成功，请到账单列表查看";
     } else {
       error.value = err?.message || "解析失败，请稍后重试";

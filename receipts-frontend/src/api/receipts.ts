@@ -78,33 +78,74 @@ export async function uploadReceipt(files: File | File[], payer?: string) {
   return data;
 }
 
+async function refreshAccessToken(baseURL: string): Promise<string | null> {
+  const refresh = localStorage.getItem("refresh_token");
+  if (!refresh) return null;
+  try {
+    const res = await fetch(`${baseURL}/auth/token/refresh/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    localStorage.setItem("access_token", data.access);
+    if (data.refresh) localStorage.setItem("refresh_token", data.refresh);
+    return data.access;
+  } catch {
+    return null;
+  }
+}
+
 export async function uploadReceiptStream(
   files: File | File[],
   payer: string,
   onPhase: (phase: string) => void,
 ): Promise<any> {
   const baseURL = import.meta.env.VITE_API_BASE || `${import.meta.env.BASE_URL}api`;
-  const token = localStorage.getItem("access_token");
+  let token = localStorage.getItem("access_token");
   const orgId = localStorage.getItem("active_org_id");
 
-  const form = new FormData();
-  const fileList = Array.isArray(files) ? files : [files];
-  for (const f of fileList) {
-    form.append("images", f);
-  }
-  if (payer) form.append("payer", payer);
+  const buildForm = () => {
+    const form = new FormData();
+    const fileList = Array.isArray(files) ? files : [files];
+    for (const f of fileList) {
+      form.append("images", f);
+    }
+    if (payer) form.append("payer", payer);
+    return form;
+  };
 
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  if (orgId) headers["X-Active-Org"] = orgId;
+  const buildHeaders = (t: string | null) => {
+    const h: Record<string, string> = {};
+    if (t) h["Authorization"] = `Bearer ${t}`;
+    if (orgId) h["X-Active-Org"] = orgId;
+    return h;
+  };
 
-  const res = await fetch(`${baseURL}/receipts/upload-stream/`, {
+  let res = await fetch(`${baseURL}/receipts/upload-stream/`, {
     method: "POST",
-    headers,
-    body: form,
+    headers: buildHeaders(token),
+    body: buildForm(),
   });
 
+  // 401 时尝试刷新 token 重试一次
+  if (res.status === 401) {
+    const newToken = await refreshAccessToken(baseURL);
+    if (newToken) {
+      token = newToken;
+      res = await fetch(`${baseURL}/receipts/upload-stream/`, {
+        method: "POST",
+        headers: buildHeaders(token),
+        body: buildForm(),
+      });
+    }
+  }
+
   if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("登录已过期，请重新登录");
+    }
     const err = await res.json().catch(() => ({ detail: "请求失败" }));
     throw new Error(err.detail || "请求失败");
   }
