@@ -239,7 +239,6 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             return Response({"detail": "image is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         receipt = Receipt.objects.create(
-            image=images[0] if len(images) == 1 else "",
             status=Receipt.STATUS_PROCESSING,
             currency=getattr(settings, "DEFAULT_CURRENCY", "GBP"),
         )
@@ -281,7 +280,6 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             return Response({"detail": "image is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         receipt = Receipt.objects.create(
-            image=images[0] if len(images) == 1 else "",
             status=Receipt.STATUS_PROCESSING,
             currency=getattr(settings, "DEFAULT_CURRENCY", "GBP"),
         )
