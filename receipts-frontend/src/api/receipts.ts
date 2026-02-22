@@ -146,6 +146,9 @@ export async function uploadReceiptStream(
     if (res.status === 401) {
       throw new Error("登录已过期，请重新登录");
     }
+    if (res.status === 413) {
+      throw new Error("图片文件过大，请压缩后重试（单次上传总大小不超过 50MB）");
+    }
     const err = await res.json().catch(() => ({ detail: "请求失败" }));
     throw new Error(err.detail || "请求失败");
   }

@@ -328,6 +328,57 @@ const phaseLabel = computed(() => {
   }
 });
 
+// 压缩图片：最长边限制 2048px，JPEG quality 0.85
+// 小于 500KB 的文件直接跳过，压缩后更大则用原图
+async function compressImageFile(file: File): Promise<File> {
+  if (file.size < 500 * 1024) return file;
+
+  const MAX_DIM = 2048;
+  const QUALITY = 0.85;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        if (width >= height) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        } else {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || blob.size >= file.size) {
+            resolve(file);
+            return;
+          }
+          const name = file.name.replace(/\.[^.]+$/, ".jpg");
+          resolve(new File([blob], name, { type: "image/jpeg", lastModified: file.lastModified }));
+        },
+        "image/jpeg",
+        QUALITY,
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+
+    img.src = url;
+  });
+}
+
 // 明细增删改时重算总计
 watch(items, (rows) => {
   if (!receipt.value) return;
@@ -342,8 +393,9 @@ const submit = async () => {
   error.value = null;
   receipt.value = null;
   try {
+    const compressed = await Promise.all(files.value.map(compressImageFile));
     const data = await uploadReceiptStream(
-      files.value.length === 1 ? files.value[0] : files.value,
+      compressed.length === 1 ? compressed[0] : compressed,
       authStore.displayName || "",
       (p) => { phase.value = p as any; },
     );
