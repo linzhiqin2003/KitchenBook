@@ -8,87 +8,113 @@ import requests
 from PIL import Image
 
 PROMPT_TEMPLATE = """
-你是一个收据解析助手。请从图片中识别超市/商店收据，严格输出纯 JSON（不要任何额外文本，不要用 ```json 等 Markdown 代码块包裹）。
-JSON 结构要求：
+<task>
+你是收据解析助手。从图片中识别超市/商店收据并提取结构化数据。
+输出要求：严格输出纯 JSON，不要任何额外文本，不要用 ```json 等 Markdown 代码块包裹。
+</task>
+
+<non_receipt>
+首先判断图片是否为收据/发票/小票。
+若不是，立即输出以下格式并停止：
+{{"is_receipt": false, "reason": "简要说明图片内容"}}
+</non_receipt>
+
+<output_schema>
+若图片是收据，输出以下结构（所有字段必须存在，未知字段填 null）：
 {{
-  "merchant": "商店名(不含地址)",
-  "address": "商店地址(如未知可空)",
-  "purchased_at": "ISO 8601 时间(如未知可空)",
-  "currency": "GBP",
+  "is_receipt": true,
+  "merchant": "商店名（不含地址）",
+  "address": "商店地址，未知填 null",
+  "purchased_at": "ISO 8601 格式时间，未知填 null",
+  "currency": "从收据识别，如 GBP/CNY/USD，未知填 GBP",
   "subtotal": 12.34,
   "tax": 0.0,
   "discount": 0.0,
   "total": 12.34,
   "items": [
     {{
-      "main_category": "主类",
+      "main_category": "主类（见规则）",
       "sub_category": "子类",
-      "name": "商品名",
-      "brand": "品牌(可空)",
+      "name": "商品中文名",
+      "brand": "品牌，未知填 null",
       "quantity": 1,
-      "unit": "单位",
+      "unit": "单位（见规则）",
       "unit_price": 3.50,
       "total_price": 3.50,
-      "tags": ["可选标签"],
+      "tags": ["规格信息，如 430g / 500ml"],
       "confidence": 0.90
     }}
   ]
 }}
-如果图片中不包含收据/发票/小票，请输出：
-{{"is_receipt": false, "reason": "简要说明图片内容"}}
 
-如果是收据，在上述 JSON 基础上加上 "is_receipt": true。
+全局约束：
+- 金额字段使用数字，不使用字符串
+- 【严禁遗漏商品】必须列出收据上每一个商品行；无法分类时将 main_category 设为"其他"
+- 必须输出有效 JSON，不得有多余注释或 trailing comma
+</output_schema>
 
-说明：
-- 必须是有效 JSON
-- 金额使用数字
-- 类目尽量细分：主类-子类-商品名
-- 【重要】必须列出收据上的每一个商品，严禁遗漏！即使无法确定分类，也要输出该商品并将 main_category 设为"其他"
+<field_rules>
 
-商店名(merchant)字段规范：
+<rule id="merchant">
+商店名(merchant)：
 {merchant_instruction}
+</rule>
 
-主类(main_category)字段规范：
+<rule id="purchased_at">
+日期(purchased_at)：
+- 仔细查找收据上的购买日期、交易日期或打印日期
+- 找到则转为 ISO 8601 格式（如 2024-03-15T14:30:00）
+- 收据上确实没有任何日期信息，填 null
+</rule>
+
+<rule id="categories">
+主类(main_category)：
 {categories_instruction}
+</rule>
 
-单位(unit)字段规范：
-- 只能从以下值中选择：个, 包, 袋, 盒, 瓶, 罐, 桶, 杯, 根, 条, 块, 片, 只, 把, 份, 串, 组, 打, 支, 卷, 升, 毫升, 千克, 克, 斤, 磅, 盘, 碗
-- 如果收据上标注了净含量/规格(如 130g, 310ml, 500ml)，填入 tags 字段而非 unit 字段
-- 如果无法判断单位，默认使用"个"
-- 禁止使用英文单位(pack/bottle/kg等)，统一使用中文
+<rule id="unit">
+单位(unit)：
+- 只能从以下枚举中选择：个, 包, 袋, 盒, 瓶, 罐, 桶, 杯, 根, 条, 块, 片, 只, 把, 份, 串, 组, 打, 支, 卷, 升, 毫升, 千克, 克, 斤, 磅, 盘, 碗
+- 规格/净含量（如 130g、500ml）放入 tags，不放 unit
+- 无法判断时默认填"个"
+- 禁止使用英文单位（pack/bottle/kg 等）
+</rule>
 
-日期(purchased_at)字段规范：
-- 仔细查看收据/发票上是否印有日期(购买日期、交易日期、打印日期等)
-- 如果能看到日期，提取并转为 ISO 8601 格式填入 purchased_at
-- 如果收据上没有任何日期信息，purchased_at 设为 null
+<rule id="brand">
+品牌(brand)：
+- 只有收据上能明确看到品牌名时才填写（如"李锦记"、"Hellmann's"）
+- 收据未标注品牌，填 null；不猜测，不用商品编码充当品牌
+- 英文品牌名保留英文原文（不翻译品牌名）
+</rule>
 
-品牌(brand)字段规范：
-- 只有在收据上能明确看到品牌名时才填写(如"李锦记"、"王致和"、"功夫")
-- 如果收据上没有标注品牌，brand 设为 null，不要猜测或用英文商品代码充当品牌
-- 品牌名使用中文，如果原文是英文且有通用中文译名则翻译
+<rule id="item_name">
+商品名(name)与子类(sub_category)：
+- 收据同时有中英文名时，以中文名为准识别商品和分类
+- 英文收据上的商品名翻译为中文通用名称
+- 【关键】必须把商品名作为整体理解，严禁拆字归类：
+  × 错误："咸蛋黄油条" → 只看"咸" → 归为调味品
+  √ 正确："咸蛋黄油条" → 整体是咸蛋黄味油条 → 零食糕点
+  × 错误："红油豆瓣酱" → 只看"油" → 归为食用油
+  √ 正确："红油豆瓣酱" → 整体是豆瓣酱 → 调味品
+- 先理解完整商品名的含义，再决定 main_category 和 sub_category
+</rule>
 
-商品名(name)与子类(sub_category)识别规范：
-- 很多收据同时印有中文名和英文名，以中文名为准来判断商品和子类
-- 【重要】必须把中文商品名作为一个整体来理解，严禁拆字归类！
-  错误示例：
-  × "咸蛋黄油条" → 拆成"咸/盐" → 归为调味品（错！这是一种油炸面食零食）
-  × "红油豆瓣酱" → 只看"油" → 归为食用油（错！这是酱料调味品）
-  正确做法：
-  √ "咸蛋黄油条" → 整体理解为"咸蛋黄味的油条" → 零食糕点
-  √ "红油豆瓣酱" → 整体理解为"豆瓣酱" → 调味品
-- 分类时先理解完整商品名的含义，再决定主类和子类
-
+<rule id="language">
 语言规范：
-- main_category、sub_category、name、brand、unit 等字段统一使用中文
-- 英文收据上的商品名需翻译为中文商品通用名称
-- 如果收据同时有中英文，以中文为准识别商品，忽略英文
-- merchant(商店名)和 address(地址)保留原文，不翻译
-- tags 中的规格信息保留原始标注(如 "130g", "310ml")
+- main_category、sub_category、name、unit 字段统一使用中文
+- merchant 和 address 保留收据原文，不翻译
+- brand 保留原文（中英文均可）
+- tags 中的规格信息保留原始标注（如 "130g"、"310ml"）
+</rule>
 
-多图说明：
-- 如果收到多张图片，它们属于同一张收据（正反面或分段拍摄）
-- 请综合所有图片信息，合并去重后输出一份完整的收据 JSON
-- 商品不要重复列出，如果多张图片有重叠部分请去重
+</field_rules>
+
+<multi_image>
+若收到多张图片，它们属于同一张收据（正反面或分段拍摄）：
+- 综合所有图片信息，输出一份完整收据 JSON
+- 去重判断：名称和价格均相同的商品行只保留一次；若同一商品在收据上确实出现多次（quantity≥2 或独立的两行），则分别保留
+- 以有价格信息的图片为准
+</multi_image>
 """.strip()
 
 _MERCHANTS_WITH_EXISTING = (
