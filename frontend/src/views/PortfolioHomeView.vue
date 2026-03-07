@@ -147,8 +147,8 @@ const navigateTo = (path) => {
             <div class="relative inline-block mb-5">
               <div class="avatar-glow"></div>
               <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-[1.75rem] bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[3px] shadow-2xl shadow-purple-500/25 relative z-10">
-                <div class="w-full h-full rounded-[1.55rem] bg-slate-800 flex items-center justify-center">
-                  <span class="text-4xl sm:text-5xl">&#x1F468;&#x200D;&#x1F4BB;</span>
+                <div class="w-full h-full rounded-[1.55rem] bg-slate-800 overflow-hidden">
+                  <img src="/avatar.jpg" alt="avatar" class="w-full h-full object-cover" />
                 </div>
               </div>
               <div class="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-slate-900 z-20"></div>
