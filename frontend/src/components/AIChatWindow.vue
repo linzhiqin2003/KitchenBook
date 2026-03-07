@@ -429,7 +429,7 @@ async function requestDeletion() {
   border: none;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.2s ease-out;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -734,13 +734,21 @@ async function requestDeletion() {
 }
 
 /* Animations */
-.scale-in-enter-active, .scale-in-leave-active {
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+.scale-in-enter-active {
+  transition: opacity 0.22s ease-out, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: bottom right;
 }
-.scale-in-enter-from, .scale-in-leave-to {
+.scale-in-leave-active {
+  transition: opacity 0.18s ease-in, transform 0.18s ease-in;
+  transform-origin: bottom right;
+}
+.scale-in-enter-from {
   opacity: 0;
-  transform: scale(0.9) translateY(20px);
+  transform: scale(0.94) translateY(10px);
+}
+.scale-in-leave-to {
+  opacity: 0;
+  transform: scale(0.96) translateY(6px);
 }
 
 /* Typography Inside Bubble */
