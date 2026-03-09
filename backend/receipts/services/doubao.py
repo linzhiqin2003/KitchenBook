@@ -288,7 +288,15 @@ def analyze_receipt(image_paths: str | list[str]) -> tuple[str, dict[str, Any]]:
     response = requests.post(conn["url"], json=payload, headers=conn["headers"], timeout=360)
     response.raise_for_status()
     data = response.json()
-    content = _strip_json_fences(data["choices"][0]["message"]["content"])
+    choices = data.get("choices")
+    if not choices:
+        error_msg = data.get("error", {}).get("message", "") if isinstance(data.get("error"), dict) else str(data.get("error", ""))
+        raise RuntimeError(f"API 返回空结果 (choices 为空): {error_msg or data}")
+    message = choices[0].get("message", {})
+    content = message.get("content") or ""
+    if not content:
+        raise RuntimeError(f"API 未返回有效内容: {message}")
+    content = _strip_json_fences(content)
     return content, data
 
 
