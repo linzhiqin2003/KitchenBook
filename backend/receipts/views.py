@@ -318,7 +318,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                     "upload-stream error: %s\n%s", exc, traceback.format_exc()
                 )
                 receipt.status = Receipt.STATUS_FAILED
-                receipt.raw_model_output = traceback.format_exc()
+                receipt.raw_model_output = str(exc)
                 receipt.save(update_fields=["status", "raw_model_output"])
                 serializer = self.get_serializer(receipt)
                 yield sse({"phase": "done", "receipt": serializer.data})

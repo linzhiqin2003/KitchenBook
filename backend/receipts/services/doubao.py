@@ -330,7 +330,8 @@ def analyze_receipt_stream(image_paths: str | list[str]):
         except _json.JSONDecodeError:
             continue
 
-        delta = chunk.get("choices", [{}])[0].get("delta", {})
+        choices = chunk.get("choices") or [{}]
+        delta = choices[0].get("delta", {})
 
         # thinking phase (reasoning_content — Ark/Qwen thinking mode)
         reasoning = delta.get("reasoning_content") or delta.get("reasoning", "")
