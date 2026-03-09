@@ -313,10 +313,12 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                         serializer = self.get_serializer(receipt)
                         yield sse({"phase": "done", "receipt": serializer.data})
             except Exception as exc:
-                import traceback
-                traceback.print_exc()
+                import logging, traceback
+                logging.getLogger("receipts").error(
+                    "upload-stream error: %s\n%s", exc, traceback.format_exc()
+                )
                 receipt.status = Receipt.STATUS_FAILED
-                receipt.raw_model_output = str(exc)
+                receipt.raw_model_output = traceback.format_exc()
                 receipt.save(update_fields=["status", "raw_model_output"])
                 serializer = self.get_serializer(receipt)
                 yield sse({"phase": "done", "receipt": serializer.data})
