@@ -140,19 +140,19 @@ const router = createRouter({
       path: '/blog/studio',
       name: 'blog-studio',
       component: BlogManagerView,
-      meta: { requiresAuth: true, authType: 'chef', title: '博客写作台 | LZQ' }
+      meta: { requiresAuth: true, title: '博客写作台 | LZQ' }
     },
     {
       path: '/blog/studio/new',
       name: 'blog-studio-new',
       component: BlogEditorView,
-      meta: { requiresAuth: true, authType: 'chef', title: '新建文章 | LZQ Blog' }
+      meta: { requiresAuth: true, title: '新建文章 | LZQ Blog' }
     },
     {
       path: '/blog/studio/:id/edit',
       name: 'blog-studio-edit',
       component: BlogEditorView,
-      meta: { requiresAuth: true, authType: 'chef', title: '编辑文章 | LZQ Blog' }
+      meta: { requiresAuth: true, title: '编辑文章 | LZQ Blog' }
     },
     {
       path: '/blog/:slug',
