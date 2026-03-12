@@ -10,11 +10,18 @@ const posts = ref([])
 const tags = ref([])
 const loading = ref(true)
 const stats = ref({ total_posts: 0, total_views: 0, total_tags: 0 })
+const isDarkTheme = ref(localStorage.getItem('blog_theme') !== 'light')
+const studioBasePath = '/blog/studio'
 
 // 筛选
 const filterStatus = ref('all') // all, published, draft
 const filterTag = ref('')
 const searchQuery = ref('')
+
+const toggleTheme = () => {
+  isDarkTheme.value = !isDarkTheme.value
+  localStorage.setItem('blog_theme', isDarkTheme.value ? 'dark' : 'light')
+}
 
 // 获取文章列表
 const fetchPosts = async () => {
@@ -84,6 +91,9 @@ const filteredPosts = computed(() => {
   
   return result
 })
+
+const publishedCount = computed(() => posts.value.filter(p => p.is_published).length)
+const draftCount = computed(() => posts.value.filter(p => !p.is_published).length)
 
 // 格式化日期
 const formatDate = (dateStr) => {
@@ -160,60 +170,97 @@ const deleteTag = async (tag) => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto">
-    <!-- 页面标题 -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-      <div>
-        <h1 class="text-3xl font-bold text-slate-800 flex items-center gap-3">
-          <span class="text-4xl">📝</span> 博客管理
-        </h1>
-        <p class="text-slate-500 mt-1">管理你的技术博客文章</p>
+  <div :class="[
+    'min-h-screen transition-colors duration-500',
+    isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-gradient-to-br from-slate-50 via-white to-violet-50 text-slate-800'
+  ]">
+    <div class="relative overflow-hidden">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.22),transparent_35%),radial-gradient(circle_at_top_right,rgba(236,72,153,0.18),transparent_30%)]"></div>
+      <div class="absolute inset-0 opacity-40" :class="isDarkTheme ? 'bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)]' : 'bg-[linear-gradient(rgba(139,92,246,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.04)_1px,transparent_1px)]'" style="background-size: 40px 40px;"></div>
+      <div class="relative max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-10">
+        <div class="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div class="space-y-4">
+            <div class="flex items-center gap-3 text-sm">
+              <router-link
+                to="/blog"
+                :class="[
+                  'inline-flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors',
+                  isDarkTheme ? 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white' : 'bg-white/70 text-slate-600 hover:text-violet-700 hover:bg-white'
+                ]"
+              >
+                <span>←</span>
+                返回博客首页
+              </router-link>
+              <span :class="isDarkTheme ? 'text-slate-500' : 'text-slate-400'">/</span>
+              <span :class="isDarkTheme ? 'text-violet-300' : 'text-violet-600'" class="font-medium">Studio</span>
+            </div>
+            <div>
+              <p :class="isDarkTheme ? 'text-violet-300/80' : 'text-violet-600'" class="text-xs uppercase tracking-[0.35em] mb-3">Blog Studio</p>
+              <h1 :class="isDarkTheme ? 'text-white' : 'text-slate-900'" class="text-4xl md:text-5xl font-bold tracking-tight">博客写作台</h1>
+              <p :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="mt-3 max-w-2xl text-sm md:text-base">
+                写作区已经从 Kitchen 后台剥离。这里专注文章草稿、发布和标签管理，视觉语言与 Blog 前台保持一致。
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button
+              @click="toggleTheme"
+              :class="[
+                'w-11 h-11 rounded-full border transition-colors flex items-center justify-center',
+                isDarkTheme ? 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white' : 'border-slate-200 bg-white/80 text-slate-600 hover:text-violet-700'
+              ]"
+              :title="isDarkTheme ? '切换亮色模式' : '切换暗色模式'"
+            >
+              <span>{{ isDarkTheme ? '☀️' : '🌙' }}</span>
+            </button>
+            <router-link
+              :to="`${studioBasePath}/new`"
+              class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-medium shadow-lg shadow-violet-500/30 hover:shadow-violet-500/40 transition-all"
+            >
+              <span>✍️</span>
+              写新文章
+            </router-link>
+          </div>
+        </div>
+
+        <div class="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white'" class="rounded-3xl border backdrop-blur-xl p-5">
+            <div class="text-3xl font-bold text-violet-400">{{ posts.length }}</div>
+            <div :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="text-sm mt-1">总文章数</div>
+          </div>
+          <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white'" class="rounded-3xl border backdrop-blur-xl p-5">
+            <div class="text-3xl font-bold text-emerald-400">{{ publishedCount }}</div>
+            <div :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="text-sm mt-1">已发布</div>
+          </div>
+          <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white'" class="rounded-3xl border backdrop-blur-xl p-5">
+            <div class="text-3xl font-bold text-amber-400">{{ draftCount }}</div>
+            <div :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="text-sm mt-1">草稿</div>
+          </div>
+          <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white'" class="rounded-3xl border backdrop-blur-xl p-5">
+            <div class="text-3xl font-bold text-sky-400">{{ stats.total_views }}</div>
+            <div :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="text-sm mt-1">总阅读量</div>
+          </div>
+        </div>
       </div>
-      
-      <router-link 
-        to="/kitchen/chef/blog/new"
-        class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors shadow-lg shadow-purple-500/30"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        写新文章
-      </router-link>
     </div>
-    
-    <!-- 统计卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-      <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-        <div class="text-3xl font-bold text-purple-600">{{ posts.length }}</div>
-        <div class="text-sm text-slate-500 mt-1">总文章数</div>
-      </div>
-      <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-        <div class="text-3xl font-bold text-green-600">{{ posts.filter(p => p.is_published).length }}</div>
-        <div class="text-sm text-slate-500 mt-1">已发布</div>
-      </div>
-      <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-        <div class="text-3xl font-bold text-amber-600">{{ posts.filter(p => !p.is_published).length }}</div>
-        <div class="text-sm text-slate-500 mt-1">草稿</div>
-      </div>
-      <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-        <div class="text-3xl font-bold text-blue-600">{{ stats.total_views }}</div>
-        <div class="text-sm text-slate-500 mt-1">总阅读量</div>
-      </div>
-    </div>
-    
-    <!-- 筛选工具栏 -->
-    <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm mb-6">
+
+    <div class="max-w-7xl mx-auto px-4 md:px-6 pb-12">
+      <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/90 border-white'" class="rounded-3xl p-4 border backdrop-blur-xl shadow-sm mb-6">
       <div class="flex flex-col md:flex-row gap-4">
         <!-- 搜索 -->
         <div class="relative flex-1">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg :class="isDarkTheme ? 'text-slate-500' : 'text-slate-400'" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             v-model="searchQuery"
             type="text"
             placeholder="搜索文章标题..."
-            class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            :class="[
+              'w-full pl-10 pr-4 py-2.5 rounded-2xl focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors',
+              isDarkTheme ? 'bg-[#13131b] border border-white/10 text-white placeholder:text-slate-500' : 'bg-white border border-slate-200 text-slate-800'
+            ]"
           />
         </div>
         
@@ -228,10 +275,10 @@ const deleteTag = async (tag) => {
             :key="status.value"
             @click="filterStatus = status.value"
             :class="[
-              'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              'px-4 py-2 rounded-full text-sm font-medium transition-all',
               filterStatus === status.value
-                ? 'bg-purple-100 text-purple-700'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                ? 'bg-violet-500 text-white'
+                : (isDarkTheme ? 'bg-white/5 text-slate-300 hover:bg-white/10' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')
             ]"
           >
             {{ status.icon }} {{ status.label }}
@@ -241,7 +288,10 @@ const deleteTag = async (tag) => {
         <!-- 标签筛选 -->
         <select
           v-model="filterTag"
-          class="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          :class="[
+            'px-4 py-2.5 rounded-2xl focus:ring-2 focus:ring-violet-500 focus:border-transparent',
+            isDarkTheme ? 'bg-[#13131b] border border-white/10 text-slate-200' : 'bg-white border border-slate-200 text-slate-700'
+          ]"
         >
           <option value="">所有标签</option>
           <option v-for="tag in tags" :key="tag.id" :value="tag.name">
@@ -249,7 +299,7 @@ const deleteTag = async (tag) => {
           </option>
         </select>
       </div>
-    </div>
+      </div>
     
     <!-- 加载状态 -->
     <div v-if="loading" class="flex justify-center items-center py-20">
@@ -261,11 +311,12 @@ const deleteTag = async (tag) => {
       <div
         v-for="post in filteredPosts"
         :key="post.id"
-        class="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+        :class="isDarkTheme ? 'bg-white/5 border-white/10 hover:bg-white/[0.07]' : 'bg-white border-slate-100 hover:shadow-md'"
+        class="rounded-3xl border shadow-sm transition-all overflow-hidden backdrop-blur-xl"
       >
         <div class="flex flex-col md:flex-row">
           <!-- 封面图 -->
-          <div class="md:w-48 h-32 md:h-auto bg-slate-100 flex-shrink-0">
+          <div :class="isDarkTheme ? 'bg-[#151520]' : 'bg-slate-100'" class="md:w-48 h-32 md:h-auto flex-shrink-0">
             <img
               v-if="post.cover_image"
               :src="post.cover_image"
@@ -307,15 +358,15 @@ const deleteTag = async (tag) => {
                 </div>
                 
                 <!-- 标题 -->
-                <h3 class="text-lg font-bold text-slate-800 mb-1 hover:text-purple-600 cursor-pointer" @click="router.push(`/kitchen/chef/blog/${post.id}/edit`)">
+                <h3 :class="isDarkTheme ? 'text-white hover:text-violet-300' : 'text-slate-800 hover:text-purple-600'" class="text-lg font-bold mb-1 cursor-pointer transition-colors" @click="router.push(`${studioBasePath}/${post.id}/edit`)">
                   {{ post.title }}
                 </h3>
                 
                 <!-- 摘要 -->
-                <p class="text-sm text-slate-500 line-clamp-1 mb-2">{{ post.summary || '暂无摘要' }}</p>
+                <p :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="text-sm line-clamp-1 mb-2">{{ post.summary || '暂无摘要' }}</p>
                 
                 <!-- 元信息 -->
-                <div class="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                <div :class="isDarkTheme ? 'text-slate-500' : 'text-slate-400'" class="flex flex-wrap items-center gap-4 text-xs">
                   <span class="flex items-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -361,7 +412,7 @@ const deleteTag = async (tag) => {
                   {{ post.is_published ? '📢' : '📝' }}
                 </button>
                 <router-link
-                  :to="`/kitchen/chef/blog/${post.id}/edit`"
+                  :to="`${studioBasePath}/${post.id}/edit`"
                   class="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition-colors"
                   title="编辑"
                 >
@@ -391,17 +442,17 @@ const deleteTag = async (tag) => {
     </div>
     
     <!-- 空状态 -->
-    <div v-else class="text-center py-20 bg-white rounded-2xl border border-slate-100">
+    <div v-else :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white border-slate-100'" class="text-center py-20 rounded-3xl border">
       <div class="text-6xl mb-4">📭</div>
-      <h3 class="text-xl font-bold text-slate-700 mb-2">
+      <h3 :class="isDarkTheme ? 'text-white' : 'text-slate-700'" class="text-xl font-bold mb-2">
         {{ searchQuery || filterTag || filterStatus !== 'all' ? '没有找到匹配的文章' : '还没有任何文章' }}
       </h3>
-      <p class="text-slate-500 mb-6">
+      <p :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="mb-6">
         {{ searchQuery || filterTag || filterStatus !== 'all' ? '试试调整筛选条件' : '点击上方按钮开始写你的第一篇技术博客吧！' }}
       </p>
       <router-link 
         v-if="!searchQuery && !filterTag && filterStatus === 'all'"
-        to="/kitchen/chef/blog/new"
+        :to="`${studioBasePath}/new`"
         class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -412,8 +463,8 @@ const deleteTag = async (tag) => {
     </div>
     
     <!-- 标签管理 -->
-    <div class="mt-8 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+    <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white border-slate-100'" class="mt-8 rounded-3xl p-6 border shadow-sm backdrop-blur-xl">
+      <h2 :class="isDarkTheme ? 'text-white' : 'text-slate-800'" class="text-xl font-bold mb-4 flex items-center gap-2">
         <span>🏷️</span> 标签管理
       </h2>
       
@@ -421,14 +472,14 @@ const deleteTag = async (tag) => {
         <div
           v-for="tag in tags"
           :key="tag.id"
-          class="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg group"
+          :class="isDarkTheme ? 'bg-white/5' : 'bg-slate-50'" class="flex items-center gap-2 px-3 py-2 rounded-2xl group"
         >
           <span
             class="w-3 h-3 rounded-full"
             :style="{ backgroundColor: tag.color }"
           ></span>
-          <span class="font-medium text-slate-700">{{ tag.name }}</span>
-          <span class="text-xs text-slate-400">({{ tag.post_count }} 篇)</span>
+          <span :class="isDarkTheme ? 'text-slate-200' : 'text-slate-700'" class="font-medium">{{ tag.name }}</span>
+          <span :class="isDarkTheme ? 'text-slate-500' : 'text-slate-400'" class="text-xs">({{ tag.post_count }} 篇)</span>
           <button
             @click="deleteTag(tag)"
             class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity ml-1"
@@ -438,9 +489,10 @@ const deleteTag = async (tag) => {
         </div>
       </div>
       
-      <p v-else class="text-slate-400 text-sm">
+      <p :class="isDarkTheme ? 'text-slate-500' : 'text-slate-400'" class="text-sm">
         暂无标签，在编辑文章时可以创建新标签
       </p>
+    </div>
     </div>
   </div>
 </template>
@@ -453,6 +505,5 @@ const deleteTag = async (tag) => {
   overflow: hidden;
 }
 </style>
-
 
 

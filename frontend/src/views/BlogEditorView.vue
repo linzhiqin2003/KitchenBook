@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch, nextTick, onUnmounted } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { marked } from 'marked'
@@ -17,6 +17,8 @@ const allTags = ref([])
 const showTagModal = ref(false)
 const newTagName = ref('')
 const newTagColor = ref('#10b981')
+const isDarkTheme = ref(localStorage.getItem('blog_theme') !== 'light')
+const studioBasePath = '/blog/studio'
 
 // 预览模式: 'edit' | 'preview' | 'split'
 const viewMode = ref('edit')
@@ -41,77 +43,10 @@ const form = ref({
 
 const coverPreview = ref('')
 
-// ============== 选中文本 AI 助手 ==============
-const selectionMenu = ref({
-  show: false,
-  x: 0,
-  y: 0,
-  text: '',
-  start: 0,
-  end: 0
-})
-
-const aiPopup = ref({
-  show: false,
-  x: 0,
-  y: 0,
-  loading: false,
-  content: '',
-  action: '',
-  selectionStart: 0,
-  selectionEnd: 0
-})
-
-// 拖拽状态
-const isDragging = ref(false)
-const dragOffset = ref({ x: 0, y: 0 })
-
-// 开始拖拽
-const startDrag = (e) => {
-  isDragging.value = true
-  dragOffset.value = {
-    x: e.clientX - aiPopup.value.x,
-    y: e.clientY - aiPopup.value.y
-  }
-  document.addEventListener('mousemove', onDrag)
-  document.addEventListener('mouseup', stopDrag)
+const toggleTheme = () => {
+  isDarkTheme.value = !isDarkTheme.value
+  localStorage.setItem('blog_theme', isDarkTheme.value ? 'dark' : 'light')
 }
-
-// 拖拽中
-const onDrag = (e) => {
-  if (!isDragging.value) return
-  aiPopup.value.x = Math.max(0, Math.min(e.clientX - dragOffset.value.x, window.innerWidth - 500))
-  aiPopup.value.y = Math.max(0, Math.min(e.clientY - dragOffset.value.y, window.innerHeight - 200))
-}
-
-// 停止拖拽
-const stopDrag = () => {
-  isDragging.value = false
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', stopDrag)
-}
-
-// 提问输入框
-const askModal = ref({
-  show: false,
-  question: '',
-  x: 0,
-  y: 0,
-  selectedText: '',
-  selectionStart: 0,
-  selectionEnd: 0
-})
-const askInputRef = ref(null)
-
-// AI 操作选项
-const aiActions = [
-  { id: 'continue', label: '续写', icon: '✨', desc: '继续写作' },
-  { id: 'polish', label: '润色', icon: '💎', desc: '优化文字' },
-  { id: 'expand', label: '扩展', icon: '📝', desc: '丰富内容' },
-  { id: 'summarize', label: '摘要', icon: '📋', desc: '生成摘要' },
-  { id: 'code_explain', label: '解释', icon: '💻', desc: '解释代码' },
-  { id: 'ask', label: '提问', icon: '❓', desc: '询问 AI' },
-]
 
 // 获取所有标签
 const fetchTags = async () => {
@@ -153,262 +88,10 @@ const fetchPost = async () => {
   }
 }
 
-// 监听文本选中
-const handleSelectionChange = () => {
-  const textarea = editorRef.value
-  if (!textarea) return
-  
-  const start = textarea.selectionStart
-  const end = textarea.selectionEnd
-  
-  if (start !== end && document.activeElement === textarea) {
-    const selectedText = form.value.content.substring(start, end)
-    
-    if (selectedText.trim().length > 0) {
-      // 计算选中文本的位置
-      const rect = textarea.getBoundingClientRect()
-      
-      // 获取光标大致位置（简化计算）
-      const textBeforeSelection = form.value.content.substring(0, start)
-      const lines = textBeforeSelection.split('\n')
-      const lineHeight = 24 // 估算行高
-      const charWidth = 8 // 估算字符宽度
-      
-      const currentLine = lines.length - 1
-      const currentCol = lines[lines.length - 1].length
-      
-      // 计算菜单位置
-      const menuX = rect.left + Math.min(currentCol * charWidth, rect.width - 200) + 16
-      const menuY = rect.top + Math.min(currentLine * lineHeight, textarea.scrollTop + 100) + 40
-      
-      selectionMenu.value = {
-        show: true,
-        x: Math.max(menuX, rect.left + 20),
-        y: Math.min(menuY, rect.bottom - 60),
-        text: selectedText,
-        start,
-        end
-      }
-    } else {
-      selectionMenu.value.show = false
-    }
-  } else {
-    // 延迟隐藏，避免点击菜单时立即消失
-    setTimeout(() => {
-      if (!aiPopup.value.show) {
-        selectionMenu.value.show = false
-      }
-    }, 200)
-  }
-}
-
-// 处理鼠标抬起事件
-const handleMouseUp = (e) => {
-  // 如果点击的是菜单或弹窗，不处理
-  if (e.target.closest('.ai-selection-menu') || e.target.closest('.ai-result-popup')) {
-    return
-  }
-  
-  setTimeout(() => {
-    handleSelectionChange()
-  }, 10)
-}
-
-// 处理键盘选择
-const handleKeyUp = (e) => {
-  if (e.shiftKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
-    handleSelectionChange()
-  }
-}
-
-// 点击其他地方关闭菜单
-const handleClickOutside = (e) => {
-  if (!e.target.closest('.ai-selection-menu') && 
-      !e.target.closest('.ai-result-popup') &&
-      !e.target.closest('.ai-ask-modal') &&
-      !e.target.closest('textarea')) {
-    selectionMenu.value.show = false
-    if (!aiPopup.value.loading) {
-      aiPopup.value.show = false
-    }
-    askModal.value.show = false
-  }
-}
-
 onMounted(() => {
   fetchTags()
   fetchPost()
-  document.addEventListener('click', handleClickOutside)
 })
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
-
-// AI 操作
-const handleAiAction = async (action) => {
-  const { text, start, end, x, y } = selectionMenu.value
-  
-  // 隐藏选择菜单
-  selectionMenu.value.show = false
-  
-  // 如果是提问，显示自定义输入框
-  if (action === 'ask') {
-    askModal.value = {
-      show: true,
-      question: '',
-      x: Math.min(x, window.innerWidth - 380),
-      y: Math.min(y + 10, window.innerHeight - 250),
-      selectedText: text,
-      selectionStart: start,
-      selectionEnd: end
-    }
-    // 聚焦输入框
-    nextTick(() => {
-      askInputRef.value?.focus()
-    })
-    return
-  }
-  
-  aiPopup.value = {
-    show: true,
-    x: Math.min(x, window.innerWidth - 420),
-    y: Math.min(y + 10, window.innerHeight - 300),
-    loading: true,
-    content: '',
-    action,
-    selectionStart: start,
-    selectionEnd: end
-  }
-  
-  await callAiStream(action, '', text)
-}
-
-// 流式调用 AI
-const callAiStream = async (action, customMessage = '', selectedText = '') => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/blog/ai-assist/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action,
-        content: selectedText || form.value.content.slice(-500),
-        context: form.value.content.slice(0, 2000),
-        message: customMessage
-      })
-    })
-    
-    if (!response.ok) {
-      throw new Error('请求失败')
-    }
-    
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      
-      const chunk = decoder.decode(value)
-      const lines = chunk.split('\n')
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6))
-            
-            if (data.type === 'content') {
-              aiPopup.value.content += data.content
-            } else if (data.type === 'done') {
-              aiPopup.value.loading = false
-            } else if (data.type === 'error') {
-              aiPopup.value.content = `❌ 错误：${data.content}`
-              aiPopup.value.loading = false
-            }
-          } catch (e) {
-            // 忽略解析错误
-          }
-        }
-      }
-    }
-    
-    aiPopup.value.loading = false
-    
-  } catch (error) {
-    console.error('AI assist failed', error)
-    aiPopup.value.content = `❌ 请求失败：${error.message}`
-    aiPopup.value.loading = false
-  }
-}
-
-// AI 结果操作
-const applyAiResult = (mode) => {
-  const { content, selectionStart, selectionEnd, action } = aiPopup.value
-  if (!content) return
-  
-  const textarea = editorRef.value
-  
-  if (mode === 'replace') {
-    // 替换选中内容
-    const text = form.value.content
-    form.value.content = text.substring(0, selectionStart) + content + text.substring(selectionEnd)
-  } else if (mode === 'insert') {
-    // 在选中内容后插入
-    const text = form.value.content
-    form.value.content = text.substring(0, selectionEnd) + '\n\n' + content + text.substring(selectionEnd)
-  } else if (mode === 'copy') {
-    navigator.clipboard.writeText(content)
-    return // 不关闭弹窗
-  } else if (mode === 'summary') {
-    form.value.summary = content
-  }
-  
-  closeAiPopup()
-  
-  // 聚焦回编辑器
-  nextTick(() => {
-    textarea?.focus()
-  })
-}
-
-const closeAiPopup = () => {
-  aiPopup.value.show = false
-  aiPopup.value.content = ''
-  aiPopup.value.loading = false
-}
-
-// 提交提问
-const submitAskQuestion = async () => {
-  const { question, selectedText, selectionStart, selectionEnd, x, y } = askModal.value
-  
-  if (!question.trim()) return
-  
-  // 关闭提问输入框
-  askModal.value.show = false
-  
-  // 显示 AI 响应弹窗
-  aiPopup.value = {
-    show: true,
-    x: Math.min(x, window.innerWidth - 420),
-    y: Math.min(y, window.innerHeight - 300),
-    loading: true,
-    content: '',
-    action: 'ask',
-    selectionStart,
-    selectionEnd
-  }
-  
-  // 调用 AI
-  await callAiStream('chat', question, selectedText)
-}
-
-// 关闭提问输入框
-const closeAskModal = () => {
-  askModal.value.show = false
-  askModal.value.question = ''
-}
 
 // 处理封面图上传
 const handleCoverUpload = (event) => {
@@ -594,7 +277,7 @@ const savePost = async (publish = false) => {
       await axios.post(`${API_BASE_URL}/api/blog/posts/`, formData, config)
     }
     
-    router.push('/kitchen/chef/blog')
+    router.push(studioBasePath)
   } catch (error) {
     console.error('Failed to save post', error)
     alert('保存失败：' + (error.response?.data?.detail || '未知错误'))
@@ -683,67 +366,70 @@ const parseMarkdown = (markdown) => {
 }
 
 const renderedContent = computed(() => parseMarkdown(form.value.content))
-
-// AI Markdown 渲染 (简化版，用于浮窗)
-const renderAiMarkdown = (text) => {
-  if (!text) return ''
-  
-  let html = marked.parse(text)
-  
-  // 简化样式
-  html = html.replace(/<h[1-6]>/g, '<h4 class="font-bold my-2">')
-  html = html.replace(/<\/h[1-6]>/g, '</h4>')
-  html = html.replace(/<p>/g, '<p class="my-2">')
-  html = html.replace(/<ul>/g, '<ul class="list-disc ml-4 my-2 text-sm">')
-  html = html.replace(/<ol>/g, '<ol class="list-decimal ml-4 my-2 text-sm">')
-  
-  // 代码块高亮
-  html = html.replace(/<pre><code class="language-(\w+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
-    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-    const highlighted = highlightCode(decoded, lang)
-    return `<pre class="bg-slate-800 text-slate-200 p-3 rounded-lg my-2 overflow-x-auto text-xs"><code class="hljs">${highlighted}</code></pre>`
-  })
-  
-  html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
-    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-    const highlighted = highlightCode(decoded, '')
-    return `<pre class="bg-slate-800 text-slate-200 p-3 rounded-lg my-2 overflow-x-auto text-xs"><code class="hljs">${highlighted}</code></pre>`
-  })
-  
-  html = html.replace(/<code>/g, '<code class="bg-purple-100 px-1 py-0.5 rounded text-purple-700 text-xs font-mono">')
-  
-  return html
-}
-
-// 获取操作标签
-const getActionLabel = (action) => {
-  const found = aiActions.find(a => a.id === action)
-  return found ? `${found.icon} ${found.label}` : action
-}
+const toolbarButtonClass = computed(() => isDarkTheme.value ? 'toolbar-btn toolbar-btn-dark' : 'toolbar-btn')
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto relative">
+  <div :class="[
+    'min-h-screen transition-colors duration-500',
+    isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-gradient-to-br from-slate-50 via-white to-violet-50 text-slate-800'
+  ]">
+    <div class="relative overflow-hidden">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.22),transparent_35%),radial-gradient(circle_at_top_right,rgba(236,72,153,0.18),transparent_30%)]"></div>
+      <div class="absolute inset-0 opacity-40" :class="isDarkTheme ? 'bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)]' : 'bg-[linear-gradient(rgba(139,92,246,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.04)_1px,transparent_1px)]'" style="background-size: 40px 40px;"></div>
+      <div class="relative max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-10">
     <!-- 顶部工具栏 -->
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-4">
-        <button 
-          @click="router.push('/kitchen/chef/blog')"
-          class="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
-          返回
-        </button>
-        <h1 class="text-xl font-bold text-slate-800">
-          {{ isEditMode ? '编辑文章' : '写新文章' }}
-        </h1>
+    <div class="flex flex-col gap-6 md:flex-row md:items-start md:justify-between mb-6">
+      <div class="space-y-4">
+        <div class="flex items-center gap-3 text-sm">
+          <button 
+            @click="router.push(studioBasePath)"
+            :class="[
+              'inline-flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors',
+              isDarkTheme ? 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white' : 'bg-white/70 text-slate-600 hover:text-violet-700 hover:bg-white'
+            ]"
+          >
+            <span>←</span>
+            返回写作台
+          </button>
+          <router-link
+            to="/blog"
+            :class="[
+              'inline-flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors',
+              isDarkTheme ? 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white' : 'bg-white/70 text-slate-600 hover:text-violet-700 hover:bg-white'
+            ]"
+          >
+            浏览前台
+          </router-link>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/30 flex items-center justify-center text-2xl">
+            ✍️
+          </div>
+          <div>
+            <p :class="isDarkTheme ? 'text-violet-300/80' : 'text-violet-600'" class="text-xs uppercase tracking-[0.35em] mb-2">Writing Deck</p>
+            <h1 :class="isDarkTheme ? 'text-white' : 'text-slate-900'" class="text-3xl md:text-4xl font-bold tracking-tight">
+              {{ isEditMode ? '编辑文章' : '写新文章' }}
+            </h1>
+            <p :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="mt-2 text-sm">
+              在独立的 Blog 写作区内完成标题、摘要、封面、标签与 Markdown 正文编辑。
+            </p>
+          </div>
+        </div>
       </div>
       
-      <div class="flex items-center gap-3">
-        <!-- 预览模式切换 -->
-        <div class="flex items-center bg-slate-100 rounded-lg p-0.5">
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          @click="toggleTheme"
+          :class="[
+            'w-11 h-11 rounded-full border transition-colors flex items-center justify-center',
+            isDarkTheme ? 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white' : 'border-slate-200 bg-white/80 text-slate-600 hover:text-violet-700'
+          ]"
+          :title="isDarkTheme ? '切换亮色模式' : '切换暗色模式'"
+        >
+          <span>{{ isDarkTheme ? '☀️' : '🌙' }}</span>
+        </button>
+        <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white'" class="flex items-center rounded-full border p-1 backdrop-blur-xl">
         <button
             v-for="mode in [
               { value: 'edit', icon: '📝', label: '编辑' },
@@ -753,10 +439,10 @@ const getActionLabel = (action) => {
             :key="mode.value"
             @click="viewMode = mode.value"
           :class="[
-              'px-3 py-1.5 text-xs rounded-md transition-all',
+              'px-3 py-2 text-xs rounded-full transition-all',
               viewMode === mode.value
                 ? 'bg-white text-purple-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-800'
+                : (isDarkTheme ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-800')
             ]"
           >
             {{ mode.icon }} {{ mode.label }}
@@ -766,7 +452,10 @@ const getActionLabel = (action) => {
         <button
           @click="savePost(false)"
           :disabled="saving"
-          class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors disabled:opacity-50"
+          :class="[
+            'px-4 py-2.5 rounded-full text-sm font-medium transition-colors disabled:opacity-50',
+            isDarkTheme ? 'bg-white/10 text-slate-100 hover:bg-white/15 border border-white/10' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          ]"
         >
           {{ saving ? '保存中...' : '保存草稿' }}
         </button>
@@ -774,9 +463,27 @@ const getActionLabel = (action) => {
         <button
           @click="savePost(true)"
           :disabled="saving"
-          class="px-5 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors shadow-lg shadow-purple-500/30 disabled:opacity-50"
+          class="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-full text-sm font-medium transition-colors shadow-lg shadow-purple-500/30 disabled:opacity-50"
         >
           {{ saving ? '发布中...' : (form.is_published ? '更新发布' : '立即发布') }}
+        </button>
+      </div>
+    </div>
+      </div>
+    </div>
+
+  <div class="max-w-7xl mx-auto px-4 md:px-6 pb-12 relative">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-4">
+        <button 
+          @click="router.push(studioBasePath)"
+          :class="isDarkTheme ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-800'"
+          class="flex items-center gap-2 transition-colors"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          返回
         </button>
       </div>
     </div>
@@ -787,7 +494,7 @@ const getActionLabel = (action) => {
     </div>
     
     <!-- 编辑区域 -->
-    <div v-else class="flex gap-4">
+    <div v-else class="flex flex-col xl:flex-row gap-4">
       <!-- 主编辑区 -->
       <div class="flex-1 min-w-0 space-y-3">
         <!-- 标题 -->
@@ -795,7 +502,10 @@ const getActionLabel = (action) => {
           v-model="form.title"
           type="text"
           placeholder="输入文章标题..."
-          class="w-full px-4 py-3 text-xl font-bold border-0 border-b-2 border-slate-200 focus:border-purple-500 focus:outline-none bg-transparent placeholder-slate-300"
+          :class="[
+            'w-full px-5 py-4 text-xl font-bold rounded-3xl focus:outline-none placeholder-slate-400 transition-colors',
+            isDarkTheme ? 'bg-white/5 border border-white/10 text-white' : 'bg-white/80 border border-white text-slate-900'
+          ]"
         />
         
         <!-- 摘要 -->
@@ -803,25 +513,28 @@ const getActionLabel = (action) => {
           v-model="form.summary"
           placeholder="简短描述文章内容（可选，用于列表展示）..."
           rows="2"
-          class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-slate-600 text-sm"
+          :class="[
+            'w-full px-5 py-3 rounded-3xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm transition-colors',
+            isDarkTheme ? 'bg-white/5 border border-white/10 text-slate-200 placeholder:text-slate-500' : 'bg-white/80 border border-white text-slate-600'
+          ]"
         ></textarea>
         
         <!-- 编辑器/预览区域 -->
-        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200'" class="rounded-3xl border overflow-hidden backdrop-blur-xl shadow-sm">
           <!-- 工具栏 -->
-          <div v-if="viewMode !== 'preview'" class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex flex-wrap items-center gap-1">
+          <div v-if="viewMode !== 'preview'" :class="isDarkTheme ? 'bg-black/20 border-white/10' : 'bg-slate-50 border-slate-200'" class="px-3 py-2 border-b flex flex-wrap items-center gap-1">
             <div class="flex items-center gap-0.5 mr-2">
-              <button @click="toolbarActions.heading1" class="toolbar-btn" title="一级标题">H1</button>
-              <button @click="toolbarActions.heading2" class="toolbar-btn" title="二级标题">H2</button>
-              <button @click="toolbarActions.heading3" class="toolbar-btn" title="三级标题">H3</button>
+              <button @click="toolbarActions.heading1" :class="toolbarButtonClass" title="一级标题">H1</button>
+              <button @click="toolbarActions.heading2" :class="toolbarButtonClass" title="二级标题">H2</button>
+              <button @click="toolbarActions.heading3" :class="toolbarButtonClass" title="三级标题">H3</button>
             </div>
             
             <div class="w-px h-6 bg-slate-300 mr-2"></div>
             
-            <button @click="toolbarActions.bold" class="toolbar-btn" title="粗体"><span class="font-bold">B</span></button>
-            <button @click="toolbarActions.italic" class="toolbar-btn" title="斜体"><span class="italic">I</span></button>
-            <button @click="toolbarActions.code" class="toolbar-btn font-mono text-xs" title="行内代码">&lt;/&gt;</button>
-            <button @click="toolbarActions.codeBlock" class="toolbar-btn" title="代码块">
+            <button @click="toolbarActions.bold" :class="toolbarButtonClass" title="粗体"><span class="font-bold">B</span></button>
+            <button @click="toolbarActions.italic" :class="toolbarButtonClass" title="斜体"><span class="italic">I</span></button>
+            <button @click="toolbarActions.code" :class="toolbarButtonClass" title="行内代码"><span class="font-mono text-xs">&lt;/&gt;</span></button>
+            <button @click="toolbarActions.codeBlock" :class="toolbarButtonClass" title="代码块">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
               </svg>
@@ -829,12 +542,12 @@ const getActionLabel = (action) => {
             
             <div class="w-px h-6 bg-slate-300 mx-1"></div>
             
-            <button @click="toolbarActions.link" class="toolbar-btn" title="链接">
+            <button @click="toolbarActions.link" :class="toolbarButtonClass" title="链接">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
               </svg>
             </button>
-            <button @click="triggerImageUpload" :disabled="uploadingImage" class="toolbar-btn" title="插入图片">
+            <button @click="triggerImageUpload" :disabled="uploadingImage" :class="toolbarButtonClass" title="插入图片">
               <svg v-if="!uploadingImage" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
@@ -844,16 +557,10 @@ const getActionLabel = (action) => {
             
             <div class="w-px h-6 bg-slate-300 mx-1"></div>
             
-            <button @click="toolbarActions.quote" class="toolbar-btn" title="引用">❝</button>
-            <button @click="toolbarActions.list" class="toolbar-btn" title="列表">☰</button>
-            <button @click="toolbarActions.hr" class="toolbar-btn" title="分割线">―</button>
+            <button @click="toolbarActions.quote" :class="toolbarButtonClass" title="引用">❝</button>
+            <button @click="toolbarActions.list" :class="toolbarButtonClass" title="列表">☰</button>
+            <button @click="toolbarActions.hr" :class="toolbarButtonClass" title="分割线">―</button>
             
-            <!-- AI 提示 -->
-            <div class="flex-grow"></div>
-            <div class="text-xs text-slate-400 flex items-center gap-1">
-              <span class="text-purple-500">✨</span>
-              <span>选中文字后可使用 AI 助手</span>
-            </div>
           </div>
           
           <!-- 编辑器内容区 -->
@@ -862,20 +569,24 @@ const getActionLabel = (action) => {
             <textarea
                 ref="editorRef"
               v-model="form.content"
-                @mouseup="handleMouseUp"
-                @keyup="handleKeyUp"
               placeholder="在这里写下你的技术分享...
 
-支持 Markdown 语法，选中文字后可呼出 AI 助手 ✨"
-                class="w-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed"
-                :class="viewMode === 'split' ? 'h-[500px]' : 'h-[550px]'"
+支持 Markdown 语法"
+                :class="[
+                  'w-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed transition-colors',
+                  viewMode === 'split' ? 'h-[500px]' : 'h-[550px]',
+                  isDarkTheme ? 'bg-transparent text-slate-100 placeholder:text-slate-500' : 'bg-transparent text-slate-800 placeholder:text-slate-400'
+                ]"
             ></textarea>
           </div>
           
             <div 
               v-if="viewMode !== 'edit'" 
-              :class="viewMode === 'split' ? 'w-1/2' : 'w-full'"
-              class="overflow-auto bg-white"
+              :class="[
+                viewMode === 'split' ? 'w-1/2' : 'w-full',
+                isDarkTheme ? 'bg-[#f8fafc]' : 'bg-white'
+              ]"
+              class="overflow-auto"
               :style="viewMode === 'split' ? 'height: 500px' : 'min-height: 550px'"
             >
               <div class="p-6 prose-preview" v-html="renderedContent"></div>
@@ -885,10 +596,10 @@ const getActionLabel = (action) => {
       </div>
       
       <!-- 右侧设置面板 -->
-      <div class="w-64 flex-shrink-0 space-y-4">
+      <div class="xl:w-72 flex-shrink-0 space-y-4">
         <!-- 封面图 -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-4">
-          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2 text-sm">
+        <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/90 border-white'" class="rounded-3xl border p-4 backdrop-blur-xl">
+          <h3 :class="isDarkTheme ? 'text-slate-100' : 'text-slate-800'" class="font-bold mb-3 flex items-center gap-2 text-sm">
             <span>🖼️</span> 封面图片
           </h3>
           
@@ -903,17 +614,17 @@ const getActionLabel = (action) => {
           </div>
           
           <label class="block">
-            <div class="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all">
+            <div :class="isDarkTheme ? 'border-white/10 hover:border-violet-400 hover:bg-white/5' : 'border-slate-200 hover:border-purple-400 hover:bg-purple-50'" class="border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all">
               <span class="text-2xl block mb-1">📷</span>
-              <span class="text-xs text-slate-500">点击上传</span>
+              <span :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="text-xs">点击上传</span>
             </div>
             <input type="file" accept="image/*" class="hidden" @change="handleCoverUpload" />
           </label>
         </div>
         
         <!-- 标签 -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-4">
-          <h3 class="font-bold text-slate-800 mb-3 flex items-center justify-between text-sm">
+        <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/90 border-white'" class="rounded-3xl border p-4 backdrop-blur-xl">
+          <h3 :class="isDarkTheme ? 'text-slate-100' : 'text-slate-800'" class="font-bold mb-3 flex items-center justify-between text-sm">
             <span class="flex items-center gap-2"><span>🏷️</span> 标签</span>
             <button @click="showTagModal = true" class="text-xs text-purple-600 hover:text-purple-800">+ 新建</button>
           </h3>
@@ -927,58 +638,42 @@ const getActionLabel = (action) => {
                 'px-2.5 py-1 rounded-full text-xs font-medium transition-all border',
                 form.tag_ids.includes(tag.id)
                   ? 'text-white border-transparent'
-                  : 'bg-white border-slate-200 hover:border-purple-300'
+                  : (isDarkTheme ? 'bg-white/5 border-white/10 hover:border-violet-300' : 'bg-white border-slate-200 hover:border-purple-300')
               ]"
               :style="form.tag_ids.includes(tag.id) ? { backgroundColor: tag.color } : { color: tag.color }"
             >
               {{ tag.name }}
             </button>
             
-            <div v-if="allTags.length === 0" class="text-xs text-slate-400 py-2">暂无标签</div>
+            <div v-if="allTags.length === 0" :class="isDarkTheme ? 'text-slate-500' : 'text-slate-400'" class="text-xs py-2">暂无标签</div>
           </div>
         </div>
         
         <!-- 发布设置 -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-4">
-          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2 text-sm">
+        <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/90 border-white'" class="rounded-3xl border p-4 backdrop-blur-xl">
+          <h3 :class="isDarkTheme ? 'text-slate-100' : 'text-slate-800'" class="font-bold mb-3 flex items-center gap-2 text-sm">
             <span>⚙️</span> 发布设置
           </h3>
           
           <div class="space-y-2">
-            <label class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-50">
+            <label :class="isDarkTheme ? 'hover:bg-white/5' : 'hover:bg-slate-50'" class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg">
               <input v-model="form.is_featured" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500" />
-              <span class="font-medium text-slate-700 text-sm">⭐ 设为精选</span>
+              <span :class="isDarkTheme ? 'text-slate-200' : 'text-slate-700'" class="font-medium text-sm">⭐ 设为精选</span>
             </label>
             
-            <label class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-50">
+            <label :class="isDarkTheme ? 'hover:bg-white/5' : 'hover:bg-slate-50'" class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg">
               <input v-model="form.is_published" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500" />
-              <span class="font-medium text-slate-700 text-sm">📢 公开发布</span>
+              <span :class="isDarkTheme ? 'text-slate-200' : 'text-slate-700'" class="font-medium text-sm">📢 公开发布</span>
             </label>
-          </div>
-        </div>
-        
-        <!-- AI 提示卡片 -->
-        <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-100 p-4">
-          <h3 class="font-bold text-purple-800 mb-2 flex items-center gap-2 text-sm">
-            <span>✨</span> AI 写作助手
-          </h3>
-          <p class="text-xs text-purple-600 leading-relaxed">
-            选中文字后，会弹出 AI 菜单，可快速：
-          </p>
-          <div class="mt-2 flex flex-wrap gap-1">
-            <span class="text-xs bg-white px-2 py-0.5 rounded-full text-purple-700">续写</span>
-            <span class="text-xs bg-white px-2 py-0.5 rounded-full text-purple-700">润色</span>
-            <span class="text-xs bg-white px-2 py-0.5 rounded-full text-purple-700">扩展</span>
-            <span class="text-xs bg-white px-2 py-0.5 rounded-full text-purple-700">摘要</span>
           </div>
         </div>
         
         <!-- Markdown 速查 -->
-        <div class="bg-slate-50 rounded-2xl border border-slate-200 p-4">
-          <h3 class="font-bold text-slate-700 mb-2 flex items-center gap-2 text-sm">
+        <div :class="isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'" class="rounded-3xl border p-4 backdrop-blur-xl">
+          <h3 :class="isDarkTheme ? 'text-slate-100' : 'text-slate-700'" class="font-bold mb-2 flex items-center gap-2 text-sm">
             <span>⌨️</span> Markdown 速查
           </h3>
-          <div class="text-xs text-slate-500 space-y-1 font-mono">
+          <div :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'" class="text-xs space-y-1 font-mono">
             <div># 标题 ## 二级</div>
             <div>**粗体** *斜体*</div>
             <div>`代码` ```代码块```</div>
@@ -988,202 +683,14 @@ const getActionLabel = (action) => {
         </div>
       </div>
     </div>
-    
-    <!-- 选中文字后的 AI 菜单 (Notion/iOS 风格) -->
-    <Teleport to="body">
-      <Transition name="menu-pop">
-        <div
-          v-if="selectionMenu.show"
-          class="ai-selection-menu fixed z-50"
-          :style="{ left: selectionMenu.x + 'px', top: selectionMenu.y + 'px' }"
-        >
-          <div class="bg-slate-900 rounded-xl shadow-2xl p-1 flex items-center gap-0.5 backdrop-blur-xl">
-            <button
-              v-for="action in aiActions"
-              :key="action.id"
-              @click="handleAiAction(action.id)"
-              class="flex items-center gap-1.5 px-3 py-2 text-white/90 hover:bg-white/10 rounded-lg transition-all text-sm whitespace-nowrap group"
-              :title="action.desc"
-            >
-              <span class="text-base">{{ action.icon }}</span>
-              <span class="hidden sm:inline text-xs font-medium">{{ action.label }}</span>
-            </button>
-          </div>
-          <!-- 小三角 -->
-          <div class="absolute -top-2 left-6 w-4 h-4 bg-slate-900 transform rotate-45"></div>
-        </div>
-      </Transition>
-    </Teleport>
-    
-    <!-- 简约提问输入框 -->
-    <Teleport to="body">
-      <Transition name="popup-scale">
-        <div
-          v-if="askModal.show"
-          class="ai-ask-modal fixed z-50"
-          :style="{ left: askModal.x + 'px', top: askModal.y + 'px' }"
-        >
-          <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200/50 w-72 overflow-hidden">
-            <!-- 简洁输入框 -->
-            <div class="p-3">
-              <div class="relative">
-                <textarea
-                  ref="askInputRef"
-                  v-model="askModal.question"
-                  @keydown.enter.exact.prevent="submitAskQuestion"
-                  @keydown.escape="closeAskModal"
-                  placeholder="问点什么..."
-                  rows="2"
-                  class="w-full px-3 py-2 bg-slate-50 border-0 rounded-xl text-sm resize-none focus:ring-2 focus:ring-purple-500/50 focus:bg-white placeholder-slate-400 transition-all"
-                ></textarea>
-              </div>
-              
-              <!-- 选中内容提示 + 操作 -->
-              <div class="flex items-center justify-between mt-2">
-                <div v-if="askModal.selectedText" class="text-xs text-slate-400 truncate max-w-[140px]" :title="askModal.selectedText">
-                  📝 {{ askModal.selectedText.slice(0, 20) }}{{ askModal.selectedText.length > 20 ? '...' : '' }}
-                </div>
-                <div v-else></div>
-                
-                <div class="flex items-center gap-1">
-                  <button
-                    @click="closeAskModal"
-                    class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                    title="取消 (Esc)"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                  <button
-                    @click="submitAskQuestion"
-                    :disabled="!askModal.question.trim()"
-                    class="p-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="发送 (Enter)"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- 小三角指示器 -->
-          <div class="absolute -top-1.5 left-8 w-3 h-3 bg-white border-l border-t border-slate-200/50 transform rotate-45"></div>
-        </div>
-      </Transition>
-    </Teleport>
-    
-    <!-- AI 结果浮窗 (简约可伸缩设计) -->
-    <Teleport to="body">
-      <Transition name="popup-scale">
-        <div
-          v-if="aiPopup.show"
-          class="ai-result-popup fixed z-50"
-          :style="{ left: aiPopup.x + 'px', top: aiPopup.y + 'px' }"
-        >
-          <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden resize flex flex-col" style="width: 480px; min-width: 320px; min-height: 200px; max-width: min(700px, 90vw); max-height: 70vh;">
-            <!-- 简约头部 (可拖拽) -->
-            <div 
-              @mousedown="startDrag"
-              class="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 cursor-move select-none flex-shrink-0"
-            >
-              <div class="flex items-center gap-2">
-                <span class="text-purple-600">{{ aiActions.find(a => a.id === aiPopup.action)?.icon || '✨' }}</span>
-                <span class="font-medium text-sm text-slate-700">{{ getActionLabel(aiPopup.action) }}</span>
-                <span v-if="aiPopup.loading" class="flex items-center gap-1 ml-2">
-                  <span class="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce"></span>
-                  <span class="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.15s"></span>
-                  <span class="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.3s"></span>
-                </span>
-              </div>
-              <button
-                @click="closeAiPopup"
-                class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <!-- 内容区域 (可滚动，flex-grow 自适应) -->
-            <div class="p-4 overflow-auto flex-grow min-h-0">
-              <div 
-                v-if="aiPopup.content"
-                class="text-sm text-slate-700 leading-relaxed ai-content prose prose-sm max-w-none"
-                v-html="renderAiMarkdown(aiPopup.content)"
-              ></div>
-              <div v-else-if="aiPopup.loading" class="flex items-center gap-2 text-sm text-slate-400">
-                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                AI 正在生成...
-              </div>
-            </div>
-            
-            <!-- 底部操作栏 (固定不收缩) -->
-            <div v-if="aiPopup.content && !aiPopup.loading" class="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
-              <button
-                @click="applyAiResult('copy')"
-                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                复制
-              </button>
-              <div class="flex items-center gap-2">
-                <button
-                  @click="closeAiPopup"
-                  class="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-                >
-                  关闭
-                </button>
-                <button
-                  v-if="aiPopup.action === 'summarize'"
-                  @click="applyAiResult('summary')"
-                  class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all"
-                >
-                  填入摘要
-                </button>
-                <button
-                  v-else-if="aiPopup.action === 'polish' || aiPopup.action === 'code_explain'"
-                  @click="applyAiResult('replace')"
-                  class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all"
-                >
-                  替换原文
-                </button>
-                <button
-                  v-else
-                  @click="applyAiResult('insert')"
-                  class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all"
-                >
-                  插入文章
-                </button>
-              </div>
-            </div>
-            
-            <!-- 右下角拖拽提示 -->
-            <div class="absolute bottom-1 right-1 text-slate-300 pointer-events-none">
-              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22Z"/>
-              </svg>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-    
+  </div>
     
     <!-- 新建标签弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showTagModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div class="absolute inset-0 bg-black/50" @click="showTagModal = false"></div>
-          <div class="relative bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div class="relative bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
             <h3 class="text-xl font-bold text-slate-800 mb-4">新建标签</h3>
             
             <div class="space-y-4">
@@ -1247,63 +754,14 @@ const getActionLabel = (action) => {
   @apply w-8 h-8 flex items-center justify-center rounded text-slate-600 hover:bg-slate-200 hover:text-slate-800 transition-colors text-sm;
 }
 
+.toolbar-btn-dark {
+  @apply text-slate-300 hover:bg-white/10 hover:text-white;
+}
+
 .prose-preview {
   font-size: 1rem;
   line-height: 1.75;
   color: #374151;
-}
-
-/* AI 内容样式 */
-.ai-content {
-  line-height: 1.6;
-}
-
-.ai-content :deep(pre) {
-  margin: 0.5rem 0;
-}
-
-.ai-content :deep(code) {
-  font-size: 0.75rem;
-}
-
-/* 菜单弹出动画 */
-.menu-pop-enter-active {
-  animation: menuPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.menu-pop-leave-active {
-  animation: menuPop 0.15s ease-in reverse;
-}
-
-@keyframes menuPop {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* 浮窗缩放动画 */
-.popup-scale-enter-active {
-  animation: popupScale 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.popup-scale-leave-active {
-  animation: popupScale 0.15s ease-in reverse;
-}
-
-@keyframes popupScale {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 /* 弹窗动画 */

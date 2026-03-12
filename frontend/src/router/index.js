@@ -115,26 +115,18 @@ const router = createRouter({
       component: InventoryView,
       meta: { requiresAuth: true, authType: 'chef', title: '库存管理 | 私房厨房' }
     },
-    // 博客管理路由（需要厨师密码）
     {
       path: '/kitchen/chef/blog',
-      name: 'chef-blog',
-      component: BlogManagerView,
-      meta: { requiresAuth: true, authType: 'chef', title: '博客管理 | 私房厨房' }
+      redirect: '/blog/studio'
     },
     {
       path: '/kitchen/chef/blog/new',
-      name: 'chef-blog-new',
-      component: BlogEditorView,
-      meta: { requiresAuth: true, authType: 'chef', title: '新建博客 | 私房厨房' }
+      redirect: '/blog/studio/new'
     },
     {
       path: '/kitchen/chef/blog/:id/edit',
-      name: 'chef-blog-edit',
-      component: BlogEditorView,
-      meta: { requiresAuth: true, authType: 'chef', title: '编辑博客 | 私房厨房' }
+      redirect: to => `/blog/studio/${to.params.id}/edit`
     },
-
     // ========================================
     // Blog 模块 - /blog 路径下
     // ========================================
@@ -143,6 +135,24 @@ const router = createRouter({
       name: 'blog',
       component: BlogListView,
       meta: { title: '技术博客 | LZQ' }
+    },
+    {
+      path: '/blog/studio',
+      name: 'blog-studio',
+      component: BlogManagerView,
+      meta: { requiresAuth: true, authType: 'chef', title: '博客写作台 | LZQ' }
+    },
+    {
+      path: '/blog/studio/new',
+      name: 'blog-studio-new',
+      component: BlogEditorView,
+      meta: { requiresAuth: true, authType: 'chef', title: '新建文章 | LZQ Blog' }
+    },
+    {
+      path: '/blog/studio/:id/edit',
+      name: 'blog-studio-edit',
+      component: BlogEditorView,
+      meta: { requiresAuth: true, authType: 'chef', title: '编辑文章 | LZQ Blog' }
     },
     {
       path: '/blog/:slug',

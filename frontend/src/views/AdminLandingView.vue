@@ -95,7 +95,7 @@ onMounted(() => {
 
     <!-- 技术博客管理 -->
     <div class="mt-8">
-      <router-link to="/kitchen/chef/blog" class="group relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl shadow-sm border border-purple-500/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block">
+      <router-link to="/blog/studio" class="group relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl shadow-sm border border-purple-500/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block">
         <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
         <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-30 transition-opacity">
             <span class="text-9xl">✍️</span>

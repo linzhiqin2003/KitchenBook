@@ -128,7 +128,7 @@ const handleFullLogout = () => {
            <router-link to="/kitchen/chef/recipes" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>📖</span> 食谱
            </router-link>
-           <router-link to="/kitchen/chef/blog" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
+           <router-link to="/blog/studio" class="hover:text-emerald-200 transition-colors flex items-center gap-1">
              <span>✍️</span> 博客
            </router-link>
            <button @click="handleLogout" class="bg-red-900/50 px-3 py-1.5 rounded-full hover:bg-red-900 transition-colors border border-red-600 flex items-center gap-1 cursor-pointer">
@@ -191,7 +191,7 @@ const handleFullLogout = () => {
             <router-link to="/kitchen/chef/recipes" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>📖</span> 食谱
             </router-link>
-            <router-link to="/kitchen/chef/blog" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+            <router-link to="/blog/studio" class="hover:bg-emerald-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
               <span>✍️</span> 博客
             </router-link>
             <button @click="handleLogout" class="bg-red-900/50 px-3 py-2 rounded-lg hover:bg-red-900 transition-colors border border-red-600 flex items-center gap-2 mt-2 w-full cursor-pointer">
