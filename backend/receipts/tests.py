@@ -114,15 +114,15 @@ class StatsOverviewTests(TestCase):
 
         # Personal receipts
         Receipt.objects.create(
-            user=self.user1, merchant="Shop", status=Receipt.STATUS_READY, total=Decimal("100.00"),
+            user=self.user1, merchant="Shop", status=Receipt.STATUS_CONFIRMED, total=Decimal("100.00"),
         )
         Receipt.objects.create(
-            user=self.user2, merchant="Shop", status=Receipt.STATUS_READY, total=Decimal("200.00"),
+            user=self.user2, merchant="Shop", status=Receipt.STATUS_CONFIRMED, total=Decimal("200.00"),
         )
         # Org receipt
         Receipt.objects.create(
             user=self.owner, organization=self.org, merchant="Org Shop",
-            status=Receipt.STATUS_READY, total=Decimal("300.00"), payer="Owner",
+            status=Receipt.STATUS_CONFIRMED, total=Decimal("300.00"), payer="Owner",
         )
 
     def test_stats_personal_scope(self):
