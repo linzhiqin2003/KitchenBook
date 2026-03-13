@@ -23,7 +23,7 @@ class PersonalReceiptTests(TestCase):
 
     def test_create_receipt_sets_user(self):
         self.client.force_authenticate(user=self.user1)
-        resp = self.client.post("/api/receipts/", {"merchant": "Test Shop"}, format="json")
+        resp = self.client.post("/receipts/api/receipts/", {"merchant": "Test Shop"}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         receipt = Receipt.objects.get(id=resp.data["id"])
         self.assertEqual(receipt.user, self.user1)
@@ -37,7 +37,7 @@ class PersonalReceiptTests(TestCase):
         )
 
         self.client.force_authenticate(user=self.user1)
-        resp = self.client.get("/api/receipts/")
+        resp = self.client.get("/receipts/api/receipts/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data), 1)
         self.assertEqual(resp.data[0]["merchant"], "Shop A")
@@ -66,7 +66,7 @@ class OrgReceiptTests(TestCase):
     def test_create_receipt_in_org(self):
         self.client.force_authenticate(user=self.owner)
         resp = self.client.post(
-            "/api/receipts/",
+            "/receipts/api/receipts/",
             {"merchant": "Org Shop"},
             format="json",
             HTTP_X_ACTIVE_ORG=str(self.org.id),
@@ -81,7 +81,7 @@ class OrgReceiptTests(TestCase):
             status=Receipt.STATUS_READY, total=Decimal("50.00"),
         )
         self.client.force_authenticate(user=self.member)
-        resp = self.client.get("/api/receipts/", HTTP_X_ACTIVE_ORG=str(self.org.id))
+        resp = self.client.get("/receipts/api/receipts/", HTTP_X_ACTIVE_ORG=str(self.org.id))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data), 1)
 
@@ -92,7 +92,7 @@ class OrgReceiptTests(TestCase):
         )
         self.client.force_authenticate(user=self.outsider)
         # Outsider provides org header but is not a member — falls back to personal mode
-        resp = self.client.get("/api/receipts/", HTTP_X_ACTIVE_ORG=str(self.org.id))
+        resp = self.client.get("/receipts/api/receipts/", HTTP_X_ACTIVE_ORG=str(self.org.id))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data), 0)
 
@@ -127,20 +127,20 @@ class StatsOverviewTests(TestCase):
 
     def test_stats_personal_scope(self):
         self.client.force_authenticate(user=self.user1)
-        resp = self.client.get("/api/stats/overview/")
+        resp = self.client.get("/receipts/api/stats/overview/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(Decimal(str(resp.data["total_spend"])), Decimal("100.00"))
         self.assertEqual(resp.data["receipt_count"], 1)
 
     def test_stats_org_scope(self):
         self.client.force_authenticate(user=self.owner)
-        resp = self.client.get("/api/stats/overview/", HTTP_X_ACTIVE_ORG=str(self.org.id))
+        resp = self.client.get("/receipts/api/stats/overview/", HTTP_X_ACTIVE_ORG=str(self.org.id))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(Decimal(str(resp.data["total_spend"])), Decimal("300.00"))
         self.assertIn("by_payer", resp.data)
 
     def test_stats_unauthenticated_returns_empty(self):
-        resp = self.client.get("/api/stats/overview/")
+        resp = self.client.get("/receipts/api/stats/overview/")
         # Default permission requires auth, so should be 401
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -156,9 +156,9 @@ class UnauthenticatedReceiptTests(TestCase):
         )
 
     def test_unauthenticated_list_returns_401(self):
-        resp = self.client.get("/api/receipts/")
+        resp = self.client.get("/receipts/api/receipts/")
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthenticated_stats_returns_401(self):
-        resp = self.client.get("/api/stats/overview/")
+        resp = self.client.get("/receipts/api/stats/overview/")
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
