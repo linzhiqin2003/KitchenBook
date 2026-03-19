@@ -110,6 +110,16 @@ PROMPT_TEMPLATE = """
 - tags 中的规格信息保留原始标注（如 "130g"、"310ml"）
 </rule>
 
+<rule id="price_reading">
+价格解读（unit_price 与 total_price）：
+- 【关键】收据/小票上商品行右侧显示的金额通常是该商品的**总价**（total_price），而非单价
+- 当商品行包含数量标记（如 "x 4"、"× 3"、"QTY 2"）时：
+  × 错误："JS GARLIC x 4  £0.87" → quantity=4, unit_price=0.87, total_price=3.48
+  √ 正确："JS GARLIC x 4  £0.87" → quantity=4, total_price=0.87, unit_price=0.22（即 0.87÷4）
+- unit_price = total_price ÷ quantity，保留两位小数
+- 若收据上同时标注了单价和总价（如 "2 @ £1.50  £3.00"），以明确标注为准
+</rule>
+
 </field_rules>
 
 <online_order>
