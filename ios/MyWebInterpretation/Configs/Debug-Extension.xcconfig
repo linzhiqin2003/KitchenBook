@@ -1,0 +1,3 @@
+// Debug Extension config
+PRODUCT_BUNDLE_IDENTIFIER = org.lzqqq.interpretation.debug.broadcast
+INFOPLIST_FILE = BroadcastExtension/Info.plist

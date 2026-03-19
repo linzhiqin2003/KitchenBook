@@ -43,5 +43,4 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd ~/KitchenBook
-            git pull origin main
             bash deploy/deploy.sh

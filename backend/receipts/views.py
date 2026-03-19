@@ -20,7 +20,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from accounts.models import OrganizationMember
 from .models import CategoryMain, CategorySub, Receipt, ReceiptImage, ReceiptItem
 from .serializers import ReceiptSerializer
-from .services.doubao import analyze_receipt, analyze_receipt_stream
+from .services.vlm import analyze_receipt, analyze_receipt_stream
 from .services.ai_generate import chat_or_generate
 from .services.parsing import NotReceiptError, parse_receipt_payload, parse_datetime_with_tz, to_decimal
 

@@ -476,7 +476,7 @@ struct ContentView: View {
             }
             inputArea
 
-            if vm.segments.isEmpty {
+            if vm.visibleSegments.isEmpty {
                 emptyState
             } else {
                 resultsList
@@ -497,7 +497,7 @@ struct ContentView: View {
                     .frame(width: 360)
                     .frame(maxHeight: .infinity, alignment: .top)
 
-                if vm.segments.isEmpty {
+                if vm.visibleSegments.isEmpty {
                     emptyResultsCard
                 } else {
                     resultsList
@@ -548,82 +548,41 @@ struct ContentView: View {
 
     private var asrModeIndicator: some View {
         HStack(spacing: 8) {
-            if vm.creditBalance > 0 {
-                // Has credits: show mode toggle
-                HStack(spacing: 0) {
-                    modePill(title: "免费", icon: "bolt.fill", isSelected: vm.asrTier == "free") {
-                        vm.asrTier = "free"
-                    }
-                    modePill(title: "高级", icon: "sparkles", isPremium: true, isSelected: vm.asrTier == "premium") {
-                        vm.asrTier = "premium"
-                    }
-                }
-                .background(.white.opacity(0.06))
-                .clipShape(Capsule())
-
-                if vm.asrTier == "premium" {
-                    Text("\(vm.creditBalance / 60) min")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.white.opacity(0.4))
-
-                    Button { showingCreditStore = true } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.purple.opacity(0.7))
-                    }
-
-                    if vm.speakerEnabled {
-                        HStack(spacing: 3) {
-                            Image(systemName: "person.2.fill")
-                                .font(.caption2)
-                            Text("人声识别")
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.white.opacity(0.35))
-                    }
-                }
-            } else {
-                // No credits: free mode + upgrade entry
-                HStack(spacing: 4) {
-                    Image(systemName: "bolt.fill")
-                        .font(.caption2)
-                    Text("免费模式")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                .foregroundStyle(.white.opacity(0.4))
-
-                Button { showingCreditStore = true } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.caption2)
-                        Text("升级")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                    }
-                    .foregroundStyle(.purple)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(.purple.opacity(0.15))
-                    .clipShape(Capsule())
-                }
-            }
-        }
-    }
-
-    private func modePill(title: String, icon: String, isPremium: Bool = false, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.2)) { action() }
-        } label: {
+            // Mode status badge (read-only, switch in Settings)
             HStack(spacing: 4) {
-                Image(systemName: icon).font(.caption2)
-                Text(title).font(.caption).fontWeight(.medium)
+                Image(systemName: vm.asrTier == "premium" ? "sparkles" : "bolt.fill")
+                    .font(.caption2)
+                Text(vm.asrTier == "premium" ? "高级" : "免费")
+                    .font(.caption)
+                    .fontWeight(.medium)
             }
-            .foregroundStyle(isSelected ? .white.opacity(0.9) : .white.opacity(0.3))
+            .foregroundStyle(vm.asrTier == "premium" ? .purple : .white.opacity(0.5))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(isSelected ? (isPremium ? Color.purple.opacity(0.3) : .white.opacity(0.1)) : .clear)
+            .background(vm.asrTier == "premium" ? Color.purple.opacity(0.15) : .white.opacity(0.06))
             .clipShape(Capsule())
+
+            if vm.asrTier == "premium" {
+                Text("\(vm.creditBalance / 60) min")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.4))
+
+                Button { showingCreditStore = true } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.purple.opacity(0.7))
+                }
+
+                if vm.speakerEnabled {
+                    HStack(spacing: 3) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption2)
+                        Text("人声识别")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.white.opacity(0.35))
+                }
+            }
         }
     }
 
@@ -931,40 +890,40 @@ struct ContentView: View {
 
     // Final (slow pipeline confirmed) text
     private var finalTranscription: String {
-        vm.segments.filter { $0.isFinal && !$0.transcription.isEmpty }
+        vm.visibleSegments.filter { $0.isFinal && !$0.transcription.isEmpty }
             .map { $0.transcription }.joined(separator: " ")
     }
     private var finalTranslation: String {
-        vm.segments.filter { $0.isFinal && !$0.translation.isEmpty }
+        vm.visibleSegments.filter { $0.isFinal && !$0.translation.isEmpty }
             .map { $0.translation }.joined(separator: " ")
     }
 
     // Pending (fast pipeline preliminary) text
     private var pendingTranscription: String {
-        vm.segments.filter { !$0.isFinal && !$0.transcription.isEmpty }
+        vm.visibleSegments.filter { !$0.isFinal && !$0.transcription.isEmpty }
             .map { $0.transcription }.joined(separator: " ")
     }
     private var pendingTranslation: String {
-        vm.segments.filter { !$0.isFinal && !$0.translation.isEmpty }
+        vm.visibleSegments.filter { !$0.isFinal && !$0.translation.isEmpty }
             .map { $0.translation }.joined(separator: " ")
     }
 
     // Combined text for export/copy (final + pending)
     private var combinedTranscription: String {
-        vm.segments.compactMap { $0.transcription.isEmpty ? nil : $0.transcription }
+        vm.visibleSegments.compactMap { $0.transcription.isEmpty ? nil : $0.transcription }
             .joined(separator: " ")
     }
     private var combinedTranslation: String {
-        vm.segments.compactMap { $0.translation.isEmpty ? nil : $0.translation }
+        vm.visibleSegments.compactMap { $0.translation.isEmpty ? nil : $0.translation }
             .joined(separator: " ")
     }
 
     private var hasPending: Bool {
-        vm.segments.contains { $0.status == .uploading || ($0.status != .done && $0.status != .error) }
+        vm.visibleSegments.contains { $0.status == .uploading || ($0.status != .done && $0.status != .error) }
     }
 
     private var displaySegments: [SegmentResult] {
-        vm.segments
+        vm.visibleSegments
             .filter { !$0.transcription.isEmpty || !$0.translation.isEmpty }
     }
 
@@ -1129,7 +1088,7 @@ struct ContentView: View {
     private var resultsSegmentListView: some View {
         let maxH: CGFloat = isPadLayout ? 650 : 360
         let isLoading: (SegmentResult) -> Bool = { $0.status == .uploading || $0.status == .transcribed || $0.status == .translated }
-        let segs = vm.segments.filter { seg in
+        let segs = vm.visibleSegments.filter { seg in
             switch displayMode {
             case .original: return !seg.transcription.isEmpty || isLoading(seg)
             case .translation: return !seg.translation.isEmpty || isLoading(seg)
@@ -1381,14 +1340,14 @@ struct ContentView: View {
             } label: {
                 Label("导出 PDF", systemImage: "doc.richtext")
             }
-            .disabled(vm.segments.isEmpty)
+            .disabled(vm.visibleSegments.isEmpty)
 
             Button {
                 exportAndShare(format: .txt)
             } label: {
                 Label("导出 TXT", systemImage: "square.and.arrow.up")
             }
-            .disabled(vm.segments.isEmpty)
+            .disabled(vm.visibleSegments.isEmpty)
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "square.and.arrow.up")
@@ -1427,14 +1386,14 @@ struct ContentView: View {
         } label: {
             Label("导出 PDF", systemImage: "doc.richtext")
         }
-        .disabled(vm.segments.isEmpty)
+        .disabled(vm.visibleSegments.isEmpty)
 
         Button {
             exportAndShare(format: .txt)
         } label: {
             Label("导出 TXT", systemImage: "square.and.arrow.up")
         }
-        .disabled(vm.segments.isEmpty)
+        .disabled(vm.visibleSegments.isEmpty)
     }
 
     private var displayModeSwipeGesture: some Gesture {
@@ -1475,7 +1434,7 @@ struct ContentView: View {
     }
 
     private func exportAndShare(format: InterpretationExportFormat) {
-        let segments = vm.segments
+        let segments = vm.visibleSegments
         let sourceLang = vm.sourceLang
         let targetLang = vm.targetLang
         let apiBaseURL = vm.apiBaseURL

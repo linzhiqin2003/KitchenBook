@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Translation
 
 @MainActor
 final class InterpretationViewModel: ObservableObject {
@@ -13,7 +14,9 @@ final class InterpretationViewModel: ObservableObject {
     @Published var waveformLevels: [CGFloat] = Array(repeating: 0.04, count: 40)
     @Published var recordingSeconds: Int = 0
     @Published var localRecordings: [LocalInterpretationRecording] = []
-    @Published var creditBalance: Int = 0
+    @Published var creditBalance: Int = UserDefaults.standard.integer(forKey: "cachedCreditBalance") {
+        didSet { UserDefaults.standard.set(creditBalance, forKey: "cachedCreditBalance") }
+    }
     private var recordingTimer: Timer?
 
     var authViewModel: AuthViewModel?
@@ -35,11 +38,14 @@ final class InterpretationViewModel: ObservableObject {
     // Slow pipeline state
     private var currentParagraphSegmentIds: [UUID] = []
     private var slowPipelineTimer: Timer?
-    private static let slowFlushDelay: TimeInterval = 1.0
+    // Must be longer than maxSegmentSeconds (~4s) so continuous speech accumulates
+    // multiple segments before flushing. Pause/stop trigger immediate flush.
+    private static let slowFlushDelay: TimeInterval = 5.0
     private var currentRecorderSessionID: UUID?
     private var segmentSessionMap: [UUID: UUID] = [:]
     private var pendingLocalArchives: [UUID: PendingLocalArchive] = [:]
     private var pendingLocalArchiveTasks: [UUID: Task<Void, Never>] = [:]
+    private var completedSessionIDs: Set<UUID> = []
     private var speakerSessionId: String?
 
     private struct PendingLocalArchive {
@@ -65,18 +71,29 @@ final class InterpretationViewModel: ObservableObject {
         )
     }
 
-    /// Fast pipeline tier: Groq for speed, or GPU/TingWu when speaker identification enabled
+    /// Fast pipeline tier: Apple local for free, Groq/GPU for premium
     var fastPipelineTier: String {
-        guard asrTier == "premium" else { return "free" }
-        guard speakerEnabled else { return "free" }
+        guard asrTier == "premium" else { return "local" }  // free → Apple on-device (WAV format)
+        guard speakerEnabled else { return "free" }         // premium no speaker → Groq
         return speakerProvider == "tingwu" ? "speaker_tingwu" : "speaker_gpu"
     }
 
-    /// Slow pipeline tier: matches user's selected tier (free or premium/DashScope)
-    var slowPipelineTier: String { asrTier }
+    /// Slow pipeline tier: Groq for free, DashScope for premium
+    var slowPipelineTier: String {
+        asrTier == "premium" ? "premium" : "free"
+    }
 
-    /// Whether slow pipeline should run (only when fast ≠ slow, i.e. premium mode)
-    var hasSlowPipeline: Bool { asrTier == "premium" }
+    /// Slow pipeline always runs in live recording (fast ≠ slow for both tiers)
+    var hasSlowPipeline: Bool { true }
+
+    /// Segments visible in the UI — hides segments from completed (stopped) sessions
+    /// while keeping them in memory for the slow pipeline and local archive to use.
+    var visibleSegments: [SegmentResult] {
+        segments.filter { seg in
+            guard let sessionID = segmentSessionMap[seg.id] else { return true }
+            return !completedSessionIDs.contains(sessionID)
+        }
+    }
 
     /// Whether the current configuration needs a speaker session ID
     var needsSpeakerSession: Bool {
@@ -204,6 +221,9 @@ final class InterpretationViewModel: ObservableObject {
         recordingTimer = nil
 
         if let stoppingSessionID {
+            // Hide this session's segments from UI immediately
+            completedSessionIDs.insert(stoppingSessionID)
+
             queueLocalArchive(
                 sessionID: stoppingSessionID,
                 createdAt: stoppingAt,
@@ -313,7 +333,8 @@ final class InterpretationViewModel: ObservableObject {
     // MARK: - Fast Pipeline
 
     private func handleSegment(fileURL: URL, seq: Int, recorderSessionID: UUID?) {
-        print("[Fast] handleSegment #\(seq)")
+        let t0 = CFAbsoluteTimeGetCurrent()
+        print("⏱️ [Seg#\(seq)] created at \(String(format: "%.3f", t0))")
         let segment = SegmentResult(seq: seq)
         segments.append(segment)
 
@@ -338,90 +359,177 @@ final class InterpretationViewModel: ObservableObject {
         let token = KeychainService.load(.accessToken)
         let authVM = self.authViewModel
 
-        // Fast pipeline: Groq for speed, GPU/TingWu only when speaker enabled
+        // Fast pipeline: Apple local for free, Groq/GPU for premium
         let fastAsrTier = self.fastPipelineTier
         let currentSpeakerSessionId = self.needsSpeakerSession ? self.speakerSessionId : nil
         // When slow pipeline follows, fast result is preliminary (shows shimmer);
         // otherwise fast result is already final.
         let fastIsFinal = !shouldEnterSlowPipeline
+        let translationSessionRef = self.translationSession
 
-        Task.detached {
-            do {
-                let result = try await self.callTranscribeTranslate(
+        if fastAsrTier == "local" {
+            // Free mode fast pipeline: Apple on-device ASR first, Groq fallback if empty
+            Task.detached {
+                let asrStart = CFAbsoluteTimeGetCurrent()
+                print("⏱️ [Seg#\(seq)] AppleASR start (+\(String(format: "%.0f", (asrStart - t0) * 1000))ms)")
+                let transcription = await AppleSpeechService.shared.transcribe(
                     fileURL: fileURL,
-                    baseURLString: baseURLString,
-                    sourceLang: sourceLang,
-                    targetLang: targetLang,
-                    token: token,
-                    authVM: authVM,
-                    asrTier: fastAsrTier,
-                    sessionId: currentSpeakerSessionId
+                    locale: AppleSpeechService.locale(for: sourceLang)
                 )
-                print("[Fast] Got result: \(result.transcription.prefix(50))... speaker=\(result.speaker_id ?? "nil")")
+                let asrEnd = CFAbsoluteTimeGetCurrent()
+                var text = transcription ?? ""
+                print("⏱️ [Seg#\(seq)] AppleASR done (+\(String(format: "%.0f", (asrEnd - t0) * 1000))ms) text=\(text.isEmpty ? "(empty)" : "\"\(text.prefix(60))\"")")
 
-                // Filter ASR hallucinations (common phantom outputs on low-energy audio)
-                if Self.isHallucination(result.transcription) {
-                    print("[Fast] Filtered hallucination: \"\(result.transcription)\"")
-                    await MainActor.run {
-                        self.updateSegment(id: segmentId) { seg in
-                            seg.transcription = ""
-                            seg.translation = ""
-                            seg.status = .done
-                            seg.isFinal = true
+                var translatedText = ""
+
+                if text.isEmpty || Self.isHallucination(text) {
+                    // Apple ASR failed — fall back to Groq for instant result
+                    print("⏱️ [Seg#\(seq)] AppleASR empty → Groq fallback")
+                    do {
+                        let result = try await self.callTranscribeTranslate(
+                            fileURL: fileURL,
+                            baseURLString: baseURLString,
+                            sourceLang: sourceLang,
+                            targetLang: targetLang,
+                            token: token,
+                            authVM: authVM,
+                            asrTier: "free"
+                        )
+                        let groqDone = CFAbsoluteTimeGetCurrent()
+                        print("⏱️ [Seg#\(seq)] Groq fallback done (+\(String(format: "%.0f", (groqDone - t0) * 1000))ms) asr=GroqWhisper translate=GroqQwen text=\"\(result.transcription.prefix(60))\"")
+
+                        if !result.transcription.isEmpty && !Self.isHallucination(result.transcription) {
+                            text = result.transcription
+                            translatedText = result.translation
+                        }
+                    } catch {
+                        print("⏱️ [Seg#\(seq)] Groq fallback error: \(error)")
+                    }
+                } else {
+                    // Apple ASR succeeded — translate locally (iOS 18+)
+                    if #available(iOS 18.0, *),
+                       let session = translationSessionRef as? TranslationSession {
+                        do {
+                            let response = try await session.translate(text)
+                            translatedText = response.targetText
+                            print("⏱️ [Seg#\(seq)] translate=AppleTranslation")
+                        } catch {
+                            print("⏱️ [Seg#\(seq)] AppleTranslation error: \(error)")
+                        }
+                    } else {
+                        print("⏱️ [Seg#\(seq)] translate=none (iOS<18, no Translation session)")
+                    }
+                }
+
+                if text.isEmpty || Self.isHallucination(text) {
+                    // Both Apple ASR and Groq fallback returned empty
+                    print("⏱️ [Seg#\(seq)] both pipelines empty")
+                    if fastIsFinal {
+                        await MainActor.run {
+                            self.updateSegment(id: segmentId) { seg in
+                                seg.transcription = ""
+                                seg.translation = ""
+                                seg.status = .done
+                                seg.isFinal = true
+                            }
                         }
                     }
                 } else {
+                    let translation = translatedText
+                    let done = CFAbsoluteTimeGetCurrent()
+                    print("⏱️ [Seg#\(seq)] fast done (+\(String(format: "%.0f", (done - t0) * 1000))ms) isFinal=\(fastIsFinal)")
+                    print("⏱️ [Seg#\(seq)]   text=\"\(text.prefix(60))\"  translation=\"\(translation.prefix(60))\"")
                     await MainActor.run {
                         self.updateSegment(id: segmentId) { seg in
-                            seg.transcription = result.transcription
-                            seg.translation = result.translation
+                            seg.transcription = text
+                            seg.translation = translation
                             seg.status = .done
-                            seg.speakerId = result.speaker_id
                             seg.isFinal = fastIsFinal
                         }
-                        // Clear fast-pipeline errors now that API is responding,
-                        // but preserve slow-pipeline errors (prefixed with [慢管道])
-                        if let err = self.lastError, !err.hasPrefix("[慢管道]") {
-                            self.lastError = nil
-                        }
                     }
                 }
-            } catch let error as APIError where error.isGroqKeyRevoked {
-                print("[Fast] Groq key revoked, stopping recording")
-                await MainActor.run {
-                    self.lastError = error.friendlyMessage
-                    self.stopAndSave()
-                }
-            } catch {
-                print("[Fast] Network error for segment #\(seq): \(error), trying local fallback...")
-
-                // Attempt local offline fallback
-                let localResult = await self.attemptLocalFallback(
-                    fileURL: fileURL, sourceLang: sourceLang, targetLang: targetLang
-                )
-                if let local = localResult {
-                    print("[Fast] Local fallback succeeded: \(local.transcription.prefix(50))...")
-                    await MainActor.run {
-                        self.updateSegment(id: segmentId) { seg in
-                            seg.transcription = local.transcription
-                            seg.translation = local.translation
-                            seg.status = .done
-                            seg.isOffline = true
-                            seg.isFinal = true
-                        }
-                    }
-                } else {
-                    print("[Fast] Local fallback unavailable for segment #\(seq)")
-                    await MainActor.run {
-                        self.updateSegment(id: segmentId) { seg in
-                            seg.status = .error
-                            seg.errorMessage = error.friendlyMessage
-                        }
-                        self.lastError = error.friendlyMessage
-                    }
-                }
+                // Don't delete file — slow pipeline needs it via accumulated audio
             }
-            try? FileManager.default.removeItem(at: fileURL)
+        } else {
+            // Premium mode fast pipeline: Groq / GPU / TingWu (network)
+            Task.detached {
+                do {
+                    let result = try await self.callTranscribeTranslate(
+                        fileURL: fileURL,
+                        baseURLString: baseURLString,
+                        sourceLang: sourceLang,
+                        targetLang: targetLang,
+                        token: token,
+                        authVM: authVM,
+                        asrTier: fastAsrTier,
+                        sessionId: currentSpeakerSessionId
+                    )
+                    print("[Fast] Got result: \(result.transcription.prefix(50))... speaker=\(result.speaker_id ?? "nil")")
+
+                    // Filter ASR hallucinations (common phantom outputs on low-energy audio)
+                    if Self.isHallucination(result.transcription) {
+                        print("[Fast] Filtered hallucination: \"\(result.transcription)\"")
+                        await MainActor.run {
+                            self.updateSegment(id: segmentId) { seg in
+                                seg.transcription = ""
+                                seg.translation = ""
+                                seg.status = .done
+                                seg.isFinal = true
+                            }
+                        }
+                    } else {
+                        await MainActor.run {
+                            self.updateSegment(id: segmentId) { seg in
+                                seg.transcription = result.transcription
+                                seg.translation = result.translation
+                                seg.status = .done
+                                seg.speakerId = result.speaker_id
+                                seg.isFinal = fastIsFinal
+                            }
+                            // Clear fast-pipeline errors now that API is responding,
+                            // but preserve slow-pipeline errors (prefixed with [慢管道])
+                            if let err = self.lastError, !err.hasPrefix("[慢管道]") {
+                                self.lastError = nil
+                            }
+                        }
+                    }
+                } catch let error as APIError where error.isGroqKeyRevoked {
+                    print("[Fast] Groq key revoked, stopping recording")
+                    await MainActor.run {
+                        self.lastError = error.friendlyMessage
+                        self.stopAndSave()
+                    }
+                } catch {
+                    print("[Fast] Network error for segment #\(seq): \(error), trying local fallback...")
+
+                    // Attempt local offline fallback
+                    let localResult = await self.attemptLocalFallback(
+                        fileURL: fileURL, sourceLang: sourceLang, targetLang: targetLang
+                    )
+                    if let local = localResult {
+                        print("[Fast] Local fallback succeeded: \(local.transcription.prefix(50))...")
+                        await MainActor.run {
+                            self.updateSegment(id: segmentId) { seg in
+                                seg.transcription = local.transcription
+                                seg.translation = local.translation
+                                seg.status = .done
+                                seg.isOffline = true
+                                seg.isFinal = true
+                            }
+                        }
+                    } else {
+                        print("[Fast] Local fallback unavailable for segment #\(seq)")
+                        await MainActor.run {
+                            self.updateSegment(id: segmentId) { seg in
+                                seg.status = .error
+                                seg.errorMessage = error.friendlyMessage
+                            }
+                            self.lastError = error.friendlyMessage
+                        }
+                    }
+                }
+                try? FileManager.default.removeItem(at: fileURL)
+            }
         }
 
         // Schedule slow pipeline flush only for live recording segments.
@@ -520,7 +628,11 @@ final class InterpretationViewModel: ObservableObject {
     // MARK: - Slow Pipeline
 
     private func scheduleSlowPipeline() {
-        slowPipelineTimer?.invalidate()
+        // "Set once, don't reset": only start a timer if one isn't already running.
+        // This lets segments accumulate during continuous speech instead of
+        // resetting the timer on every new segment (which would prevent it from
+        // ever firing when segment interval < delay).
+        guard slowPipelineTimer == nil else { return }
         slowPipelineTimer = Timer.scheduledTimer(
             withTimeInterval: Self.slowFlushDelay,
             repeats: false
@@ -570,12 +682,15 @@ final class InterpretationViewModel: ObservableObject {
         // Slow pipeline: use DashScope (premium) for quality, no speaker session
         let slowAsrTier = self.slowPipelineTier
 
-        print("[Slow] Flushing \(entryIds.count) segments, tier=\(slowAsrTier), audioSize=\(fileSize)B, hasToken=\(token != nil)")
+        let slowT0 = CFAbsoluteTimeGetCurrent()
+        let slowModels = slowAsrTier == "free" ? "asr=GroqWhisper translate=GroqQwen" : "asr=DashScope translate=Cerebras"
+        print("⏱️ [Slow] flush \(entryIds.count) segs, tier=\(slowAsrTier) (\(slowModels)), audioSize=\(fileSize)B")
 
         Task.detached {
             defer { try? FileManager.default.removeItem(at: accumulatedURL) }
 
             do {
+                print("⏱️ [Slow] API call start (+\(String(format: "%.0f", (CFAbsoluteTimeGetCurrent() - slowT0) * 1000))ms)")
                 let result = try await self.callTranscribeTranslate(
                     fileURL: accumulatedURL,
                     baseURLString: baseURLString,
@@ -586,11 +701,18 @@ final class InterpretationViewModel: ObservableObject {
                     asrTier: slowAsrTier
                 )
 
-                print("[Slow] Got result: \(result.transcription.prefix(80))...")
+                let slowElapsed = CFAbsoluteTimeGetCurrent() - slowT0
+                print("⏱️ [Slow] API done (+\(String(format: "%.0f", slowElapsed * 1000))ms) text=\"\(result.transcription.prefix(80))\"")
 
                 let primaryId = entryIds[0]
                 let slowTranscription = result.transcription
 
+                // Check if fast pipeline had no text (e.g. Apple ASR returned empty)
+                let fastHadNoText = await MainActor.run {
+                    self.segments.first(where: { $0.id == primaryId })?.transcription.isEmpty ?? true
+                }
+
+                print("⏱️ [Slow] fastHadNoText=\(fastHadNoText), will shimmer=\(fastHadNoText)")
                 await MainActor.run {
                     for (i, entryId) in entryIds.enumerated() {
                         self.updateSegment(id: entryId) { seg in
@@ -598,7 +720,8 @@ final class InterpretationViewModel: ObservableObject {
                                 seg.transcription = result.transcription
                                 seg.translation = result.translation
                                 seg.status = .done
-                                seg.isFinal = true
+                                // Show brief shimmer when fast pipeline had no preview text
+                                seg.isFinal = !fastHadNoText
                             } else {
                                 seg.transcription = ""
                                 seg.translation = ""
@@ -607,6 +730,18 @@ final class InterpretationViewModel: ObservableObject {
                             }
                         }
                     }
+                }
+
+                // Brief shimmer flash for text that appeared without fast pipeline preview
+                if fastHadNoText {
+                    print("⏱️ [Slow] shimmer start (0.6s)")
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                    await MainActor.run {
+                        self.updateSegment(id: primaryId) { seg in
+                            seg.isFinal = true
+                        }
+                    }
+                    print("⏱️ [Slow] shimmer → final")
                 }
 
                 // Trigger refine pipeline for this paragraph
@@ -622,11 +757,12 @@ final class InterpretationViewModel: ObservableObject {
                 }
             } catch let apiError as APIError {
                 print("[Slow] API error (tier=\(slowAsrTier)): \(apiError)")
-                // Fast pipeline already has results in these segments;
-                // just promote them to final instead of overwriting.
+                // Promote fast pipeline results to final; also ensure status is .done
+                // in case the fast pipeline left the segment as .uploading (e.g. local ASR returned empty).
                 await MainActor.run {
                     for entryId in entryIds {
                         self.updateSegment(id: entryId) { seg in
+                            seg.status = .done
                             seg.isFinal = true
                         }
                     }
@@ -637,6 +773,7 @@ final class InterpretationViewModel: ObservableObject {
                 await MainActor.run {
                     for entryId in entryIds {
                         self.updateSegment(id: entryId) { seg in
+                            seg.status = .done
                             seg.isFinal = true
                         }
                     }
@@ -807,6 +944,9 @@ final class InterpretationViewModel: ObservableObject {
         let transcription = Self.joinWithSpeakerLabels(sessionSegments, keyPath: \.transcription)
         let translation = Self.joinWithSpeakerLabels(sessionSegments, keyPath: \.translation)
 
+        // Clean up: remove session segments from memory and maps
+        cleanupSessionSegments(sessionID: sessionID)
+
         if transcription.isEmpty, translation.isEmpty, pending.audioURL == nil {
             return
         }
@@ -868,6 +1008,17 @@ final class InterpretationViewModel: ObservableObject {
                 self.lastError = error.friendlyMessage
             }
         }
+    }
+
+    private func cleanupSessionSegments(sessionID: UUID) {
+        let idsToRemove = segments
+            .filter { segmentSessionMap[$0.id] == sessionID }
+            .map(\.id)
+        segments.removeAll { segmentSessionMap[$0.id] == sessionID }
+        for id in idsToRemove {
+            segmentSessionMap.removeValue(forKey: id)
+        }
+        completedSessionIDs.remove(sessionID)
     }
 
     /// Join segment texts with 【S1】/【S2】 labels on speaker change.

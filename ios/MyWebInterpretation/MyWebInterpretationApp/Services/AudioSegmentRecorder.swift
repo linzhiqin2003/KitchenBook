@@ -53,7 +53,8 @@ final class AudioSegmentRecorder {
     private var accumulatedURL: URL?
     private var sessionFile: AVAudioFile?
     private var sessionURL: URL?
-    private var storedOutputSettings: [String: Any]?
+    private var storedOutputSettings: [String: Any]?   // M4A/AAC for accumulated & session
+    private var segmentOutputSettings: [String: Any]?  // WAV/PCM for segments (Apple ASR compatible)
     private let audioLock = NSLock()
     private(set) var sessionID: UUID = UUID()
     private var interruptionObserver: NSObjectProtocol?
@@ -109,6 +110,17 @@ final class AudioSegmentRecorder {
             AVSampleRateKey: sampleRate,
             AVNumberOfChannelsKey: 1,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+        ]
+        // WAV (Linear PCM) for segment files — Apple ASR can't handle short AAC clips
+        // from an active .voiceChat session (always returns "No speech detected")
+        segmentOutputSettings = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
         ]
 
         // Install tap once — runs for entire recording session
@@ -295,7 +307,7 @@ final class AudioSegmentRecorder {
     }
 
     private func openNewSegmentFile() throws {
-        guard let settings = storedOutputSettings else {
+        guard let settings = segmentOutputSettings ?? storedOutputSettings else {
             throw AudioRecorderError.failedToStartRecording
         }
 
@@ -311,7 +323,8 @@ final class AudioSegmentRecorder {
         segmentTotalPolls = 0
 
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        let url = dir.appendingPathComponent("segment-\(seq)-\(UUID().uuidString).m4a")
+        let ext = segmentOutputSettings != nil ? "wav" : "m4a"
+        let url = dir.appendingPathComponent("segment-\(seq)-\(UUID().uuidString).\(ext)")
         currentSegmentURL = url
 
         audioLock.lock()
@@ -468,7 +481,13 @@ final class AudioSegmentRecorder {
             try? FileManager.default.removeItem(at: url)
         } else {
             print("[Recorder] Segment #\(currentSeq) ready (RMS=\(String(format: "%.4f", segmentRMS)), speech=\(String(format: "%.0f", speechRatio * 100))%), sending to API")
-            onSegmentReady?(url, currentSeq, currentSessionID)
+            // Delay callback to ensure WAV file is fully flushed — the audio tap
+            // may still hold a reference from its current callback, and the WAV
+            // header data-size field isn't finalized until all references are released.
+            let callback = onSegmentReady
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                callback?(url, currentSeq, currentSessionID)
+            }
         }
     }
 

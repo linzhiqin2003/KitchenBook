@@ -163,7 +163,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-gray-50 transition-all duration-300 border-r border-gray-200"
+  <div class="flex flex-col h-full min-h-0 bg-gray-50 transition-all duration-300 border-r border-gray-200"
        :class="[
          isCollapsed ? 'w-0 lg:w-16 overflow-hidden' : 'w-64',
          'fixed z-50 lg:relative lg:z-auto'
@@ -202,7 +202,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 会话列表 -->
-    <div class="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
+    <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2 custom-scrollbar">
       <div v-if="conversations.length === 0 && !isCollapsed" class="text-center text-gray-400 text-sm mt-10 px-4">
         <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
           <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

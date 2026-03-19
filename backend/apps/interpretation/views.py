@@ -465,13 +465,30 @@ def gen_title(request):
     POST /api/interpretation/generate-title/
       - text: transcription or translation text
     Returns: { title }
+
+    Uses Groq (user's key) when JWT is provided, falls back to Cerebras.
     """
     text = request.data.get('text', '').strip()
     if not text:
         return Response({'error': 'No text provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Try to extract user's Groq key via JWT
+    user_groq_key = None
+    from rest_framework_simplejwt.authentication import JWTAuthentication
+    from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+    try:
+        auth_result = JWTAuthentication().authenticate(request)
+        if auth_result:
+            user, _ = auth_result
+            profile = getattr(user, 'profile', None)
+            if profile and profile.groq_api_key:
+                user_groq_key = profile.groq_api_key
+    except (InvalidToken, TokenError, Exception):
+        pass  # No auth or invalid token — fall back to Cerebras
+
     try:
         from .services.transcribe_translate_service import generate_title
-        title = generate_title(text)
+        title = generate_title(text, groq_api_key=user_groq_key)
         return Response({'title': title})
     except Exception as e:
         logger.error(f"gen_title error: {e}", exc_info=True)

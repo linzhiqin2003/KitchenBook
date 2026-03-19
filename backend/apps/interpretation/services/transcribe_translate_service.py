@@ -1,7 +1,8 @@
 """
 Transcribe + Translate pipeline:
-  1. Qwen3-ASR-1.7B (primary) / Groq Whisper (fallback) — ASR
-  2. Cerebras Qwen3-32B — translation
+  Free tier:    Groq Whisper ASR → Groq qwen/qwen3-32b translation (user's key)
+  Premium tier: DashScope qwen3-asr-flash ASR → Cerebras Qwen3-32B translation
+  Title gen:    Groq openai/gpt-oss-120b (user's key), Cerebras fallback
 """
 
 import json
@@ -70,6 +71,65 @@ _LANG_NAMES = {
 _WHISPER_TO_QWEN3_LANG = {
     'tl': 'fil',
 }
+
+
+def _groq_chat_completion(
+    messages: list,
+    model: str,
+    groq_api_key: str,
+    max_tokens: int = 4096,
+    temperature: float = 0.1,
+    timeout: int = 30,
+) -> str:
+    """Call Groq chat completion API (OpenAI-compatible)."""
+    if not groq_api_key:
+        raise RuntimeError("No Groq API key provided for chat completion")
+
+    payload = json.dumps({
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.groq.com/openai/v1/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {groq_api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    result = (data["choices"][0]["message"].get("content") or "").strip()
+    # Strip <think>...</think> tags from reasoning models
+    result = re.sub(r'<think>[\s\S]*?</think>\s*', '', result).strip()
+    return result
+
+
+def _groq_translate(text: str, source_lang: str, target_lang: str, groq_api_key: str) -> str:
+    """Call Groq qwen/qwen3-32b for translation (free tier)."""
+    src_name = _LANG_NAMES.get(source_lang.lower(), source_lang)
+    tgt_name = _LANG_NAMES.get(target_lang.lower(), target_lang)
+    system_msg = (
+        "/no_think\nYou are a professional translator. "
+        f"The source text is in {src_name}. "
+        f"Translate it into {tgt_name}. "
+        f"You MUST output ONLY the {tgt_name} translation, nothing else. "
+        f"Do NOT output any {src_name} text or other languages."
+    )
+    return _groq_chat_completion(
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": text},
+        ],
+        model="qwen/qwen3-32b",
+        groq_api_key=groq_api_key,
+        max_tokens=4096,
+        temperature=0.1,
+    )
 
 
 def _cerebras_translate(text: str, source_lang: str, target_lang: str) -> str:
@@ -514,8 +574,13 @@ def transcribe_and_translate(
             "speaker_confidence": None,
         }
 
-    translated = _cerebras_translate(text, source_lang, target_lang)
-    logger.info("Cerebras translation done (%d chars)", len(translated))
+    # Free tier with user's Groq key → Groq translation; otherwise Cerebras
+    if groq_api_key:
+        translated = _groq_translate(text, source_lang, target_lang, groq_api_key)
+        logger.info("Groq translation done (%d chars)", len(translated))
+    else:
+        translated = _cerebras_translate(text, source_lang, target_lang)
+        logger.info("Cerebras translation done (%d chars)", len(translated))
 
     return {
         "transcription": text,
@@ -606,22 +671,46 @@ def refine_text(text: str, lang: str) -> str:
     return _cerebras_refine(text, lang)
 
 
-def generate_title(text: str) -> str:
-    """Use Cerebras to generate a very short title from transcription/translation text."""
-    key = _get_cerebras_key()
-    if not key:
-        raise RuntimeError("CEREBRAS_API_KEY_POOL not configured")
+def generate_title(text: str, groq_api_key: str | None = None) -> str:
+    """Generate a very short title from transcription/translation text.
 
+    Uses Groq openai/gpt-oss-120b when a Groq key is provided,
+    falls back to Cerebras Qwen3-32B otherwise.
+    """
     snippet = text[:500]
     system_msg = (
-        "/no_think\nGenerate a very short title (max 6 words) for the following text. "
+        "Generate a very short title (max 6 words) for the following text. "
         "If the text is in Chinese, output a Chinese title (max 8 characters). "
         "Output ONLY the title, nothing else. No quotes, no punctuation at the end."
     )
+
+    if groq_api_key:
+        try:
+            result = _groq_chat_completion(
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": snippet},
+                ],
+                model="openai/gpt-oss-120b",
+                groq_api_key=groq_api_key,
+                max_tokens=64,
+                temperature=0.3,
+                timeout=15,
+            )
+            result = result.strip('"\'""''')
+            return result or "新录音"
+        except Exception as e:
+            logger.warning("Groq title generation failed, falling back to Cerebras: %s", e)
+
+    # Fallback: Cerebras
+    key = _get_cerebras_key()
+    if not key:
+        return "新录音"
+
     payload = json.dumps({
         "model": "qwen-3-32b",
         "messages": [
-            {"role": "system", "content": system_msg},
+            {"role": "system", "content": f"/no_think\n{system_msg}"},
             {"role": "user", "content": snippet},
         ],
         "max_tokens": 64,

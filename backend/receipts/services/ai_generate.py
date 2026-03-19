@@ -4,7 +4,7 @@ from datetime import datetime
 from cerebras.cloud.sdk import Cerebras
 from django.conf import settings
 
-from .doubao import _build_prompt, _strip_json_fences
+from .vlm import _build_prompt, _strip_json_fences
 
 
 # ── Cerebras key pool (mirrors api/tools.py) ──
