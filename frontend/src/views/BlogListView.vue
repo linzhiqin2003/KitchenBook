@@ -493,7 +493,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                   </div>
                   <span :class="[
                     'text-sm font-medium text-center leading-tight transition-colors',
-                    isDarkTheme ? 'text-slate-300 group-hover:text-white' : 'text-slate-700 group-hover:text-violet-700'
+                    isDarkTheme ? 'text-slate-300 group-hover:text-white' : 'text-slate-700 group-hover:text-slate-900'
                   ]">
                     {{ cat.name }}
                   </span>
@@ -601,7 +601,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                     :style="{ transitionDelay: `${index * 50}ms` }">
                     <div :class="['text-2xl font-bold w-8 text-center shrink-0', isDarkTheme ? 'text-white/10' : 'text-slate-200']">{{ String(index + 1).padStart(2, '0') }}</div>
                     <div class="flex-1 min-w-0">
-                      <h3 :class="['font-bold transition-colors truncate', isDarkTheme ? 'text-slate-200 group-hover:text-violet-300' : 'text-slate-800 group-hover:text-violet-600']">{{ post.title }}</h3>
+                      <h3 :class="['font-bold transition-colors truncate', isDarkTheme ? 'text-slate-200 group-hover:text-violet-300' : 'text-slate-800 group-hover:text-slate-600']">{{ post.title }}</h3>
                       <p :class="['text-sm truncate mt-1', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">{{ post.summary || '暂无摘要' }}</p>
                     </div>
                     <div class="hidden sm:flex items-center gap-4 shrink-0 text-sm text-slate-500">
