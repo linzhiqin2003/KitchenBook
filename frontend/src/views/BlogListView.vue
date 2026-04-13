@@ -317,16 +317,9 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
         
         <div class="relative px-4 md:px-6 lg:px-8 py-20 md:py-32">
           <div class="container mx-auto text-center">
-            <!-- 状态标签 -->
-            <div :class="[
-              'inline-flex items-center gap-2 px-5 py-2.5 rounded-full backdrop-blur-md border text-sm mb-8 animate-fade-in',
-              isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/60 border-violet-200/50 shadow-lg shadow-violet-500/5'
-            ]">
-              <span class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span :class="isDarkTheme ? 'text-slate-300' : 'text-slate-600'">技术分享 · 持续更新中</span>
+            <!-- 副品牌 -->
+            <div :class="['text-sm tracking-[0.3em] uppercase mb-8 animate-fade-in', isDarkTheme ? 'text-slate-500' : 'text-amber-700/60']">
+              Code · Think · Share
             </div>
             
             <!-- 标题 -->
