@@ -232,14 +232,13 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
             </button>
             
             <!-- 标签 -->
-            <div class="flex flex-wrap gap-2 mb-4">
+            <div class="flex flex-wrap items-center gap-3 mb-5">
               <span
-                v-for="tag in post.tags"
+                v-for="(tag, i) in post.tags"
                 :key="tag.id"
-                class="px-3 py-1 rounded-full text-sm font-medium border"
-                :style="{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color + '40' }"
+                :class="['text-sm font-medium tracking-wide uppercase', isDarkTheme ? 'text-violet-400' : 'text-amber-700']"
               >
-                {{ tag.name }}
+                <span v-if="i > 0" :class="['mx-2', isDarkTheme ? 'text-slate-600' : 'text-amber-300']">/</span>{{ tag.name }}
               </span>
             </div>
             
