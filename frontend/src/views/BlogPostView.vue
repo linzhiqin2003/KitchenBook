@@ -669,11 +669,23 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 }
 
 .prose-light :deep(.md-link) {
-  color: #7c3aed;
+  color: #6d28d9;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: #6d28d920;
 }
 
 .prose-light :deep(.md-link:hover) {
-  color: #6d28d9;
+  color: #5b21b6;
+  text-decoration-color: #5b21b6;
+}
+
+.prose-light :deep(strong) {
+  color: #1e293b;
+}
+
+.prose-light :deep(em) {
+  color: #334155;
 }
 
 .prose-light :deep(.inline-code) {
