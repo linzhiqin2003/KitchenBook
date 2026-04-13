@@ -187,12 +187,12 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
 <template>
   <div :class="[
     'min-h-screen font-sans transition-colors duration-500',
-    isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#faf8f0] text-slate-800'
+    isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#fcfbf7] text-slate-800'
   ]">
     <!-- 独立导航栏 -->
     <header :class="[
       'fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-colors duration-500',
-      isDarkTheme ? 'bg-[#0a0a0f]/80 border-white/5' : 'bg-[#faf8f0]/90 border-amber-200/30'
+      isDarkTheme ? 'bg-[#0a0a0f]/80 border-white/5' : 'bg-[#fcfbf7]/90 border-amber-200/30'
     ]">
       <div class="container mx-auto px-4 md:px-6">
         <div class="flex items-center justify-between h-16 md:h-20">
@@ -306,7 +306,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
           <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
         </div>
         <!-- 亮色背景 -->
-        <div v-else class="absolute inset-0 bg-gradient-to-br from-[#f5f0e0] via-[#faf8f0] to-[#f0ebe0]">
+        <div v-else class="absolute inset-0 bg-gradient-to-br from-[#f9f8f3] via-[#fcfbf7] to-[#f5f4ef]">
           <!-- 渐变光晕 -->
           <div class="absolute top-0 left-1/4 w-[500px] h-[500px] bg-violet-300/30 rounded-full blur-[120px]"></div>
           <div class="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-fuchsia-300/20 rounded-full blur-[100px]"></div>
@@ -386,7 +386,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
       
 
       <!-- 内容区域 -->
-      <div :class="['min-h-[50vh] transition-colors duration-500', isDarkTheme ? 'bg-[#0f0f15]' : 'bg-[#f7f4ea]']">
+      <div :class="['min-h-[50vh] transition-colors duration-500', isDarkTheme ? 'bg-[#0f0f15]' : 'bg-[#faf9f4]']">
         <div class="container mx-auto px-4 py-12">
           <!-- 加载状态 -->
           <div v-if="loading" class="flex flex-col justify-center items-center py-20">
@@ -583,7 +583,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
     <!-- 独立页脚 -->
     <footer :class="[
       'border-t transition-colors duration-500',
-      isDarkTheme ? 'bg-[#08080c] border-white/5' : 'bg-[#f0ebe0] border-amber-200/30'
+      isDarkTheme ? 'bg-[#08080c] border-white/5' : 'bg-[#f5f4ef] border-amber-200/30'
     ]">
       <div class="container mx-auto px-4 py-8">
         <div :class="['flex flex-col md:flex-row items-center justify-between gap-4 text-sm', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">
