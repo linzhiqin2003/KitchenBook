@@ -57,9 +57,17 @@ const buildGraph = () => {
   const height = rect.height || 500
   const t = getTheme()
 
-  // 节点大小：基于 view_count
-  const maxViews = Math.max(...props.nodes.map(n => n.view_count), 1)
-  const nodeRadius = (n) => 28 + (n.view_count / maxViews) * 20
+  // 节点显示名（取冒号前的短标题，否则完整标题）
+  const displayName = (title) => {
+    const short = title.split(/[：:]/)[0].trim()
+    return short.length > 12 ? short.slice(0, 12) + '…' : short
+  }
+
+  // 节点大小：按显示文字长度自适应
+  const nodeRadius = (n) => {
+    const name = displayName(n.title)
+    return Math.max(32, name.length * 7 + 16)
+  }
 
   // 复制数据（D3 会修改原数据）
   const nodes = props.nodes.map(n => ({ ...n }))
@@ -81,7 +89,7 @@ const buildGraph = () => {
   svg.append('defs').append('marker')
     .attr('id', 'arrowhead')
     .attr('viewBox', '0 -5 10 10')
-    .attr('refX', 20)
+    .attr('refX', 8)
     .attr('refY', 0)
     .attr('markerWidth', 6)
     .attr('markerHeight', 6)
@@ -95,7 +103,7 @@ const buildGraph = () => {
     .force('link', d3.forceLink(edges).id(d => d.id).distance(140).strength(0.5))
     .force('charge', d3.forceManyBody().strength(-600))
     .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 20))
+    .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 15))
 
   // 连线
   const link = g.append('g')
@@ -129,7 +137,7 @@ const buildGraph = () => {
 
   // 节点文字
   node.append('text')
-    .text(d => truncate(d.title.replace(/[：:]/g, '\n').split('\n')[0], 8))
+    .text(d => displayName(d.title))
     .attr('text-anchor', 'middle')
     .attr('dy', '0.35em')
     .attr('fill', t.text)
@@ -176,13 +184,20 @@ const buildGraph = () => {
     router.push(`/blog/${d.slug}`)
   })
 
-  // Tick
+  // Tick — 连线端点缩短到圆圈边缘
   simulation.on('tick', () => {
-    link
-      .attr('x1', d => d.source.x)
-      .attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x)
-      .attr('y2', d => d.target.y)
+    link.each(function(d) {
+      const dx = d.target.x - d.source.x
+      const dy = d.target.y - d.source.y
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1
+      const sr = nodeRadius(d.source) + 2
+      const tr = nodeRadius(d.target) + 10 // 留出箭头空间
+      d3.select(this)
+        .attr('x1', d.source.x + dx / dist * sr)
+        .attr('y1', d.source.y + dy / dist * sr)
+        .attr('x2', d.target.x - dx / dist * tr)
+        .attr('y2', d.target.y - dy / dist * tr)
+    })
 
     node.attr('transform', d => `translate(${d.x},${d.y})`)
   })
