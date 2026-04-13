@@ -285,7 +285,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
         
         <!-- 文章正文 -->
         <div class="container mx-auto max-w-4xl px-4 mt-12">
-          <div :class="['rounded-2xl border p-6 md:p-10', isDarkTheme ? 'bg-[#12121a] border-white/5' : 'bg-white border-amber-200/30 shadow-sm']">
+          <div :class="['rounded-2xl border p-6 md:p-10', isDarkTheme ? 'bg-[#12121a] border-white/5' : 'bg-[#faf7ef] border-amber-200/30 shadow-sm']">
             <div :class="['prose-content', isDarkTheme ? '' : 'prose-light']" v-html="parsedContent"></div>
           </div>
           
@@ -677,8 +677,10 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 }
 
 .prose-light :deep(.inline-code) {
-  background: rgba(139, 92, 246, 0.1);
-  color: #6d28d9;
+  background: rgba(139, 92, 246, 0.12);
+  color: #5b21b6;
+  padding: 0.2rem 0.45rem;
+  font-weight: 500;
 }
 
 .prose-light :deep(.code-block) {
