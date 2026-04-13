@@ -211,9 +211,9 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
       <!-- 文章内容 -->
       <article v-else-if="post" class="pb-16">
         <!-- 文章头部 -->
-        <header class="relative overflow-hidden bg-[#0a0a0f] text-white px-4 md:px-6 lg:px-8 py-16 md:py-24">
+        <header :class="['relative overflow-hidden px-4 md:px-6 lg:px-8 py-16 md:py-24', isDarkTheme ? 'bg-[#0a0a0f] text-white' : 'bg-[#f5f0e0] text-slate-800']">
           <!-- 装饰背景 -->
-          <div class="absolute inset-0 overflow-hidden">
+          <div v-if="isDarkTheme" class="absolute inset-0 overflow-hidden">
             <div class="absolute -top-40 -right-40 w-80 h-80 bg-violet-500/15 rounded-full blur-[100px]"></div>
             <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/15 rounded-full blur-[100px]"></div>
             <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
@@ -223,7 +223,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
             <!-- 返回按钮 -->
             <button 
               @click="goBack"
-              class="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group"
+              :class="['inline-flex items-center gap-2 mb-8 transition-colors group', isDarkTheme ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800']"
             >
               <svg class="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -247,10 +247,10 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
             <h1 class="text-3xl md:text-5xl font-bold mb-6 leading-tight">{{ post.title }}</h1>
             
             <!-- 摘要 -->
-            <p v-if="post.summary" class="text-lg text-slate-400 mb-8 max-w-3xl leading-relaxed">{{ post.summary }}</p>
+            <p v-if="post.summary" :class="['text-lg mb-8 max-w-3xl leading-relaxed', isDarkTheme ? 'text-slate-400' : 'text-slate-600']">{{ post.summary }}</p>
             
             <!-- 元信息 -->
-            <div class="flex flex-wrap items-center gap-6 text-sm text-slate-500">
+            <div :class="['flex flex-wrap items-center gap-6 text-sm', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">
               <div class="flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -285,16 +285,16 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
         
         <!-- 文章正文 -->
         <div class="container mx-auto max-w-4xl px-4 mt-12">
-          <div class="bg-[#12121a] rounded-2xl border border-white/5 p-6 md:p-10">
-            <div class="prose-content" v-html="parsedContent"></div>
+          <div :class="['rounded-2xl border p-6 md:p-10', isDarkTheme ? 'bg-[#12121a] border-white/5' : 'bg-white border-amber-200/30 shadow-sm']">
+            <div :class="['prose-content', isDarkTheme ? '' : 'prose-light']" v-html="parsedContent"></div>
           </div>
           
           <!-- 文章底部 -->
-          <div class="mt-12 p-6 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-2xl border border-violet-500/20">
+          <div :class="['mt-12 p-6 rounded-2xl border', isDarkTheme ? 'bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border-violet-500/20' : 'bg-amber-50 border-amber-200/50']">
             <div class="flex flex-col md:flex-row items-center justify-between gap-4">
               <div>
-                <h3 class="text-lg font-bold text-white mb-1">感谢阅读！</h3>
-                <p class="text-slate-400 text-sm">如果这篇文章对你有帮助，欢迎分享给更多人</p>
+                <h3 :class="['text-lg font-bold mb-1', isDarkTheme ? 'text-white' : 'text-slate-800']">感谢阅读！</h3>
+                <p :class="['text-sm', isDarkTheme ? 'text-slate-400' : 'text-slate-600']">如果这篇文章对你有帮助，欢迎分享给更多人</p>
               </div>
               <button 
                 @click="goBack"
@@ -309,7 +309,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
     </main>
     
     <!-- 独立页脚 -->
-    <footer class="bg-[#08080c] border-t border-white/5">
+    <footer :class="['border-t', isDarkTheme ? 'bg-[#08080c] border-white/5' : 'bg-[#f0ebe0] border-amber-200/30']">
       <div class="container mx-auto px-4 py-8">
         <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
           <!-- 左侧：品牌 -->
@@ -644,5 +644,67 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 
 .prose-content :deep(.task-list-item input) {
   margin-right: 0.5rem;
+}
+
+/* ====== 亮色模式覆盖 ====== */
+.prose-light :deep(.md-h1),
+.prose-light :deep(.md-h2),
+.prose-light :deep(.md-h3),
+.prose-light :deep(.md-h4) {
+  color: #1e293b;
+}
+
+.prose-light :deep(.md-p) {
+  color: #334155;
+}
+
+.prose-light :deep(.md-li) {
+  color: #334155;
+}
+
+.prose-light :deep(.md-quote) {
+  border-left-color: #d97706;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.prose-light :deep(.md-link) {
+  color: #7c3aed;
+}
+
+.prose-light :deep(.md-link:hover) {
+  color: #6d28d9;
+}
+
+.prose-light :deep(.inline-code) {
+  background: rgba(139, 92, 246, 0.1);
+  color: #6d28d9;
+}
+
+.prose-light :deep(.code-block) {
+  background: #1e1e2e;
+  border: 1px solid #e2e8f0;
+}
+
+.prose-light :deep(.md-table th) {
+  background: #f5f0e0;
+  color: #1e293b;
+}
+
+.prose-light :deep(.md-table td) {
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+.prose-light :deep(.md-table tr:hover) {
+  background: #faf8f0;
+}
+
+.prose-light :deep(.md-hr) {
+  border-color: #e2e8f0;
+}
+
+.prose-light :deep(del) {
+  color: #94a3b8;
 }
 </style>
