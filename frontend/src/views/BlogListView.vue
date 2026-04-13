@@ -306,13 +306,8 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
           <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
         </div>
         <!-- 亮色背景 -->
-        <div v-else class="absolute inset-0 bg-gradient-to-br from-[#f9f8f3] via-[#fcfbf7] to-[#f5f4ef]">
-          <!-- 渐变光晕 -->
-          <div class="absolute top-0 left-1/4 w-[500px] h-[500px] bg-violet-300/30 rounded-full blur-[120px]"></div>
-          <div class="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-fuchsia-300/20 rounded-full blur-[100px]"></div>
-          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-200/20 rounded-full blur-[150px]"></div>
-          <!-- 网格 -->
-          <div class="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.05)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
+        <div v-else class="absolute inset-0 bg-[#fcfbf7]">
+          <div class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-300/40 to-transparent"></div>
         </div>
         
         <div class="relative px-4 md:px-6 lg:px-8 py-20 md:py-32">
