@@ -28,6 +28,13 @@ const allowedTags = ['a', 'b', 'i', 'strong', 'em', 'u', 'strike', 's', 'del', '
   'blockquote', 'pre', 'code', 'img', 'video', 'audio', 'source', 'iframe', 'figure', 
   'figcaption', 'details', 'summary', 'abbr', 'cite', 'q', 'dfn', 'kbd', 'samp', 'var']
 
+// HTML 实体解码（一次性处理所有实体）
+const decodeHtmlEntities = (text) => {
+  const el = document.createElement('textarea')
+  el.innerHTML = text
+  return el.value
+}
+
 // 代码高亮函数
 const highlightCode = (code, lang) => {
   if (lang && hljs.getLanguage(lang)) {
@@ -74,14 +81,14 @@ const parseMarkdown = (markdown) => {
   
   // 代码块高亮
   html = html.replace(/<pre><code class="language-(\w+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
-    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    const decoded = decodeHtmlEntities(code)
     const highlighted = highlightCode(decoded, lang)
     return `<pre class="code-block" data-lang="${lang}"><code class="hljs language-${lang}">${highlighted}</code></pre>`
   })
   
   // 无语言代码块
   html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
-    const decoded = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    const decoded = decodeHtmlEntities(code)
     const highlighted = highlightCode(decoded, '')
     return `<pre class="code-block"><code class="hljs">${highlighted}</code></pre>`
   })
