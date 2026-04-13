@@ -418,10 +418,8 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
           </div>
 
           <template v-else>
-            <!-- ======== 文件夹视图（未打开任何文件夹） ======== -->
-            <div v-if="!selectedCategory && !searchQuery">
-              <!-- 搜索栏 + 智能补全 -->
-              <div class="scroll-reveal mb-10 max-w-lg mx-auto">
+            <!-- 搜索栏（始终显示，不在文件夹内时） -->
+            <div v-if="!selectedCategory" class="scroll-reveal mb-10 max-w-lg mx-auto">
                 <div class="relative">
                   <input
                     v-model="searchQuery"
@@ -467,8 +465,10 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                     </button>
                   </div>
                 </div>
-              </div>
+            </div>
 
+            <!-- ======== 文件夹视图（未打开任何文件夹且未搜索） ======== -->
+            <div v-if="!selectedCategory && !searchQuery">
               <!-- 文件夹网格 -->
               <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 md:gap-6">
                 <button
@@ -541,7 +541,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             </div>
 
             <!-- ======== 打开了文件夹 / 搜索结果 ======== -->
-            <div v-else>
+            <div v-if="selectedCategory || searchQuery">
               <!-- 面包屑 + 视图切换 -->
               <div class="scroll-reveal flex items-center justify-between mb-8">
                 <div class="flex items-center gap-3">
