@@ -138,9 +138,9 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 </script>
 
 <template>
-  <div :class="['min-h-screen font-sans transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#faf8f0] text-slate-800 paper-texture']">
+  <div :class="['min-h-screen font-sans transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#fcfbf7] text-slate-800 paper-texture']">
     <!-- 独立导航栏 -->
-    <header :class="['fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f]/80 border-white/5' : 'bg-[#faf8f0]/90 border-amber-200/30']">
+    <header :class="['fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f]/80 border-white/5' : 'bg-[#fcfbf7]/90 border-amber-200/30']">
       <div class="container mx-auto px-4 md:px-6">
         <div class="flex items-center justify-between h-16 md:h-20">
           <!-- Logo -->
@@ -213,7 +213,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
       <!-- 文章内容 -->
       <article v-else-if="post" class="pb-16">
         <!-- 文章头部 -->
-        <header :class="['relative overflow-hidden px-4 md:px-6 lg:px-8 py-16 md:py-24', isDarkTheme ? 'bg-[#0a0a0f] text-white' : 'bg-[#f5f0e0] text-slate-800']">
+        <header :class="['relative overflow-hidden px-4 md:px-6 lg:px-8 py-16 md:py-24', isDarkTheme ? 'bg-[#0a0a0f] text-white' : 'bg-[#faf9f4] text-slate-800']">
           <!-- 装饰背景 -->
           <div v-if="isDarkTheme" class="absolute inset-0 overflow-hidden">
             <div class="absolute -top-40 -right-40 w-80 h-80 bg-violet-500/15 rounded-full blur-[100px]"></div>
@@ -310,7 +310,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
     </main>
     
     <!-- 独立页脚 -->
-    <footer :class="['border-t', isDarkTheme ? 'bg-[#08080c] border-white/5' : 'bg-[#f0ebe0] border-amber-200/30']">
+    <footer :class="['border-t', isDarkTheme ? 'bg-[#08080c] border-white/5' : 'bg-[#f5f4ef] border-amber-200/30']">
       <div class="container mx-auto px-4 py-8">
         <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
           <!-- 左侧：品牌 -->
@@ -729,6 +729,6 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 .paper-texture {
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
-  background-color: #faf8f0;
+  background-color: #fcfbf7;
 }
 </style>
