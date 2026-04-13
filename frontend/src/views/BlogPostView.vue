@@ -217,7 +217,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
     </header>
     
     <!-- 主内容区域 -->
-    <main class="pt-16 md:pt-20">
+    <main class="pt-16 md:pt-20 min-h-[calc(100vh-4rem)]">
       <!-- 加载状态 -->
       <div v-if="loading" class="flex justify-center items-center py-40">
         <div class="relative w-16 h-16">

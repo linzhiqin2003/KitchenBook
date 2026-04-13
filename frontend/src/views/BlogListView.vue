@@ -314,7 +314,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
     </header>
     
     <!-- 主内容区域 -->
-    <main class="pt-16 md:pt-20">
+    <main class="pt-16 md:pt-20 min-h-[calc(100vh-4rem)]">
       <!-- 博客头部 Hero Section -->
       <div class="relative overflow-hidden">
         <!-- 暗色背景 -->
