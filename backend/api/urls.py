@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView,
-    BlogPostViewSet, TagViewSet, AiAgentView, DeepSeekSpecialeView,
+    BlogPostViewSet, TagViewSet, CategoryViewSet, AiAgentView, DeepSeekSpecialeView,
     DeepSeekOCRView, WhisperTranscribeView, RecipeStepViewSet, RecipeIngredientViewSet,
     AiLabConversationViewSet, AiLabMessageViewSet
 )
@@ -15,6 +15,7 @@ router.register(r'recipe-steps', RecipeStepViewSet, basename='recipe-step')
 router.register(r'recipe-ingredients', RecipeIngredientViewSet, basename='recipe-ingredient')
 router.register(r'blog/posts', BlogPostViewSet, basename='blogpost')
 router.register(r'blog/tags', TagViewSet)
+router.register(r'blog/categories', CategoryViewSet)
 router.register(r'ai/conversations', AiLabConversationViewSet, basename='ai-conversation')
 router.register(r'ai/messages', AiLabMessageViewSet, basename='ai-message')
 

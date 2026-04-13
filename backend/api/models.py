@@ -102,9 +102,33 @@ class Tag(models.Model):
     """博客标签"""
     name = models.CharField(max_length=50, unique=True)
     color = models.CharField(max_length=7, default='#10b981', help_text="Hex color code")
-    
+
     def __str__(self):
         return self.name
+
+
+class Category(models.Model):
+    """博客分类（文件夹）"""
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100, unique=True, blank=True)
+    icon = models.CharField(max_length=10, default='📁', help_text="文件夹图标 emoji")
+    color = models.CharField(max_length=7, default='#6366f1', help_text="主题色")
+    description = models.TextField(blank=True, help_text="分类描述")
+    order = models.IntegerField(default=0, help_text="排序权重，数字越小越靠前")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name_plural = 'categories'
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name, allow_unicode=True) or self.name.lower().replace(' ', '-')
+        super().save(*args, **kwargs)
 
 
 # ==================== AI Lab 会话模块 ====================
@@ -157,6 +181,7 @@ class BlogPost(models.Model):
     summary = models.TextField(max_length=500, help_text="文章摘要", blank=True)
     content = models.TextField(help_text="Markdown 格式内容")
     cover_image = models.ImageField(upload_to='blog/', null=True, blank=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='posts')
     tags = models.ManyToManyField(Tag, related_name='posts', blank=True)
     
     # 元数据

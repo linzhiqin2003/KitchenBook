@@ -7,9 +7,11 @@ import API_BASE_URL from '../config/api'
 const router = useRouter()
 const posts = ref([])
 const tags = ref([])
+const categories = ref([])
 const stats = ref({ total_posts: 0, total_views: 0, total_tags: 0 })
 const loading = ref(true)
 const selectedTag = ref('')
+const selectedCategory = ref('')
 const searchQuery = ref('')
 
 // 主题切换 (dark / light)
@@ -74,6 +76,9 @@ const fetchPosts = async () => {
     let url = `${API_BASE_URL}/api/blog/posts/`
     const params = new URLSearchParams()
     
+    if (selectedCategory.value) {
+      params.append('category', selectedCategory.value)
+    }
     if (selectedTag.value) {
       params.append('tag', selectedTag.value)
     }
@@ -106,6 +111,16 @@ const fetchTags = async () => {
   }
 }
 
+// 获取分类列表
+const fetchCategories = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/blog/categories/`)
+    categories.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch categories', error)
+  }
+}
+
 // 获取统计信息
 const fetchStats = async () => {
   try {
@@ -119,8 +134,15 @@ const fetchStats = async () => {
 onMounted(() => {
   fetchPosts()
   fetchTags()
+  fetchCategories()
   fetchStats()
 })
+
+// 筛选分类（文件夹）
+const filterByCategory = (slug) => {
+  selectedCategory.value = selectedCategory.value === slug ? '' : slug
+  fetchPosts()
+}
 
 // 筛选标签
 const filterByTag = (tagName) => {
@@ -431,6 +453,64 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
         </div>
       </div>
       
+      <!-- 文件夹分类视图 -->
+      <div v-if="categories.length > 0" :class="['transition-colors duration-500', isDarkTheme ? 'bg-[#0c0c14]' : 'bg-white']">
+        <div class="container mx-auto px-4 py-10">
+          <div class="scroll-reveal flex items-center gap-3 mb-8">
+            <div class="w-1 h-8 bg-gradient-to-b from-violet-400 to-indigo-500 rounded-full"></div>
+            <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">知识库</h2>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+            <button
+              v-for="cat in categories"
+              :key="cat.id"
+              @click="filterByCategory(cat.slug)"
+              :class="[
+                'group flex flex-col items-center gap-3 p-5 rounded-2xl transition-all duration-300 cursor-pointer',
+                selectedCategory === cat.slug
+                  ? isDarkTheme
+                    ? 'bg-white/10 ring-2 ring-violet-500/50 shadow-lg shadow-violet-500/10'
+                    : 'bg-violet-50 ring-2 ring-violet-400/50 shadow-lg shadow-violet-500/10'
+                  : isDarkTheme
+                    ? 'bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10'
+                    : 'bg-slate-50 hover:bg-slate-100 border border-slate-200/50 hover:border-slate-300'
+              ]"
+            >
+              <!-- 文件夹图标 -->
+              <div :class="[
+                'w-16 h-16 rounded-2xl flex items-center justify-center text-3xl transition-all duration-300',
+                'group-hover:scale-110 group-hover:-translate-y-1',
+                selectedCategory === cat.slug ? 'scale-110 -translate-y-1' : ''
+              ]"
+              :style="{
+                background: `linear-gradient(135deg, ${cat.color}20, ${cat.color}40)`,
+                boxShadow: selectedCategory === cat.slug ? `0 8px 24px -4px ${cat.color}30` : 'none'
+              }">
+                {{ cat.icon }}
+              </div>
+              <!-- 分类名 -->
+              <span :class="[
+                'text-sm font-medium text-center leading-tight transition-colors',
+                selectedCategory === cat.slug
+                  ? isDarkTheme ? 'text-white' : 'text-violet-700'
+                  : isDarkTheme ? 'text-slate-400 group-hover:text-slate-200' : 'text-slate-600 group-hover:text-slate-800'
+              ]">
+                {{ cat.name }}
+              </span>
+              <!-- 文章数 -->
+              <span :class="[
+                'text-xs px-2.5 py-0.5 rounded-full transition-colors',
+                selectedCategory === cat.slug
+                  ? 'bg-violet-500/20 text-violet-300'
+                  : isDarkTheme ? 'bg-white/5 text-slate-500' : 'bg-slate-200/70 text-slate-500'
+              ]">
+                {{ cat.post_count }} 篇
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 文章列表区域 -->
       <div :class="['min-h-[50vh] transition-colors duration-500', isDarkTheme ? 'bg-[#0f0f15]' : 'bg-slate-50']">
         <div class="container mx-auto px-4 py-12">
@@ -446,7 +526,18 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
           <!-- 文章列表 -->
           <div v-else-if="posts.length > 0">
             <!-- 精选文章 -->
-            <div v-if="featuredPosts.length > 0 && !selectedTag && !searchQuery" class="mb-14">
+            <!-- 当前分类标题 -->
+            <div v-if="selectedCategory" class="scroll-reveal flex items-center gap-3 mb-8">
+              <div class="w-1 h-8 bg-gradient-to-b from-violet-400 to-indigo-500 rounded-full"></div>
+              <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">
+                {{ categories.find(c => c.slug === selectedCategory)?.name || selectedCategory }}
+              </h2>
+              <span :class="['text-sm ml-1', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">
+                {{ posts.length }} 篇文章
+              </span>
+            </div>
+
+            <div v-if="featuredPosts.length > 0 && !selectedTag && !searchQuery && !selectedCategory" class="mb-14">
               <div class="scroll-reveal flex items-center gap-3 mb-8">
                 <div class="w-1 h-8 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full"></div>
                 <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">精选推荐</h2>

@@ -16,10 +16,10 @@ import os
 import uuid
 import base64
 import tempfile
-from .models import Recipe, Ingredient, Order, BlogPost, Tag, RecipeStep, RecipeIngredient
+from .models import Recipe, Ingredient, Order, BlogPost, Tag, Category, RecipeStep, RecipeIngredient
 from .serializers import (
     RecipeSerializer, PublicRecipeSerializer, IngredientSerializer, OrderSerializer,
-    BlogPostListSerializer, BlogPostDetailSerializer, TagSerializer,
+    BlogPostListSerializer, BlogPostDetailSerializer, TagSerializer, CategorySerializer,
     RecipeStepSerializer, RecipeIngredientSerializer, RecipeIngredientWriteSerializer
 )
 
@@ -252,6 +252,14 @@ class TagViewSet(viewsets.ModelViewSet):
     permission_classes = []
 
 
+class CategoryViewSet(viewsets.ModelViewSet):
+    """博客分类（文件夹）管理"""
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    authentication_classes = []
+    permission_classes = []
+
+
 class BlogPostViewSet(viewsets.ModelViewSet):
     """博客文章管理"""
     authentication_classes = []
@@ -276,11 +284,16 @@ class BlogPostViewSet(viewsets.ModelViewSet):
             if self.request.query_params.get('mode') != 'chef':
                 queryset = queryset.filter(is_published=True)
         
+        # 按分类筛选
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category__slug=category)
+
         # 按标签筛选
         tag = self.request.query_params.get('tag')
         if tag:
             queryset = queryset.filter(tags__name=tag)
-        
+
         # 只看精选
         featured = self.request.query_params.get('featured')
         if featured == 'true':
