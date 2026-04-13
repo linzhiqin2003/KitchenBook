@@ -238,7 +238,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             <!-- Logo -->
           <router-link to="/blog" class="flex items-center gap-3 group">
             <div :class="['w-10 h-10 rounded-xl flex items-center justify-center transition-shadow', isDarkTheme ? 'bg-white/10 group-hover:bg-white/15' : 'bg-slate-100 group-hover:bg-slate-200']">
-              <svg class="w-5 h-5" :class="isDarkTheme ? 'text-violet-400' : 'text-violet-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="w-5 h-5" :class="isDarkTheme ? 'text-violet-400' : 'text-slate-800'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
               </svg>
             </div>
@@ -479,15 +479,15 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                     'group flex flex-col items-center gap-3 p-6 rounded-2xl transition-all duration-300 cursor-pointer',
                     isDarkTheme
                       ? 'bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-white/15'
-                      : 'bg-[#faf7ef] hover:bg-amber-50 border border-amber-200/40 hover:border-amber-300 shadow-sm hover:shadow-lg'
+                      : 'bg-white/50 hover:bg-white/80 border border-slate-200/60 hover:border-slate-300 shadow-sm hover:shadow-md'
                   ]"
                 >
                   <div class="w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-1"
-                    :style="{ background: `linear-gradient(135deg, ${cat.color}15, ${cat.color}30)` }">
-                    <svg v-if="cat.slug === 'web-server-architecture'" class="w-8 h-8" :style="{ color: cat.color }" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    :style="{ background: isDarkTheme ? `linear-gradient(135deg, ${cat.color}15, ${cat.color}30)` : 'rgba(0,0,0,0.04)' }">
+                    <svg v-if="cat.slug === 'web-server-architecture'" class="w-8 h-8" :class="isDarkTheme ? '' : 'text-slate-700'" :style="isDarkTheme ? { color: cat.color } : {}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
                     </svg>
-                    <svg v-else class="w-8 h-8" :style="{ color: cat.color }" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <svg v-else class="w-8 h-8" :class="isDarkTheme ? '' : 'text-slate-700'" :style="isDarkTheme ? { color: cat.color } : {}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                     </svg>
                   </div>
@@ -638,7 +638,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
           <!-- 左侧：品牌 -->
           <div class="flex items-center gap-3">
             <div :class="['w-8 h-8 rounded-lg flex items-center justify-center', isDarkTheme ? 'bg-white/10' : 'bg-slate-100']">
-              <svg class="w-4 h-4" :class="isDarkTheme ? 'text-violet-400' : 'text-violet-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="w-4 h-4" :class="isDarkTheme ? 'text-violet-400' : 'text-slate-800'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
               </svg>
             </div>

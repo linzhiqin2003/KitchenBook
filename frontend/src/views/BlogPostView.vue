@@ -146,7 +146,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
           <!-- Logo -->
           <router-link to="/blog" class="flex items-center gap-3 group">
             <div :class="['w-10 h-10 rounded-xl flex items-center justify-center transition-shadow', isDarkTheme ? 'bg-white/10 group-hover:bg-white/15' : 'bg-slate-100 group-hover:bg-slate-200']">
-              <svg class="w-5 h-5" :class="isDarkTheme ? 'text-violet-400' : 'text-violet-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="w-5 h-5" :class="isDarkTheme ? 'text-violet-400' : 'text-slate-800'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
               </svg>
             </div>
@@ -316,7 +316,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
           <!-- 左侧：品牌 -->
           <div class="flex items-center gap-3">
             <div :class="['w-8 h-8 rounded-lg flex items-center justify-center', isDarkTheme ? 'bg-white/10' : 'bg-slate-100']">
-              <svg class="w-4 h-4" :class="isDarkTheme ? 'text-violet-400' : 'text-violet-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="w-4 h-4" :class="isDarkTheme ? 'text-violet-400' : 'text-slate-800'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
               </svg>
             </div>
