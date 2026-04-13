@@ -406,10 +406,10 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                     type="text"
                     placeholder="搜索文章..."
                     :class="[
-                      'w-full pl-11 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all text-sm',
+                      'w-full pl-11 pr-4 py-3 border rounded-xl focus:outline-none transition-all text-sm',
                       isDarkTheme
-                        ? 'bg-white/5 border-white/10 text-white placeholder-slate-500'
-                        : 'bg-[#faf7ef] border-amber-200/40 text-slate-800 placeholder-slate-400 shadow-sm'
+                        ? 'bg-white/5 border-white/10 text-white placeholder-slate-500 focus:border-white/20 focus:shadow-lg focus:shadow-white/5'
+                        : 'bg-[#faf7ef] border-amber-200/40 text-slate-800 placeholder-slate-400 shadow-sm focus:border-amber-300/60 focus:shadow-lg focus:shadow-amber-200/20'
                     ]"
                   />
                   <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
