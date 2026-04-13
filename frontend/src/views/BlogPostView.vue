@@ -316,7 +316,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm">
               L
             </div>
-            <span class="text-slate-400">© 2025 LZQ's Tech Blog</span>
+            <span class="text-slate-400">© 2026 LZQ's Tech Blog</span>
           </div>
           
           <!-- 右侧：GitHub + 技术栈 -->
@@ -724,7 +724,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 /* 纸质纹理 */
 .paper-texture {
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
   background-color: #faf8f0;
 }
 </style>

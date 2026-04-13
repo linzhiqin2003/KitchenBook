@@ -216,7 +216,7 @@ const handleFullLogout = () => {
           <!-- 左侧：版权 -->
           <div class="flex items-center gap-2">
             <span>🍳</span>
-            <span>© 2025 LZQ的私人厨房</span>
+            <span>© 2026 LZQ的私人厨房</span>
           </div>
           
           <!-- 中间：链接 -->

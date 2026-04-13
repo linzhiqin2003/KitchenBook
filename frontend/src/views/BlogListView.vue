@@ -187,12 +187,12 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
 <template>
   <div :class="[
     'min-h-screen font-sans transition-colors duration-500',
-    isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-gradient-to-br from-slate-50 via-white to-violet-50 text-slate-800'
+    isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#faf8f0] text-slate-800'
   ]">
     <!-- 独立导航栏 -->
     <header :class="[
       'fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-colors duration-500',
-      isDarkTheme ? 'bg-[#0a0a0f]/80 border-white/5' : 'bg-white/80 border-slate-200/50'
+      isDarkTheme ? 'bg-[#0a0a0f]/80 border-white/5' : 'bg-[#faf8f0]/90 border-amber-200/30'
     ]">
       <div class="container mx-auto px-4 md:px-6">
         <div class="flex items-center justify-between h-16 md:h-20">
@@ -306,7 +306,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
           <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
         </div>
         <!-- 亮色背景 -->
-        <div v-else class="absolute inset-0 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50">
+        <div v-else class="absolute inset-0 bg-gradient-to-br from-[#f5f0e0] via-[#faf8f0] to-[#f0ebe0]">
           <!-- 渐变光晕 -->
           <div class="absolute top-0 left-1/4 w-[500px] h-[500px] bg-violet-300/30 rounded-full blur-[120px]"></div>
           <div class="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-fuchsia-300/20 rounded-full blur-[100px]"></div>
@@ -393,7 +393,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
       
 
       <!-- 内容区域 -->
-      <div :class="['min-h-[50vh] transition-colors duration-500', isDarkTheme ? 'bg-[#0f0f15]' : 'bg-slate-50']">
+      <div :class="['min-h-[50vh] transition-colors duration-500', isDarkTheme ? 'bg-[#0f0f15]' : 'bg-[#f7f4ea]']">
         <div class="container mx-auto px-4 py-12">
           <!-- 加载状态 -->
           <div v-if="loading" class="flex flex-col justify-center items-center py-20">
@@ -419,7 +419,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                       'w-full pl-11 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all text-sm',
                       isDarkTheme
                         ? 'bg-white/5 border-white/10 text-white placeholder-slate-500'
-                        : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 shadow-sm'
+                        : 'bg-[#faf7ef] border-amber-200/40 text-slate-800 placeholder-slate-400 shadow-sm'
                     ]"
                   />
                   <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,7 +438,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                     'group flex flex-col items-center gap-3 p-6 rounded-2xl transition-all duration-300 cursor-pointer',
                     isDarkTheme
                       ? 'bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-white/15'
-                      : 'bg-white hover:bg-violet-50/50 border border-slate-200/60 hover:border-violet-300 shadow-sm hover:shadow-lg'
+                      : 'bg-[#faf7ef] hover:bg-amber-50 border border-amber-200/40 hover:border-amber-300 shadow-sm hover:shadow-lg'
                   ]"
                 >
                   <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-1"
@@ -510,10 +510,10 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                   <span :class="['text-sm', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">{{ posts.length }} 篇</span>
                 </div>
                 <div :class="['flex rounded-lg overflow-hidden border', isDarkTheme ? 'border-white/10' : 'border-slate-200']">
-                  <button @click="setViewMode('card')" :class="['px-3 py-2 transition-colors', viewMode === 'card' ? 'bg-violet-600 text-white' : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-white text-slate-500 hover:text-slate-700']" title="卡片视图">
+                  <button @click="setViewMode('card')" :class="['px-3 py-2 transition-colors', viewMode === 'card' ? 'bg-violet-600 text-white' : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="卡片视图">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                   </button>
-                  <button @click="setViewMode('list')" :class="['px-3 py-2 transition-colors', viewMode === 'list' ? 'bg-violet-600 text-white' : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-white text-slate-500 hover:text-slate-700']" title="列表视图">
+                  <button @click="setViewMode('list')" :class="['px-3 py-2 transition-colors', viewMode === 'list' ? 'bg-violet-600 text-white' : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="列表视图">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                   </button>
                 </div>
@@ -523,7 +523,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                 <!-- 卡片视图 -->
                 <div v-if="viewMode === 'card'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <router-link v-for="(post, index) in posts" :key="post.id" :to="`/blog/${post.slug}`"
-                    :class="['scroll-reveal group rounded-2xl overflow-hidden border transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:shadow-violet-500/10' : 'bg-white border-slate-200/50 hover:border-violet-300 hover:shadow-violet-200/50 shadow-lg']"
+                    :class="['scroll-reveal group rounded-2xl overflow-hidden border transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:shadow-violet-500/10' : 'bg-[#faf7ef] border-amber-200/40 hover:border-amber-300 hover:shadow-amber-200/50 shadow-md']"
                     :style="{ transitionDelay: `${index * 80}ms` }">
                     <div class="aspect-[16/10] relative overflow-hidden">
                       <div v-if="!post.cover_image" class="absolute inset-0 bg-gradient-to-br opacity-90" :class="getDefaultCover(index)">
@@ -551,7 +551,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                 <!-- 列表视图 -->
                 <div v-else class="flex flex-col gap-3">
                   <router-link v-for="(post, index) in posts" :key="post.id" :to="`/blog/${post.slug}`"
-                    :class="['scroll-reveal group flex items-center gap-5 p-4 rounded-xl border transition-all duration-300 hover:shadow-lg', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:bg-[#1a1a25]' : 'bg-white border-slate-200/50 hover:border-violet-300 shadow-sm']"
+                    :class="['scroll-reveal group flex items-center gap-5 p-4 rounded-xl border transition-all duration-300 hover:shadow-lg', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:bg-[#1a1a25]' : 'bg-[#faf7ef] border-amber-200/40 hover:border-amber-300 shadow-sm']"
                     :style="{ transitionDelay: `${index * 50}ms` }">
                     <div :class="['text-2xl font-bold w-8 text-center shrink-0', isDarkTheme ? 'text-white/10' : 'text-slate-200']">{{ String(index + 1).padStart(2, '0') }}</div>
                     <div class="flex-1 min-w-0">
@@ -585,7 +585,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
     <!-- 独立页脚 -->
     <footer :class="[
       'border-t transition-colors duration-500',
-      isDarkTheme ? 'bg-[#08080c] border-white/5' : 'bg-slate-50 border-slate-200'
+      isDarkTheme ? 'bg-[#08080c] border-white/5' : 'bg-[#f0ebe0] border-amber-200/30'
     ]">
       <div class="container mx-auto px-4 py-8">
         <div :class="['flex flex-col md:flex-row items-center justify-between gap-4 text-sm', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">
@@ -594,7 +594,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm">
               L
             </div>
-            <span :class="isDarkTheme ? 'text-slate-400' : 'text-slate-600'">© 2025 LZQ's Tech Blog</span>
+            <span :class="isDarkTheme ? 'text-slate-400' : 'text-slate-600'">© 2026 LZQ's Tech Blog</span>
           </div>
           
           <!-- 右侧：GitHub + 技术栈 -->
