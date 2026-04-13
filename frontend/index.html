@@ -12,6 +12,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   </head>
   <body>
+    <script>
+      // 在 Vue 挂载前同步设置背景色，防止主题闪烁
+      (function(){
+        var t = localStorage.getItem('blog_theme');
+        if (t === 'light') document.body.style.backgroundColor = '#faf8f0';
+        else if (t === 'dark' || !t) document.body.style.backgroundColor = '#0a0a0f';
+      })();
+    </script>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>
