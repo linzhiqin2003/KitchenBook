@@ -346,7 +346,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             <h1 class="text-5xl md:text-7xl font-black mb-6 animate-fade-in-up tracking-tight">
               <span :class="[
                 'bg-clip-text text-transparent',
-                isDarkTheme ? 'bg-gradient-to-r from-white via-violet-200 to-fuchsia-200' : 'bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600'
+                isDarkTheme ? 'bg-gradient-to-r from-white via-violet-200 to-fuchsia-200' : 'bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700'
               ]">
                 技术博客
               </span>
@@ -362,12 +362,34 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             </p>
             
             <!-- 统计信息 -->
-            <div :class="['flex justify-center items-center gap-6 md:gap-8 text-sm animate-fade-in-up animation-delay-400', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">
-              <span><strong :class="isDarkTheme ? 'text-white' : 'text-slate-700'">{{ stats.total_posts }}</strong> 篇文章</span>
-              <span :class="isDarkTheme ? 'text-slate-700' : 'text-slate-300'">·</span>
-              <span><strong :class="isDarkTheme ? 'text-white' : 'text-slate-700'">{{ stats.total_views }}</strong> 次阅读</span>
-              <span :class="isDarkTheme ? 'text-slate-700' : 'text-slate-300'">·</span>
-              <span><strong :class="isDarkTheme ? 'text-white' : 'text-slate-700'">{{ stats.total_tags }}</strong> 个标签</span>
+            <div class="flex justify-center gap-6 md:gap-12 animate-fade-in-up animation-delay-400">
+              <div class="group">
+                <div :class="[
+                  'rounded-2xl px-6 md:px-8 py-4 md:py-5 border transition-shadow',
+                  isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/60 border-slate-200/50 shadow-sm group-hover:shadow-md'
+                ]">
+                  <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-slate-700']">{{ stats.total_posts }}</div>
+                  <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-400']">篇文章</div>
+                </div>
+              </div>
+              <div class="group">
+                <div :class="[
+                  'rounded-2xl px-6 md:px-8 py-4 md:py-5 border transition-shadow',
+                  isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/60 border-slate-200/50 shadow-sm group-hover:shadow-md'
+                ]">
+                  <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-slate-700']">{{ stats.total_views }}</div>
+                  <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-400']">次阅读</div>
+                </div>
+              </div>
+              <div class="group">
+                <div :class="[
+                  'rounded-2xl px-6 md:px-8 py-4 md:py-5 border transition-shadow',
+                  isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/60 border-slate-200/50 shadow-sm group-hover:shadow-md'
+                ]">
+                  <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-slate-700']">{{ stats.total_tags }}</div>
+                  <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-400']">个标签</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
