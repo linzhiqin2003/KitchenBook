@@ -12,6 +12,9 @@ const post = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
+// 读取博客列表页的主题设置
+const isDarkTheme = ref(localStorage.getItem('blog_theme') !== 'light')
+
 // 配置 marked
 marked.setOptions({
   breaks: true,
@@ -135,9 +138,9 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#0a0a0f] text-slate-100 font-sans">
+  <div :class="['min-h-screen font-sans transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-slate-50 text-slate-800']">
     <!-- 独立导航栏 -->
-    <header class="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-white/5">
+    <header :class="['fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f]/80 border-white/5' : 'bg-white/80 border-slate-200/50']">
       <div class="container mx-auto px-4 md:px-6">
         <div class="flex items-center justify-between h-16 md:h-20">
           <!-- Logo -->

@@ -10,9 +10,14 @@ const tags = ref([])
 const categories = ref([])
 const stats = ref({ total_posts: 0, total_views: 0, total_tags: 0 })
 const loading = ref(true)
-const selectedTag = ref('')
 const selectedCategory = ref('')
 const searchQuery = ref('')
+const viewMode = ref(localStorage.getItem('blog_view_mode') || 'card')
+
+const setViewMode = (mode) => {
+  viewMode.value = mode
+  localStorage.setItem('blog_view_mode', mode)
+}
 
 // 主题切换 (dark / light)
 const isDarkTheme = ref(localStorage.getItem('blog_theme') !== 'light')
@@ -79,9 +84,6 @@ const fetchPosts = async () => {
     if (selectedCategory.value) {
       params.append('category', selectedCategory.value)
     }
-    if (selectedTag.value) {
-      params.append('tag', selectedTag.value)
-    }
     if (searchQuery.value) {
       params.append('search', searchQuery.value)
     }
@@ -138,15 +140,14 @@ onMounted(() => {
   fetchStats()
 })
 
-// 筛选分类（文件夹）
-const filterByCategory = (slug) => {
-  selectedCategory.value = selectedCategory.value === slug ? '' : slug
+// 打开/关闭文件夹
+const openCategory = (slug) => {
+  selectedCategory.value = slug
   fetchPosts()
 }
 
-// 筛选标签
-const filterByTag = (tagName) => {
-  selectedTag.value = selectedTag.value === tagName ? '' : tagName
+const closeCategory = () => {
+  selectedCategory.value = ''
   fetchPosts()
 }
 
@@ -166,9 +167,15 @@ const formatDate = (dateStr) => {
   })
 }
 
-// 精选文章
+// 精选文章（仅在未打开文件夹时显示）
 const featuredPosts = computed(() => posts.value.filter(p => p.is_featured).slice(0, 3))
 const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || featuredPosts.value.length === 0))
+
+// 当前打开的文件夹信息
+const currentCategory = computed(() => categories.value.find(c => c.slug === selectedCategory.value))
+
+// 未归类文章
+const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
 </script>
 
 <template>
@@ -378,140 +385,8 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
         </div>
       </div>
       
-      <!-- 搜索和筛选区域 -->
-      <div :class="[
-        'border-y transition-colors duration-500',
-        isDarkTheme ? 'bg-[#12121a] border-white/5' : 'bg-white border-slate-200'
-      ]">
-        <div class="container mx-auto px-4 py-6">
-          <div class="scroll-reveal flex flex-col md:flex-row gap-4 items-center justify-between">
-            <!-- 搜索框 -->
-            <div class="relative w-full md:w-auto md:flex-1 md:max-w-md">
-              <input
-                v-model="searchQuery"
-                @keyup.enter="handleSearch"
-                type="text"
-                placeholder="搜索文章标题或内容..."
-                :class="[
-                  'w-full pl-12 pr-24 py-3.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all',
-                  isDarkTheme 
-                    ? 'bg-white/5 border-white/10 text-white placeholder-slate-500' 
-                    : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 shadow-lg'
-                ]"
-              />
-              <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <button 
-                @click="handleSearch"
-                class="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-sm font-medium rounded-lg hover:shadow-lg hover:shadow-violet-500/25 transition-all"
-              >
-                搜索
-              </button>
-            </div>
-            
-            <!-- 标签筛选 -->
-            <div class="flex flex-wrap gap-2 justify-center md:justify-end">
-              <button
-                @click="filterByTag('')"
-                :class="[
-                  'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300',
-                  !selectedTag 
-                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25' 
-                    : isDarkTheme 
-                      ? 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/10'
-                      : 'bg-white text-slate-600 hover:bg-violet-50 hover:text-violet-600 border border-slate-200 shadow-sm'
-                ]"
-              >
-                全部文章
-              </button>
-              <button
-                v-for="tag in tags"
-                :key="tag.id"
-                @click="filterByTag(tag.name)"
-                :class="[
-                  'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2',
-                  selectedTag === tag.name 
-                    ? 'text-white shadow-lg' 
-                    : isDarkTheme 
-                      ? 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/10'
-                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 shadow-sm'
-                ]"
-                :style="selectedTag === tag.name ? { 
-                  background: `linear-gradient(135deg, ${tag.color}, ${tag.color}dd)`,
-                  boxShadow: `0 10px 25px -5px ${tag.color}50`
-                } : {}"
-              >
-                <span 
-                  class="w-2 h-2 rounded-full" 
-                  :style="{ backgroundColor: tag.color }"
-                ></span>
-                {{ tag.name }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 文件夹分类视图 -->
-      <div v-if="categories.length > 0" :class="['transition-colors duration-500', isDarkTheme ? 'bg-[#0c0c14]' : 'bg-white']">
-        <div class="container mx-auto px-4 py-10">
-          <div class="scroll-reveal flex items-center gap-3 mb-8">
-            <div class="w-1 h-8 bg-gradient-to-b from-violet-400 to-indigo-500 rounded-full"></div>
-            <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">知识库</h2>
-          </div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-            <button
-              v-for="cat in categories"
-              :key="cat.id"
-              @click="filterByCategory(cat.slug)"
-              :class="[
-                'group flex flex-col items-center gap-3 p-5 rounded-2xl transition-all duration-300 cursor-pointer',
-                selectedCategory === cat.slug
-                  ? isDarkTheme
-                    ? 'bg-white/10 ring-2 ring-violet-500/50 shadow-lg shadow-violet-500/10'
-                    : 'bg-violet-50 ring-2 ring-violet-400/50 shadow-lg shadow-violet-500/10'
-                  : isDarkTheme
-                    ? 'bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10'
-                    : 'bg-slate-50 hover:bg-slate-100 border border-slate-200/50 hover:border-slate-300'
-              ]"
-            >
-              <!-- 文件夹图标 -->
-              <div :class="[
-                'w-16 h-16 rounded-2xl flex items-center justify-center text-3xl transition-all duration-300',
-                'group-hover:scale-110 group-hover:-translate-y-1',
-                selectedCategory === cat.slug ? 'scale-110 -translate-y-1' : ''
-              ]"
-              :style="{
-                background: `linear-gradient(135deg, ${cat.color}20, ${cat.color}40)`,
-                boxShadow: selectedCategory === cat.slug ? `0 8px 24px -4px ${cat.color}30` : 'none'
-              }">
-                {{ cat.icon }}
-              </div>
-              <!-- 分类名 -->
-              <span :class="[
-                'text-sm font-medium text-center leading-tight transition-colors',
-                selectedCategory === cat.slug
-                  ? isDarkTheme ? 'text-white' : 'text-violet-700'
-                  : isDarkTheme ? 'text-slate-400 group-hover:text-slate-200' : 'text-slate-600 group-hover:text-slate-800'
-              ]">
-                {{ cat.name }}
-              </span>
-              <!-- 文章数 -->
-              <span :class="[
-                'text-xs px-2.5 py-0.5 rounded-full transition-colors',
-                selectedCategory === cat.slug
-                  ? 'bg-violet-500/20 text-violet-300'
-                  : isDarkTheme ? 'bg-white/5 text-slate-500' : 'bg-slate-200/70 text-slate-500'
-              ]">
-                {{ cat.post_count }} 篇
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
 
-      <!-- 文章列表区域 -->
+      <!-- 内容区域 -->
       <div :class="['min-h-[50vh] transition-colors duration-500', isDarkTheme ? 'bg-[#0f0f15]' : 'bg-slate-50']">
         <div class="container mx-auto px-4 py-12">
           <!-- 加载状态 -->
@@ -522,181 +397,181 @@ const regularPosts = computed(() => posts.value.filter(p => !p.is_featured || fe
             </div>
             <p :class="['mt-4', isDarkTheme ? 'text-slate-500' : 'text-slate-600']">加载中...</p>
           </div>
-          
-          <!-- 文章列表 -->
-          <div v-else-if="posts.length > 0">
-            <!-- 精选文章 -->
-            <!-- 当前分类标题 -->
-            <div v-if="selectedCategory" class="scroll-reveal flex items-center gap-3 mb-8">
-              <div class="w-1 h-8 bg-gradient-to-b from-violet-400 to-indigo-500 rounded-full"></div>
-              <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">
-                {{ categories.find(c => c.slug === selectedCategory)?.name || selectedCategory }}
-              </h2>
-              <span :class="['text-sm ml-1', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">
-                {{ posts.length }} 篇文章
-              </span>
+
+          <template v-else>
+            <!-- ======== 文件夹视图（未打开任何文件夹） ======== -->
+            <div v-if="!selectedCategory && !searchQuery">
+              <!-- 搜索栏 -->
+              <div class="scroll-reveal mb-10 max-w-lg mx-auto">
+                <div class="relative">
+                  <input
+                    v-model="searchQuery"
+                    @keyup.enter="handleSearch"
+                    type="text"
+                    placeholder="搜索文章..."
+                    :class="[
+                      'w-full pl-11 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all text-sm',
+                      isDarkTheme
+                        ? 'bg-white/5 border-white/10 text-white placeholder-slate-500'
+                        : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 shadow-sm'
+                    ]"
+                  />
+                  <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+
+              <!-- 文件夹网格 -->
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 md:gap-6">
+                <button
+                  v-for="cat in categories"
+                  :key="cat.id"
+                  @click="openCategory(cat.slug)"
+                  :class="[
+                    'group flex flex-col items-center gap-3 p-6 rounded-2xl transition-all duration-300 cursor-pointer',
+                    isDarkTheme
+                      ? 'bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-white/15'
+                      : 'bg-white hover:bg-violet-50/50 border border-slate-200/60 hover:border-violet-300 shadow-sm hover:shadow-lg'
+                  ]"
+                >
+                  <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-1"
+                    :style="{ background: `linear-gradient(135deg, ${cat.color}15, ${cat.color}30)` }">
+                    {{ cat.icon }}
+                  </div>
+                  <span :class="[
+                    'text-sm font-medium text-center leading-tight transition-colors',
+                    isDarkTheme ? 'text-slate-300 group-hover:text-white' : 'text-slate-700 group-hover:text-violet-700'
+                  ]">
+                    {{ cat.name }}
+                  </span>
+                  <span :class="[
+                    'text-xs px-2.5 py-0.5 rounded-full',
+                    isDarkTheme ? 'bg-white/5 text-slate-500' : 'bg-slate-100 text-slate-500'
+                  ]">
+                    {{ cat.post_count }} 篇
+                  </span>
+                </button>
+              </div>
+
+              <!-- 精选文章 -->
+              <div v-if="featuredPosts.length > 0" class="mt-14">
+                <div class="scroll-reveal flex items-center gap-3 mb-8">
+                  <div class="w-1 h-8 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full"></div>
+                  <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">精选推荐</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <router-link
+                    v-for="(post, index) in featuredPosts"
+                    :key="post.id"
+                    :to="`/blog/${post.slug}`"
+                    class="scroll-reveal group relative overflow-hidden rounded-2xl aspect-[4/3] cursor-pointer"
+                    :style="{ transitionDelay: `${index * 100}ms` }"
+                  >
+                    <div class="absolute inset-0 bg-gradient-to-br transition-transform duration-500 group-hover:scale-110" :class="post.cover_image ? '' : getDefaultCover(index)">
+                      <img v-if="post.cover_image" :src="post.cover_image" :alt="post.title" class="w-full h-full object-cover" />
+                    </div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+                    <div class="absolute inset-0 p-6 flex flex-col justify-end">
+                      <h3 class="text-xl font-bold text-white mb-2 group-hover:text-violet-200 transition-colors line-clamp-2">{{ post.title }}</h3>
+                      <div class="flex items-center justify-between text-sm text-white/60">
+                        <span>{{ formatDate(post.published_at || post.created_at) }}</span>
+                        <span class="flex items-center gap-1">
+                          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                          {{ post.view_count }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="absolute inset-0 border-2 border-white/0 group-hover:border-violet-400/50 rounded-2xl transition-colors duration-300"></div>
+                  </router-link>
+                </div>
+              </div>
             </div>
 
-            <div v-if="featuredPosts.length > 0 && !selectedTag && !searchQuery && !selectedCategory" class="mb-14">
-              <div class="scroll-reveal flex items-center gap-3 mb-8">
-                <div class="w-1 h-8 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full"></div>
-                <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">精选推荐</h2>
+            <!-- ======== 打开了文件夹 / 搜索结果 ======== -->
+            <div v-else>
+              <!-- 面包屑 + 视图切换 -->
+              <div class="scroll-reveal flex items-center justify-between mb-8">
+                <div class="flex items-center gap-3">
+                  <button @click="closeCategory(); searchQuery = ''"
+                    :class="['w-9 h-9 rounded-lg flex items-center justify-center transition-all group', isDarkTheme ? 'bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-500 hover:text-slate-700']">
+                    <svg class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                  </button>
+                  <div class="w-1 h-8 bg-gradient-to-b from-violet-400 to-indigo-500 rounded-full"></div>
+                  <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">
+                    {{ searchQuery ? `搜索: "${searchQuery}"` : currentCategory?.name || '' }}
+                  </h2>
+                  <span :class="['text-sm', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">{{ posts.length }} 篇</span>
+                </div>
+                <div :class="['flex rounded-lg overflow-hidden border', isDarkTheme ? 'border-white/10' : 'border-slate-200']">
+                  <button @click="setViewMode('card')" :class="['px-3 py-2 transition-colors', viewMode === 'card' ? 'bg-violet-600 text-white' : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-white text-slate-500 hover:text-slate-700']" title="卡片视图">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                  </button>
+                  <button @click="setViewMode('list')" :class="['px-3 py-2 transition-colors', viewMode === 'list' ? 'bg-violet-600 text-white' : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-white text-slate-500 hover:text-slate-700']" title="列表视图">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                  </button>
+                </div>
               </div>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <router-link
-                  v-for="(post, index) in featuredPosts"
-                  :key="post.id"
-                  :to="`/blog/${post.slug}`"
-                  class="scroll-reveal group relative overflow-hidden rounded-2xl aspect-[4/3] cursor-pointer"
-                  :style="{ transitionDelay: `${index * 100}ms` }"
-                >
-                  <!-- 背景 -->
-                  <div 
-                    class="absolute inset-0 bg-gradient-to-br transition-transform duration-500 group-hover:scale-110"
-                    :class="post.cover_image ? '' : getDefaultCover(index)"
-                  >
-                    <img 
-                      v-if="post.cover_image"
-                      :src="post.cover_image"
-                      :alt="post.title"
-                      class="w-full h-full object-cover"
-                    />
-                  </div>
-                  <!-- 遮罩 -->
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-                  <!-- 内容 -->
-                  <div class="absolute inset-0 p-6 flex flex-col justify-end">
-                    <div class="flex gap-2 mb-3">
-                      <span
-                        v-for="tag in post.tags?.slice(0, 2)"
-                        :key="tag.id"
-                        class="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white/90"
-                      >
-                        {{ tag.name }}
-                      </span>
+
+              <div v-if="posts.length > 0">
+                <!-- 卡片视图 -->
+                <div v-if="viewMode === 'card'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <router-link v-for="(post, index) in posts" :key="post.id" :to="`/blog/${post.slug}`"
+                    :class="['scroll-reveal group rounded-2xl overflow-hidden border transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:shadow-violet-500/10' : 'bg-white border-slate-200/50 hover:border-violet-300 hover:shadow-violet-200/50 shadow-lg']"
+                    :style="{ transitionDelay: `${index * 80}ms` }">
+                    <div class="aspect-[16/10] relative overflow-hidden">
+                      <div v-if="!post.cover_image" class="absolute inset-0 bg-gradient-to-br opacity-90" :class="getDefaultCover(index)">
+                        <div class="absolute inset-0 flex items-center justify-center">
+                          <svg class="w-16 h-16 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        </div>
+                      </div>
+                      <img v-else :src="post.cover_image" :alt="post.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      <div class="absolute top-4 right-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full text-white text-xs font-medium">{{ post.reading_time }} min</div>
                     </div>
-                    <h3 class="text-xl font-bold text-white mb-2 group-hover:text-violet-200 transition-colors line-clamp-2">
-                      {{ post.title }}
-                    </h3>
-                    <div class="flex items-center justify-between text-sm text-white/60">
-                      <span>{{ formatDate(post.published_at || post.created_at) }}</span>
+                    <div class="p-5">
+                      <h3 :class="['text-lg font-bold mb-2 transition-colors line-clamp-2', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-violet-600']">{{ post.title }}</h3>
+                      <p :class="['text-sm line-clamp-2 mb-4 leading-relaxed', isDarkTheme ? 'text-slate-500' : 'text-slate-600']">{{ post.summary || '暂无摘要' }}</p>
+                      <div :class="['flex items-center justify-between pt-4 border-t', isDarkTheme ? 'border-white/5' : 'border-slate-100']">
+                        <span :class="['text-sm', 'text-slate-500']">{{ formatDate(post.published_at || post.created_at) }}</span>
+                        <div class="flex items-center gap-1.5 text-sm text-slate-500">
+                          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                          {{ post.view_count }}
+                        </div>
+                      </div>
+                    </div>
+                  </router-link>
+                </div>
+
+                <!-- 列表视图 -->
+                <div v-else class="flex flex-col gap-3">
+                  <router-link v-for="(post, index) in posts" :key="post.id" :to="`/blog/${post.slug}`"
+                    :class="['scroll-reveal group flex items-center gap-5 p-4 rounded-xl border transition-all duration-300 hover:shadow-lg', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:bg-[#1a1a25]' : 'bg-white border-slate-200/50 hover:border-violet-300 shadow-sm']"
+                    :style="{ transitionDelay: `${index * 50}ms` }">
+                    <div :class="['text-2xl font-bold w-8 text-center shrink-0', isDarkTheme ? 'text-white/10' : 'text-slate-200']">{{ String(index + 1).padStart(2, '0') }}</div>
+                    <div class="flex-1 min-w-0">
+                      <h3 :class="['font-bold transition-colors truncate', isDarkTheme ? 'text-slate-200 group-hover:text-violet-300' : 'text-slate-800 group-hover:text-violet-600']">{{ post.title }}</h3>
+                      <p :class="['text-sm truncate mt-1', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">{{ post.summary || '暂无摘要' }}</p>
+                    </div>
+                    <div class="hidden sm:flex items-center gap-4 shrink-0 text-sm text-slate-500">
+                      <span>{{ post.reading_time }} min</span>
                       <span class="flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                          <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
-                        </svg>
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
                         {{ post.view_count }}
                       </span>
+                      <span>{{ formatDate(post.published_at || post.created_at) }}</span>
                     </div>
-                  </div>
-                  <!-- 悬停边框 -->
-                  <div class="absolute inset-0 border-2 border-white/0 group-hover:border-violet-400/50 rounded-2xl transition-colors duration-300"></div>
-                </router-link>
+                    <svg :class="['w-4 h-4 shrink-0 transition-transform group-hover:translate-x-1', isDarkTheme ? 'text-slate-600' : 'text-slate-400']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                  </router-link>
+                </div>
+              </div>
+
+              <!-- 空状态 -->
+              <div v-else class="text-center py-20">
+                <h3 :class="['text-xl font-bold mb-2', isDarkTheme ? 'text-white' : 'text-slate-700']">暂无文章</h3>
+                <p :class="isDarkTheme ? 'text-slate-500' : 'text-slate-500'">{{ searchQuery ? '没有找到匹配的文章' : '这个分类还没有文章' }}</p>
               </div>
             </div>
-            
-            <!-- 所有文章 -->
-            <div>
-              <div v-if="featuredPosts.length > 0 && !selectedTag && !searchQuery" class="scroll-reveal flex items-center gap-3 mb-8">
-                <div class="w-1 h-8 bg-gradient-to-b from-violet-500 to-fuchsia-600 rounded-full"></div>
-                <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">最新文章</h2>
-              </div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <router-link
-                  v-for="(post, index) in (selectedTag || searchQuery ? posts : regularPosts)"
-                  :key="post.id"
-                  :to="`/blog/${post.slug}`"
-                  :class="[
-                    'scroll-reveal group rounded-2xl overflow-hidden border transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl',
-                    isDarkTheme 
-                      ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:shadow-violet-500/10' 
-                      : 'bg-white border-slate-200/50 hover:border-violet-300 hover:shadow-violet-200/50 shadow-lg'
-                  ]"
-                  :style="{ transitionDelay: `${index * 80}ms` }"
-                >
-                  <!-- 封面图 -->
-                  <div class="aspect-[16/10] relative overflow-hidden">
-                    <div 
-                      v-if="!post.cover_image"
-                      class="absolute inset-0 bg-gradient-to-br opacity-90"
-                      :class="getDefaultCover(index)"
-                    >
-                      <div class="absolute inset-0 flex items-center justify-center">
-                        <svg class="w-16 h-16 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <img 
-                      v-else
-                      :src="post.cover_image"
-                      :alt="post.title"
-                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                    />
-                    <!-- 阅读时间 -->
-                    <div class="absolute top-4 right-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full text-white text-xs font-medium">
-                      {{ post.reading_time }} min
-                    </div>
-                  </div>
-                  
-                  <!-- 内容 -->
-                  <div class="p-5">
-                    <!-- 标签 -->
-                    <div class="flex flex-wrap gap-2 mb-3">
-                      <span
-                        v-for="tag in post.tags?.slice(0, 3)"
-                        :key="tag.id"
-                        class="px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
-                        :style="{ 
-                          backgroundColor: tag.color + '20', 
-                          color: tag.color,
-                        }"
-                      >
-                        {{ tag.name }}
-                      </span>
-                    </div>
-                    
-                    <h3 :class="['text-lg font-bold mb-2 transition-colors line-clamp-2', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-violet-600']">
-                      {{ post.title }}
-                    </h3>
-                    
-                    <p :class="['text-sm line-clamp-2 mb-4 leading-relaxed', isDarkTheme ? 'text-slate-500' : 'text-slate-600']">
-                      {{ post.summary || '暂无摘要' }}
-                    </p>
-                    
-                    <!-- 底部信息 -->
-                    <div :class="['flex items-center justify-between pt-4 border-t', isDarkTheme ? 'border-white/5' : 'border-slate-100']">
-                      <span :class="['text-sm', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">{{ formatDate(post.published_at || post.created_at) }}</span>
-                      <div class="flex items-center gap-1.5 text-sm text-slate-500">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                          <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
-                        </svg>
-                        {{ post.view_count }}
-                      </div>
-                    </div>
-                  </div>
-                </router-link>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 空状态 -->
-          <div v-else class="text-center py-20">
-            <div :class="[
-              'inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 border',
-              isDarkTheme ? 'bg-gradient-to-br from-slate-800 to-slate-900 border-white/10' : 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300'
-            ]">
-              <svg :class="['w-10 h-10', isDarkTheme ? 'text-slate-600' : 'text-slate-400']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <h3 :class="['text-xl font-bold mb-2', isDarkTheme ? 'text-white' : 'text-slate-700']">暂无文章</h3>
-            <p :class="isDarkTheme ? 'text-slate-500' : 'text-slate-500'">
-              {{ searchQuery ? '没有找到匹配的文章，试试其他关键词？' : '博主还没有发布任何文章，敬请期待！' }}
-            </p>
-          </div>
+          </template>
         </div>
       </div>
     </main>
