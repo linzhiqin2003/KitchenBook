@@ -365,37 +365,37 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             <div class="flex justify-center gap-6 md:gap-12 animate-fade-in-up animation-delay-400">
               <div class="group">
                 <div class="relative">
-                  <div :class="['absolute inset-0 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity', isDarkTheme ? 'bg-violet-500/30' : 'bg-amber-400/25']"></div>
+                  <div class="absolute inset-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
                   <div :class="[
-                    'relative rounded-2xl px-6 md:px-8 py-4 md:py-5 border transition-all',
-                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/70 border-amber-200/40 shadow-sm group-hover:shadow-lg group-hover:border-amber-300/50'
+                    'relative backdrop-blur-md rounded-2xl px-6 md:px-8 py-4 md:py-5 border',
+                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-violet-200/50 shadow-xl'
                   ]">
-                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-amber-700']">{{ stats.total_posts }}</div>
-                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-400']">篇文章</div>
+                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-violet-600']">{{ stats.total_posts }}</div>
+                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-500']">篇文章</div>
                   </div>
                 </div>
               </div>
               <div class="group">
                 <div class="relative">
-                  <div :class="['absolute inset-0 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity', isDarkTheme ? 'bg-cyan-500/30' : 'bg-teal-400/25']"></div>
+                  <div class="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
                   <div :class="[
-                    'relative rounded-2xl px-6 md:px-8 py-4 md:py-5 border transition-all',
-                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/70 border-teal-200/40 shadow-sm group-hover:shadow-lg group-hover:border-teal-300/50'
+                    'relative backdrop-blur-md rounded-2xl px-6 md:px-8 py-4 md:py-5 border',
+                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-cyan-200/50 shadow-xl'
                   ]">
-                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-teal-700']">{{ stats.total_views }}</div>
-                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-400']">次阅读</div>
+                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-cyan-600']">{{ stats.total_views }}</div>
+                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-500']">次阅读</div>
                   </div>
                 </div>
               </div>
               <div class="group">
                 <div class="relative">
-                  <div :class="['absolute inset-0 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity', isDarkTheme ? 'bg-emerald-500/30' : 'bg-violet-400/20']"></div>
+                  <div class="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
                   <div :class="[
-                    'relative rounded-2xl px-6 md:px-8 py-4 md:py-5 border transition-all',
-                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/70 border-violet-200/40 shadow-sm group-hover:shadow-lg group-hover:border-violet-300/50'
+                    'relative backdrop-blur-md rounded-2xl px-6 md:px-8 py-4 md:py-5 border',
+                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-emerald-200/50 shadow-xl'
                   ]">
-                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-violet-700']">{{ stats.total_tags }}</div>
-                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-400']">个标签</div>
+                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-emerald-600']">{{ stats.total_tags }}</div>
+                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-500']">个标签</div>
                   </div>
                 </div>
               </div>
