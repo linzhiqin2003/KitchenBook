@@ -148,12 +148,20 @@ class BlogPostDetailSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    related_post_ids = serializers.PrimaryKeyRelatedField(
+        queryset=BlogPost.objects.all(),
+        many=True,
+        write_only=True,
+        source='related_posts',
+        required=False
+    )
     reading_time = serializers.SerializerMethodField()
 
     class Meta:
         model = BlogPost
         fields = ['id', 'title', 'slug', 'summary', 'content', 'cover_image',
                   'tags', 'tag_ids', 'category', 'category_id',
+                  'related_post_ids',
                   'is_published', 'is_featured', 'view_count',
                   'created_at', 'updated_at', 'published_at', 'reading_time']
         read_only_fields = ['slug', 'view_count', 'created_at', 'updated_at']
@@ -165,17 +173,23 @@ class BlogPostDetailSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         tags = validated_data.pop('tags', [])
+        related = validated_data.pop('related_posts', [])
         post = BlogPost.objects.create(**validated_data)
         post.tags.set(tags)
+        if related:
+            post.related_posts.set(related)
         return post
 
     def update(self, instance, validated_data):
         tags = validated_data.pop('tags', None)
+        related = validated_data.pop('related_posts', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         if tags is not None:
             instance.tags.set(tags)
+        if related is not None:
+            instance.related_posts.set(related)
         return instance
 
 

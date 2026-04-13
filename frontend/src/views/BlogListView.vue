@@ -3,6 +3,7 @@ import { ref, onMounted, computed, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import API_BASE_URL from '../config/api'
+import KnowledgeGraph from '../components/blog/KnowledgeGraph.vue'
 
 const router = useRouter()
 const posts = ref([])
@@ -12,7 +13,8 @@ const stats = ref({ total_posts: 0, total_views: 0, total_tags: 0 })
 const loading = ref(true)
 const selectedCategory = ref('')
 const searchQuery = ref('')
-const viewMode = ref(localStorage.getItem('blog_view_mode') || 'card')
+const viewMode = ref(localStorage.getItem('blog_view_mode') || 'graph')
+const graphData = ref({ nodes: [], edges: [] })
 
 const setViewMode = (mode) => {
   viewMode.value = mode
@@ -142,10 +144,21 @@ onMounted(() => {
   fetchAllPosts()
 })
 
+// 获取图谱数据
+const fetchGraph = async (categorySlug) => {
+  try {
+    const resp = await axios.get(`${API_BASE_URL}/api/blog/posts/graph/?category=${categorySlug}`)
+    graphData.value = resp.data
+  } catch (e) {
+    console.error('Failed to fetch graph', e)
+  }
+}
+
 // 打开/关闭文件夹
 const openCategory = (slug) => {
   selectedCategory.value = slug
   fetchPosts()
+  fetchGraph(slug)
 }
 
 const closeCategory = () => {
@@ -556,8 +569,8 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                   <span :class="['text-sm shrink-0', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">{{ posts.length }} 篇</span>
                 </div>
                 <div :class="['flex rounded-lg overflow-hidden border shrink-0', isDarkTheme ? 'border-white/10' : 'border-slate-200']">
-                  <button @click="setViewMode('card')" :class="['px-3 py-2 transition-colors', viewMode === 'card' ? (isDarkTheme ? 'bg-violet-600 text-white' : 'bg-slate-800 text-white') : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="卡片视图">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                  <button @click="setViewMode('graph')" :class="['px-3 py-2 transition-colors', viewMode === 'graph' ? (isDarkTheme ? 'bg-violet-600 text-white' : 'bg-slate-800 text-white') : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="知识图谱">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="8" y1="7" x2="11" y2="16"/><line x1="16" y1="7" x2="13" y2="16"/><line x1="8.5" y1="6" x2="15.5" y2="6"/></svg>
                   </button>
                   <button @click="setViewMode('list')" :class="['px-3 py-2 transition-colors', viewMode === 'list' ? (isDarkTheme ? 'bg-violet-600 text-white' : 'bg-slate-800 text-white') : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="列表视图">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -566,36 +579,17 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
               </div>
 
               <div v-if="posts.length > 0">
-                <!-- 卡片视图 -->
-                <div v-if="viewMode === 'card'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <router-link v-for="(post, index) in posts" :key="post.id" :to="`/blog/${post.slug}`"
-                    :class="['scroll-reveal group rounded-2xl overflow-hidden border transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:shadow-violet-500/10' : 'bg-[#faf7ef] border-slate-200/60 hover:border-slate-400 hover:shadow-lg shadow-md']"
-                    :style="{ transitionDelay: `${index * 80}ms` }">
-                    <div class="aspect-[16/10] relative overflow-hidden">
-                      <div v-if="!post.cover_image" class="absolute inset-0 bg-gradient-to-br opacity-90" :class="getDefaultCover(index)">
-                        <div class="absolute inset-0 flex items-center justify-center">
-                          <svg class="w-16 h-16 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        </div>
-                      </div>
-                      <img v-else :src="post.cover_image" :alt="post.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                      <div class="absolute top-4 right-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full text-white text-xs font-medium">{{ post.reading_time }} min</div>
-                    </div>
-                    <div class="p-5">
-                      <h3 :class="['text-lg font-bold mb-2 transition-colors line-clamp-2', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-slate-600']">{{ post.title }}</h3>
-                      <p :class="['text-sm line-clamp-2 mb-4 leading-relaxed', isDarkTheme ? 'text-slate-500' : 'text-slate-600']">{{ post.summary || '暂无摘要' }}</p>
-                      <div :class="['flex items-center justify-between pt-4 border-t', isDarkTheme ? 'border-white/5' : 'border-slate-100']">
-                        <span :class="['text-sm', 'text-slate-500']">{{ formatDate(post.published_at || post.created_at) }}</span>
-                        <div class="flex items-center gap-1.5 text-sm text-slate-500">
-                          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
-                          {{ post.view_count }}
-                        </div>
-                      </div>
-                    </div>
-                  </router-link>
+                <!-- 知识图谱视图 -->
+                <div v-if="viewMode === 'graph'">
+                  <KnowledgeGraph
+                    :nodes="graphData.nodes"
+                    :edges="graphData.edges"
+                    :isDarkTheme="isDarkTheme"
+                  />
                 </div>
 
                 <!-- 列表视图 -->
-                <div v-else class="flex flex-col gap-3">
+                <div v-if="viewMode === 'list'" class="flex flex-col gap-3">
                   <router-link v-for="(post, index) in posts" :key="post.id" :to="`/blog/${post.slug}`"
                     :class="['scroll-reveal group flex items-center gap-5 p-4 rounded-xl border transition-all duration-300 hover:shadow-lg', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:bg-[#1a1a25]' : 'bg-[#faf7ef] border-slate-200/60 hover:border-slate-400 hover:shadow-md shadow-sm']"
                     :style="{ transitionDelay: `${index * 50}ms` }">

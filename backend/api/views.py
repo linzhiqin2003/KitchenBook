@@ -350,6 +350,49 @@ class BlogPostViewSet(viewsets.ModelViewSet):
             'total_tags': total_tags
         })
     
+    @action(detail=False, methods=['get'])
+    def graph(self, request):
+        """知识图谱数据：返回 nodes + edges"""
+        import re as _re
+        queryset = BlogPost.objects.filter(is_published=True)
+        category_slug = request.query_params.get('category')
+        if category_slug:
+            queryset = queryset.filter(category__slug=category_slug)
+
+        posts = list(queryset)
+        slug_to_id = {p.slug: p.id for p in posts}
+
+        nodes = []
+        edges_set = set()
+
+        for p in posts:
+            nodes.append({
+                'id': p.id,
+                'title': p.title,
+                'slug': p.slug,
+                'summary': p.summary[:120] if p.summary else '',
+                'reading_time': max(1, round(len(p.content) / 400)),
+                'view_count': p.view_count,
+            })
+
+            # 从 content 中提取内链 /blog/{slug}
+            for match in _re.finditer(r'\(/blog/([^)]+)\)', p.content):
+                target_slug = match.group(1)
+                # URL decode
+                from urllib.parse import unquote
+                target_slug = unquote(target_slug)
+                if target_slug in slug_to_id and slug_to_id[target_slug] != p.id:
+                    edges_set.add((p.id, slug_to_id[target_slug]))
+
+            # 手动关联的 related_posts
+            for related in p.related_posts.filter(is_published=True):
+                if related.id in {n['id'] for n in nodes} or related.id in slug_to_id.values():
+                    edges_set.add((p.id, related.id))
+
+        edges = [{'source': s, 'target': t} for s, t in edges_set]
+
+        return Response({'nodes': nodes, 'edges': edges})
+
     @action(detail=False, methods=['get'], url_path='by-slug/(?P<slug>[^/.]+)')
     def by_slug(self, request, slug=None):
         """通过 slug 获取文章"""

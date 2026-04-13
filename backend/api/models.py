@@ -183,7 +183,8 @@ class BlogPost(models.Model):
     cover_image = models.ImageField(upload_to='blog/', null=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='posts')
     tags = models.ManyToManyField(Tag, related_name='posts', blank=True)
-    
+    related_posts = models.ManyToManyField('self', symmetrical=False, blank=True, help_text="手动关联的文章（知识图谱）")
+
     # 元数据
     is_published = models.BooleanField(default=False, help_text="是否发布")
     is_featured = models.BooleanField(default=False, help_text="是否精选")
