@@ -243,7 +243,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
               </svg>
             </div>
             <div>
-              <h1 :class="['text-lg font-bold transition-colors tracking-tight', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-violet-600']">LZQ's Tech Blog</h1>
+              <h1 :class="['text-lg font-bold transition-colors tracking-tight', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-slate-600']">LZQ's Tech Blog</h1>
               <p :class="['text-xs hidden sm:block', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">技术沉淀 · 持续进化</p>
             </div>
           </router-link>
@@ -274,7 +274,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
               to="/kitchen" 
               :class="[
                 'hidden md:flex items-center gap-2 text-sm transition-colors px-3 py-2 rounded-lg',
-                isDarkTheme ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-violet-600 hover:bg-violet-50'
+                isDarkTheme ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               ]"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,7 +286,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
               to="/ai-lab" 
               :class="[
                 'flex items-center gap-2 text-sm transition-colors px-3 py-2 rounded-lg',
-                isDarkTheme ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-violet-600 hover:bg-violet-50'
+                isDarkTheme ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               ]"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,7 +300,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
               target="_blank"
               :class="[
                 'flex items-center gap-2 text-sm transition-colors px-3 py-2 rounded-lg',
-                isDarkTheme ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-violet-600 hover:bg-violet-50'
+                isDarkTheme ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               ]"
             >
               <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -549,17 +549,17 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                     :class="['w-9 h-9 rounded-lg flex items-center justify-center transition-all group', isDarkTheme ? 'bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-500 hover:text-slate-700']">
                     <svg class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                   </button>
-                  <div class="w-1 h-8 bg-gradient-to-b from-violet-400 to-indigo-500 rounded-full"></div>
+                  <div :class="['w-1 h-8 rounded-full', isDarkTheme ? 'bg-gradient-to-b from-violet-400 to-indigo-500' : 'bg-slate-800']"></div>
                   <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">
                     {{ searchQuery ? `搜索: "${searchQuery}"` : currentCategory?.name || '' }}
                   </h2>
                   <span :class="['text-sm', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">{{ posts.length }} 篇</span>
                 </div>
                 <div :class="['flex rounded-lg overflow-hidden border', isDarkTheme ? 'border-white/10' : 'border-slate-200']">
-                  <button @click="setViewMode('card')" :class="['px-3 py-2 transition-colors', viewMode === 'card' ? 'bg-violet-600 text-white' : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="卡片视图">
+                  <button @click="setViewMode('card')" :class="['px-3 py-2 transition-colors', viewMode === 'card' ? (isDarkTheme ? 'bg-violet-600 text-white' : 'bg-slate-800 text-white') : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="卡片视图">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                   </button>
-                  <button @click="setViewMode('list')" :class="['px-3 py-2 transition-colors', viewMode === 'list' ? 'bg-violet-600 text-white' : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="列表视图">
+                  <button @click="setViewMode('list')" :class="['px-3 py-2 transition-colors', viewMode === 'list' ? (isDarkTheme ? 'bg-violet-600 text-white' : 'bg-slate-800 text-white') : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="列表视图">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                   </button>
                 </div>
@@ -581,7 +581,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                       <div class="absolute top-4 right-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full text-white text-xs font-medium">{{ post.reading_time }} min</div>
                     </div>
                     <div class="p-5">
-                      <h3 :class="['text-lg font-bold mb-2 transition-colors line-clamp-2', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-violet-600']">{{ post.title }}</h3>
+                      <h3 :class="['text-lg font-bold mb-2 transition-colors line-clamp-2', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-slate-600']">{{ post.title }}</h3>
                       <p :class="['text-sm line-clamp-2 mb-4 leading-relaxed', isDarkTheme ? 'text-slate-500' : 'text-slate-600']">{{ post.summary || '暂无摘要' }}</p>
                       <div :class="['flex items-center justify-between pt-4 border-t', isDarkTheme ? 'border-white/5' : 'border-slate-100']">
                         <span :class="['text-sm', 'text-slate-500']">{{ formatDate(post.published_at || post.created_at) }}</span>
