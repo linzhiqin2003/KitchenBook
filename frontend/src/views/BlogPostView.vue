@@ -138,7 +138,7 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 </script>
 
 <template>
-  <div :class="['min-h-screen font-sans transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#faf8f0] text-slate-800']">
+  <div :class="['min-h-screen font-sans transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#faf8f0] text-slate-800 paper-texture']">
     <!-- 独立导航栏 -->
     <header :class="['fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-colors duration-500', isDarkTheme ? 'bg-[#0a0a0f]/80 border-white/5' : 'bg-[#faf8f0]/90 border-amber-200/30']">
       <div class="container mx-auto px-4 md:px-6">
@@ -706,5 +706,12 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
 
 .prose-light :deep(del) {
   color: #94a3b8;
+}
+
+/* 纸质纹理 */
+.paper-texture {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-color: #faf8f0;
 }
 </style>
