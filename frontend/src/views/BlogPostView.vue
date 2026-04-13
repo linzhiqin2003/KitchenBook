@@ -145,8 +145,10 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
         <div class="flex items-center justify-between h-16 md:h-20">
           <!-- Logo -->
           <router-link to="/blog" class="flex items-center gap-3 group">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-500/25 group-hover:shadow-violet-500/40 transition-shadow">
-              L
+            <div :class="['w-10 h-10 rounded-xl flex items-center justify-center transition-shadow', isDarkTheme ? 'bg-white/10 group-hover:bg-white/15' : 'bg-slate-100 group-hover:bg-slate-200']">
+              <svg class="w-5 h-5" :class="isDarkTheme ? 'text-violet-400' : 'text-violet-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+              </svg>
             </div>
             <div>
               <h1 :class="['text-lg font-bold transition-colors', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-violet-600']">LZQ's Tech Blog</h1>
@@ -313,8 +315,10 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
         <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
           <!-- 左侧：品牌 -->
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm">
-              L
+            <div :class="['w-8 h-8 rounded-lg flex items-center justify-center', isDarkTheme ? 'bg-white/10' : 'bg-slate-100']">
+              <svg class="w-4 h-4" :class="isDarkTheme ? 'text-violet-400' : 'text-violet-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+              </svg>
             </div>
             <span class="text-slate-400">© 2026 LZQ's Tech Blog</span>
           </div>
