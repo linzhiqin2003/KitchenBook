@@ -139,6 +139,7 @@ onMounted(() => {
   fetchTags()
   fetchCategories()
   fetchStats()
+  fetchAllPosts()
 })
 
 // 打开/关闭文件夹
@@ -157,9 +158,31 @@ const handleSearchAndAnimate = () => {
   handleSearch()
 }
 
-// 搜索
+// 搜索 + 智能补全
+const allPosts = ref([])  // 全部文章缓存，用于搜索补全
+const fetchAllPosts = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/blog/posts/`)
+    allPosts.value = response.data
+  } catch (e) { /* ignore */ }
+}
+const searchSuggestions = computed(() => {
+  if (!searchQuery.value || searchQuery.value.length < 1) return []
+  const q = searchQuery.value.toLowerCase()
+  return allPosts.value
+    .filter(p => p.title.toLowerCase().includes(q) || (p.summary && p.summary.toLowerCase().includes(q)))
+    .slice(0, 5)
+})
+const showSuggestions = ref(false)
+
 const handleSearch = () => {
+  showSuggestions.value = false
   fetchPosts()
+}
+
+const selectSuggestion = (slug) => {
+  showSuggestions.value = false
+  router.push(`/blog/${slug}`)
 }
 
 // 格式化日期
@@ -339,43 +362,12 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             </p>
             
             <!-- 统计信息 -->
-            <div class="flex justify-center gap-6 md:gap-12 animate-fade-in-up animation-delay-400">
-              <div class="group">
-                <div class="relative">
-                  <div class="absolute inset-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
-                  <div :class="[
-                    'relative backdrop-blur-md rounded-2xl px-6 md:px-8 py-4 md:py-5 border',
-                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-violet-200/50 shadow-xl'
-                  ]">
-                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-violet-600']">{{ stats.total_posts }}</div>
-                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-500']">篇文章</div>
-                  </div>
-                </div>
-              </div>
-              <div class="group">
-                <div class="relative">
-                  <div class="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
-                  <div :class="[
-                    'relative backdrop-blur-md rounded-2xl px-6 md:px-8 py-4 md:py-5 border',
-                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-cyan-200/50 shadow-xl'
-                  ]">
-                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-cyan-600']">{{ stats.total_views }}</div>
-                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-500']">次阅读</div>
-                  </div>
-                </div>
-              </div>
-              <div class="group">
-                <div class="relative">
-                  <div class="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
-                  <div :class="[
-                    'relative backdrop-blur-md rounded-2xl px-6 md:px-8 py-4 md:py-5 border',
-                    isDarkTheme ? 'bg-white/5 border-white/10' : 'bg-white/80 border-emerald-200/50 shadow-xl'
-                  ]">
-                    <div :class="['text-3xl md:text-4xl font-bold mb-1', isDarkTheme ? 'text-white' : 'text-emerald-600']">{{ stats.total_tags }}</div>
-                    <div :class="['text-xs md:text-sm uppercase tracking-wider', isDarkTheme ? 'text-slate-400' : 'text-slate-500']">个标签</div>
-                  </div>
-                </div>
-              </div>
+            <div :class="['flex justify-center items-center gap-6 md:gap-8 text-sm animate-fade-in-up animation-delay-400', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">
+              <span><strong :class="isDarkTheme ? 'text-white' : 'text-slate-700'">{{ stats.total_posts }}</strong> 篇文章</span>
+              <span :class="isDarkTheme ? 'text-slate-700' : 'text-slate-300'">·</span>
+              <span><strong :class="isDarkTheme ? 'text-white' : 'text-slate-700'">{{ stats.total_views }}</strong> 次阅读</span>
+              <span :class="isDarkTheme ? 'text-slate-700' : 'text-slate-300'">·</span>
+              <span><strong :class="isDarkTheme ? 'text-white' : 'text-slate-700'">{{ stats.total_tags }}</strong> 个标签</span>
             </div>
           </div>
         </div>
@@ -397,12 +389,14 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
           <template v-else>
             <!-- ======== 文件夹视图（未打开任何文件夹） ======== -->
             <div v-if="!selectedCategory && !searchQuery">
-              <!-- 搜索栏 -->
+              <!-- 搜索栏 + 智能补全 -->
               <div class="scroll-reveal mb-10 max-w-lg mx-auto">
                 <div class="relative">
                   <input
                     v-model="searchQuery"
                     @keyup.enter="handleSearch"
+                    @focus="showSuggestions = true"
+                    @blur="setTimeout(() => showSuggestions = false, 200)"
                     type="text"
                     placeholder="搜索文章..."
                     :class="[
@@ -415,6 +409,32 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                   <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
+                  <!-- 补全下拉 -->
+                  <div
+                    v-if="showSuggestions && searchSuggestions.length > 0"
+                    :class="[
+                      'absolute top-full left-0 right-0 mt-2 rounded-xl border overflow-hidden z-50 shadow-xl',
+                      isDarkTheme ? 'bg-[#16161f] border-white/10' : 'bg-white border-amber-200/40'
+                    ]"
+                  >
+                    <button
+                      v-for="s in searchSuggestions"
+                      :key="s.id"
+                      @mousedown.prevent="selectSuggestion(s.slug)"
+                      :class="[
+                        'w-full text-left px-4 py-3 flex items-center gap-3 transition-colors',
+                        isDarkTheme ? 'hover:bg-white/5' : 'hover:bg-amber-50'
+                      ]"
+                    >
+                      <svg :class="['w-4 h-4 shrink-0', isDarkTheme ? 'text-slate-600' : 'text-slate-400']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      </svg>
+                      <div class="min-w-0">
+                        <div :class="['text-sm font-medium truncate', isDarkTheme ? 'text-slate-200' : 'text-slate-700']">{{ s.title }}</div>
+                        <div :class="['text-xs truncate', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">{{ s.reading_time }} min</div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
 
