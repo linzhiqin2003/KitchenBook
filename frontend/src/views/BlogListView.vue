@@ -17,6 +17,7 @@ const viewMode = ref(localStorage.getItem('blog_view_mode') || 'card')
 const setViewMode = (mode) => {
   viewMode.value = mode
   localStorage.setItem('blog_view_mode', mode)
+  setupScrollAnimation()
 }
 
 // 主题切换 (dark / light)
@@ -149,6 +150,11 @@ const openCategory = (slug) => {
 const closeCategory = () => {
   selectedCategory.value = ''
   fetchPosts()
+}
+
+// 搜索后也要重建动画
+const handleSearchAndAnimate = () => {
+  handleSearch()
 }
 
 // 搜索
