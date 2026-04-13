@@ -121,8 +121,26 @@ const fetchPost = async () => {
   }
 }
 
-onMounted(fetchPost)
-watch(() => route.params.slug, fetchPost)
+// 推荐文章（同分类的其他文章，随机 3 篇）
+const recommendations = ref([])
+const fetchRecommendations = async () => {
+  try {
+    if (!post.value?.category?.slug) return
+    const resp = await axios.get(`${API_BASE_URL}/api/blog/posts/?category=${post.value.category.slug}`)
+    const others = resp.data.filter(p => p.id !== post.value.id)
+    // 随机打乱取 3 篇
+    recommendations.value = others.sort(() => Math.random() - 0.5).slice(0, 3)
+  } catch (e) { /* ignore */ }
+}
+
+onMounted(async () => {
+  await fetchPost()
+  fetchRecommendations()
+})
+watch(() => route.params.slug, async () => {
+  await fetchPost()
+  fetchRecommendations()
+})
 
 // 格式化日期
 const formatDate = (dateStr) => {
@@ -297,20 +315,52 @@ const parsedContent = computed(() => parseMarkdown(post.value?.content))
             <div :class="['prose-content', isDarkTheme ? '' : 'prose-light']" v-html="parsedContent"></div>
           </div>
           
-          <!-- 文章底部 -->
-          <div :class="['mt-12 p-6 rounded-2xl border', isDarkTheme ? 'bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border-violet-500/20' : 'bg-amber-50 border-amber-200/50']">
-            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div>
-                <h3 :class="['text-lg font-bold mb-1', isDarkTheme ? 'text-white' : 'text-slate-800']">感谢阅读！</h3>
-                <p :class="['text-sm', isDarkTheme ? 'text-slate-400' : 'text-slate-600']">如果这篇文章对你有帮助，欢迎分享给更多人</p>
-              </div>
-              <button 
-                @click="goBack"
-                class="px-6 py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl hover:shadow-lg hover:shadow-violet-500/25 transition-all"
-              >
-                查看更多文章
-              </button>
+          <!-- 猜你想读 -->
+          <div v-if="recommendations.length > 0" class="mt-16">
+            <div class="flex items-center gap-3 mb-6">
+              <div :class="['w-1 h-6 rounded-full', isDarkTheme ? 'bg-gradient-to-b from-violet-400 to-indigo-500' : 'bg-slate-800']"></div>
+              <h3 :class="['text-lg font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">猜你想读</h3>
             </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <router-link
+                v-for="rec in recommendations"
+                :key="rec.id"
+                :to="`/blog/${rec.slug}`"
+                :class="[
+                  'group p-5 rounded-xl border transition-all duration-300 hover:shadow-md',
+                  isDarkTheme
+                    ? 'bg-white/[0.03] border-white/5 hover:border-white/15 hover:bg-white/[0.06]'
+                    : 'bg-white/50 border-slate-200/60 hover:border-slate-300 hover:bg-white/80'
+                ]"
+              >
+                <h4 :class="[
+                  'font-bold mb-2 line-clamp-2 transition-colors',
+                  isDarkTheme ? 'text-slate-200 group-hover:text-white' : 'text-slate-700 group-hover:text-slate-900'
+                ]">{{ rec.title }}</h4>
+                <p :class="['text-sm line-clamp-2 mb-3', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">{{ rec.summary || '' }}</p>
+                <div :class="['text-xs flex items-center gap-3', isDarkTheme ? 'text-slate-600' : 'text-slate-400']">
+                  <span>{{ rec.reading_time }} min</span>
+                  <span>·</span>
+                  <span>{{ rec.view_count }} 次阅读</span>
+                </div>
+              </router-link>
+            </div>
+          </div>
+
+          <!-- 返回 -->
+          <div class="mt-10 text-center">
+            <button
+              @click="goBack"
+              :class="[
+                'inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all border',
+                isDarkTheme
+                  ? 'border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                  : 'border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              ]"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+              返回文章列表
+            </button>
           </div>
         </div>
       </article>
