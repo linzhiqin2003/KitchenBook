@@ -242,9 +242,9 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                 <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
               </svg>
             </div>
-            <div>
+            <div class="hidden sm:block">
               <h1 :class="['text-lg font-bold transition-colors tracking-tight', isDarkTheme ? 'text-white group-hover:text-violet-300' : 'text-slate-800 group-hover:text-slate-600']">LZQ's Tech Blog</h1>
-              <p :class="['text-xs hidden sm:block', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">技术沉淀 · 持续进化</p>
+              <p :class="['text-xs', isDarkTheme ? 'text-slate-500' : 'text-slate-500']">技术沉淀 · 持续进化</p>
             </div>
           </router-link>
           </div>
@@ -335,7 +335,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
           <div class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-300/40 to-transparent"></div>
         </div>
         
-        <div class="relative px-4 md:px-6 lg:px-8 py-20 md:py-32">
+        <div class="relative px-4 md:px-6 lg:px-8 py-12 md:py-32">
           <div class="container mx-auto text-center">
             <!-- 副品牌 -->
             <div :class="['text-sm tracking-[0.3em] uppercase mb-8 animate-fade-in', isDarkTheme ? 'text-slate-500' : 'text-amber-700/60']">
@@ -343,7 +343,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             </div>
             
             <!-- 标题 -->
-            <h1 class="text-5xl md:text-7xl font-black mb-6 animate-fade-in-up tracking-tight">
+            <h1 class="text-3xl sm:text-5xl md:text-7xl font-black mb-6 animate-fade-in-up tracking-tight">
               <span :class="[
                 'bg-clip-text text-transparent',
                 isDarkTheme ? 'bg-gradient-to-r from-white via-violet-200 to-fuchsia-200' : 'bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700'
@@ -543,19 +543,19 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
             <!-- ======== 打开了文件夹 / 搜索结果 ======== -->
             <div v-if="selectedCategory || searchQuery">
               <!-- 面包屑 + 视图切换 -->
-              <div class="scroll-reveal flex items-center justify-between mb-8">
-                <div class="flex items-center gap-3">
+              <div class="scroll-reveal flex flex-wrap items-center justify-between gap-4 mb-8">
+                <div class="flex items-center gap-2 sm:gap-3 min-w-0">
                   <button @click="closeCategory(); searchQuery = ''"
-                    :class="['w-9 h-9 rounded-lg flex items-center justify-center transition-all group', isDarkTheme ? 'bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-500 hover:text-slate-700']">
+                    :class="['w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition-all group shrink-0', isDarkTheme ? 'bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-500 hover:text-slate-700']">
                     <svg class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                   </button>
-                  <div :class="['w-1 h-8 rounded-full', isDarkTheme ? 'bg-gradient-to-b from-violet-400 to-indigo-500' : 'bg-slate-800']"></div>
-                  <h2 :class="['text-2xl font-bold', isDarkTheme ? 'text-white' : 'text-slate-800']">
+                  <div :class="['w-1 h-6 sm:h-8 rounded-full shrink-0', isDarkTheme ? 'bg-gradient-to-b from-violet-400 to-indigo-500' : 'bg-slate-800']"></div>
+                  <h2 :class="['text-lg sm:text-2xl font-bold truncate', isDarkTheme ? 'text-white' : 'text-slate-800']">
                     {{ searchQuery ? `搜索: "${searchQuery}"` : currentCategory?.name || '' }}
                   </h2>
-                  <span :class="['text-sm', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">{{ posts.length }} 篇</span>
+                  <span :class="['text-sm shrink-0', isDarkTheme ? 'text-slate-500' : 'text-slate-400']">{{ posts.length }} 篇</span>
                 </div>
-                <div :class="['flex rounded-lg overflow-hidden border', isDarkTheme ? 'border-white/10' : 'border-slate-200']">
+                <div :class="['flex rounded-lg overflow-hidden border shrink-0', isDarkTheme ? 'border-white/10' : 'border-slate-200']">
                   <button @click="setViewMode('card')" :class="['px-3 py-2 transition-colors', viewMode === 'card' ? (isDarkTheme ? 'bg-violet-600 text-white' : 'bg-slate-800 text-white') : isDarkTheme ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-[#faf7ef] text-slate-500 hover:text-slate-700']" title="卡片视图">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                   </button>
