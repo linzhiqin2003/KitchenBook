@@ -569,7 +569,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                 <!-- 卡片视图 -->
                 <div v-if="viewMode === 'card'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <router-link v-for="(post, index) in posts" :key="post.id" :to="`/blog/${post.slug}`"
-                    :class="['scroll-reveal group rounded-2xl overflow-hidden border transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:shadow-violet-500/10' : 'bg-[#faf7ef] border-amber-200/40 hover:border-amber-300 hover:shadow-amber-200/50 shadow-md']"
+                    :class="['scroll-reveal group rounded-2xl overflow-hidden border transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:shadow-violet-500/10' : 'bg-[#faf7ef] border-slate-200/60 hover:border-slate-400 hover:shadow-lg shadow-md']"
                     :style="{ transitionDelay: `${index * 80}ms` }">
                     <div class="aspect-[16/10] relative overflow-hidden">
                       <div v-if="!post.cover_image" class="absolute inset-0 bg-gradient-to-br opacity-90" :class="getDefaultCover(index)">
@@ -597,7 +597,7 @@ const uncategorizedPosts = computed(() => posts.value.filter(p => !p.category))
                 <!-- 列表视图 -->
                 <div v-else class="flex flex-col gap-3">
                   <router-link v-for="(post, index) in posts" :key="post.id" :to="`/blog/${post.slug}`"
-                    :class="['scroll-reveal group flex items-center gap-5 p-4 rounded-xl border transition-all duration-300 hover:shadow-lg', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:bg-[#1a1a25]' : 'bg-[#faf7ef] border-amber-200/40 hover:border-amber-300 shadow-sm']"
+                    :class="['scroll-reveal group flex items-center gap-5 p-4 rounded-xl border transition-all duration-300 hover:shadow-lg', isDarkTheme ? 'bg-[#16161f] border-white/5 hover:border-violet-500/30 hover:bg-[#1a1a25]' : 'bg-[#faf7ef] border-slate-200/60 hover:border-slate-400 hover:shadow-md shadow-sm']"
                     :style="{ transitionDelay: `${index * 50}ms` }">
                     <div :class="['text-2xl font-bold w-8 text-center shrink-0', isDarkTheme ? 'text-white/10' : 'text-slate-200']">{{ String(index + 1).padStart(2, '0') }}</div>
                     <div class="flex-1 min-w-0">
