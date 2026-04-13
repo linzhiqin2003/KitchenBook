@@ -57,16 +57,19 @@ const buildGraph = () => {
   const height = rect.height || 500
   const t = getTheme()
 
-  // 节点显示名（取冒号前的短标题，否则完整标题）
-  const displayName = (title) => {
-    const short = title.split(/[：:]/)[0].trim()
-    return short.length > 12 ? short.slice(0, 12) + '…' : short
+  // 节点显示名：取冒号前的专有名词
+  const displayName = (n) => {
+    // 优先用后端提供的 short_title（未来扩展）
+    if (n.short_title) return n.short_title
+    return n.title.split(/[：:]/)[0].trim()
   }
 
-  // 节点大小：按显示文字长度自适应
+  // 节点大小：按文字长度自适应
   const nodeRadius = (n) => {
-    const name = displayName(n.title)
-    return Math.max(32, name.length * 7 + 16)
+    const name = displayName(n)
+    // 中文字符算 2 宽度，英文/数字算 1
+    const textWidth = [...name].reduce((w, c) => w + (/[\u4e00-\u9fff]/.test(c) ? 2 : 1), 0)
+    return Math.max(36, textWidth * 5 + 20)
   }
 
   // 复制数据（D3 会修改原数据）
@@ -100,8 +103,8 @@ const buildGraph = () => {
 
   // 力模拟
   simulation = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(edges).id(d => d.id).distance(140).strength(0.5))
-    .force('charge', d3.forceManyBody().strength(-600))
+    .force('link', d3.forceLink(edges).id(d => d.id).distance(180).strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-800))
     .force('center', d3.forceCenter(width / 2, height / 2))
     .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 15))
 
@@ -137,11 +140,11 @@ const buildGraph = () => {
 
   // 节点文字
   node.append('text')
-    .text(d => displayName(d.title))
+    .text(d => displayName(d))
     .attr('text-anchor', 'middle')
     .attr('dy', '0.35em')
     .attr('fill', t.text)
-    .attr('font-size', '11px')
+    .attr('font-size', '12px')
     .attr('font-weight', '600')
     .style('pointer-events', 'none')
     .style('user-select', 'none')
