@@ -37,13 +37,12 @@ PROMPT_TEMPLATE = """
   "items": [
     {{
       "main_category": "主类（见规则）",
-      "sub_category": "子类",
       "name": "商品中文名",
       "brand": "品牌，未知填 null",
       "quantity": 1,
       "unit": "单位（见规则）",
       "unit_price": 3.50,
-      "total_price": 3.50,
+      "discount": 0,
       "tags": ["规格信息，如 430g / 500ml"],
       "confidence": 0.90
     }}
@@ -91,7 +90,7 @@ PROMPT_TEMPLATE = """
 </rule>
 
 <rule id="item_name">
-商品名(name)与子类(sub_category)：
+商品名(name)：
 - 收据同时有中英文名时，以中文名为准识别商品和分类
 - 英文收据上的商品名翻译为中文通用名称
 - 【关键】必须把商品名作为整体理解，严禁拆字归类：
@@ -99,25 +98,31 @@ PROMPT_TEMPLATE = """
   √ 正确："咸蛋黄油条" → 整体是咸蛋黄味油条 → 零食糕点
   × 错误："红油豆瓣酱" → 只看"油" → 归为食用油
   √ 正确："红油豆瓣酱" → 整体是豆瓣酱 → 调味品
-- 先理解完整商品名的含义，再决定 main_category 和 sub_category
+- 先理解完整商品名的含义，再决定 main_category
 </rule>
 
 <rule id="language">
 语言规范：
-- main_category、sub_category、name、unit 字段统一使用中文
+- main_category、name、unit 字段统一使用中文
 - merchant 和 address 保留收据原文，不翻译
 - brand 保留原文（中英文均可）
 - tags 中的规格信息保留原始标注（如 "130g"、"310ml"）
 </rule>
 
 <rule id="price_reading">
-价格解读（unit_price 与 total_price）：
-- 【关键】收据/小票上商品行右侧显示的金额通常是该商品的**总价**（total_price），而非单价
-- 当商品行包含数量标记（如 "x 4"、"× 3"、"QTY 2"）时：
-  × 错误："JS GARLIC x 4  £0.87" → quantity=4, unit_price=0.87, total_price=3.48
-  √ 正确："JS GARLIC x 4  £0.87" → quantity=4, total_price=0.87, unit_price=0.22（即 0.87÷4）
-- unit_price = total_price ÷ quantity，保留两位小数
-- 若收据上同时标注了单价和总价（如 "2 @ £1.50  £3.00"），以明确标注为准
+价格解读（unit_price / quantity / discount）：
+- 只需识别三个字段：unit_price（折扣前单价）、quantity（数量）、discount（该商品折扣金额）
+- 系统会自动按公式计算总价：total_price = unit_price × quantity - discount，不要输出 total_price
+- 【关键】收据/小票上商品行右侧显示的金额通常是该商品的**行总价**（而非单价）：
+  × 错误："JS GARLIC x 4  £0.87" → quantity=4, unit_price=0.87（会算出 3.48）
+  √ 正确："JS GARLIC x 4  £0.87" → quantity=4, unit_price=0.22（0.87÷4，折后总价仍为 0.87）
+  - 即：若右侧金额是行总价，则 unit_price = 行总价 ÷ quantity
+- 若收据上明确标注了单价（如 "2 @ £1.50"），直接使用 1.50 作为 unit_price
+- 折扣处理：
+  - 若商品行有划线原价与折后价（如原价 £2.00 折后 £1.50），则 unit_price=2.00, discount=(2.00-1.50)*quantity
+  - 若商品行下方有"会员价/满减/优惠 -£0.50"等单独的减项，则 discount=0.50 填入该商品
+  - 商品行未标注任何折扣时，discount 填 0
+- 所有金额保留两位小数
 </rule>
 
 </field_rules>

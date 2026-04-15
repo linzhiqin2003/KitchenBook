@@ -7,12 +7,12 @@ export interface ReceiptItemPayload {
   quantity?: number | string;
   unit?: string;
   unit_price?: number | string | null;
+  discount?: number | string | null;
   total_price?: number | string | null;
   tags?: string[];
   confidence?: number | string | null;
   line_index?: number;
   main_category?: string;
-  sub_category?: string;
   target_org_id?: string | null;
 }
 

@@ -1,23 +1,19 @@
 from decimal import Decimal
 from django.db import models
 from rest_framework import serializers
-from .models import CategoryMain, CategorySub, Receipt, ReceiptImage, ReceiptItem
+from .models import CategoryMain, Receipt, ReceiptImage, ReceiptItem
 
 
 def _normalize_text(value: str) -> str:
     return " ".join((value or "").strip().split())
 
 
-def _get_or_create_categories(main_name: str | None, sub_name: str | None) -> tuple[CategoryMain | None, CategorySub | None]:
-    main = None
-    sub = None
+def _get_or_create_main_category(main_name: str | None) -> CategoryMain | None:
     main_name = _normalize_text(main_name or "")
-    sub_name = _normalize_text(sub_name or "")
-    if main_name:
-        main, _ = CategoryMain.objects.get_or_create(name=main_name)
-        if sub_name:
-            sub, _ = CategorySub.objects.get_or_create(main=main, name=sub_name)
-    return main, sub
+    if not main_name:
+        return None
+    main, _ = CategoryMain.objects.get_or_create(name=main_name)
+    return main
 
 
 class ReceiptImageSerializer(serializers.ModelSerializer):
@@ -28,7 +24,6 @@ class ReceiptImageSerializer(serializers.ModelSerializer):
 
 class ReceiptItemSerializer(serializers.ModelSerializer):
     main_category = serializers.CharField(required=False, allow_blank=True)
-    sub_category = serializers.CharField(required=False, allow_blank=True)
     target_org_id = serializers.CharField(required=False, allow_blank=True, default="")
 
     class Meta:
@@ -40,19 +35,18 @@ class ReceiptItemSerializer(serializers.ModelSerializer):
             "quantity",
             "unit",
             "unit_price",
+            "discount",
             "total_price",
             "tags",
             "confidence",
             "line_index",
             "main_category",
-            "sub_category",
             "target_org_id",
         ]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["main_category"] = instance.category_main.name if instance.category_main else ""
-        data["sub_category"] = instance.category_sub.name if instance.category_sub else ""
         data.pop("target_org_id", None)
         return data
 
@@ -110,13 +104,20 @@ class ReceiptSerializer(serializers.ModelSerializer):
             for index, item in enumerate(items_data):
                 item.pop("target_org_id", None)
                 main_name = item.pop("main_category", "")
-                sub_name = item.pop("sub_category", "")
                 line_index = item.pop("line_index", index)
-                category_main, category_sub = _get_or_create_categories(main_name, sub_name)
+                category_main = _get_or_create_main_category(main_name)
+                # 自动计算 total_price = unit_price * quantity - discount
+                unit_price = item.get("unit_price")
+                quantity = item.get("quantity") or Decimal("1")
+                discount = item.get("discount") or Decimal("0")
+                if unit_price is not None:
+                    item["total_price"] = (
+                        Decimal(str(unit_price)) * Decimal(str(quantity))
+                        - Decimal(str(discount))
+                    ).quantize(Decimal("0.01"))
                 ReceiptItem.objects.create(
                     receipt=instance,
                     category_main=category_main,
-                    category_sub=category_sub,
                     line_index=line_index,
                     **item,
                 )

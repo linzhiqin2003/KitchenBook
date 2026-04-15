@@ -85,14 +85,12 @@ class ReceiptItem(models.Model):
     category_main = models.ForeignKey(
         CategoryMain, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
     )
-    category_sub = models.ForeignKey(
-        CategorySub, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
-    )
     name = models.CharField(max_length=200)
     brand = models.CharField(max_length=100, blank=True)
     quantity = models.DecimalField(max_digits=10, decimal_places=3, default=Decimal("1"))
     unit = models.CharField(max_length=50, blank=True)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0"))
     total_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     tags = models.JSONField(default=list, blank=True)
     confidence = models.DecimalField(max_digits=4, decimal_places=3, null=True, blank=True)

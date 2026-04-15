@@ -9,12 +9,12 @@ from pydantic import BaseModel, Field, ValidationError
 
 class ParsedItem(BaseModel):
     main_category: str | None = ""
-    sub_category: str | None = ""
     name: str
     brand: str | None = ""
     quantity: float | None = 1
     unit: str | None = ""
     unit_price: float | None = None
+    discount: float | None = 0
     total_price: float | None = None
     tags: list[str] = Field(default_factory=list)
     confidence: float | None = None

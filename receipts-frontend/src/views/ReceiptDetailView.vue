@@ -79,9 +79,9 @@
         <span v-if="convert(receipt.discount)" class="converted-hint">{{ convert(receipt.discount) }}</span>
       </div>
       <div class="form-field">
-        <label>总计</label>
-        <input class="input" v-model="receipt.total" :readonly="!isOwner" />
-        <span v-if="convert(receipt.total)" class="converted-hint">{{ convert(receipt.total) }}</span>
+        <label>总计（自动）</label>
+        <div class="input input-readonly">{{ computedTotal.toFixed(2) }}</div>
+        <span v-if="convert(computedTotal)" class="converted-hint">{{ convert(computedTotal) }}</span>
       </div>
       <div class="form-field">
         <label>付款人</label>
@@ -162,12 +162,12 @@
         <thead>
           <tr>
             <th>主类</th>
-            <th>子类</th>
             <th>商品</th>
             <th>品牌</th>
             <th>数量</th>
             <th>单位</th>
-            <th>单价</th>
+            <th>折扣前单价</th>
+            <th>折扣</th>
             <th>总价</th>
             <th v-if="parseFloat(receipt.tax)">分摊税费</th>
             <th v-if="parseFloat(receipt.discount)">分摊折扣</th>
@@ -176,12 +176,12 @@
         <tbody>
           <tr v-for="(item, index) in items" :key="index">
             <td data-label="主类">{{ item.main_category || '-' }}</td>
-            <td data-label="子类">{{ item.sub_category || '-' }}</td>
             <td data-label="商品">{{ item.name || '-' }}</td>
             <td data-label="品牌">{{ item.brand || '-' }}</td>
             <td data-label="数量">{{ item.quantity }}</td>
             <td data-label="单位">{{ item.unit || '-' }}</td>
-            <td data-label="单价">{{ item.unit_price ?? '-' }}</td>
+            <td data-label="折扣前单价">{{ item.unit_price ?? '-' }}</td>
+            <td data-label="折扣">{{ item.discount ?? 0 }}</td>
             <td data-label="总价">{{ item.total_price ?? '-' }}</td>
             <td v-if="parseFloat(receipt.tax)" data-label="分摊税费" class="prorate-cell">{{ readonlyProrated[index]?.tax ?? '-' }}</td>
             <td v-if="parseFloat(receipt.discount)" data-label="分摊折扣" class="prorate-cell">{{ readonlyProrated[index]?.discount ?? '-' }}</td>
@@ -219,11 +219,13 @@ const moveTargets = reactive<Record<number, string>>({});
 const exchangeRate = ref<number | null>(null);
 const currentOrgIdStr = computed(() => authStore.activeOrgId || "");
 
-// baseline refs — 记录加载时的基准值，作为等比缩放参照
-const baselineSubtotal = ref(0);
-const baselineTax = ref(0);
-const baselineDiscount = ref(0);
-let programmaticUpdate = false;
+// 总计 = 小计 + 税费 - 折扣（自动计算，不可编辑）
+const computedTotal = computed(() => {
+  const sub = parseFloat(receipt.value?.subtotal) || 0;
+  const tax = parseFloat(receipt.value?.tax) || 0;
+  const disc = parseFloat(receipt.value?.discount) || 0;
+  return parseFloat((sub + tax - disc).toFixed(2));
+});
 
 const resolveImageUrl = (img: string) => {
   if (!img) return "";
@@ -284,10 +286,6 @@ const load = async () => {
     const data = await getReceipt(route.params.id as string);
     receipt.value = data;
     items.value = data.items || [];
-    // 初始化 baseline
-    baselineSubtotal.value = parseFloat(data.subtotal) || 0;
-    baselineTax.value = parseFloat(data.tax) || 0;
-    baselineDiscount.value = parseFloat(data.discount) || 0;
     // 判断加载时是否为空记录（手动新建且从未保存过有效数据）
     const loadedItems = data.items || [];
     isEmptyOnLoad.value = !data.merchant && !data.address && !data.purchased_at
@@ -304,50 +302,14 @@ const load = async () => {
   }
 };
 
-// 从商品明细重新计算小计和总计，等比缩放 tax/discount
-const recalcTotals = () => {
-  if (!receipt.value) return;
+// 商品明细变化时自动刷新小计（总计由 computedTotal 自动派生）
+watch(items, () => {
+  if (!recalcReady.value || !receipt.value) return;
   const newSubtotal = items.value.reduce((sum, item) => {
     return sum + (parseFloat(item.total_price) || 0);
   }, 0);
   receipt.value.subtotal = parseFloat(newSubtotal.toFixed(2));
-  if (baselineSubtotal.value > 0) {
-    const ratio = newSubtotal / baselineSubtotal.value;
-    programmaticUpdate = true;
-    receipt.value.tax = parseFloat((baselineTax.value * ratio).toFixed(2));
-    receipt.value.discount = parseFloat((baselineDiscount.value * ratio).toFixed(2));
-    programmaticUpdate = false;
-  }
-  recalcTotal();
-};
-
-// 仅重算总计 = 小计 + 税费 - 折扣
-const recalcTotal = () => {
-  if (!receipt.value) return;
-  const subtotal = parseFloat(receipt.value.subtotal) || 0;
-  const tax = parseFloat(receipt.value.tax) || 0;
-  const discount = parseFloat(receipt.value.discount) || 0;
-  receipt.value.total = parseFloat((subtotal + tax - discount).toFixed(2));
-};
-
-// 商品明细变化时自动重算小计和总计
-watch(items, () => {
-  if (recalcReady.value) recalcTotals();
 });
-
-// 税费或折扣变化时：用户手动改则更新 baseline，然后重算总计
-watch(
-  () => [receipt.value?.tax, receipt.value?.discount],
-  () => {
-    if (!recalcReady.value) return;
-    if (!programmaticUpdate) {
-      baselineTax.value = parseFloat(receipt.value?.tax) || 0;
-      baselineDiscount.value = parseFloat(receipt.value?.discount) || 0;
-      baselineSubtotal.value = parseFloat(receipt.value?.subtotal) || 0;
-    }
-    recalcTotal();
-  }
-);
 
 const saveAndBack = async (itemsData?: any[]) => {
   if (!receipt.value) return;
@@ -361,7 +323,7 @@ const saveAndBack = async (itemsData?: any[]) => {
       subtotal: receipt.value.subtotal,
       tax: receipt.value.tax,
       discount: receipt.value.discount,
-      total: receipt.value.total,
+      total: computedTotal.value,
       notes: receipt.value.notes,
       payer: receipt.value.payer,
       items: itemsData || items.value
@@ -416,7 +378,7 @@ const confirmAndBack = async (itemsData?: any[]) => {
       subtotal: receipt.value.subtotal,
       tax: receipt.value.tax,
       discount: receipt.value.discount,
-      total: receipt.value.total,
+      total: computedTotal.value,
       notes: receipt.value.notes,
       payer: receipt.value.payer,
       items: itemsList,
@@ -593,6 +555,16 @@ onMounted(async () => {
   margin-top: 4px;
   font-size: 12px;
   color: var(--muted, #8e8e93);
+}
+
+.input-readonly {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text, #1d1d1f);
+  font-weight: 600;
+  cursor: default;
+  user-select: none;
+  display: flex;
+  align-items: center;
 }
 
 .action-bar {

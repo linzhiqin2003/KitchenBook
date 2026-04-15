@@ -18,7 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from accounts.models import OrganizationMember
-from .models import CategoryMain, CategorySub, Receipt, ReceiptImage, ReceiptItem
+from .models import CategoryMain, Receipt, ReceiptImage, ReceiptItem
 from .serializers import ReceiptSerializer
 from .services.vlm import analyze_receipt, analyze_receipt_stream
 from .services.ai_generate import chat_or_generate
@@ -49,16 +49,12 @@ def _normalize_text(value: str) -> str:
     return " ".join((value or "").strip().split())
 
 
-def _get_or_create_categories(main_name: str | None, sub_name: str | None):
-    main = None
-    sub = None
+def _get_or_create_main_category(main_name: str | None):
     main_name = _normalize_text(main_name or "")
-    sub_name = _normalize_text(sub_name or "")
-    if main_name:
-        main, _ = CategoryMain.objects.get_or_create(name=main_name)
-        if sub_name:
-            sub, _ = CategorySub.objects.get_or_create(main=main, name=sub_name)
-    return main, sub
+    if not main_name:
+        return None
+    main, _ = CategoryMain.objects.get_or_create(name=main_name)
+    return main
 
 
 MERCHANT_ALIASES = {
@@ -120,22 +116,25 @@ def _apply_parsed_result(receipt: Receipt, parsed, raw_text: str, raw_json: dict
 
     receipt.items.all().delete()
     for index, item in enumerate(payload.items):
-        category_main, category_sub = _get_or_create_categories(item.main_category, item.sub_category)
-        total_price = to_decimal(item.total_price)
+        category_main = _get_or_create_main_category(item.main_category)
         unit_price = to_decimal(item.unit_price)
-        if total_price is None and unit_price is not None:
-            quantity = Decimal(str(item.quantity or 1))
-            total_price = unit_price * quantity
+        quantity = Decimal(str(item.quantity or 1))
+        discount = to_decimal(item.discount) or Decimal("0")
+        # total_price = 折扣前单价 * 数量 - 折扣（自动计算）
+        if unit_price is not None:
+            total_price = (unit_price * quantity - discount).quantize(Decimal("0.01"))
+        else:
+            total_price = to_decimal(item.total_price)
 
         ReceiptItem.objects.create(
             receipt=receipt,
             category_main=category_main,
-            category_sub=category_sub,
             name=item.name,
             brand=item.brand or "",
-            quantity=Decimal(str(item.quantity or 1)),
+            quantity=quantity,
             unit=item.unit or "",
             unit_price=unit_price,
+            discount=discount,
             total_price=total_price,
             tags=item.tags or [],
             confidence=to_decimal(item.confidence),
@@ -184,7 +183,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Receipt.objects.all().prefetch_related(
-            "items", "items__category_main", "items__category_sub", "images"
+            "items", "items__category_main", "images"
         ).order_by("-created_at")
 
         # Data scoping: org mode vs personal mode

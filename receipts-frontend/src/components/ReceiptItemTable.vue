@@ -6,13 +6,13 @@
         <thead>
           <tr>
             <th>主类</th>
-            <th>子类</th>
             <th>商品</th>
             <th>品牌</th>
             <th>数量</th>
             <th>单位</th>
-            <th>单价</th>
-            <th>总价</th>
+            <th>折扣前单价</th>
+            <th>折扣</th>
+            <th>总价（自动）</th>
             <th v-if="tax" class="prorate-header">分摊税费</th>
             <th v-if="discount" class="prorate-header">分摊折扣</th>
             <th v-if="showOrgSelector">归属</th>
@@ -22,13 +22,13 @@
         <tbody>
           <tr v-for="(item, index) in localItems" :key="index" class="item-row">
             <td data-label="主类"><input class="input" v-model="item.main_category" /></td>
-            <td data-label="子类"><input class="input" v-model="item.sub_category" /></td>
             <td data-label="商品"><input class="input" v-model="item.name" /></td>
             <td data-label="品牌"><input class="input" v-model="item.brand" /></td>
             <td data-label="数量"><input class="input" v-model="item.quantity" /></td>
             <td data-label="单位"><input class="input" v-model="item.unit" /></td>
-            <td data-label="单价"><input class="input" v-model="item.unit_price" /></td>
-            <td data-label="总价"><input class="input" v-model="item.total_price" /></td>
+            <td data-label="折扣前单价"><input class="input" v-model="item.unit_price" /></td>
+            <td data-label="折扣"><input class="input" v-model="item.discount" /></td>
+            <td data-label="总价" class="auto-total-cell">{{ computeTotal(item) }}</td>
             <td v-if="tax" data-label="分摊税费" class="prorate-cell">{{ proratedValues[index]?.tax }}</td>
             <td v-if="discount" data-label="分摊折扣" class="prorate-cell">{{ proratedValues[index]?.discount }}</td>
             <td v-if="showOrgSelector" data-label="归属">
@@ -96,6 +96,25 @@ const emit = defineEmits<{
   (e: "discard"): void;
 }>();
 
+// 单行总价自动计算 = 折扣前单价 * 数量 - 折扣
+const computeTotal = (item: ReceiptItemPayload): string => {
+  const up = parseFloat(item.unit_price as any);
+  const qty = parseFloat(item.quantity as any);
+  const disc = parseFloat(item.discount as any) || 0;
+  if (isNaN(up) || isNaN(qty)) return "-";
+  return (up * qty - disc).toFixed(2);
+};
+
+// 保持 item.total_price 与计算值同步（便于父组件读取和持久化）
+const syncItemTotal = (item: ReceiptItemPayload) => {
+  const up = parseFloat(item.unit_price as any);
+  const qty = parseFloat(item.quantity as any);
+  const disc = parseFloat(item.discount as any) || 0;
+  if (!isNaN(up) && !isNaN(qty)) {
+    item.total_price = parseFloat((up * qty - disc).toFixed(2));
+  }
+};
+
 // 按价格占比计算每行分摊税费/折扣，最后一行取余数避免舍入漂移
 const proratedValues = computed(() => {
   const sub = props.subtotal;
@@ -138,7 +157,15 @@ watch(
 );
 
 const addRow = () => {
-  localItems.push({ name: "", quantity: 1, main_category: "", sub_category: "", target_org_id: props.currentOrgId });
+  localItems.push({
+    name: "",
+    quantity: 1,
+    main_category: "",
+    unit_price: null,
+    discount: 0,
+    total_price: null,
+    target_org_id: props.currentOrgId,
+  });
   emitUpdate();
 };
 
@@ -153,10 +180,12 @@ const emitUpdate = () => {
 };
 
 // Deep watch: 任何字段编辑都同步到父组件（节流 300ms）
+// 在 emit 前确保 total_price 已按公式同步
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
   localItems,
   () => {
+    localItems.forEach(syncItemTotal);
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(emitUpdate, 300);
   },
@@ -220,6 +249,14 @@ const onConfirm = () => {
 
 .danger-text {
   color: var(--danger) !important;
+}
+
+.auto-total-cell {
+  font-weight: 600;
+  color: var(--text, #1d1d1f);
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 12px;
 }
 
 .prorate-header {
