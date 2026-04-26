@@ -69,8 +69,18 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         paper_path = Path(opts["paper"])
+        # The command runs from `backend/` but `courses/` lives at the project
+        # root. Search both locations so users can pass either a relative
+        # path from the project root OR an absolute path.
         if not paper_path.is_absolute():
-            paper_path = Path.cwd() / paper_path
+            backend_root = Path(__file__).resolve().parent.parent.parent.parent  # backend/
+            project_root = backend_root.parent
+            for candidate in (Path.cwd() / paper_path,
+                              project_root / paper_path,
+                              backend_root / paper_path):
+                if candidate.exists():
+                    paper_path = candidate
+                    break
         if not paper_path.exists():
             self.stderr.write(self.style.ERROR(f"Paper not found: {paper_path}"))
             sys.exit(1)
