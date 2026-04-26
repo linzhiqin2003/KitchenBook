@@ -67,7 +67,7 @@
             class="qg-modetabs__btn"
             @click="setStudyMode(sm.value)"
           >
-            <span class="qg-modetabs__icon">{{ sm.icon }}</span>
+            <QgIcon :name="sm.icon" :size="15" class="qg-modetabs__icon" />
             <span class="qg-modetabs__label">{{ sm.label }}</span>
           </button>
         </nav>
@@ -331,6 +331,7 @@ import AIChatWindow from '../components/AIChatWindow.vue';
 import QgThemeToggle from '../components/QgThemeToggle.vue';
 import NotesView from '../components/NotesView.vue';
 import CoursewareView from '../components/CoursewareView.vue';
+import QgIcon from '../components/QgIcon.vue';
 import { questionApi } from '../api';
 
 // LocalStorage keys
@@ -349,9 +350,9 @@ const QUESTION_TYPES = [
   { value: 'essay', label: '论述题', icon: '✍︎' },
 ];
 const STUDY_MODES = [
-  { value: 'answer', label: '答题', icon: '🎯' },
-  { value: 'notes', label: '知识点', icon: '📝' },
-  { value: 'raw', label: '原文', icon: '📄' },
+  { value: 'answer', label: '答题', icon: 'target' },
+  { value: 'notes',  label: '知识点', icon: 'note' },
+  { value: 'raw',    label: '原文', icon: 'doc' },
 ];
 
 // State
@@ -419,7 +420,6 @@ const correctCount = computed(() => historyQuestions.value.filter(h => h.correct
 const currentCourse = computed(() => availableCourses.value[currentCourseId.value] || {});
 const currentCourseName = computed(() => currentCourse.value.name || '选择课程');
 const currentCourseDisplayName = computed(() => currentCourse.value.display_name || currentCourse.value.name || '刷题');
-const currentCourseIcon = computed(() => currentCourse.value.icon || '📚');
 
 // Question types this course supports — backend returns in course config.
 // Default to ['mcq'] for any course that doesn't opt into fill/essay.
@@ -1220,9 +1220,10 @@ onBeforeUnmount(() => {
   border-radius: 2px 2px 0 0;
 }
 .qg-modetabs__icon {
-  font-size: 14px;
-  opacity: 0.85;
+  opacity: 0.7;
+  transition: opacity var(--qg-dur-fast) var(--qg-ease);
 }
+.qg-modetabs__btn[aria-selected="true"] .qg-modetabs__icon { opacity: 1; }
 @media (max-width: 540px) {
   .qg-modetabs { margin-top: 22px; }
   .qg-modetabs__btn { padding: 10px 14px 12px; font-size: var(--qg-text-sm); }

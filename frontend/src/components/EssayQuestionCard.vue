@@ -86,7 +86,9 @@
           <div class="essay__points">
             <div class="essay__pointGroup" data-kind="matched">
               <header class="essay__pointHead">
-                <span class="essay__pointBullet">✓</span>
+                <span class="essay__pointBullet">
+                  <QgIcon name="check" :size="11" :stroke-width="2.4" />
+                </span>
                 <span class="essay__pointTitle">已得分要点</span>
                 <span class="qg-num essay__pointCount">{{ (gradeResult.matched_points || []).length }}</span>
               </header>
@@ -98,7 +100,9 @@
 
             <div class="essay__pointGroup" data-kind="missing">
               <header class="essay__pointHead">
-                <span class="essay__pointBullet">−</span>
+                <span class="essay__pointBullet">
+                  <QgIcon name="minus" :size="11" :stroke-width="2.4" />
+                </span>
                 <span class="essay__pointTitle">未覆盖要点</span>
                 <span class="qg-num essay__pointCount">{{ (gradeResult.missing_points || []).length }}</span>
               </header>
@@ -115,7 +119,9 @@
             class="essay__suggest"
           >
             <header class="essay__suggestHead">
-              <span class="essay__suggestBullet">↗</span>
+              <span class="essay__suggestBullet">
+                <QgIcon name="arrow_right" :size="12" :stroke-width="2" />
+              </span>
               <span class="essay__suggestTitle">改进建议</span>
             </header>
             <ol class="essay__suggestList">
@@ -152,6 +158,7 @@
 import { ref, computed, watch } from 'vue';
 import { marked } from 'marked';
 import { questionApi } from '../api';
+import QgIcon from './QgIcon.vue';
 
 const props = defineProps({
   question: { type: Object, required: true },
