@@ -17,6 +17,7 @@ class QuestionSerializer(serializers.ModelSerializer):
             'source_files',
             'source_chapter',
             'source_excerpt',
+            'generation_context',
             'created_at',
         ]
 

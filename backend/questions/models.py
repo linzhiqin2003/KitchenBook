@@ -87,6 +87,20 @@ class Question(models.Model):
     # rows by `manage.py backfill_citations`.
     source_chapter = models.CharField(max_length=200, blank=True, default="")
     source_excerpt = models.TextField(blank=True, default="")
+    # Full generation context (essay only, optional). Stored verbatim so the
+    # grader doesn't depend on the courseware on disk staying identical to
+    # what the LLM saw at generation time. Schema:
+    #   {
+    #     "seed_paper": "...",                # the full mock paper text
+    #     "chapter_id": "l4-object-oriented-design",
+    #     "chapter_excerpt": "<full chapter material verbatim>",
+    #     "marks_total": 25,
+    #     "rubric_breakdown": [
+    #       {"criterion": "...", "marks": N, "key_points": ["..."]}
+    #     ],
+    #     "is_original": true|false           # true = lifted from the mock paper
+    #   }
+    generation_context = models.JSONField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

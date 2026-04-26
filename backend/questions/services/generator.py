@@ -496,11 +496,16 @@ Create an **original ESSAY / DISCUSSION question** for the topic "{matching_topi
         return {"error": str(e)}
 
 
-def grade_essay_answer(question_text, model_answer, rubric, student_answer, course_id=None):
+def grade_essay_answer(question_text, model_answer, rubric, student_answer,
+                       course_id=None, generation_context=None):
     """Grade a student's free-text essay answer against the rubric.
 
-    Returns dict with: score (0-10), max_score (10), feedback (markdown),
-    matched_points (list of points the student covered).
+    If `generation_context` is supplied (saved at generation time), the grader
+    treats its `chapter_excerpt` as ground truth so scoring stays reproducible
+    even if the courseware on disk has since changed.
+
+    Returns dict with: score, max_score, feedback (markdown), matched_points,
+    missing_points, improvement_suggestions.
     """
     client = get_client()
     if not client:
@@ -509,36 +514,68 @@ def grade_essay_answer(question_text, model_answer, rubric, student_answer, cour
     course_config = get_course(course_id) if course_id else None
     course_name = course_config.get("name", "Course") if course_config else "Course"
 
-    prompt = f"""You are a fair, rigorous grader for a "{course_name}" course.
+    gc = generation_context or {}
+    max_score = gc.get("marks_total") or 10
+    chapter_excerpt = gc.get("chapter_excerpt") or ""
+    rubric_breakdown = gc.get("rubric_breakdown") or []
+    is_original = gc.get("is_original")
 
-Grade the student's essay answer against the official rubric.
+    ground_truth_block = ""
+    if chapter_excerpt:
+        ground_truth_block = (
+            "\n## Ground Truth (the chapter material the question was generated from)\n"
+            f"{chapter_excerpt[:8000]}\n"
+            "Use this passage as the authoritative reference. Award marks only for content "
+            "supported by this passage (or universally-true equivalents).\n"
+        )
+
+    rubric_block = rubric or ""
+    if rubric_breakdown:
+        rubric_block = (
+            rubric_block
+            + "\n\n### Mark allocation (machine-readable)\n"
+            + "\n".join(
+                f"- ({r.get('marks','?')} marks) {r.get('criterion','')} — key points: "
+                f"{'; '.join(r.get('key_points') or [])}"
+                for r in rubric_breakdown
+            )
+        )
+
+    origin_note = ""
+    if is_original is True:
+        origin_note = "\nThis is an EXAM-PAPER ORIGINAL — apply the paper's own rubric strictly.\n"
+
+    prompt = f"""You are a fair, rigorous grader for a "{course_name}" course.{origin_note}
+
+Grade the student's essay answer against the rubric below.
 
 ## Question
 {question_text}
 
-## Model Answer (for reference, full marks)
+## Model Answer (for reference; this earns full marks)
 {model_answer}
 
-## Rubric (total 10 marks)
-{rubric}
-
+## Rubric (total {max_score} marks)
+{rubric_block}
+{ground_truth_block}
 ## Student Answer
 {student_answer}
 
 ## Instructions
 1. Read the student answer carefully.
-2. For each rubric point, decide whether the student covered it (fully / partially / not at all) and award proportional marks.
-3. Be fair — accept paraphrases, alternative valid arguments, and partial credit.
-4. Do NOT award marks for irrelevant filler.
-5. Provide feedback that explicitly tells the student what they got right and what they missed.
+2. For each rubric criterion, decide whether the student covered the listed key_points (fully / partially / not at all) and award proportional marks. Mark sub-totals MUST sum to ≤ marks_total.
+3. Accept paraphrases and alternative valid arguments that are supported by the ground-truth passage if provided.
+4. Do NOT award marks for irrelevant filler or for claims that contradict the ground truth.
+5. Suggest 2–3 concrete improvements the student could make.
 
 ## Output Format (JSON only)
 {{
-  "score": <number 0-10, can be decimal like 7.5>,
-  "max_score": 10,
+  "score": <number 0-{max_score}, decimals OK>,
+  "max_score": {max_score},
   "matched_points": ["short summary of each rubric point the student covered"],
   "missing_points": ["short summary of each rubric point the student missed or got wrong"],
-  "feedback": "2-4 sentence personalized feedback in Chinese, encouraging tone but honest."
+  "improvement_suggestions": ["2–3 actionable, specific suggestions in Chinese"],
+  "feedback": "2–4 sentence personalised feedback in Chinese — encouraging but honest, name 1 strength + 1 priority improvement."
 }}
 """
 
@@ -546,11 +583,13 @@ Grade the student's essay answer against the official rubric.
         response = client.chat.completions.create(
             model=CHAT_MODEL,
             messages=[
-                {"role": "system", "content": "You are a rigorous but fair exam grader. Output ONLY valid JSON."},
+                {"role": "system",
+                 "content": "You are a rigorous but fair exam grader. Output ONLY valid JSON."},
                 {"role": "user", "content": prompt},
             ],
             response_format={"type": "json_object"},
             temperature=0.2,
+            max_tokens=2400,
             **non_thinking_kwargs(),
         )
         return json.loads(response.choices[0].message.content)
@@ -730,6 +769,107 @@ Each point must be:
         )
         result = json.loads(response.choices[0].message.content)
         result["course_id"] = course_id
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def generate_essays_for_chapter_from_paper(
+    course_id: str,
+    chapter_topic: str,
+    paper_text: str,
+    *,
+    context_data=None,
+    num_samples: int = 2,
+):
+    """Per-chapter essay batch grounded in a real mock exam paper.
+
+    The model receives the WHOLE mock paper (so it learns the exam's style,
+    rigour and mark structure) plus the courseware for ONE chapter. It then
+    returns two lists:
+
+      * `originals` — questions lifted verbatim from the paper that this
+        chapter could legitimately host (zero, one or more depending on the
+        paper). Each original keeps the paper's own sample-answer rubric.
+      * `samples` — `num_samples` fresh exam-style variants that test
+        different aspects of the same chapter (no overlap with the
+        originals' subject matter).
+
+    Every produced question is attached with the full generation context so
+    the grader can later score against the same evidence the LLM saw —
+    independent of any future courseware edits.
+    """
+    client = get_client()
+    if not client:
+        return {"error": "DEEPSEEK_API_KEY not configured"}
+
+    if context_data is None:
+        context_data = parse_courseware(course_id)
+
+    course_config = get_course(course_id)
+    course_name = course_config.get("name", "Course") if course_config else "Course"
+
+    matching_topic, snippet = _pick_topic_and_context(chapter_topic, course_id, context_data)
+
+    prompt = f"""You are an expert university exam question designer for a "{course_name}" course.
+
+Below you have:
+1. **The full text of a real mock final exam paper** (questions + official sample answers).
+2. **Course material for ONE chapter**: `{matching_topic}`.
+
+Your job, for THIS chapter only:
+
+A. **Originals** — Look at every question and sub-question in the mock paper. Identify the ones whose subject matter clearly belongs to THIS chapter's material. Lift them verbatim. Convert the paper's "Sample answer" into a structured rubric (criterion + marks + key points). Preserve the original mark allocation.
+
+B. **Samples** — Generate exactly `{num_samples}` fresh exam-style essay questions that:
+   - Cover aspects of THIS chapter that are NOT addressed by the originals you extracted.
+   - Match the paper's tone, rigour and mark distribution.
+   - Use a concrete fictional scenario where appropriate (different from any used in the originals).
+   - Total marks per sample should be in the same range as the originals (e.g. 5–25 marks).
+
+For every produced question (originals AND samples) you MUST include:
+- `question`: the prompt text (verbatim for originals, original wording for samples)
+- `answer`: the model answer (200–400 words for big questions; shorter for sub-parts)
+- `rubric_breakdown`: array of `{{criterion, marks, key_points: [..]}}` summing to `marks_total`
+- `marks_total`: integer total marks
+- `source_chapter`: section/sub-heading inside the chapter material
+- `source_excerpt`: a short verbatim quote (≤200 chars) from the chapter material proving the answer
+- `is_original`: true for lifted-from-paper, false for new samples
+
+If the chapter does not match any question in the paper, output an empty `originals` list and still produce `{num_samples}` samples.
+
+## Output Format (JSON only)
+{{
+  "topic": "{matching_topic}",
+  "originals": [ /* extracted from paper */ ],
+  "samples":   [ /* {num_samples} fresh variants */ ]
+}}
+
+# ---- MOCK PAPER (style + difficulty reference) ----
+{paper_text}
+
+# ---- CHAPTER MATERIAL ({matching_topic}) ----
+{snippet}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system",
+                 "content": "You are a meticulous senior exam question designer. Output ONLY valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.45,
+            max_tokens=12000,
+            **non_thinking_kwargs(),
+        )
+        result = json.loads(response.choices[0].message.content)
+        result["course_id"] = course_id
+        result["chapter_topic"] = matching_topic
+        # Attach the chapter excerpt so callers can ship it into generation_context
+        result["_chapter_excerpt"] = snippet
         return result
     except Exception as e:
         return {"error": str(e)}

@@ -380,6 +380,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
                 question.explanation,  # rubric stored in explanation
                 student_answer,
                 course_id=question.course_id,
+                generation_context=question.generation_context,
             )
             if "error" in result:
                 return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

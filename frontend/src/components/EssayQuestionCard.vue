@@ -109,6 +109,23 @@
             </div>
           </div>
 
+          <!-- Improvement suggestions -->
+          <div
+            v-if="(gradeResult.improvement_suggestions || []).length"
+            class="essay__suggest"
+          >
+            <header class="essay__suggestHead">
+              <span class="essay__suggestBullet">↗</span>
+              <span class="essay__suggestTitle">改进建议</span>
+            </header>
+            <ol class="essay__suggestList">
+              <li
+                v-for="(s, i) in gradeResult.improvement_suggestions"
+                :key="i"
+              >{{ s }}</li>
+            </ol>
+          </div>
+
           <!-- Reference (collapsed) -->
           <details class="essay__reference">
             <summary>
@@ -458,6 +475,52 @@ defineExpose({
 .essay__pointEmpty {
   color: var(--qg-text-tertiary);
   font-style: italic;
+}
+
+/* Improvement suggestions panel — accent-tinted, focused call-to-action */
+.essay__suggest {
+  border: 1px solid color-mix(in oklch, var(--qg-accent) 28%, transparent);
+  background: var(--qg-accent-soft);
+  border-radius: var(--qg-radius-md);
+  padding: 14px 18px;
+}
+.essay__suggestHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.essay__suggestBullet {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--qg-font-mono);
+  font-size: 13px;
+  color: var(--qg-accent);
+  background: color-mix(in oklch, var(--qg-accent) 16%, transparent);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.essay__suggestTitle {
+  font-size: var(--qg-text-sm);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--qg-text-primary);
+}
+.essay__suggestList {
+  list-style: decimal;
+  padding-left: 22px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.essay__suggestList li {
+  font-size: var(--qg-text-sm);
+  line-height: 1.6;
+  color: var(--qg-text-primary);
 }
 
 .essay__reference {
