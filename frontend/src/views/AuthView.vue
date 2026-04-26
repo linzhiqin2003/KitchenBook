@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../store/auth'
+import QgThemeToggle from '../components/QgThemeToggle.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -20,11 +21,9 @@ const handleSubmit = async () => {
     error.value = mode.value === 'login' ? '请输入邮箱和密码' : '请填写所有必填项'
     return
   }
-
   loading.value = true
   error.value = ''
   success.value = false
-
   try {
     if (mode.value === 'login') {
       await authStore.login(email.value, password.value)
@@ -32,15 +31,15 @@ const handleSubmit = async () => {
       await authStore.register(email.value, password.value, nickname.value)
     }
     success.value = true
-    const redirectPath = route.query.redirect || '/kitchen'
+    const redirectPath = route.query.redirect || '/'
     setTimeout(() => router.push(redirectPath), 400)
   } catch (err) {
     const data = err.response?.data
     if (err.response?.status === 401) {
       error.value = '邮箱或密码错误'
     } else if (data) {
-      // Extract first error message from DRF response
-      const firstError = typeof data === 'string' ? data
+      const firstError = typeof data === 'string'
+        ? data
         : data.detail || Object.values(data).flat()[0] || '操作失败'
       error.value = firstError
     } else {
@@ -51,31 +50,30 @@ const handleSubmit = async () => {
   }
 }
 
-// Google Login
+const setMode = (next) => {
+  if (mode.value === next) return
+  mode.value = next
+  error.value = ''
+}
+
+// Google one-tap / button — kept functional but visually tamed
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 const initGoogleSignIn = () => {
   if (!googleClientId) return
-
   const script = document.createElement('script')
   script.src = 'https://accounts.google.com/gsi/client'
   script.async = true
   script.defer = true
   script.onload = () => {
+    if (!window.google) return
     window.google.accounts.id.initialize({
       client_id: googleClientId,
       callback: handleGoogleCallback,
     })
     window.google.accounts.id.renderButton(
       document.getElementById('google-signin-btn'),
-      {
-        theme: 'filled_black',
-        size: 'large',
-        width: '100%',
-        shape: 'pill',
-        text: 'continue_with',
-        locale: 'zh_CN',
-      }
+      { theme: 'outline', size: 'large', width: 320, shape: 'rectangular', text: 'continue_with', locale: 'zh_CN' }
     )
   }
   document.head.appendChild(script)
@@ -87,7 +85,7 @@ const handleGoogleCallback = async (response) => {
   try {
     await authStore.googleLogin(response.credential)
     success.value = true
-    const redirectPath = route.query.redirect || '/kitchen'
+    const redirectPath = route.query.redirect || '/'
     setTimeout(() => router.push(redirectPath), 400)
   } catch (err) {
     error.value = err.response?.data?.detail || 'Google 登录失败'
@@ -96,270 +94,487 @@ const handleGoogleCallback = async (response) => {
   }
 }
 
-onMounted(() => {
-  initGoogleSignIn()
-})
+onMounted(() => initGoogleSignIn())
+
+// Mini "table of contents" — what's behind the door
+const spaces = [
+  { label: 'Practice',  hint: '题库 / 选择 · 填空 · 论述' },
+  { label: 'Kitchen',   hint: '菜谱 / 点单 / 后厨' },
+  { label: 'Blog',      hint: '技术随笔 + 知识图谱' },
+  { label: 'AI Lab',    hint: '对话 / 翻译 / 表情包' },
+  { label: 'Tarot',     hint: '塔罗占卜' },
+  { label: 'Receipts',  hint: '私人记账' },
+]
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden flex items-center justify-center p-4">
-    <!-- Dynamic Background -->
-    <div class="fixed inset-0 pointer-events-none overflow-hidden">
-      <div class="orb orb-purple"></div>
-      <div class="orb orb-cyan"></div>
-      <div class="orb orb-orange"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
-    </div>
+  <div data-qg-surface class="auth">
+    <!-- Top utility bar -->
+    <header class="auth__top">
+      <router-link to="/" class="auth__back" title="返回首页">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <span>返回</span>
+      </router-link>
+      <QgThemeToggle />
+    </header>
 
-    <div class="w-full max-w-md relative z-10 auth-card-enter">
-      <!-- Logo -->
-      <div class="text-center mb-8">
-        <div class="relative inline-block mb-4">
-          <div class="logo-glow"></div>
-          <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[2px] shadow-2xl shadow-purple-500/25 relative z-10">
-            <div class="w-full h-full rounded-[14px] bg-slate-800/90 backdrop-blur-sm flex items-center justify-center">
-              <svg class="w-10 h-10 text-white/90" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 1.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5L4.5 9l5.5-2 2-5.5z" fill-opacity="0.92"/>
-                <path d="M20 12l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" fill-opacity="0.5"/>
-              </svg>
+    <!-- Two-column layout — editorial left, form right. Mobile collapses to single column. -->
+    <main class="auth__grid">
+      <!-- LEFT: brand essay -->
+      <section class="auth__brand">
+        <div class="auth__eyebrow" data-mono>Personal · Established 2024</div>
+        <h1 class="auth__wordmark">LZQ Space</h1>
+        <p class="auth__tagline">
+          一个人的工作室。<br />
+          收纳习题、菜谱、随笔、占卜与日常账本。
+        </p>
+
+        <div class="auth__index" aria-label="目录">
+          <div class="auth__indexHead" data-mono>Inside</div>
+          <ul class="auth__indexList">
+            <li v-for="s in spaces" :key="s.label" class="auth__indexRow">
+              <span class="auth__indexName">{{ s.label }}</span>
+              <span class="auth__indexHint">{{ s.hint }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <footer class="auth__brandFoot" data-mono>
+          <span>www.lzqqq.org</span>
+          <span class="auth__brandDot">·</span>
+          <span>v 0.4</span>
+        </footer>
+      </section>
+
+      <!-- RIGHT: form -->
+      <section class="auth__form">
+        <div class="auth__formInner">
+          <div class="auth__tabs" role="tablist" aria-label="登录或注册">
+            <button
+              role="tab"
+              :aria-selected="mode === 'login'"
+              class="auth__tab"
+              @click="setMode('login')"
+            >登录</button>
+            <button
+              role="tab"
+              :aria-selected="mode === 'register'"
+              class="auth__tab"
+              @click="setMode('register')"
+            >注册</button>
+          </div>
+
+          <h2 class="auth__formTitle">
+            {{ mode === 'login' ? '继续。' : '入门。' }}
+          </h2>
+          <p class="auth__formSub">
+            {{ mode === 'login' ? '用邮箱或 Google 账号登录。' : '创建账号开始使用。' }}
+          </p>
+
+          <form @submit.prevent="handleSubmit" class="auth__fields" novalidate>
+            <transition name="auth-fade">
+              <div v-if="success" class="auth__notice" data-tone="success">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4 4L19 7"/></svg>
+                <span>{{ mode === 'login' ? '登录成功，正在跳转…' : '注册成功，正在跳转…' }}</span>
+              </div>
+            </transition>
+            <transition name="auth-fade">
+              <div v-if="error" class="auth__notice" data-tone="danger">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 8v4M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>
+                <span>{{ error }}</span>
+              </div>
+            </transition>
+
+            <div v-if="mode === 'register'" class="auth__field">
+              <label class="auth__label" for="auth-nickname">昵称</label>
+              <input
+                id="auth-nickname"
+                v-model="nickname"
+                type="text"
+                class="auth__input"
+                placeholder="可选"
+                :disabled="loading"
+              />
             </div>
-          </div>
-        </div>
-        <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/80">
-          LZQ Space
-        </h1>
-        <p class="text-white/40 text-sm mt-1">{{ mode === 'login' ? '登录以继续' : '创建你的账号' }}</p>
-      </div>
 
-      <!-- Auth Card -->
-      <div class="glass-card rounded-3xl p-8 border border-white/10">
-        <!-- Tab Switch -->
-        <div class="flex bg-white/[0.06] rounded-xl p-1 mb-6">
-          <button
-            @click="mode = 'login'; error = ''"
-            :class="mode === 'login' ? 'bg-white/[0.12] text-white shadow-sm' : 'text-white/50 hover:text-white/70'"
-            class="flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-          >
-            登录
-          </button>
-          <button
-            @click="mode = 'register'; error = ''"
-            :class="mode === 'register' ? 'bg-white/[0.12] text-white shadow-sm' : 'text-white/50 hover:text-white/70'"
-            class="flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-          >
-            注册
-          </button>
-        </div>
+            <div class="auth__field">
+              <label class="auth__label" for="auth-email">邮箱</label>
+              <input
+                id="auth-email"
+                v-model="email"
+                type="email"
+                class="auth__input"
+                placeholder="you@example.com"
+                :disabled="loading"
+                autocomplete="email"
+              />
+            </div>
 
-        <form @submit.prevent="handleSubmit" class="space-y-5">
-          <!-- Success -->
-          <div v-if="success" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
-            <span class="animate-bounce">&#10003;</span>
-            {{ mode === 'login' ? '登录成功，正在跳转...' : '注册成功，正在跳转...' }}
-          </div>
+            <div class="auth__field">
+              <label class="auth__label" for="auth-password">密码</label>
+              <input
+                id="auth-password"
+                v-model="password"
+                type="password"
+                class="auth__input"
+                :placeholder="mode === 'register' ? '至少 6 位' : '请输入密码'"
+                :disabled="loading"
+                :autocomplete="mode === 'register' ? 'new-password' : 'current-password'"
+                @keyup.enter="handleSubmit"
+              />
+            </div>
 
-          <!-- Error -->
-          <div v-if="error" class="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
-            <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-            </svg>
-            {{ error }}
-          </div>
-
-          <!-- Nickname (register only) -->
-          <div v-if="mode === 'register'">
-            <label class="block text-sm font-medium text-white/60 mb-2">昵称</label>
-            <input
-              v-model="nickname"
-              type="text"
-              placeholder="你的昵称（选填）"
-              class="auth-input"
+            <button
+              type="submit"
+              class="auth__submit"
               :disabled="loading"
-            />
+            >
+              <svg v-if="loading" class="auth__spinner" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M12 2a10 10 0 1 1-7.07 2.93" opacity="0.8"/>
+              </svg>
+              <span>{{ loading ? '处理中…' : (mode === 'login' ? '登录' : '注册') }}</span>
+              <svg v-if="!loading" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </form>
+
+          <div v-if="googleClientId" class="auth__divider">
+            <span class="auth__dividerLine"></span>
+            <span class="auth__dividerLabel" data-mono>OR</span>
+            <span class="auth__dividerLine"></span>
           </div>
 
-          <!-- Email -->
-          <div>
-            <label class="block text-sm font-medium text-white/60 mb-2">邮箱</label>
-            <input
-              v-model="email"
-              type="email"
-              placeholder="your@email.com"
-              class="auth-input"
-              :disabled="loading"
-              autocomplete="email"
-            />
-          </div>
-
-          <!-- Password -->
-          <div>
-            <label class="block text-sm font-medium text-white/60 mb-2">密码</label>
-            <input
-              v-model="password"
-              type="password"
-              :placeholder="mode === 'register' ? '至少 6 位' : '请输入密码'"
-              class="auth-input"
-              :disabled="loading"
-              autocomplete="current-password"
-              @keyup.enter="handleSubmit"
-            />
-          </div>
-
-          <!-- Submit Button -->
-          <button
-            type="submit"
-            :disabled="loading"
-            class="w-full py-3.5 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40"
-          >
-            <svg v-if="loading" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-            </svg>
-            {{ loading ? '处理中...' : (mode === 'login' ? '登录' : '注册') }}
-          </button>
-        </form>
-
-        <!-- Divider -->
-        <div v-if="googleClientId" class="flex items-center gap-3 my-6">
-          <div class="flex-1 h-px bg-white/10"></div>
-          <span class="text-xs text-white/30">或</span>
-          <div class="flex-1 h-px bg-white/10"></div>
+          <div v-if="googleClientId" id="google-signin-btn" class="auth__google"></div>
         </div>
-
-        <!-- Google Sign In -->
-        <div v-if="googleClientId" id="google-signin-btn" class="flex justify-center"></div>
-      </div>
-
-      <!-- Back to Home -->
-      <div class="text-center mt-6">
-        <router-link to="/" class="text-white/40 hover:text-white/60 text-sm flex items-center justify-center gap-1.5 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-          </svg>
-          返回首页
-        </router-link>
-      </div>
-    </div>
+      </section>
+    </main>
   </div>
 </template>
 
 <style scoped>
-/* Glass Card */
-.glass-card {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+.auth {
+  min-height: 100dvh;
+  background: var(--qg-surface-base);
+  color: var(--qg-text-primary);
+  font-family: var(--qg-font-body);
+  display: flex;
+  flex-direction: column;
 }
 
-/* Input Style */
-.auth-input {
+/* ─── Top utility row ─────────────────────────────────────────────── */
+.auth__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px clamp(20px, 4vw, 40px);
+  border-bottom: 1px solid var(--qg-border-default);
+  background: color-mix(in oklch, var(--qg-surface-base) 92%, transparent);
+  backdrop-filter: saturate(160%) blur(8px);
+}
+.auth__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--qg-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--qg-text-secondary);
+  text-decoration: none;
+  padding: 6px 10px 6px 8px;
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  transition: color var(--qg-dur-fast) var(--qg-ease),
+              border-color var(--qg-dur-fast) var(--qg-ease);
+}
+.auth__back:hover { color: var(--qg-text-primary); border-color: var(--qg-border-strong); }
+
+/* ─── Two-column layout ───────────────────────────────────────────── */
+.auth__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+@media (min-width: 880px) {
+  .auth__grid {
+    grid-template-columns: 1.1fr 1fr;
+  }
+}
+
+/* ─── Left: brand essay ───────────────────────────────────────────── */
+.auth__brand {
+  padding: clamp(40px, 6vw, 80px) clamp(24px, 5vw, 64px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 4vw, 36px);
+  border-bottom: 1px solid var(--qg-border-default);
+}
+@media (min-width: 880px) {
+  .auth__brand {
+    border-bottom: none;
+    border-right: 1px solid var(--qg-border-default);
+    min-height: calc(100dvh - 60px);
+  }
+}
+
+.auth__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--qg-text-tertiary);
+}
+
+.auth__wordmark {
+  font-family: var(--qg-font-display);
+  font-weight: 500;
+  font-size: clamp(3rem, 4vw + 1.5rem, 5.25rem);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  margin: 0;
+  color: var(--qg-text-primary);
+  font-variation-settings: 'opsz' 96;
+}
+
+.auth__tagline {
+  font-size: var(--qg-text-md);
+  line-height: 1.65;
+  color: var(--qg-text-secondary);
+  max-width: 38ch;
+  margin: 0;
+}
+
+.auth__index {
+  margin-top: auto;
+  border-top: 1px solid var(--qg-border-default);
+  padding-top: 24px;
+}
+.auth__indexHead {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--qg-text-tertiary);
+  margin-bottom: 14px;
+}
+.auth__indexList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.auth__indexRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--qg-border-default);
+  gap: 16px;
+}
+.auth__indexRow:last-child { border-bottom: none; }
+.auth__indexName {
+  font-family: var(--qg-font-display);
+  font-size: var(--qg-text-md);
+  font-weight: 500;
+  color: var(--qg-text-primary);
+  letter-spacing: -0.005em;
+}
+.auth__indexHint {
+  font-family: var(--qg-font-mono);
+  font-size: 11px;
+  color: var(--qg-text-tertiary);
+  letter-spacing: 0.02em;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.auth__brandFoot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--qg-text-muted);
+  margin-top: 8px;
+}
+.auth__brandDot { color: var(--qg-text-muted); }
+
+/* ─── Right: form ─────────────────────────────────────────────────── */
+.auth__form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(40px, 6vw, 64px) clamp(24px, 5vw, 56px);
+  background: var(--qg-surface-raised);
+}
+.auth__formInner {
   width: 100%;
-  padding: 0.875rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.75rem;
-  color: white;
-  font-size: 0.875rem;
+  max-width: 380px;
+}
+
+.auth__tabs {
+  display: inline-flex;
+  background: var(--qg-surface-sunken);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  padding: 3px;
+  gap: 2px;
+  margin-bottom: 28px;
+}
+.auth__tab {
+  padding: 6px 16px;
+  font-size: var(--qg-text-sm);
+  font-weight: 500;
+  color: var(--qg-text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  letter-spacing: -0.005em;
+  transition: background var(--qg-dur-fast) var(--qg-ease),
+              color var(--qg-dur-fast) var(--qg-ease);
+}
+.auth__tab:hover { color: var(--qg-text-primary); }
+.auth__tab[aria-selected="true"] {
+  background: var(--qg-surface-raised);
+  color: var(--qg-text-primary);
+  box-shadow: var(--qg-shadow-1);
+}
+
+.auth__formTitle {
+  font-family: var(--qg-font-display);
+  font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin: 0;
+  color: var(--qg-text-primary);
+  font-variation-settings: 'opsz' 60;
+}
+.auth__formSub {
+  font-size: var(--qg-text-base);
+  color: var(--qg-text-secondary);
+  margin: 8px 0 28px;
+  line-height: 1.5;
+}
+
+.auth__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth__notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--qg-radius-md);
+  font-size: var(--qg-text-sm);
+  border: 1px solid transparent;
+}
+.auth__notice[data-tone="success"] {
+  background: var(--qg-success-soft);
+  color: var(--qg-success);
+  border-color: color-mix(in oklch, var(--qg-success) 25%, transparent);
+}
+.auth__notice[data-tone="danger"] {
+  background: var(--qg-danger-soft);
+  color: var(--qg-danger);
+  border-color: color-mix(in oklch, var(--qg-danger) 25%, transparent);
+}
+
+.auth__field { display: flex; flex-direction: column; gap: 6px; }
+.auth__label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--qg-font-mono);
+  color: var(--qg-text-tertiary);
+}
+.auth__input {
+  font-family: var(--qg-font-body);
+  font-size: var(--qg-text-md);
+  color: var(--qg-text-primary);
+  background: var(--qg-surface-sunken);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  padding: 12px 14px;
   outline: none;
-  transition: all 0.2s;
+  letter-spacing: -0.005em;
+  transition: border-color var(--qg-dur-fast) var(--qg-ease),
+              background var(--qg-dur-fast) var(--qg-ease);
+}
+.auth__input::placeholder { color: var(--qg-text-muted); }
+.auth__input:focus {
+  border-color: var(--qg-border-focus);
+  background: var(--qg-surface-base);
+  box-shadow: var(--qg-shadow-focus);
+}
+.auth__input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.auth__submit {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--qg-font-body);
+  font-size: var(--qg-text-base);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--qg-accent-on);
+  background: var(--qg-accent);
+  border: none;
+  border-radius: var(--qg-radius-md);
+  padding: 13px 18px;
+  cursor: pointer;
+  transition: background var(--qg-dur-fast) var(--qg-ease),
+              transform var(--qg-dur-fast) var(--qg-ease);
+}
+.auth__submit:hover:not([disabled]) { background: var(--qg-accent-hover); }
+.auth__submit:active:not([disabled]) { transform: translateY(0.5px); }
+.auth__submit:focus-visible { outline: none; box-shadow: var(--qg-shadow-focus); }
+.auth__submit[disabled] { opacity: 0.55; cursor: not-allowed; }
+.auth__spinner { animation: auth-spin 0.9s linear infinite; }
+@keyframes auth-spin { to { transform: rotate(360deg); } }
+
+.auth__divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+}
+.auth__dividerLine {
+  flex: 1;
+  height: 1px;
+  background: var(--qg-border-default);
+}
+.auth__dividerLabel {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--qg-text-muted);
 }
 
-.auth-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+.auth__google {
+  display: flex;
+  justify-content: center;
+}
+/* Tame Google's iframe button shadow & rounding */
+.auth__google :deep(iframe) {
+  border-radius: var(--qg-radius-md) !important;
+  filter: saturate(0.9);
 }
 
-.auth-input:focus {
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+/* ─── Transitions ─────────────────────────────────────────────────── */
+.auth-fade-enter-active,
+.auth-fade-leave-active {
+  transition: opacity var(--qg-dur-base) var(--qg-ease),
+              transform var(--qg-dur-base) var(--qg-ease);
 }
-
-.auth-input:disabled {
-  opacity: 0.5;
-}
-
-/* Logo Glow */
-.logo-glow {
-  position: absolute;
-  inset: -8px;
-  border-radius: 1.25rem;
-  background: linear-gradient(135deg, #a855f7, #7c3aed, #d946ef);
-  opacity: 0.35;
-  filter: blur(16px);
-  z-index: 0;
-  animation: logoBreath 3s ease-in-out infinite;
-}
-
-@keyframes logoBreath {
-  0%, 100% { opacity: 0.25; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.06); }
-}
-
-/* Card Enter Animation */
-.auth-card-enter {
-  animation: cardSlideIn 0.6s ease-out;
-}
-
-@keyframes cardSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(24px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* Floating Orbs */
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-}
-
-.orb-purple {
-  width: 400px;
-  height: 400px;
-  background: rgba(139, 92, 246, 0.12);
-  top: -10%;
-  left: -10%;
-  animation: orbFloat1 20s ease-in-out infinite;
-}
-
-.orb-cyan {
-  width: 350px;
-  height: 350px;
-  background: rgba(6, 182, 212, 0.1);
-  bottom: -5%;
-  right: -10%;
-  animation: orbFloat2 25s ease-in-out infinite;
-}
-
-.orb-orange {
-  width: 300px;
-  height: 300px;
-  background: rgba(251, 146, 60, 0.08);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: orbFloat3 18s ease-in-out infinite;
-}
-
-@keyframes orbFloat1 {
-  0%, 100% { transform: translate(0, 0); }
-  33% { transform: translate(60px, 40px); }
-  66% { transform: translate(-30px, 60px); }
-}
-
-@keyframes orbFloat2 {
-  0%, 100% { transform: translate(0, 0); }
-  33% { transform: translate(-50px, -30px); }
-  66% { transform: translate(40px, -50px); }
-}
-
-@keyframes orbFloat3 {
-  0%, 100% { transform: translate(-50%, -50%); }
-  33% { transform: translate(-40%, -55%); }
-  66% { transform: translate(-55%, -45%); }
+.auth-fade-enter-from,
+.auth-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>
