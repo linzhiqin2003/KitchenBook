@@ -200,19 +200,19 @@ def infer_topic_with_ai(question_text, topics, course_id=None):
     import os
     import json
     from pathlib import Path
-    from openai import OpenAI
     from dotenv import load_dotenv
-    
+    from common.deepseek_models import CHAT_MODEL, get_client as _get_deepseek_client, non_thinking_kwargs
+
     # Load API key
     BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
     load_dotenv(BACKEND_DIR / ".env")
-    
+
     API_KEY = os.getenv("DEEPSEEK_API_KEY")
     if not API_KEY:
         return None
-    
+
     try:
-        client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com/v1")
+        client = _get_deepseek_client(API_KEY)
         
         # Get course name for context
         course_config = get_course(course_id) if course_id else None
@@ -240,13 +240,14 @@ Given the following exam question, classify it into ONE of the available topics.
 ## Your Answer (topic name only):"""
 
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=CHAT_MODEL,
             messages=[
                 {"role": "system", "content": "You are a precise classifier. Output ONLY the topic name, no explanation."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=50,
-            temperature=0.1  # Low temperature for consistent classification
+            temperature=0.1,  # Low temperature for consistent classification
+            **non_thinking_kwargs(),
         )
         
         result = response.choices[0].message.content.strip().lower()

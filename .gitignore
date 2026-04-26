@@ -55,3 +55,15 @@ DerivedData/
 *.xcuserstate
 *.xccheckout
 *.xcscmblueprint
+
+# Claude Code local artifacts
+.claude/launch.json
+.claude/scheduled_tasks.lock
+.claude/agent_state*
+
+# Xcode local project (developer tooling, not part of build)
+MyWebInterpretation.xcodeproj
+MyWebInterpretation.xcodeproj/
+
+# Source notebook files (courseware lives in courses/*/courseware/)
+/软件工程.md

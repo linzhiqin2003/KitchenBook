@@ -7,8 +7,8 @@ Supports two modes:
 import os
 import json
 from pathlib import Path
-from openai import OpenAI
 from dotenv import load_dotenv
+from common.deepseek_models import CHAT_MODEL, REASONER_MODEL, get_client as _get_deepseek_client, thinking_kwargs, non_thinking_kwargs
 from .parser import parse_courseware
 from .courses import get_course
 
@@ -17,14 +17,11 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BACKEND_DIR / ".env")
 
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
-BASE_URL = "https://api.deepseek.com/v1"
 
 
 def get_client():
     """Initialize OpenAI-compatible client for DeepSeek."""
-    if not API_KEY:
-        return None
-    return OpenAI(api_key=API_KEY, base_url=BASE_URL)
+    return _get_deepseek_client(API_KEY)
 
 
 def chat_qa_mode(messages, current_question, course_id=None):
@@ -88,12 +85,13 @@ def chat_qa_mode(messages, current_question, course_id=None):
         ] + messages
         
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=CHAT_MODEL,
             messages=full_messages,
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
+            **non_thinking_kwargs(),
         )
-        
+
         return {"response": response.choices[0].message.content}
         
     except Exception as e:
@@ -168,10 +166,11 @@ Answer in the same language as the user's question.
         ] + messages
         
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=CHAT_MODEL,
             messages=full_messages,
             temperature=0.3,  # Lower temperature for more consistent evaluation
-            max_tokens=1500
+            max_tokens=1500,
+            **non_thinking_kwargs(),
         )
         
         ai_response = response.choices[0].message.content
@@ -250,11 +249,12 @@ Respond in Chinese."""
 
     try:
         response = client.chat.completions.create(
-            model="deepseek-reasoner",  # Use reasoner for careful analysis
+            model=REASONER_MODEL,  # v4-flash with thinking enabled for careful analysis
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=2000
+            max_tokens=2000,
+            **thinking_kwargs(effort="high"),
         )
         
         ai_response = response.choices[0].message.content
@@ -410,11 +410,12 @@ def chat_stream(mode, messages, current_question, course_id=None):
     
     try:
         stream = client.chat.completions.create(
-            model="deepseek-chat",
+            model=CHAT_MODEL,
             messages=full_messages,
             temperature=temperature,
             max_tokens=1500,
-            stream=True
+            stream=True,
+            **non_thinking_kwargs(),
         )
         
         full_response = ""

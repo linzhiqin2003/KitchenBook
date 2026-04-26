@@ -57,12 +57,13 @@ Keep it mystical, insightful, and under 150 words.
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "deepseek-chat",
+                    "model": "deepseek-v4-flash",
                     "messages": [
                         {"role": "system", "content": "You are a mystical Tarot Reader. Provide unified, flowing interpretations with a simple Chinese summary. Follow the exact format requested."},
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": 500
+                    "max_tokens": 500,
+                    "thinking": {"type": "disabled"}
                 }
             )
             response.raise_for_status()

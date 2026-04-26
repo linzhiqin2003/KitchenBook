@@ -388,13 +388,14 @@ def _llm_call(system_msg, user_msg, max_tokens=2048, timeout=30):
         return None
 
     payload = json.dumps({
-        "model": "deepseek-chat",
+        "model": "deepseek-v4-flash",
         "messages": [
             {"role": "system", "content": system_msg},
             {"role": "user", "content": user_msg},
         ],
         "max_tokens": max_tokens,
         "temperature": 0.3,
+        "thinking": {"type": "disabled"},
     }).encode("utf-8")
     req = urllib.request.Request(
         f"{base_url}/chat/completions",

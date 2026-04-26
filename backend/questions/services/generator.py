@@ -6,8 +6,8 @@ import os
 import json
 import random
 from pathlib import Path
-from openai import OpenAI
 from dotenv import load_dotenv
+from common.deepseek_models import CHAT_MODEL, get_client as _get_deepseek_client, non_thinking_kwargs
 from .parser import parse_courseware, parse_simulation_questions, infer_topic, get_all_topics
 from .courses import get_course, get_default_course
 
@@ -16,14 +16,11 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BACKEND_DIR / ".env")
 
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
-BASE_URL = "https://api.deepseek.com/v1"
 
 
 def get_client():
     """Initialize OpenAI-compatible client for DeepSeek."""
-    if not API_KEY:
-        return None
-    return OpenAI(api_key=API_KEY, base_url=BASE_URL)
+    return _get_deepseek_client(API_KEY)
 
 
 def generate_question(seed_question, course_id=None, context_data=None, target_difficulty=None):
@@ -130,13 +127,14 @@ If any option contains code (e.g., function definitions, shell commands, SQL que
 
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=CHAT_MODEL,
             messages=[
                 {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON. Be creative and divergent."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.9  # Higher temperature for more creativity
+            temperature=0.9,  # Higher temperature for more creativity
+            **non_thinking_kwargs(),
         )
         content = response.choices[0].message.content
         result = json.loads(content)
@@ -276,13 +274,14 @@ If any option contains code (e.g., function definitions, shell commands, SQL que
 
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=CHAT_MODEL,
             messages=[
                 {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON. Be creative and divergent."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.9  # Higher temperature for more creativity
+            temperature=0.9,  # Higher temperature for more creativity
+            **non_thinking_kwargs(),
         )
         content = response.choices[0].message.content
         result = json.loads(content)
@@ -298,31 +297,333 @@ If any option contains code (e.g., function definitions, shell commands, SQL que
         return {"error": str(e)}
 
 
+def _pick_topic_and_context(topic, course_id, context_data):
+    """Resolve topic name to a context_data key, return (topic_key, snippet)."""
+    matching_topic = None
+    for key in context_data.keys():
+        if topic.lower() == key.lower():
+            matching_topic = key
+            break
+    if not matching_topic:
+        for key in context_data.keys():
+            if key.lower().endswith('-' + topic.lower()):
+                matching_topic = key
+                break
+    if not matching_topic:
+        candidates = [k for k in context_data.keys() if topic.lower() in k.lower() or k.lower() in topic.lower()]
+        if candidates:
+            matching_topic = min(candidates, key=len)
+    if not matching_topic and context_data:
+        matching_topic = list(context_data.keys())[0]
+
+    full_text = context_data.get(matching_topic, "")
+    if len(full_text) > 50000:
+        start_idx = random.randint(0, len(full_text) - 50000)
+        snippet = full_text[start_idx : start_idx + 50000]
+    else:
+        snippet = full_text
+    return matching_topic, snippet
+
+
+def generate_fill_question(topic, course_id=None, context_data=None, target_difficulty=None, num_blanks=None):
+    """Generate a fill-in-the-blank question for a specific topic.
+
+    Returns dict with keys: question, answer (joined by '|||' if multi-blank),
+    explanation, topic, difficulty, num_blanks.
+    """
+    client = get_client()
+    if not client:
+        return {"error": "DEEPSEEK_API_KEY not configured"}
+
+    if course_id is None:
+        course_id = get_default_course()
+    if context_data is None:
+        context_data = parse_courseware(course_id)
+
+    course_config = get_course(course_id)
+    course_name = course_config.get("name", "Course") if course_config else "Course"
+
+    matching_topic, snippet = _pick_topic_and_context(topic, course_id, context_data)
+    if num_blanks is None:
+        num_blanks = random.choice([1, 1, 2])  # mostly 1, sometimes 2
+
+    prompt = f"""You are an expert university exam question designer for a "{course_name}" course.
+
+## Your Goal
+Create an **original FILL-IN-THE-BLANK question** for the topic "{matching_topic}".
+
+## Format Rules
+1. The question text MUST contain exactly {num_blanks} blank(s) marked as `____` (four underscores).
+2. Each blank should test a precise term, concept, value, or short phrase from the Course Material.
+3. Avoid trivially-guessable blanks; aim for terms a student must recall to answer.
+4. Provide the correct answer(s) — for multiple blanks, separate them with `|||` in the same left-to-right order they appear.
+5. Include a brief explanation that justifies the answer using the Course Material.
+
+## CRITICAL: Self-Contained
+This is a closed-book exam. The question must NOT reference "the lecture" / "the slides" / "the material".
+Embed any required context (definitions, code, scenarios) directly in the question text.
+
+## Difficulty: {f'Generate **{target_difficulty.upper()}** difficulty.' if target_difficulty else 'Choose easy/medium/hard yourself.'}
+- easy: direct term recall
+- medium: term used in a concrete scenario
+- hard: subtle distinctions, combinations of concepts
+
+## Output Format (JSON only)
+{{
+  "topic": "{matching_topic}",
+  "difficulty": "easy" or "medium" or "hard",
+  "question": "Question text with ____ blank(s)",
+  "answer": "answer1{('|||answer2' if num_blanks > 1 else '')}",
+  "explanation": "Why these answers are correct, citing the relevant concept.",
+  "num_blanks": {num_blanks}
+}}
+
+---
+## Course Material ({matching_topic}):
+{snippet}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.85,
+            **non_thinking_kwargs(),
+        )
+        result = json.loads(response.choices[0].message.content)
+        result["course_id"] = course_id
+        result["question_type"] = "fill"
+        result["seed_question"] = f"Topic: {matching_topic} (fill)"
+        if target_difficulty in ("easy", "medium", "hard"):
+            result["difficulty"] = target_difficulty
+        elif result.get("difficulty") not in ("easy", "medium", "hard"):
+            result["difficulty"] = "medium"
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def generate_essay_question(topic, course_id=None, context_data=None, target_difficulty=None):
+    """Generate an essay/discussion question with a model answer + grading rubric.
+
+    Returns dict with: question, answer (model answer), explanation (rubric),
+    topic, difficulty.
+    """
+    client = get_client()
+    if not client:
+        return {"error": "DEEPSEEK_API_KEY not configured"}
+
+    if course_id is None:
+        course_id = get_default_course()
+    if context_data is None:
+        context_data = parse_courseware(course_id)
+
+    course_config = get_course(course_id)
+    course_name = course_config.get("name", "Course") if course_config else "Course"
+
+    matching_topic, snippet = _pick_topic_and_context(topic, course_id, context_data)
+
+    prompt = f"""You are an expert university exam question designer for a "{course_name}" course.
+
+## Your Goal
+Create an **original ESSAY / DISCUSSION question** for the topic "{matching_topic}" suitable for a final exam.
+
+## Question Style
+- Open-ended; expects 200–500 words of student response.
+- Tests understanding, comparison, application, or critique — NOT just recall.
+- Good prompts start with: "Discuss…", "Compare and contrast…", "Explain how…", "Analyze the role of…", "Evaluate the trade-offs of…", "Argue for or against…".
+- Self-contained (no "as in the slides" references).
+
+## Output Requirements
+1. **answer**: A concise but complete model answer (~200–300 words) that earns full marks.
+2. **explanation**: A grading rubric — list of 3–6 key points the student must mention to score well, formatted as a markdown list. Each point includes the weighting in parentheses, e.g. "- (3 marks) Defines the concept correctly."
+3. The total marks across the rubric should sum to 10.
+
+## Difficulty: {f'Generate **{target_difficulty.upper()}** difficulty.' if target_difficulty else 'Default to medium for exam-style essays.'}
+- easy: definitions + a single example
+- medium: comparison or application across 2–3 concepts
+- hard: critique, trade-off analysis, multi-step reasoning
+
+## Output Format (JSON only)
+{{
+  "topic": "{matching_topic}",
+  "difficulty": "easy" or "medium" or "hard",
+  "question": "The essay prompt (1–3 sentences).",
+  "answer": "Model answer in paragraph form, ~200–300 words.",
+  "explanation": "- (X marks) point 1\\n- (Y marks) point 2\\n- (Z marks) point 3 …"
+}}
+
+---
+## Course Material ({matching_topic}):
+{snippet}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": "You are an expert exam question designer. Output ONLY valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.8,
+            **non_thinking_kwargs(),
+        )
+        result = json.loads(response.choices[0].message.content)
+        result["course_id"] = course_id
+        result["question_type"] = "essay"
+        result["seed_question"] = f"Topic: {matching_topic} (essay)"
+        if target_difficulty in ("easy", "medium", "hard"):
+            result["difficulty"] = target_difficulty
+        elif result.get("difficulty") not in ("easy", "medium", "hard"):
+            result["difficulty"] = "medium"
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def grade_essay_answer(question_text, model_answer, rubric, student_answer, course_id=None):
+    """Grade a student's free-text essay answer against the rubric.
+
+    Returns dict with: score (0-10), max_score (10), feedback (markdown),
+    matched_points (list of points the student covered).
+    """
+    client = get_client()
+    if not client:
+        return {"error": "DEEPSEEK_API_KEY not configured"}
+
+    course_config = get_course(course_id) if course_id else None
+    course_name = course_config.get("name", "Course") if course_config else "Course"
+
+    prompt = f"""You are a fair, rigorous grader for a "{course_name}" course.
+
+Grade the student's essay answer against the official rubric.
+
+## Question
+{question_text}
+
+## Model Answer (for reference, full marks)
+{model_answer}
+
+## Rubric (total 10 marks)
+{rubric}
+
+## Student Answer
+{student_answer}
+
+## Instructions
+1. Read the student answer carefully.
+2. For each rubric point, decide whether the student covered it (fully / partially / not at all) and award proportional marks.
+3. Be fair — accept paraphrases, alternative valid arguments, and partial credit.
+4. Do NOT award marks for irrelevant filler.
+5. Provide feedback that explicitly tells the student what they got right and what they missed.
+
+## Output Format (JSON only)
+{{
+  "score": <number 0-10, can be decimal like 7.5>,
+  "max_score": 10,
+  "matched_points": ["short summary of each rubric point the student covered"],
+  "missing_points": ["short summary of each rubric point the student missed or got wrong"],
+  "feedback": "2-4 sentence personalized feedback in Chinese, encouraging tone but honest."
+}}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a rigorous but fair exam grader. Output ONLY valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            **non_thinking_kwargs(),
+        )
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def grade_fill_answer(correct_answer, student_answer):
+    """Locally grade a fill-in-the-blank answer (no LLM call).
+
+    Compares pipe-separated answers case-insensitively with whitespace stripped.
+    Returns dict with: correct (bool), per_blank (list of bool), expected (list).
+    """
+    expected = [a.strip() for a in (correct_answer or '').split('|||')]
+    given = [a.strip() for a in (student_answer or '').split('|||')]
+    # Pad shorter list with empty strings
+    while len(given) < len(expected):
+        given.append('')
+    per_blank = [g.lower() == e.lower() and e != '' for g, e in zip(given, expected)]
+    return {
+        "correct": all(per_blank) and len(per_blank) > 0,
+        "per_blank": per_blank,
+        "expected": expected,
+    }
+
+
 def batch_generate(course_id=None, limit=None):
     """
     Generate questions from all seed questions for a course.
-    
+
     Args:
         course_id: Course identifier (uses default if None)
         limit: Maximum number of questions to generate
-    
+
     Returns:
         list of generated question dicts
     """
     if course_id is None:
         course_id = get_default_course()
-    
+
     seeds = parse_simulation_questions(course_id)
     context = parse_courseware(course_id)
-    
+
     if limit:
         seeds = seeds[:limit]
-    
+
     results = []
     for seed in seeds:
         result = generate_question(seed, course_id, context)
         if "error" not in result:
             result["seed_question"] = seed
             results.append(result)
-    
+
+    return results
+
+
+def batch_generate_typed(course_id, question_type, limit, target_difficulty=None, topic=None):
+    """Batch-generate questions of a given type for a course.
+
+    Distributes generation across all available topics (or focuses on one if `topic` set).
+    """
+    if course_id is None:
+        course_id = get_default_course()
+    context = parse_courseware(course_id)
+    if not context:
+        return []
+
+    if topic:
+        topics = [topic]
+    else:
+        topics = list(context.keys())
+
+    results = []
+    for i in range(limit):
+        chosen_topic = topics[i % len(topics)]
+        if question_type == "mcq":
+            result = generate_question_for_topic(chosen_topic, course_id, context, target_difficulty)
+        elif question_type == "fill":
+            result = generate_fill_question(chosen_topic, course_id, context, target_difficulty)
+        elif question_type == "essay":
+            result = generate_essay_question(chosen_topic, course_id, context, target_difficulty)
+        else:
+            continue
+        if "error" not in result:
+            results.append(result)
     return results

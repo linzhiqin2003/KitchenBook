@@ -15,15 +15,14 @@ import os
 from pathlib import Path
 from django.core.management.base import BaseCommand
 from questions.models import Question
-from openai import OpenAI
 from dotenv import load_dotenv
+from common.deepseek_models import CHAT_MODEL, get_client as _get_deepseek_client, non_thinking_kwargs
 
 # Load .env
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent.parent
 load_dotenv(BACKEND_DIR / ".env")
 
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
-BASE_URL = "https://api.deepseek.com/v1"
 
 
 def is_code_option(text):
@@ -64,13 +63,14 @@ Reformatted code:"""
 
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=CHAT_MODEL,
             messages=[
                 {"role": "system", "content": "You are a code formatter. Output ONLY the reformatted code, nothing else."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,  # Low temperature for consistent formatting
-            max_tokens=1000
+            max_tokens=1000,
+            **non_thinking_kwargs(),
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -109,7 +109,7 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR('DEEPSEEK_API_KEY not configured in .env'))
             return
 
-        client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+        client = _get_deepseek_client(API_KEY)
 
         # Find questions with code options
         queryset = Question.objects.all()

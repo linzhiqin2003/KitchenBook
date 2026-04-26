@@ -810,12 +810,13 @@ class AiAgentView(APIView):
                         yield f"data: {json.dumps({'type': 'thinking', 'content': '让我想想...'}, ensure_ascii=False)}\n\n"
                     
                     response = client.chat.completions.create(
-                        model="deepseek-chat",
+                        model="deepseek-v4-flash",
                         messages=full_messages,
                         tools=self.TOOLS,
                         tool_choice="auto",
                         max_tokens=1000,
-                        temperature=0.3  # 降低温度，让模型更倾向于遵循指令调用工具
+                        temperature=0.3,  # 降低温度，让模型更倾向于遵循指令调用工具
+                        extra_body={"thinking": {"type": "disabled"}},
                     )
                     
                     assistant_message = response.choices[0].message
@@ -828,11 +829,12 @@ class AiAgentView(APIView):
                         
                         # 流式输出最终内容
                         final_stream = client.chat.completions.create(
-                            model="deepseek-chat",
+                            model="deepseek-v4-flash",
                             messages=full_messages,
                             stream=True,
                             max_tokens=500,
-                            temperature=0.5  # 最终回复可以稍微有点创意
+                            temperature=0.5,  # 最终回复可以稍微有点创意
+                            extra_body={"thinking": {"type": "disabled"}},
                         )
                         
                         content_buffer = ""
@@ -906,11 +908,12 @@ class AiAgentView(APIView):
                     yield f"data: {json.dumps({'type': 'thinking_done', 'steps': thinking_steps}, ensure_ascii=False)}\n\n"
                 
                 final_stream = client.chat.completions.create(
-                    model="deepseek-chat",
+                    model="deepseek-v4-flash",
                     messages=full_messages,
                     stream=True,
                     max_tokens=500,
-                    temperature=0.5  # 最终回复可以稍微有点创意
+                    temperature=0.5,  # 最终回复可以稍微有点创意
+                    extra_body={"thinking": {"type": "disabled"}},
                 )
                 
                 # 收集完整内容后再清理输出
@@ -1487,7 +1490,7 @@ class WhisperTranscribeView(APIView):
                         )
                         
                         completion = deepseek_client.chat.completions.create(
-                            model="deepseek-chat",
+                            model="deepseek-v4-flash",
                             messages=[
                                 {
                                     "role": "system",
@@ -1499,9 +1502,10 @@ class WhisperTranscribeView(APIView):
                                 }
                             ],
                             max_tokens=500,
-                            temperature=0.3
+                            temperature=0.3,
+                            extra_body={"thinking": {"type": "disabled"}},
                         )
-                        
+
                         refined_text = completion.choices[0].message.content.strip()
                         if refined_text:
                             text = refined_text
