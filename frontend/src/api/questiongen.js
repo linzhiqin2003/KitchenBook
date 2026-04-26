@@ -76,6 +76,14 @@ export const questionApi = {
         return api.post('/notes/generate/', { course_id: courseId, topic, replace });
     },
 
+    // ─── Raw courseware (the source markdown the AI was fed) ─────────
+    getCoursewareChapter(courseId, topic) {
+        return api.get('/courseware/chapter/', { params: { course_id: courseId, topic } });
+    },
+    getCoursewareTopics(courseId) {
+        return api.get('/courseware/topics/', { params: { course_id: courseId } });
+    },
+
     // Get available topics for a course
     getTopics(courseId = null) {
         const params = courseId ? { course_id: courseId } : {};

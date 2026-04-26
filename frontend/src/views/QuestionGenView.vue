@@ -80,7 +80,7 @@
         </div>
 
         <!-- Question type: questions only -->
-        <div v-if="studyMode !== 'notes'" class="qg-console__group">
+        <div v-if="studyMode === 'answer'" class="qg-console__group">
           <div class="qg-console__label" data-mono>Type</div>
           <div class="qg-segment" role="tablist" aria-label="题型">
             <button
@@ -99,13 +99,13 @@
 
         <!-- Source / Topic — Random+Topic toggle for questions, just the chapter picker for notes -->
         <div class="qg-console__group">
-          <div class="qg-console__label" data-mono>{{ studyMode === 'notes' ? 'Chapter' : 'Source' }}</div>
+          <div class="qg-console__label" data-mono>{{ studyMode === 'answer' ? 'Source' : 'Chapter' }}</div>
           <div class="qg-source">
-            <div v-if="studyMode !== 'notes'" class="qg-segment" role="tablist" aria-label="出题源">
+            <div v-if="studyMode === 'answer'" class="qg-segment" role="tablist" aria-label="出题源">
               <button role="tab" :aria-selected="practiceMode === 'random'" class="qg-segment__btn" @click="setMode('random')">Random</button>
               <button role="tab" :aria-selected="practiceMode === 'topic'" class="qg-segment__btn" @click="setMode('topic')">Topic</button>
             </div>
-            <div v-if="studyMode === 'notes' || practiceMode === 'topic'" class="qg-topicpick">
+            <div v-if="studyMode !== 'answer' || practiceMode === 'topic'" class="qg-topicpick">
               <button class="qg-topicpick__btn" @click="showTopicDropdown = !showTopicDropdown">
                 <span class="qg-topicpick__name">{{ selectedTopic === 'all' ? '选择章节' : formatTopicName(selectedTopic) }}</span>
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -119,7 +119,7 @@
                   @click="selectTopicFromDropdown(topic)"
                 >
                   <span>{{ formatTopicName(topic) }}</span>
-                  <span class="qg-num qg-menu__count">{{ topicCount(topic) }}</span>
+                  <span v-if="studyMode !== 'raw'" class="qg-num qg-menu__count">{{ topicCount(topic) }}</span>
                 </button>
               </div>
             </div>
@@ -127,7 +127,7 @@
         </div>
 
         <!-- Difficulty: questions only -->
-        <div v-if="studyMode !== 'notes'" class="qg-console__group qg-console__group--right">
+        <div v-if="studyMode === 'answer'" class="qg-console__group qg-console__group--right">
           <div class="qg-console__label" data-mono>Difficulty</div>
           <div class="qg-difficulty">
             <button
@@ -155,9 +155,17 @@
 
     <!-- ─── Stage ─── -->
     <main class="qg-stage">
-      <!-- Knowledge-point mode swaps the question card for the notes browser -->
+      <!-- Notes mode: structured knowledge points -->
       <div v-if="studyMode === 'notes'" class="qg-stage__inner">
         <NotesView
+          :course-id="currentCourseId"
+          :topic="selectedTopic === 'all' ? null : selectedTopic"
+        />
+      </div>
+
+      <!-- Raw courseware mode: source markdown for the chapter -->
+      <div v-else-if="studyMode === 'raw'" class="qg-stage__inner">
+        <CoursewareView
           :course-id="currentCourseId"
           :topic="selectedTopic === 'all' ? null : selectedTopic"
         />
@@ -274,6 +282,7 @@ import QuestionSkeleton from '../components/QuestionSkeleton.vue';
 import AIChatWindow from '../components/AIChatWindow.vue';
 import QgThemeToggle from '../components/QgThemeToggle.vue';
 import NotesView from '../components/NotesView.vue';
+import CoursewareView from '../components/CoursewareView.vue';
 import { questionApi } from '../api';
 
 // LocalStorage keys
@@ -294,6 +303,7 @@ const QUESTION_TYPES = [
 const STUDY_MODES = [
   { value: 'answer', label: '答题', icon: '🎯' },
   { value: 'notes', label: '知识点', icon: '📝' },
+  { value: 'raw', label: '原文', icon: '📄' },
 ];
 
 // State

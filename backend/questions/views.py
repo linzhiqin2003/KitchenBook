@@ -569,6 +569,56 @@ class QuestionViewSet(viewsets.ModelViewSet):
             })
 
 
+class CoursewareView(viewsets.ViewSet):
+    """Read-only access to the raw courseware (the source markdown the AI was
+    fed). Lets the user browse the original chapter content directly.
+    """
+    authentication_classes = [CsrfExemptSessionAuthentication]
+
+    @action(detail=False, methods=['get'], url_path='chapter')
+    def chapter(self, request):
+        """GET /api/questiongen/courseware/chapter/?course_id=X&topic=Y
+
+        Returns the markdown body for one chapter so the frontend can render
+        it as a read-only document.
+        """
+        course_id = request.query_params.get('course_id') or get_default_course()
+        topic = request.query_params.get('topic')
+        if not topic:
+            return Response({"error": "topic required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        ctx = parse_courseware(course_id)
+        match = None
+        for k in ctx.keys():
+            if k.lower() == topic.lower():
+                match = k
+                break
+        if not match:
+            return Response({"error": "topic not found in courseware"},
+                            status=status.HTTP_404_NOT_FOUND)
+        body = ctx[match]
+        return Response({
+            "course_id": course_id,
+            "topic": match,
+            "content": body,
+            "char_count": len(body),
+            "line_count": body.count("\n") + 1,
+        })
+
+    @action(detail=False, methods=['get'], url_path='topics')
+    def topics(self, request):
+        """List chapter ids + their character counts for a course."""
+        course_id = request.query_params.get('course_id') or get_default_course()
+        ctx = parse_courseware(course_id)
+        return Response({
+            "course_id": course_id,
+            "topics": [
+                {"topic": t, "char_count": len(content)}
+                for t, content in ctx.items()
+            ],
+        })
+
+
 class KnowledgePointViewSet(viewsets.ReadOnlyModelViewSet):
     """List + lazily-generate study notes (knowledge points) for a course/topic."""
     queryset = KnowledgePoint.objects.all()
