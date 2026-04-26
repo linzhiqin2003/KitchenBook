@@ -1,0 +1,18 @@
+{
+    "name": "Software Engineering",
+    "display_name": "软件工程 SEDP",
+    "description": "Bristol SEDP 期末复习：Agile / 需求 / OOD / 项目管理 / HCI / 测试 / 可持续性 / 隐私",
+    "icon": "🛠️",
+    "topic_keywords": {
+        "l1-introduction": ["software crisis", "sdlc", "waterfall", "lifecycle", "verification", "validation"],
+        "l2-agile": ["agile", "scrum", "kanban", "extreme programming", "xp", "tdd", "sprint", "manifesto"],
+        "l3-requirements": ["requirements", "epic", "user story", "acceptance criteria", "use case", "functional", "non-functional"],
+        "l4-object-oriented-design": ["uml", "class diagram", "encapsulation", "inheritance", "polymorphism", "association", "aggregation", "sequence diagram", "ood"],
+        "l5-project-management": ["project management", "estimation", "story points", "feedback loop", "sprint review", "retrospective"],
+        "l7-hci-evaluation-part-one": ["hci", "heuristic evaluation", "nielsen", "usability", "match real world", "consistency"],
+        "l8-hci-evaluation-part-two": ["sus", "system usability scale", "questionnaire", "nasa tlx", "between-subjects", "within-subjects", "alpha"],
+        "l9-software-quality-and-testing": ["software quality", "testing", "white box", "black box", "equivalence partitioning", "boundary value", "category partition"],
+        "l10-software-engineering-for-sustainability": ["sustainability", "susaf", "sustainability dimensions", "cloud sustainability"],
+        "l11-privacy-by-design": ["privacy by design", "gdpr", "data protection", "consent", "personas", "minimise"]
+    }
+}
