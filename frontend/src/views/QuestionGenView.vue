@@ -1,286 +1,254 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 safe-area-bottom">
-    <!-- Header: Premium Unified Command Bar -->
-    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 transition-all">
-      <div class="max-w-5xl mx-auto px-2 sm:px-4 h-16 flex items-center justify-between gap-2 sm:gap-4">
-        
-        <!-- Left: Back Button + Course Identity -->
-        <div class="flex items-center gap-2 shrink-0">
-          <!-- Back to Home -->
-          <router-link 
-            to="/" 
-            class="w-9 h-9 rounded-lg bg-gray-100 hover:bg-indigo-100 flex items-center justify-center transition-all group"
-            title="返回首页"
-          >
-            <svg class="w-4 h-4 text-gray-500 group-hover:text-indigo-600 group-hover:-translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-            </svg>
+  <div data-qg-surface class="qg-shell">
+    <!-- ─── Top bar: minimal hairline. Course + theme toggle live here. ─── -->
+    <header class="qg-topbar">
+      <div class="qg-topbar__inner">
+        <div class="qg-topbar__left">
+          <router-link to="/" class="qg-back" title="返回">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </router-link>
-          
-          <!-- Course Identity -->
-          <div class="relative">
-          <button
-            @click="showCourseDropdown = !showCourseDropdown"
-            class="group flex items-center gap-3 hover:bg-gray-50 px-2 py-1.5 -ml-2 rounded-xl transition-all"
-          >
-            <div class="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-lg shadow-sm group-hover:shadow-md transition-all">
-              <span class="text-xl">{{ currentCourseIcon }}</span>
-            </div>
-            <div class="text-left hidden sm:block">
-              <div class="text-xs font-medium text-gray-500">Current Course</div>
-              <div class="text-sm font-bold text-gray-900 flex items-center gap-1">
-                {{ currentCourseName }}
-                <svg class="w-3 h-3 text-gray-400 group-hover:text-indigo-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-              </div>
-            </div>
-          </button>
-
-          <!-- Course Dropdown -->
-          <div v-if="showCourseDropdown" class="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-xl ring-1 ring-black/5 p-2 z-50 w-72 origin-top-left flex flex-col gap-1">
-            <button
-              v-for="(course, id) in availableCourses"
-              :key="id"
-              @click="selectCourse(id)"
-              :class="currentCourseId === id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'"
-              class="w-full px-3 py-3 text-left rounded-xl flex items-center gap-3 transition-all"
-            >
-              <span class="text-xl bg-white p-2 rounded-lg shadow-sm border border-gray-100">{{ course.icon }}</span>
-              <div>
-                <div class="font-bold text-sm">{{ course.name }}</div>
-                <div class="text-xs opacity-70 mt-0.5 font-medium">{{ course.description }}</div>
-              </div>
-              <div v-if="currentCourseId === id" class="ml-auto text-indigo-600">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              </div>
-            </button>
-          </div>
-        </div>
-        </div>
-
-        <!-- Center: Unified Control Pill -->
-        <div class="flex-1 flex justify-center max-w-2xl">
-          <div class="flex items-center bg-gray-100/80 p-1 sm:p-1.5 rounded-2xl border border-gray-200/50 shadow-inner gap-1 sm:gap-2">
-            
-            <!-- Mode Segment -->
-            <div class="flex bg-white rounded-xl shadow-sm border border-gray-100 divide-x divide-gray-100 overflow-hidden">
-              <button
-                @click="setMode('random')"
-                :class="practiceMode === 'random' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-gray-500 hover:bg-gray-50 font-medium'"
-                class="px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition-all flex items-center gap-2"
-              >
-                <span>🎲</span>
-                <span class="hidden sm:inline">随机</span>
-              </button>
-              <button
-                @click="setMode('topic')"
-                :class="practiceMode === 'topic' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-gray-500 hover:bg-gray-50 font-medium'"
-                class="px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition-all flex items-center gap-2"
-              >
-                <span>📚</span>
-                <span class="hidden sm:inline">主题</span>
-              </button>
-            </div>
-
-            <!-- VS Separator (Visual Only) -->
-            <div class="w-px h-5 bg-gray-300 hidden sm:block"></div>
-
-            <!-- Topic Selector (Conditional) -->
-            <div v-if="practiceMode === 'topic'" class="relative">
-              <button
-                @click="showTopicDropdown = !showTopicDropdown"
-                class="px-2 sm:px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs sm:text-sm font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center gap-2 min-w-[100px] sm:min-w-[120px] justify-between shadow-sm"
-              >
-                <span class="truncate max-w-[100px] sm:max-w-[150px]">{{ selectedTopic === 'all' ? '选择主题' : formatTopicName(selectedTopic) }}</span>
-                <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-              </button>
-               
-               <!-- Topic Menu -->
-               <div v-if="showTopicDropdown" class="absolute top-full left-0 mt-2 w-64 max-h-[300px] overflow-y-auto bg-white rounded-xl shadow-xl ring-1 ring-black/5 p-1 z-50">
-                 <button
-                   v-for="topic in availableTopics"
-                   :key="topic"
-                   @click="selectTopicFromDropdown(topic)"
-                   :class="selectedTopic === topic ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'"
-                   class="w-full px-3 py-2 text-left text-sm rounded-lg flex justify-between items-center transition-colors mb-0.5"
-                 >
-                   <span class="truncate">{{ formatTopicName(topic) }}</span>
-                   <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{{ topicStats[topic] || 0 }}</span>
-                 </button>
-               </div>
-            </div>
-            
-            <!-- Default Text when Random -->
-            <div v-else class="hidden sm:flex items-center px-3 text-xs text-gray-400 font-medium select-none">
-              全库随机 · {{ totalCachedQuestions }}题
-            </div>
-
-            <!-- VS Separator -->
-            <div class="w-px h-5 bg-gray-300 hidden sm:block"></div>
-
-            <!-- Difficulty Traffic Lights -->
-            <div class="flex items-center gap-1 pl-1">
-              <button
-                 v-for="diff in difficultyOptions"
-                 :key="diff.value"
-                 @click="setDifficulty(diff.value)"
-                 class="group relative w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                 :title="diff.label"
-              >
-                <div 
-                  class="w-3 h-3 rounded-full transition-all duration-300"
-                  :class="[
-                     selectedDifficulty === diff.value ? 'scale-125 ring-2 ring-offset-1 ring-gray-200 opacity-100' : 'opacity-20 group-hover:opacity-100',
-                     diff.value === 'easy' ? 'bg-green-500' : diff.value === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
-                  ]"
-                ></div>
-              </button>
-            </div>
-
+          <div class="qg-wordmark">
+            <span class="qg-wordmark__brand">LZQ</span>
+            <span class="qg-wordmark__sep">/</span>
+            <span class="qg-wordmark__page">Practice</span>
           </div>
         </div>
 
-        <!-- Right: Meta Actions -->
-        <div class="flex items-center gap-3 shrink-0">
-          <div class="hidden sm:flex flex-col items-end mr-2">
-            <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Session</span>
-            <div class="text-sm font-bold text-gray-700 font-mono">{{ correctCount }}<span class="text-gray-300">/</span>{{ historyQuestions.length }}</div>
+        <div class="qg-topbar__right">
+          <div class="qg-session" v-if="historyQuestions.length > 0">
+            <span class="qg-session__label">Session</span>
+            <span class="qg-num qg-session__count">{{ correctCount }}<span class="qg-session__sep">/</span>{{ historyQuestions.length }}</span>
           </div>
-          
-          <button 
-             @click="showHistory = !showHistory" 
-             class="w-10 h-10 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-md transition-all relative overflow-hidden group"
-             title="历史记录"
-          >
-             <span class="relative z-10">📋</span>
-             <div class="absolute inset-0 bg-indigo-50 transform scale-0 group-hover:scale-100 transition-transform origin-center rounded-full"></div>
+          <button class="qg-iconbtn" @click="showHistory = !showHistory" title="答题历史">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/><path d="M3 8l9 7 9-7"/></svg>
           </button>
-          
-          <button 
-             v-if="historyQuestions.length > 0" 
-             @click="clearHistory" 
-             class="w-10 h-10 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-100 hover:shadow-md transition-all group relative overflow-hidden"
-             title="清空"
-          >
-             <span class="relative z-10">🗑️</span>
-             <div class="absolute inset-0 bg-red-50 transform scale-0 group-hover:scale-100 transition-transform origin-center rounded-full"></div>
-          </button>
+          <QgThemeToggle />
         </div>
-
       </div>
     </header>
 
-    <!-- Click outside overlay - Must be BELOW header z-index but above main content -->
-    <div 
-      v-if="showCourseDropdown || showTopicDropdown" 
-      class="fixed inset-0"
-      style="z-index: 35;"
+    <!-- ─── Editorial title block: course + topic foregrounded as content. ─── -->
+    <section class="qg-hero">
+      <div class="qg-hero__inner">
+        <div class="qg-eyebrow" data-mono>{{ currentCourseDisplayName || currentCourseName }}</div>
+
+        <div class="qg-courseswitch">
+          <button class="qg-courseswitch__trigger" @click="showCourseDropdown = !showCourseDropdown" :aria-expanded="showCourseDropdown">
+            <h1 class="qg-display qg-hero__title">{{ currentCourseName }}</h1>
+            <svg class="qg-courseswitch__chev" :class="{ 'qg-courseswitch__chev--open': showCourseDropdown }" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div v-if="showCourseDropdown" class="qg-menu qg-menu--course">
+            <button
+              v-for="(course, id) in availableCourses"
+              :key="id"
+              class="qg-menu__row"
+              :data-active="currentCourseId === id"
+              @click="selectCourse(id)"
+            >
+              <span class="qg-menu__title">{{ course.name }}</span>
+              <span class="qg-menu__sub">{{ course.description }}</span>
+            </button>
+          </div>
+        </div>
+
+        <p class="qg-hero__meta">
+          <span>{{ totalCachedQuestions }} questions in library</span>
+          <span class="qg-hero__dot">·</span>
+          <span>{{ availableTopics.length }} topics</span>
+        </p>
+      </div>
+    </section>
+
+    <!-- ─── Practice console: type / mode / source / difficulty in one row ─── -->
+    <section class="qg-console">
+      <div class="qg-console__inner">
+        <!-- Question type -->
+        <div class="qg-console__group">
+          <div class="qg-console__label" data-mono>Type</div>
+          <div class="qg-segment" role="tablist" aria-label="题型">
+            <button
+              v-for="qt in QUESTION_TYPES"
+              :key="qt.value"
+              role="tab"
+              :aria-selected="selectedQuestionType === qt.value"
+              class="qg-segment__btn"
+              @click="setQuestionType(qt.value)"
+            >
+              <span data-mono class="qg-segment__icon">{{ qt.icon }}</span>
+              <span class="qg-segment__txt">{{ qt.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Study mode -->
+        <div class="qg-console__group">
+          <div class="qg-console__label" data-mono>Mode</div>
+          <div class="qg-segment" role="tablist" aria-label="模式">
+            <button
+              v-for="sm in STUDY_MODES"
+              :key="sm.value"
+              role="tab"
+              :aria-selected="studyMode === sm.value"
+              class="qg-segment__btn"
+              @click="setStudyMode(sm.value)"
+            >
+              <span class="qg-segment__txt">{{ sm.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Source: random vs topic -->
+        <div class="qg-console__group">
+          <div class="qg-console__label" data-mono>Source</div>
+          <div class="qg-source">
+            <div class="qg-segment" role="tablist" aria-label="出题源">
+              <button role="tab" :aria-selected="practiceMode === 'random'" class="qg-segment__btn" @click="setMode('random')">Random</button>
+              <button role="tab" :aria-selected="practiceMode === 'topic'" class="qg-segment__btn" @click="setMode('topic')">Topic</button>
+            </div>
+            <div v-if="practiceMode === 'topic'" class="qg-topicpick">
+              <button class="qg-topicpick__btn" @click="showTopicDropdown = !showTopicDropdown">
+                <span class="qg-topicpick__name">{{ selectedTopic === 'all' ? '选择主题' : formatTopicName(selectedTopic) }}</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div v-if="showTopicDropdown" class="qg-menu qg-menu--topic">
+                <button
+                  v-for="topic in availableTopics"
+                  :key="topic"
+                  class="qg-menu__row qg-menu__row--compact"
+                  :data-active="selectedTopic === topic"
+                  @click="selectTopicFromDropdown(topic)"
+                >
+                  <span>{{ formatTopicName(topic) }}</span>
+                  <span class="qg-num qg-menu__count">{{ topicStats[topic] || 0 }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Difficulty -->
+        <div class="qg-console__group qg-console__group--right">
+          <div class="qg-console__label" data-mono>Difficulty</div>
+          <div class="qg-difficulty">
+            <button
+              v-for="diff in difficultyOptions"
+              :key="diff.value"
+              class="qg-difficulty__btn"
+              :data-active="selectedDifficulty === diff.value"
+              :data-level="diff.value"
+              @click="setDifficulty(diff.value)"
+            >
+              <span class="qg-difficulty__dot"></span>
+              <span class="qg-difficulty__label">{{ diff.value }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Outside-click overlay -->
+    <div
+      v-if="showCourseDropdown || showTopicDropdown"
+      class="qg-veil"
       @click="showCourseDropdown = false; showTopicDropdown = false"
     ></div>
 
-    <!-- Main Content -->
-    <main class="max-w-2xl mx-auto px-4 pt-6 pb-12">
-      <!-- Loading State - Skeleton -->
-      <div v-if="loading">
+    <!-- ─── Question stage ─── -->
+    <main class="qg-stage">
+      <div v-if="loading" class="qg-stage__inner">
         <QuestionSkeleton />
-        <p class="mt-4 text-center text-sm text-gray-400">{{ loadingMessage }}</p>
+        <p class="qg-stage__loading">{{ loadingMessage }}</p>
       </div>
 
-      <!-- Error State -->
-      <div v-else-if="error" class="bg-white rounded-2xl shadow-lg p-8 text-center">
-        <div class="text-6xl mb-4">⚠️</div>
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">出错了</h2>
-        <p class="text-gray-500 mb-6">{{ error }}</p>
-        <button 
-          @click="retryGenerate" 
-          class="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
-        >
-          重试
-        </button>
+      <div v-else-if="error" class="qg-stage__inner">
+        <div class="qg-card qg-empty">
+          <div class="qg-empty__heading">出错了</div>
+          <p class="qg-empty__body">{{ error }}</p>
+          <button class="qg-btn qg-btn--primary" @click="retryGenerate">重试</button>
+        </div>
       </div>
 
-      <!-- Current Question Card -->
-      <div v-else-if="currentQuestion">
+      <div v-else-if="currentQuestion" class="qg-stage__inner">
         <QuestionCard
           ref="cardRef"
-          :key="currentQuestion.id"
+          :key="`${currentQuestion.id}-${studyMode}`"
           :question="currentQuestion"
           :question-number="historyQuestions.length + 1"
+          :mode="studyMode"
           @next="moveToNextQuestion"
           @answered="onAnswered"
         />
-        
-        <!-- Prefetch Indicator -->
-        <div v-if="prefetching" class="mt-4 text-center text-sm text-gray-400">
-          <span class="inline-flex items-center gap-2">
-            <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-            正在预生成下一题...
-          </span>
+        <div v-if="prefetching" class="qg-prefetch">
+          <span class="qg-prefetch__dot"></span>
+          <span data-mono>Pre-generating next…</span>
         </div>
       </div>
 
-      <!-- Empty State (Shouldn't normally show) -->
-      <div v-else class="bg-white rounded-2xl shadow-lg p-8 text-center">
-        <div class="text-6xl mb-4">📚</div>
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">准备开始</h2>
-        <p class="text-gray-500 mb-6">正在加载第一道题目...</p>
+      <div v-else class="qg-stage__inner">
+        <div class="qg-card qg-empty">
+          <div class="qg-empty__heading">准备开始</div>
+          <p class="qg-empty__body">正在加载第一道题目…</p>
+        </div>
       </div>
     </main>
 
-    <!-- History Sidebar -->
-    <transition name="slide">
-      <div v-if="showHistory" class="fixed inset-0 z-50 flex justify-end">
-        <div class="absolute inset-0 bg-black/30" @click="showHistory = false"></div>
-        <div class="relative w-full max-w-md bg-white shadow-2xl overflow-hidden flex flex-col">
-          <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50">
-            <h2 class="text-lg font-bold text-gray-800">📋 答题历史</h2>
-            <button @click="showHistory = false" class="p-2 hover:bg-white/50 rounded-full cursor-pointer transition-colors">
-              ✕
+    <!-- ─── History drawer ─── -->
+    <transition name="qg-drawer">
+      <div v-if="showHistory" class="qg-drawer">
+        <div class="qg-drawer__veil" @click="showHistory = false"></div>
+        <aside class="qg-drawer__panel">
+          <header class="qg-drawer__head">
+            <div>
+              <div class="qg-eyebrow" data-mono>History</div>
+              <h2 class="qg-drawer__title">答题历史</h2>
+            </div>
+            <button class="qg-iconbtn" @click="showHistory = false" title="关闭">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
             </button>
-          </div>
-          <div class="flex-1 overflow-y-auto p-4 space-y-3">
-            <div 
-              v-for="(item, index) in [...historyQuestions].reverse()" 
+          </header>
+          <div class="qg-drawer__body">
+            <div
+              v-for="(item, index) in [...historyQuestions].reverse()"
               :key="item.id"
-              class="p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md"
-              :class="item.correct ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50'"
+              class="qg-history__item"
+              :data-correct="item.correct"
               @click="viewHistoryItem(item)"
             >
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-medium px-2 py-0.5 rounded-full"
-                      :class="item.correct ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
-                  {{ item.correct ? '✓ 正确' : '✗ 错误' }}
-                </span>
-                <span class="text-xs text-gray-400">#{{ historyQuestions.length - index }}</span>
+              <div class="qg-history__head">
+                <span class="qg-pill" :data-tint="item.correct ? 'success' : 'danger'">{{ item.correct ? 'Correct' : 'Incorrect' }}</span>
+                <span class="qg-num qg-history__index">#{{ historyQuestions.length - index }}</span>
               </div>
-              <p class="text-sm text-gray-800 line-clamp-2">{{ item.question.question_text }}</p>
+              <p class="qg-history__preview">{{ item.question.question_text }}</p>
             </div>
-            <div v-if="historyQuestions.length === 0" class="text-center text-gray-400 py-8">
+            <div v-if="historyQuestions.length === 0" class="qg-history__empty">
               暂无答题记录
             </div>
           </div>
-        </div>
+          <footer v-if="historyQuestions.length > 0" class="qg-drawer__foot">
+            <button class="qg-btn qg-btn--quiet" @click="clearHistory">清空记录</button>
+          </footer>
+        </aside>
       </div>
     </transition>
 
-    <!-- History Detail Modal -->
-    <transition name="fade">
-      <div v-if="historyDetailItem" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/50" @click="historyDetailItem = null"></div>
-        <div class="relative max-w-2xl w-full max-h-[80vh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-6">
-          <button @click="historyDetailItem = null" class="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full cursor-pointer">
-            ✕
+    <!-- History detail modal -->
+    <transition name="qg-fade">
+      <div v-if="historyDetailItem" class="qg-modal">
+        <div class="qg-modal__veil" @click="historyDetailItem = null"></div>
+        <div class="qg-modal__panel">
+          <button class="qg-iconbtn qg-modal__close" @click="historyDetailItem = null" title="关闭">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
           <QuestionCard
             :question="historyDetailItem.question"
             :question-number="historyDetailItem.index + 1"
             :loading="false"
-            class="pointer-events-none shadow-none"
+            mode="memorize"
           />
         </div>
       </div>
     </transition>
 
-    <!-- AI Chat Window -->
     <AIChatWindow
       :current-question="currentQuestion"
       :course-id="currentCourseId"
@@ -296,6 +264,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import QuestionCard from '../components/QuestionCard.vue';
 import QuestionSkeleton from '../components/QuestionSkeleton.vue';
 import AIChatWindow from '../components/AIChatWindow.vue';
+import QgThemeToggle from '../components/QgThemeToggle.vue';
 import { questionApi } from '../api';
 
 // LocalStorage keys
@@ -304,6 +273,19 @@ const SEEN_IDS_STORAGE_KEY = 'questiongen_seen_ids';
 const SELECTED_TOPIC_KEY = 'questiongen_selected_topic';
 const PRACTICE_MODE_KEY = 'questiongen_practice_mode';
 const CURRENT_COURSE_KEY = 'questiongen_current_course';
+const QUESTION_TYPE_KEY = 'questiongen_question_type';
+const STUDY_MODE_KEY = 'questiongen_study_mode';
+
+// Question type + study mode (背题/答题)
+const QUESTION_TYPES = [
+  { value: 'mcq', label: '选择题', icon: 'A·B' },
+  { value: 'fill', label: '填空题', icon: '___' },
+  { value: 'essay', label: '论述题', icon: '✍︎' },
+];
+const STUDY_MODES = [
+  { value: 'answer', label: '答题', icon: '🎯' },
+  { value: 'memorize', label: '背题', icon: '📖' },
+];
 
 // State
 const currentQuestion = ref(null);
@@ -338,6 +320,10 @@ const showTopicDropdown = ref(false);
 // Stats
 const totalCachedQuestions = ref(0);
 const topicStats = ref({});
+
+// Question type + study mode
+const selectedQuestionType = ref('mcq');
+const studyMode = ref('answer');
 
 // Difficulty filter
 const selectedDifficulty = ref(null);  // null = all, 'easy', 'medium', 'hard'
@@ -594,9 +580,42 @@ function loadHistoryFromStorage() {
     if (topicStored) {
       selectedTopic.value = topicStored;
     }
+    const qtypeStored = localStorage.getItem(QUESTION_TYPE_KEY);
+    if (qtypeStored && QUESTION_TYPES.some(t => t.value === qtypeStored)) {
+      selectedQuestionType.value = qtypeStored;
+    }
+    const studyStored = localStorage.getItem(STUDY_MODE_KEY);
+    if (studyStored && STUDY_MODES.some(m => m.value === studyStored)) {
+      studyMode.value = studyStored;
+    }
   } catch (e) {
     console.error('Failed to load history from localStorage:', e);
   }
+}
+
+// Set question type and reload
+async function setQuestionType(qtype) {
+  if (qtype === selectedQuestionType.value) return;
+  selectedQuestionType.value = qtype;
+  localStorage.setItem(QUESTION_TYPE_KEY, qtype);
+  prefetchedQuestion.value = null;
+  loading.value = true;
+  loadingMessage.value = `正在加载${QUESTION_TYPES.find(t => t.value === qtype)?.label || ''}...`;
+  error.value = null;
+  currentQuestion.value = await getSmartNextQuestion();
+  loading.value = false;
+  if (currentQuestion.value) prefetchNextQuestion();
+}
+
+// Set study mode (背题/答题) — no API call needed; just toggles UI
+function setStudyMode(mode) {
+  if (mode === studyMode.value) return;
+  studyMode.value = mode;
+  localStorage.setItem(STUDY_MODE_KEY, mode);
+  // Reset answered state on mode swap so the card re-renders cleanly
+  questionAnswered.value = false;
+  userAnswer.value = null;
+  cardRef.value?.reset?.();
 }
 
 // Save history to localStorage
@@ -649,11 +668,12 @@ async function getSmartNextQuestion() {
     const difficultyParam = selectedDifficulty.value;
     
     const response = await questionApi.smartNext(
-      combinedSeenIds, 
-      true, 
-      topicParam, 
+      combinedSeenIds,
+      true,
+      topicParam,
       difficultyParam,
-      currentCourseId.value
+      currentCourseId.value,
+      selectedQuestionType.value
     );
     const question = response.data;
     
@@ -716,7 +736,7 @@ async function prefetchNextQuestion() {
     
     const topicParam = selectedTopic.value === 'all' ? null : selectedTopic.value;
     // Fix: pass null for difficulty (4th arg) so courseId (5th arg) is correct
-    const response = await questionApi.smartNext(combinedSeenIds, true, topicParam, null, currentCourseId.value);
+    const response = await questionApi.smartNext(combinedSeenIds, true, topicParam, null, currentCourseId.value, selectedQuestionType.value);
     const question = response.data;
     
     // Add to session seen (not persistent yet)
@@ -847,39 +867,601 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s ease;
-}
-.slide-enter-from,
-.slide-leave-to {
-  transform: translateX(100%);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+/* ─── Shell ─────────────────────────────────────────────────────────── */
+.qg-shell {
+  min-height: 100dvh;
+  background: var(--qg-surface-base);
+  color: var(--qg-text-primary);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.dropdown-enter-active,
-.dropdown-leave-active {
-  transition: all 0.2s ease;
+/* ─── Topbar ────────────────────────────────────────────────────────── */
+.qg-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in oklch, var(--qg-surface-base) 88%, transparent);
+  backdrop-filter: saturate(160%) blur(12px);
+  -webkit-backdrop-filter: saturate(160%) blur(12px);
+  border-bottom: 1px solid var(--qg-border-default);
 }
-.dropdown-enter-from,
-.dropdown-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
+.qg-topbar__inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 12px clamp(16px, 4vw, 32px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.qg-topbar__left,
+.qg-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.line-clamp-2 {
+.qg-back {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--qg-text-secondary);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  background: transparent;
+  transition: color var(--qg-dur-fast) var(--qg-ease),
+              border-color var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-back:hover { color: var(--qg-text-primary); border-color: var(--qg-border-strong); }
+
+.qg-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--qg-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--qg-text-secondary);
+}
+.qg-wordmark__brand { color: var(--qg-text-primary); font-weight: 500; }
+.qg-wordmark__sep { color: var(--qg-text-muted); }
+.qg-wordmark__page { text-transform: uppercase; }
+
+.qg-session {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 4px;
+}
+.qg-session__label {
+  font-family: var(--qg-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--qg-text-muted);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.qg-session__count {
+  font-size: 13px;
+  color: var(--qg-text-primary);
+  font-weight: 500;
+}
+.qg-session__sep { color: var(--qg-text-muted); margin: 0 1px; }
+
+.qg-iconbtn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--qg-text-secondary);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  cursor: pointer;
+  transition: color var(--qg-dur-fast) var(--qg-ease),
+              border-color var(--qg-dur-fast) var(--qg-ease),
+              background var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-iconbtn:hover {
+  color: var(--qg-text-primary);
+  border-color: var(--qg-border-strong);
+  background: var(--qg-surface-sunken);
+}
+
+/* ─── Hero ──────────────────────────────────────────────────────────── */
+.qg-hero {
+  border-bottom: 1px solid var(--qg-border-default);
+}
+.qg-hero__inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 56px) clamp(16px, 4vw, 32px) clamp(20px, 4vw, 36px);
+}
+.qg-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--qg-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.qg-courseswitch { position: relative; }
+.qg-courseswitch__trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--qg-text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.qg-hero__title {
+  font-size: var(--qg-text-display);
+  font-weight: 500;
+  font-family: var(--qg-font-display);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: var(--qg-text-primary);
+  /* opsz axis (Bricolage Grotesque variable) — display optical size */
+  font-variation-settings: 'opsz' 72;
+}
+.qg-courseswitch__chev {
+  color: var(--qg-text-tertiary);
+  transition: transform var(--qg-dur-base) var(--qg-ease),
+              color var(--qg-dur-fast) var(--qg-ease);
+  transform: translateY(-3px);
+}
+.qg-courseswitch__chev--open {
+  transform: translateY(-3px) rotate(180deg);
+  color: var(--qg-text-primary);
+}
+.qg-courseswitch__trigger:hover .qg-courseswitch__chev { color: var(--qg-text-primary); }
+
+.qg-hero__meta {
+  margin: 14px 0 0;
+  font-size: var(--qg-text-sm);
+  color: var(--qg-text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.qg-hero__dot { color: var(--qg-text-muted); }
+
+.qg-menu {
+  position: absolute;
+  z-index: 50;
+  background: var(--qg-surface-raised);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-lg);
+  box-shadow: var(--qg-shadow-2);
+  padding: 6px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 12px;
+  animation: qg-menu-in var(--qg-dur-base) var(--qg-ease);
+}
+.qg-menu--course { left: 0; top: 100%; }
+.qg-menu--topic { right: 0; top: 100%; max-height: 320px; overflow-y: auto; }
+
+@keyframes qg-menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.qg-menu__row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--qg-radius-md);
+  cursor: pointer;
+  color: var(--qg-text-secondary);
+  transition: background var(--qg-dur-fast) var(--qg-ease),
+              color var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-menu__row:hover {
+  background: var(--qg-surface-sunken);
+  color: var(--qg-text-primary);
+}
+.qg-menu__row[data-active="true"] {
+  background: var(--qg-accent-soft);
+  color: var(--qg-accent);
+}
+.qg-menu__title {
+  font-size: var(--qg-text-base);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.qg-menu__sub {
+  font-size: var(--qg-text-xs);
+  color: var(--qg-text-tertiary);
+  margin-top: 2px;
+  font-weight: 400;
+}
+.qg-menu__row--compact {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  font-size: var(--qg-text-sm);
+}
+.qg-menu__count {
+  font-size: 11px;
+  color: var(--qg-text-tertiary);
+  background: var(--qg-surface-sunken);
+  padding: 2px 8px;
+  border-radius: var(--qg-radius-pill);
+}
+.qg-menu__row[data-active="true"] .qg-menu__count {
+  background: color-mix(in oklch, var(--qg-accent) 18%, transparent);
+  color: var(--qg-accent);
+}
+
+/* ─── Console ───────────────────────────────────────────────────────── */
+.qg-console {
+  border-bottom: 1px solid var(--qg-border-default);
+  background: var(--qg-surface-sunken);
+}
+.qg-console__inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 18px clamp(16px, 4vw, 32px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 24px 28px;
+}
+.qg-console__group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.qg-console__group--right { margin-left: auto; }
+.qg-console__label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--qg-text-tertiary);
+  line-height: 1;
+}
+
+/* Segmented controls already styled by qg-design-tokens; refine icon font */
+.qg-segment__icon {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--qg-text-tertiary);
+}
+.qg-segment__btn[aria-selected="true"] .qg-segment__icon {
+  color: var(--qg-text-primary);
+}
+
+.qg-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.qg-topicpick { position: relative; }
+.qg-topicpick__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 7px 14px;
+  background: var(--qg-surface-raised);
+  color: var(--qg-text-primary);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  font-size: var(--qg-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: -0.005em;
+  transition: border-color var(--qg-dur-fast) var(--qg-ease),
+              color var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-topicpick__btn:hover { border-color: var(--qg-border-strong); }
+.qg-topicpick__name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Difficulty selector — replaces the traffic-light dots */
+.qg-difficulty {
+  display: inline-flex;
+  gap: 4px;
+}
+.qg-difficulty__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--qg-radius-md);
+  cursor: pointer;
+  color: var(--qg-text-tertiary);
+  transition: color var(--qg-dur-fast) var(--qg-ease),
+              background var(--qg-dur-fast) var(--qg-ease),
+              border-color var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-difficulty__btn:hover { color: var(--qg-text-primary); }
+.qg-difficulty__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  transition: opacity var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-difficulty__label {
+  font-family: var(--qg-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.qg-difficulty__btn[data-level="easy"] { color: var(--qg-diff-easy); }
+.qg-difficulty__btn[data-level="medium"] { color: var(--qg-diff-medium); }
+.qg-difficulty__btn[data-level="hard"] { color: var(--qg-diff-hard); }
+.qg-difficulty__btn[data-active="true"] {
+  background: color-mix(in oklch, currentColor 12%, transparent);
+  border-color: color-mix(in oklch, currentColor 30%, transparent);
+}
+.qg-difficulty__btn[data-active="true"] .qg-difficulty__dot { opacity: 1; }
+
+/* ─── Stage ─────────────────────────────────────────────────────────── */
+.qg-stage {
+  padding: clamp(28px, 5vw, 56px) clamp(16px, 4vw, 32px) 96px;
+}
+.qg-stage__inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.qg-stage__loading {
+  margin-top: 20px;
+  text-align: center;
+  font-size: var(--qg-text-sm);
+  color: var(--qg-text-tertiary);
+  font-family: var(--qg-font-mono);
+  letter-spacing: 0.04em;
+}
+
+.qg-empty {
+  padding: clamp(32px, 5vw, 56px);
+  text-align: center;
+}
+.qg-empty__heading {
+  font-family: var(--qg-font-display);
+  font-size: var(--qg-text-xl);
+  letter-spacing: -0.015em;
+  color: var(--qg-text-primary);
+  margin-bottom: 8px;
+}
+.qg-empty__body {
+  color: var(--qg-text-secondary);
+  font-size: var(--qg-text-base);
+  margin-bottom: 24px;
+}
+
+.qg-prefetch {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--qg-text-tertiary);
+}
+.qg-prefetch__dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--qg-success);
+  animation: qg-pulse 1.6s var(--qg-ease) infinite;
+}
+@keyframes qg-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* ─── Veil for outside-click ────────────────────────────────────────── */
+.qg-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+}
+
+/* ─── Drawer (history) ─────────────────────────────────────────────── */
+.qg-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+.qg-drawer__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--qg-surface-overlay);
+  backdrop-filter: blur(2px);
+}
+.qg-drawer__panel {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--qg-surface-raised);
+  border-left: 1px solid var(--qg-border-default);
+  display: flex;
+  flex-direction: column;
+}
+.qg-drawer__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 24px 24px 18px;
+  border-bottom: 1px solid var(--qg-border-default);
+}
+.qg-drawer__title {
+  font-family: var(--qg-font-display);
+  font-size: var(--qg-text-xl);
+  font-weight: 500;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: var(--qg-text-primary);
+}
+.qg-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qg-drawer__foot {
+  border-top: 1px solid var(--qg-border-default);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.qg-history__item {
+  padding: 12px 14px;
+  background: var(--qg-surface-sunken);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  cursor: pointer;
+  transition: background var(--qg-dur-fast) var(--qg-ease),
+              border-color var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-history__item:hover {
+  background: var(--qg-surface-raised);
+  border-color: var(--qg-border-strong);
+}
+.qg-history__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.qg-history__index {
+  font-size: 11px;
+  color: var(--qg-text-tertiary);
+}
+.qg-history__preview {
+  font-size: var(--qg-text-sm);
+  color: var(--qg-text-secondary);
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  margin: 0;
+}
+.qg-history__empty {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--qg-text-tertiary);
+  font-size: var(--qg-text-sm);
+}
+
+/* Drawer transition */
+.qg-drawer-enter-active .qg-drawer__panel,
+.qg-drawer-leave-active .qg-drawer__panel {
+  transition: transform var(--qg-dur-slow) var(--qg-ease);
+}
+.qg-drawer-enter-from .qg-drawer__panel,
+.qg-drawer-leave-to .qg-drawer__panel {
+  transform: translateX(100%);
+}
+.qg-drawer-enter-active .qg-drawer__veil,
+.qg-drawer-leave-active .qg-drawer__veil {
+  transition: opacity var(--qg-dur-slow) var(--qg-ease);
+}
+.qg-drawer-enter-from .qg-drawer__veil,
+.qg-drawer-leave-to .qg-drawer__veil {
+  opacity: 0;
+}
+
+/* ─── Modal (history detail) ───────────────────────────────────────── */
+.qg-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.qg-modal__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--qg-surface-overlay);
+  backdrop-filter: blur(4px);
+}
+.qg-modal__panel {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  max-height: 84vh;
+  overflow-y: auto;
+  background: var(--qg-surface-raised);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-xl);
+  box-shadow: var(--qg-shadow-2);
+  padding: 24px;
+}
+.qg-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+}
+
+.qg-fade-enter-active,
+.qg-fade-leave-active { transition: opacity var(--qg-dur-base) var(--qg-ease); }
+.qg-fade-enter-from,
+.qg-fade-leave-to { opacity: 0; }
+
+/* ─── Responsive trims ──────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .qg-console__group--right { margin-left: 0; }
+  .qg-session { display: none; }
+}
+
+/* Below 540px: TYPE segment falls back to icons only (still legible);
+   MODE keeps Chinese label since 答/背 is the meaning, no icon to fall back on.  */
+@media (max-width: 540px) {
+  .qg-console__inner { gap: 18px 20px; }
+  /* Only TYPE segment's text label hides — its 'A·B / ___ / ✍︎' icons remain */
+  .qg-console__group:nth-child(1) .qg-segment__txt { display: none; }
+  .qg-console__group:nth-child(1) .qg-segment__btn { padding: 6px 10px; }
+  /* Difficulty: shorten labels via uppercase initials (handled by CSS pseudo) */
+  .qg-difficulty__label { display: none; }
+  .qg-difficulty__btn { padding: 6px 8px; }
+  .qg-difficulty__btn::after {
+    font-family: var(--qg-font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .qg-difficulty__btn[data-level="easy"]::after   { content: "E"; }
+  .qg-difficulty__btn[data-level="medium"]::after { content: "M"; }
+  .qg-difficulty__btn[data-level="hard"]::after   { content: "H"; }
+  .qg-wordmark__page { display: none; }
+}
+
+@media (max-width: 380px) {
+  .qg-console__inner { flex-direction: column; align-items: stretch; gap: 14px; }
+  .qg-console__group--right { margin-left: 0; align-items: flex-start; }
+  .qg-source { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
 </style>
