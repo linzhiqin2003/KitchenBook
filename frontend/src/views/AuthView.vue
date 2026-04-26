@@ -111,64 +111,79 @@ onMounted(() => {
       <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
     </div>
 
-    <div class="w-full max-w-md relative z-10 auth-card-enter">
-      <!-- Logo -->
-      <div class="text-center mb-8">
-        <div class="relative inline-block mb-4">
+    <div class="w-full max-w-[400px] relative z-10 auth-card-enter">
+      <!-- Header: refined logo + title cluster -->
+      <div class="text-center mb-7">
+        <div class="relative inline-block mb-5">
           <div class="logo-glow"></div>
-          <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[2px] shadow-2xl shadow-purple-500/25 relative z-10">
-            <div class="w-full h-full rounded-[14px] bg-slate-800/90 backdrop-blur-sm flex items-center justify-center">
-              <svg class="w-10 h-10 text-white/90" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 1.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5L4.5 9l5.5-2 2-5.5z" fill-opacity="0.92"/>
-                <path d="M20 12l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" fill-opacity="0.5"/>
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[1.5px] shadow-lg shadow-purple-500/20 relative z-10">
+            <div class="w-full h-full rounded-[14px] bg-slate-800/95 backdrop-blur-sm flex items-center justify-center">
+              <svg class="w-6 h-6 text-white/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+                <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>
+                <path d="M19 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" fill-opacity="0.6" stroke="none"/>
               </svg>
             </div>
           </div>
         </div>
-        <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/80">
+        <h1 class="text-3xl font-medium bg-clip-text text-transparent bg-gradient-to-b from-white to-white/70 tracking-tight">
           LZQ Space
         </h1>
-        <p class="text-white/40 text-sm mt-1">{{ mode === 'login' ? '登录以继续' : '创建你的账号' }}</p>
+        <p class="text-white/45 text-sm mt-2.5 tracking-wide">
+          {{ mode === 'login' ? '登录以继续' : '创建你的账号' }}
+        </p>
       </div>
 
       <!-- Auth Card -->
-      <div class="glass-card rounded-3xl p-8 border border-white/10">
-        <!-- Tab Switch -->
-        <div class="flex bg-white/[0.06] rounded-xl p-1 mb-6">
+      <div class="glass-card rounded-[22px] p-7 border border-white/[0.08] relative">
+        <!-- Subtle inner top highlight — gives the glass a hand-lit edge -->
+        <div class="absolute inset-x-7 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none"></div>
+
+        <!-- Tab Switch — sliding indicator -->
+        <div class="auth-tabs relative grid grid-cols-2 bg-white/[0.045] rounded-[10px] p-1 mb-7 border border-white/[0.04]">
+          <span class="auth-tabs__indicator" :class="{ 'is-register': mode === 'register' }"></span>
           <button
+            type="button"
             @click="mode = 'login'; error = ''"
-            :class="mode === 'login' ? 'bg-white/[0.12] text-white shadow-sm' : 'text-white/50 hover:text-white/70'"
-            class="flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+            :class="mode === 'login' ? 'text-white' : 'text-white/45 hover:text-white/70'"
+            class="relative z-10 py-1.5 rounded-[7px] text-[13px] font-medium tracking-wide transition-colors duration-200"
           >
             登录
           </button>
           <button
+            type="button"
             @click="mode = 'register'; error = ''"
-            :class="mode === 'register' ? 'bg-white/[0.12] text-white shadow-sm' : 'text-white/50 hover:text-white/70'"
-            class="flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+            :class="mode === 'register' ? 'text-white' : 'text-white/45 hover:text-white/70'"
+            class="relative z-10 py-1.5 rounded-[7px] text-[13px] font-medium tracking-wide transition-colors duration-200"
           >
             注册
           </button>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="space-y-5">
+        <form @submit.prevent="handleSubmit" class="space-y-4">
           <!-- Success -->
-          <div v-if="success" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
-            <span class="animate-bounce">&#10003;</span>
-            {{ mode === 'login' ? '登录成功，正在跳转...' : '注册成功，正在跳转...' }}
-          </div>
+          <transition name="auth-fade">
+            <div v-if="success" class="bg-emerald-500/[0.08] border border-emerald-500/20 text-emerald-300 px-3.5 py-2.5 rounded-xl text-[13px] flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 10.5l3.5 3.5L15 7"/>
+              </svg>
+              <span>{{ mode === 'login' ? '登录成功，正在跳转…' : '注册成功，正在跳转…' }}</span>
+            </div>
+          </transition>
 
           <!-- Error -->
-          <div v-if="error" class="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
-            <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-            </svg>
-            {{ error }}
-          </div>
+          <transition name="auth-fade">
+            <div v-if="error" class="bg-red-500/[0.08] border border-red-500/20 text-red-300 px-3.5 py-2.5 rounded-xl text-[13px] flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="10" cy="10" r="7.5"/>
+                <path d="M10 6.5v4M10 13.5h.01"/>
+              </svg>
+              <span>{{ error }}</span>
+            </div>
+          </transition>
 
           <!-- Nickname (register only) -->
-          <div v-if="mode === 'register'">
-            <label class="block text-sm font-medium text-white/60 mb-2">昵称</label>
+          <div v-if="mode === 'register'" class="auth-field">
+            <label class="auth-label">昵称</label>
             <input
               v-model="nickname"
               type="text"
@@ -179,8 +194,8 @@ onMounted(() => {
           </div>
 
           <!-- Email -->
-          <div>
-            <label class="block text-sm font-medium text-white/60 mb-2">邮箱</label>
+          <div class="auth-field">
+            <label class="auth-label">邮箱</label>
             <input
               v-model="email"
               type="email"
@@ -192,8 +207,8 @@ onMounted(() => {
           </div>
 
           <!-- Password -->
-          <div>
-            <label class="block text-sm font-medium text-white/60 mb-2">密码</label>
+          <div class="auth-field">
+            <label class="auth-label">密码</label>
             <input
               v-model="password"
               type="password"
@@ -209,34 +224,37 @@ onMounted(() => {
           <button
             type="submit"
             :disabled="loading"
-            class="w-full py-3.5 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40"
+            class="auth-submit"
           >
-            <svg v-if="loading" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            <svg v-if="loading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"/>
+              <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
             </svg>
-            {{ loading ? '处理中...' : (mode === 'login' ? '登录' : '注册') }}
+            <span>{{ loading ? '处理中…' : (mode === 'login' ? '登录' : '注册') }}</span>
+            <svg v-if="!loading" class="auth-submit__arrow w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6"/>
+            </svg>
           </button>
         </form>
 
         <!-- Divider -->
-        <div v-if="googleClientId" class="flex items-center gap-3 my-6">
-          <div class="flex-1 h-px bg-white/10"></div>
-          <span class="text-xs text-white/30">或</span>
-          <div class="flex-1 h-px bg-white/10"></div>
+        <div v-if="googleClientId" class="flex items-center gap-3 my-5">
+          <div class="flex-1 h-px bg-gradient-to-r from-transparent to-white/10"></div>
+          <span class="text-[10px] tracking-[0.18em] uppercase text-white/30 font-medium">或继续使用</span>
+          <div class="flex-1 h-px bg-gradient-to-l from-transparent to-white/10"></div>
         </div>
 
         <!-- Google Sign In -->
-        <div v-if="googleClientId" id="google-signin-btn" class="flex justify-center"></div>
+        <div v-if="googleClientId" id="google-signin-btn" class="flex justify-center auth-google"></div>
       </div>
 
       <!-- Back to Home -->
-      <div class="text-center mt-6">
-        <router-link to="/" class="text-white/40 hover:text-white/60 text-sm flex items-center justify-center gap-1.5 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      <div class="text-center mt-5">
+        <router-link to="/" class="auth-back text-white/35 hover:text-white/65 text-[13px] inline-flex items-center justify-center gap-1.5 transition-colors">
+          <svg class="auth-back__arrow w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 18l-6-6 6-6"/>
           </svg>
-          返回首页
+          <span>返回首页</span>
         </router-link>
       </div>
     </div>
@@ -260,55 +278,150 @@ onMounted(() => {
   letter-spacing: -0.003em;
 }
 
-/* Glass Card */
+/* Glass Card — slightly more refined edge + subtle inner glow */
 .glass-card {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.045) 0%,
+    rgba(255, 255, 255, 0.025) 100%
+  );
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 24px 60px -20px rgba(0, 0, 0, 0.5);
 }
 
-/* Input Style */
+/* Field group — tighter label/input pairing */
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+.auth-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* Refined Input */
 .auth-input {
   width: 100%;
-  padding: 0.875rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.75rem;
+  padding: 11px 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
   color: white;
-  font-size: 0.875rem;
+  font-size: 14px;
   outline: none;
-  transition: all 0.2s;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
-
-.auth-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+.auth-input::placeholder { color: rgba(255, 255, 255, 0.28); }
+.auth-input:hover:not(:focus):not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
 }
-
 .auth-input:focus {
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+  border-color: rgba(167, 139, 250, 0.55);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14);
+}
+.auth-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Sliding tab indicator — refined active state without per-button bg flicker */
+.auth-tabs__indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.07));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 4px 12px -4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.32s cubic-bezier(0.65, 0, 0.35, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+.auth-tabs__indicator.is-register { transform: translateX(100%); }
+
+/* Submit button — same brand gradient, refined geometry + arrow micro-motion */
+.auth-submit {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  color: white;
+  background: linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #a855f7 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  cursor: pointer;
+  margin-top: 8px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.15) inset,
+    0 8px 24px -8px rgba(139, 92, 246, 0.5),
+    0 2px 6px -2px rgba(124, 58, 237, 0.4);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.auth-submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 10px 30px -8px rgba(139, 92, 246, 0.6),
+    0 2px 6px -2px rgba(124, 58, 237, 0.5);
+}
+.auth-submit:hover:not(:disabled) .auth-submit__arrow { transform: translateX(3px); }
+.auth-submit:active:not(:disabled) { transform: translateY(0.5px); }
+.auth-submit:disabled {
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
+  box-shadow: none;
+  opacity: 0.65;
+}
+.auth-submit__arrow { transition: transform 0.18s ease; }
+
+/* Google iframe button — match the card's radius and tone down its harshness */
+.auth-google :deep(iframe) {
+  border-radius: 12px !important;
+  filter: brightness(0.96);
 }
 
-.auth-input:disabled {
-  opacity: 0.5;
+/* Back link — subtle arrow shimmy on hover */
+.auth-back {
+  letter-spacing: 0.02em;
+  padding: 4px 8px;
+  border-radius: 6px;
 }
+.auth-back:hover .auth-back__arrow { transform: translateX(-3px); }
+.auth-back__arrow { transition: transform 0.18s ease; }
 
-/* Logo Glow */
+/* Logo glow — slower and softer */
 .logo-glow {
   position: absolute;
-  inset: -8px;
+  inset: -10px;
   border-radius: 1.25rem;
-  background: linear-gradient(135deg, #a855f7, #7c3aed, #d946ef);
-  opacity: 0.35;
-  filter: blur(16px);
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.5), rgba(124, 58, 237, 0.2) 50%, transparent 70%);
+  filter: blur(18px);
   z-index: 0;
-  animation: logoBreath 3s ease-in-out infinite;
+  animation: logoBreath 5.5s ease-in-out infinite;
 }
 
 @keyframes logoBreath {
-  0%, 100% { opacity: 0.25; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.06); }
+  0%, 100% { opacity: 0.18; transform: scale(0.96); }
+  50%      { opacity: 0.34; transform: scale(1.04); }
 }
+
+/* Notice transitions */
+.auth-fade-enter-active,
+.auth-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.auth-fade-enter-from,
+.auth-fade-leave-to { opacity: 0; transform: translateY(-4px); }
 
 /* Card Enter Animation */
 .auth-card-enter {
