@@ -119,7 +119,7 @@
                   @click="selectTopicFromDropdown(topic)"
                 >
                   <span>{{ formatTopicName(topic) }}</span>
-                  <span class="qg-num qg-menu__count">{{ topicStats[topic] || 0 }}</span>
+                  <span class="qg-num qg-menu__count">{{ topicCount(topic) }}</span>
                 </button>
               </div>
             </div>
@@ -293,7 +293,6 @@ const QUESTION_TYPES = [
 ];
 const STUDY_MODES = [
   { value: 'answer', label: '答题', icon: '🎯' },
-  { value: 'memorize', label: '背题', icon: '📖' },
   { value: 'notes', label: '知识点', icon: '📝' },
 ];
 
@@ -330,6 +329,14 @@ const showTopicDropdown = ref(false);
 // Stats
 const totalCachedQuestions = ref(0);
 const topicStats = ref({});
+const notesTopicStats = ref({});  // chapter → knowledge-point count
+
+// Topic dropdown count: switches between question count and notes count
+// based on the active study mode.
+function topicCount(topic) {
+  if (studyMode.value === 'notes') return notesTopicStats.value[topic] || 0;
+  return topicStats.value[topic] || 0;
+}
 
 // Question type + study mode
 const selectedQuestionType = ref('mcq');
@@ -410,6 +417,7 @@ async function selectCourse(courseId) {
   // Reload topics and questions for new course
   await loadTopics();
   await loadStats();
+  await loadNotesStats();
 
   loading.value = true;
   loadingMessage.value = `正在加载 ${currentCourseName.value} 题目...`;
@@ -432,6 +440,20 @@ async function loadStats() {
     topicStats.value = data.by_topic || {};
   } catch (err) {
     console.error('Failed to load stats:', err);
+  }
+}
+
+// Load knowledge-point counts per chapter (used by Topic dropdown in notes mode)
+async function loadNotesStats() {
+  try {
+    const r = await questionApi.getNotesTopics(currentCourseId.value);
+    const map = {};
+    for (const t of (r.data?.topics || [])) {
+      map[t.topic] = t.count || 0;
+    }
+    notesTopicStats.value = map;
+  } catch (err) {
+    console.error('Failed to load notes stats:', err);
   }
 }
 
@@ -614,7 +636,11 @@ function loadHistoryFromStorage() {
       selectedQuestionType.value = qtypeStored;
     }
     const studyStored = localStorage.getItem(STUDY_MODE_KEY);
-    if (studyStored && STUDY_MODES.some(m => m.value === studyStored)) {
+    if (studyStored === 'memorize') {
+      // 背题 mode was retired in favour of 知识点; migrate the stored value.
+      studyMode.value = 'answer';
+      localStorage.setItem(STUDY_MODE_KEY, 'answer');
+    } else if (studyStored && STUDY_MODES.some(m => m.value === studyStored)) {
       studyMode.value = studyStored;
     }
   } catch (e) {
@@ -870,6 +896,7 @@ async function handleQuestionDeleted(questionId) {
   
   // Update stats
   await loadStats();
+  await loadNotesStats();
 }
 
 // Initial load
@@ -889,6 +916,7 @@ onMounted(async () => {
   // Then load topics and stats for the current course
   await loadTopics();
   await loadStats();
+  await loadNotesStats();
   
   loading.value = true;
   loadingMessage.value = '正在加载题目...';
