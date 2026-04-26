@@ -56,29 +56,27 @@
           <span class="qg-hero__dot">·</span>
           <span>{{ availableTopics.length }} topics</span>
         </p>
+
+        <!-- Page-level mode tabs — switches the whole stage paradigm -->
+        <nav class="qg-modetabs" role="tablist" aria-label="模式">
+          <button
+            v-for="sm in STUDY_MODES"
+            :key="sm.value"
+            role="tab"
+            :aria-selected="studyMode === sm.value"
+            class="qg-modetabs__btn"
+            @click="setStudyMode(sm.value)"
+          >
+            <span class="qg-modetabs__icon">{{ sm.icon }}</span>
+            <span class="qg-modetabs__label">{{ sm.label }}</span>
+          </button>
+        </nav>
       </div>
     </section>
 
-    <!-- ─── Practice console — controls collapse to what the active mode needs ─── -->
+    <!-- ─── Practice console — only shows controls relevant to the active mode ─── -->
     <section class="qg-console">
       <div class="qg-console__inner">
-        <!-- Mode: always visible -->
-        <div class="qg-console__group">
-          <div class="qg-console__label" data-mono>Mode</div>
-          <div class="qg-segment" role="tablist" aria-label="模式">
-            <button
-              v-for="sm in STUDY_MODES"
-              :key="sm.value"
-              role="tab"
-              :aria-selected="studyMode === sm.value"
-              class="qg-segment__btn"
-              @click="setStudyMode(sm.value)"
-            >
-              <span class="qg-segment__txt">{{ sm.label }}</span>
-            </button>
-          </div>
-        </div>
-
         <!-- Question type: questions only -->
         <div v-if="studyMode === 'answer'" class="qg-console__group">
           <div class="qg-console__label" data-mono>Type</div>
@@ -247,20 +245,70 @@
       </div>
     </transition>
 
-    <!-- History detail modal -->
-    <transition name="qg-fade">
-      <div v-if="historyDetailItem" class="qg-modal">
-        <div class="qg-modal__veil" @click="historyDetailItem = null"></div>
-        <div class="qg-modal__panel">
-          <button class="qg-iconbtn qg-modal__close" @click="historyDetailItem = null" title="关闭">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-          <QuestionCard
-            :question="historyDetailItem.question"
-            :question-number="historyDetailItem.index + 1"
-            :loading="false"
-            mode="memorize"
-          />
+    <!-- History detail — floating card with left/right pagination -->
+    <transition name="qg-modal-pop">
+      <div v-if="historyIndex !== null" class="qg-history-modal">
+        <div class="qg-history-modal__veil" @click="closeHistoryDetail"></div>
+
+        <!-- Side-flanking nav buttons (desktop) -->
+        <button
+          class="qg-history-modal__navside qg-history-modal__navside--prev"
+          :disabled="historyIndex === 0"
+          @click="stepHistory(-1)"
+          aria-label="上一题"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button
+          class="qg-history-modal__navside qg-history-modal__navside--next"
+          :disabled="historyIndex >= historyQuestions.length - 1"
+          @click="stepHistory(1)"
+          aria-label="下一题"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+
+        <div class="qg-history-modal__panel">
+          <header class="qg-history-modal__head">
+            <div class="qg-history-modal__crumb">
+              <span class="qg-pill" :data-tint="currentHistoryItem?.correct ? 'success' : 'danger'">
+                {{ currentHistoryItem?.correct ? 'Correct' : 'Incorrect' }}
+              </span>
+              <span class="qg-num qg-history-modal__pos">
+                {{ String(historyIndex + 1).padStart(2, '0') }}
+                <span class="qg-history-modal__posSep">/</span>
+                {{ String(historyQuestions.length).padStart(2, '0') }}
+              </span>
+            </div>
+            <div class="qg-history-modal__nav">
+              <button class="qg-iconbtn" :disabled="historyIndex === 0" @click="stepHistory(-1)" aria-label="上一题">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <button class="qg-iconbtn" :disabled="historyIndex >= historyQuestions.length - 1" @click="stepHistory(1)" aria-label="下一题">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+              <button class="qg-iconbtn" @click="closeHistoryDetail" aria-label="关闭">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+          </header>
+
+          <div class="qg-history-modal__body">
+            <QuestionCard
+              v-if="currentHistoryItem"
+              :key="`hist-${historyIndex}-${currentHistoryItem.id}`"
+              :question="currentHistoryItem.question"
+              :question-number="historyIndex + 1"
+              :loading="false"
+              mode="memorize"
+            />
+          </div>
+
+          <footer class="qg-history-modal__foot" data-mono>
+            <span>← →  导航</span>
+            <span class="qg-history-modal__footSep">·</span>
+            <span>ESC  关闭</span>
+          </footer>
         </div>
       </div>
     </transition>
@@ -276,7 +324,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import QuestionCard from '../components/QuestionCard.vue';
 import QuestionSkeleton from '../components/QuestionSkeleton.vue';
 import AIChatWindow from '../components/AIChatWindow.vue';
@@ -317,7 +365,12 @@ const isMobileMenuOpen = ref(false);
 const prefetching = ref(false);
 const loadingMessage = ref('正在加载题目...');
 const showHistory = ref(false);
-const historyDetailItem = ref(null);
+// History detail — track an index into historyQuestions so the modal can
+// page through them with ← / → keys or the side nav buttons.
+const historyIndex = ref(null);
+const currentHistoryItem = computed(() =>
+  historyIndex.value !== null ? historyQuestions.value[historyIndex.value] || null : null
+);
 const cardRef = ref(null);
 const error = ref(null);
 const questionSource = ref('');
@@ -875,12 +928,25 @@ async function moveToNextQuestion() {
   cardRef.value?.reset();
 }
 
-// View historical question detail
+// View historical question detail — opens the paginated overlay
 function viewHistoryItem(item) {
-  historyDetailItem.value = {
-    ...item,
-    index: historyQuestions.value.indexOf(item)
-  };
+  const idx = historyQuestions.value.indexOf(item);
+  if (idx >= 0) historyIndex.value = idx;
+}
+function stepHistory(delta) {
+  if (historyIndex.value === null) return;
+  const next = historyIndex.value + delta;
+  if (next < 0 || next >= historyQuestions.value.length) return;
+  historyIndex.value = next;
+}
+function closeHistoryDetail() {
+  historyIndex.value = null;
+}
+function onHistoryKey(e) {
+  if (historyIndex.value === null) return;
+  if (e.key === 'Escape')      { e.preventDefault(); closeHistoryDetail(); }
+  else if (e.key === 'ArrowLeft')  { e.preventDefault(); stepHistory(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); stepHistory(1);  }
 }
 
 // Handle question deleted from AI chat
@@ -916,6 +982,7 @@ async function handleQuestionDeleted(questionId) {
 // Initial load
 onMounted(async () => {
   loadHistoryFromStorage();
+  window.addEventListener('keydown', onHistoryKey);
 
   // Load courses first
   await loadCourses();
@@ -941,6 +1008,10 @@ onMounted(async () => {
   if (currentQuestion.value) {
     prefetchNextQuestion();
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onHistoryKey);
 });
 </script>
 
@@ -1111,6 +1182,51 @@ onMounted(async () => {
   gap: 8px;
 }
 .qg-hero__dot { color: var(--qg-text-muted); }
+
+/* Page-level mode tabs — primary navigation, sits in the hero */
+.qg-modetabs {
+  margin-top: 28px;
+  display: inline-flex;
+  gap: 0;
+  border-bottom: 1px solid var(--qg-border-default);
+}
+.qg-modetabs__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--qg-text-tertiary);
+  font-size: var(--qg-text-base);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: color var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-modetabs__btn:hover { color: var(--qg-text-secondary); }
+.qg-modetabs__btn[aria-selected="true"] {
+  color: var(--qg-text-primary);
+}
+.qg-modetabs__btn[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--qg-accent);
+  border-radius: 2px 2px 0 0;
+}
+.qg-modetabs__icon {
+  font-size: 14px;
+  opacity: 0.85;
+}
+@media (max-width: 540px) {
+  .qg-modetabs { margin-top: 22px; }
+  .qg-modetabs__btn { padding: 10px 14px 12px; font-size: var(--qg-text-sm); }
+}
 
 .qg-menu {
   position: absolute;
@@ -1469,39 +1585,156 @@ onMounted(async () => {
   opacity: 0;
 }
 
-/* ─── Modal (history detail) ───────────────────────────────────────── */
-.qg-modal {
+/* ─── History detail modal (paginated floating card) ───────────────── */
+.qg-history-modal {
   position: fixed;
   inset: 0;
   z-index: 70;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: clamp(12px, 3vw, 28px);
 }
-.qg-modal__veil {
+.qg-history-modal__veil {
   position: absolute;
   inset: 0;
   background: var(--qg-surface-overlay);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
-.qg-modal__panel {
+
+/* Side-flanking large nav buttons (desktop only) */
+.qg-history-modal__navside {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--qg-surface-raised);
+  color: var(--qg-text-secondary);
+  border: 1px solid var(--qg-border-default);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: var(--qg-shadow-1);
+  transition: color var(--qg-dur-fast) var(--qg-ease),
+              border-color var(--qg-dur-fast) var(--qg-ease),
+              transform var(--qg-dur-fast) var(--qg-ease),
+              opacity var(--qg-dur-fast) var(--qg-ease);
+}
+.qg-history-modal__navside:hover:not(:disabled) {
+  color: var(--qg-text-primary);
+  border-color: var(--qg-border-strong);
+  transform: translateY(-50%) scale(1.06);
+}
+.qg-history-modal__navside:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.qg-history-modal__navside--prev { left: clamp(8px, 4vw, 40px); }
+.qg-history-modal__navside--next { right: clamp(8px, 4vw, 40px); }
+@media (max-width: 720px) {
+  .qg-history-modal__navside { display: none; }
+}
+
+/* The card itself */
+.qg-history-modal__panel {
   position: relative;
   width: 100%;
   max-width: 720px;
-  max-height: 84vh;
-  overflow-y: auto;
+  max-height: 86vh;
   background: var(--qg-surface-raised);
   border: 1px solid var(--qg-border-default);
   border-radius: var(--qg-radius-xl);
   box-shadow: var(--qg-shadow-2);
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-.qg-modal__close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 1;
+.qg-history-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--qg-border-default);
+  background: var(--qg-surface-base);
+}
+.qg-history-modal__crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.qg-history-modal__pos {
+  font-size: 12px;
+  color: var(--qg-text-secondary);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.qg-history-modal__posSep {
+  color: var(--qg-text-muted);
+  margin: 0 2px;
+}
+.qg-history-modal__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.qg-history-modal__nav .qg-iconbtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.qg-history-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px clamp(14px, 3vw, 28px);
+}
+/* Strip the inner question card border so it sits flat inside the modal */
+.qg-history-modal__body :deep(.qg-card) {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
+.qg-history-modal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--qg-border-default);
+  background: var(--qg-surface-base);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--qg-text-tertiary);
+}
+.qg-history-modal__footSep { color: var(--qg-text-muted); }
+@media (max-width: 540px) {
+  .qg-history-modal__foot { display: none; }
+}
+
+/* Pop-in transition */
+.qg-modal-pop-enter-active,
+.qg-modal-pop-leave-active {
+  transition: opacity var(--qg-dur-base) var(--qg-ease);
+}
+.qg-modal-pop-enter-active .qg-history-modal__panel,
+.qg-modal-pop-leave-active .qg-history-modal__panel {
+  transition: transform var(--qg-dur-base) var(--qg-ease),
+              opacity var(--qg-dur-base) var(--qg-ease);
+}
+.qg-modal-pop-enter-from,
+.qg-modal-pop-leave-to { opacity: 0; }
+.qg-modal-pop-enter-from .qg-history-modal__panel,
+.qg-modal-pop-leave-to .qg-history-modal__panel {
+  transform: scale(0.96) translateY(8px);
+  opacity: 0;
 }
 
 .qg-fade-enter-active,
