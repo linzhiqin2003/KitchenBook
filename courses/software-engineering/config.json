@@ -3,6 +3,7 @@
     "display_name": "软件工程 SEDP",
     "description": "Bristol SEDP 期末复习：Agile / 需求 / OOD / 项目管理 / HCI / 测试 / 可持续性 / 隐私",
     "icon": "🛠️",
+    "question_types": ["mcq", "fill", "essay"],
     "topic_keywords": {
         "l1-introduction": ["software crisis", "sdlc", "waterfall", "lifecycle", "verification", "validation"],
         "l2-agile": ["agile", "scrum", "kanban", "extreme programming", "xp", "tdd", "sprint", "manifesto"],

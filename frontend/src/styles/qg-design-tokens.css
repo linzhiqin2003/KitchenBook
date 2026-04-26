@@ -11,108 +11,122 @@
  * Type: Bricolage Grotesque (display, variable opsz) + Geist (body) + Geist Mono.
  */
 
-/* ─── Light theme ─────────────────────────────────────────────────────── */
+/* ─── Light theme — soft warm paper ────────────────────────────────────
+ * Reference: Apple Books "Sepia", iA Writer light, Penguin Classics interior.
+ * The base sits at 96% lightness with a subtle warm tint (hue 80) so it reads
+ * as paper/cream rather than glaring office-white. Cards lift gently to ~98%.
+ * ───────────────────────────────────────────────────────────────────── */
 :root,
 [data-qg-theme="light"] {
-  /* Surfaces — warm stone neutrals tinted toward brand blue (chroma 0.004) */
-  --qg-surface-base:    oklch(0.985 0.004 250);
-  --qg-surface-raised:  oklch(0.99  0.003 250);
-  --qg-surface-sunken:  oklch(0.965 0.005 250);
-  --qg-surface-overlay: oklch(1     0     0 / 0.72);
+  /* Surfaces — warm cream, not white */
+  --qg-surface-base:    oklch(0.962 0.012 80);   /* main page — soft cream */
+  --qg-surface-raised:  oklch(0.985 0.008 80);   /* cards — gently lifted */
+  --qg-surface-sunken:  oklch(0.940 0.015 80);   /* console / input bg */
+  --qg-surface-overlay: oklch(0.30  0.012 80 / 0.42);
 
-  /* Text */
-  --qg-text-primary:    oklch(0.205 0.012 250);
-  --qg-text-secondary:  oklch(0.45  0.012 250);
-  --qg-text-tertiary:   oklch(0.62  0.010 250);
-  --qg-text-muted:      oklch(0.75  0.008 250);
+  /* Text — graphite with a hint of warmth, NOT pure black */
+  --qg-text-primary:    oklch(0.225 0.013 60);
+  --qg-text-secondary:  oklch(0.46  0.012 60);
+  --qg-text-tertiary:   oklch(0.60  0.010 60);
+  --qg-text-muted:      oklch(0.74  0.008 60);
 
-  /* Hairlines & dividers */
-  --qg-border-default:  oklch(0.92  0.005 250);
-  --qg-border-strong:   oklch(0.86  0.007 250);
+  /* Hairlines & dividers — a touch warmer + slightly more visible against cream */
+  --qg-border-default:  oklch(0.88  0.014 80);
+  --qg-border-strong:   oklch(0.82  0.018 80);
   --qg-border-focus:    oklch(0.55  0.13  252);
 
   /* Accents — single inky blue, used sparingly */
   --qg-accent:          oklch(0.46  0.13  252);
   --qg-accent-hover:    oklch(0.40  0.14  252);
-  --qg-accent-soft:     oklch(0.95  0.025 252);
-  --qg-accent-on:       oklch(0.985 0.003 252);
+  --qg-accent-soft:     oklch(0.92  0.030 252);
+  --qg-accent-on:       oklch(0.985 0.005 80);
 
   /* Per-type accents (desaturated, all in same lightness band for harmony) */
   --qg-type-mcq:        oklch(0.48  0.07  240);
-  --qg-type-mcq-soft:   oklch(0.96  0.02  240);
+  --qg-type-mcq-soft:   oklch(0.93  0.025 240);
   --qg-type-fill:       oklch(0.55  0.09  75);
-  --qg-type-fill-soft:  oklch(0.96  0.025 75);
+  --qg-type-fill-soft:  oklch(0.93  0.030 75);
   --qg-type-essay:      oklch(0.48  0.10  315);
-  --qg-type-essay-soft: oklch(0.96  0.025 315);
+  --qg-type-essay-soft: oklch(0.93  0.030 315);
 
   /* Result states */
   --qg-success:         oklch(0.50  0.10  155);
-  --qg-success-soft:    oklch(0.96  0.025 155);
+  --qg-success-soft:    oklch(0.93  0.030 155);
   --qg-danger:          oklch(0.53  0.16  25);
-  --qg-danger-soft:     oklch(0.96  0.025 25);
-  --qg-warning:         oklch(0.62  0.13  72);
-  --qg-warning-soft:    oklch(0.96  0.025 72);
+  --qg-danger-soft:     oklch(0.93  0.028 25);
+  --qg-warning:         oklch(0.60  0.12  72);
+  --qg-warning-soft:    oklch(0.94  0.032 72);
 
-  /* Difficulty markers — stay neutral, communicate via icon glyph */
+  /* Difficulty markers */
   --qg-diff-easy:       oklch(0.55  0.08  155);
-  --qg-diff-medium:     oklch(0.60  0.10  72);
+  --qg-diff-medium:     oklch(0.58  0.10  72);
   --qg-diff-hard:       oklch(0.55  0.13  25);
 
-  /* Elevation — subtle layered shadows, no big drop shadows */
-  --qg-shadow-1: 0 1px 0 oklch(0.92 0.005 250 / 0.6),
-                 0 1px 2px -1px oklch(0.205 0.012 250 / 0.06);
-  --qg-shadow-2: 0 1px 0 oklch(0.92 0.005 250 / 0.7),
-                 0 4px 12px -4px oklch(0.205 0.012 250 / 0.08),
-                 0 16px 32px -16px oklch(0.205 0.012 250 / 0.10);
+  /* Elevation — subtle warm shadows */
+  --qg-shadow-1: 0 1px 0 oklch(0.85 0.014 80 / 0.5),
+                 0 1px 2px -1px oklch(0.225 0.013 60 / 0.05);
+  --qg-shadow-2: 0 1px 0 oklch(0.85 0.014 80 / 0.6),
+                 0 4px 12px -4px oklch(0.225 0.013 60 / 0.07),
+                 0 16px 32px -16px oklch(0.225 0.013 60 / 0.09);
   --qg-shadow-focus: 0 0 0 3px oklch(0.55 0.13 252 / 0.18);
 }
 
-/* ─── Dark theme ──────────────────────────────────────────────────────── */
+/* ─── Dark theme — warm graphite, not jet black ────────────────────────
+ * Reference: Bear app dark, iA Writer dark, Reeder dark. Lifted from
+ * 16% to ~21% lightness with a warm tint (hue 75) so the page reads as
+ * "lit room at night" rather than "OLED black hole".
+ * ───────────────────────────────────────────────────────────────────── */
 [data-qg-theme="dark"] {
-  --qg-surface-base:    oklch(0.16  0.005 250);
-  --qg-surface-raised:  oklch(0.20  0.006 250);
-  --qg-surface-sunken:  oklch(0.13  0.005 250);
-  --qg-surface-overlay: oklch(0.10  0     0 / 0.66);
+  --qg-surface-base:    oklch(0.215 0.008 75);   /* main page — warm graphite */
+  --qg-surface-raised:  oklch(0.255 0.010 75);   /* cards lift gently */
+  --qg-surface-sunken:  oklch(0.180 0.006 75);   /* console / input bg */
+  --qg-surface-overlay: oklch(0.10  0.006 75 / 0.62);
 
-  --qg-text-primary:    oklch(0.97  0.005 250);
-  --qg-text-secondary:  oklch(0.72  0.008 250);
-  --qg-text-tertiary:   oklch(0.55  0.008 250);
-  --qg-text-muted:      oklch(0.42  0.006 250);
+  --qg-text-primary:    oklch(0.95  0.010 75);
+  --qg-text-secondary:  oklch(0.74  0.012 75);
+  --qg-text-tertiary:   oklch(0.58  0.010 75);
+  --qg-text-muted:      oklch(0.45  0.008 75);
 
-  --qg-border-default:  oklch(0.27  0.007 250);
-  --qg-border-strong:   oklch(0.34  0.009 250);
-  --qg-border-focus:    oklch(0.72  0.13  252);
+  --qg-border-default:  oklch(0.32  0.012 75);
+  --qg-border-strong:   oklch(0.40  0.014 75);
+  --qg-border-focus:    oklch(0.74  0.13  252);
 
-  --qg-accent:          oklch(0.72  0.14  252);
-  --qg-accent-hover:    oklch(0.78  0.13  252);
-  --qg-accent-soft:     oklch(0.30  0.06  252);
-  --qg-accent-on:       oklch(0.10  0.02  252);
+  --qg-accent:          oklch(0.74  0.14  252);
+  --qg-accent-hover:    oklch(0.80  0.13  252);
+  --qg-accent-soft:     oklch(0.34  0.07  252);
+  --qg-accent-on:       oklch(0.14  0.012 75);
 
-  --qg-type-mcq:        oklch(0.72  0.08  240);
-  --qg-type-mcq-soft:   oklch(0.26  0.04  240);
-  --qg-type-fill:       oklch(0.78  0.10  75);
-  --qg-type-fill-soft:  oklch(0.26  0.04  75);
-  --qg-type-essay:      oklch(0.74  0.10  315);
-  --qg-type-essay-soft: oklch(0.26  0.04  315);
+  --qg-type-mcq:        oklch(0.74  0.08  240);
+  --qg-type-mcq-soft:   oklch(0.30  0.05  240);
+  --qg-type-fill:       oklch(0.80  0.10  75);
+  --qg-type-fill-soft:  oklch(0.30  0.05  75);
+  --qg-type-essay:      oklch(0.76  0.10  315);
+  --qg-type-essay-soft: oklch(0.30  0.05  315);
 
-  --qg-success:         oklch(0.70  0.12  155);
-  --qg-success-soft:    oklch(0.26  0.04  155);
-  --qg-danger:          oklch(0.72  0.16  25);
-  --qg-danger-soft:     oklch(0.28  0.06  25);
-  --qg-warning:         oklch(0.78  0.13  72);
-  --qg-warning-soft:    oklch(0.28  0.04  72);
+  --qg-success:         oklch(0.72  0.12  155);
+  --qg-success-soft:    oklch(0.30  0.05  155);
+  --qg-danger:          oklch(0.74  0.16  25);
+  --qg-danger-soft:     oklch(0.32  0.07  25);
+  --qg-warning:         oklch(0.80  0.13  72);
+  --qg-warning-soft:    oklch(0.32  0.05  72);
 
-  --qg-diff-easy:       oklch(0.72  0.10  155);
-  --qg-diff-medium:     oklch(0.78  0.13  72);
-  --qg-diff-hard:       oklch(0.72  0.14  25);
+  --qg-diff-easy:       oklch(0.74  0.10  155);
+  --qg-diff-medium:     oklch(0.80  0.13  72);
+  --qg-diff-hard:       oklch(0.74  0.14  25);
 
-  --qg-shadow-1: 0 1px 0 oklch(0 0 0 / 0.4),
-                 0 1px 2px -1px oklch(0 0 0 / 0.5);
-  --qg-shadow-2: 0 1px 0 oklch(0 0 0 / 0.5),
-                 0 4px 16px -4px oklch(0 0 0 / 0.4),
-                 0 24px 48px -24px oklch(0 0 0 / 0.5);
-  --qg-shadow-focus: 0 0 0 3px oklch(0.72 0.13 252 / 0.32);
+  --qg-shadow-1: 0 1px 0 oklch(0 0 0 / 0.30),
+                 0 1px 2px -1px oklch(0 0 0 / 0.40);
+  --qg-shadow-2: 0 1px 0 oklch(0 0 0 / 0.40),
+                 0 4px 16px -4px oklch(0 0 0 / 0.32),
+                 0 24px 48px -24px oklch(0 0 0 / 0.42);
+  --qg-shadow-focus: 0 0 0 3px oklch(0.74 0.13 252 / 0.32);
 }
+
+/* Pre-mount paint: html bg matches the resolved theme so the QuestionGen
+   page never flashes white-on-load when entering dark mode. Other modules
+   set their own body bg, which paints over this. */
+html[data-qg-theme="light"] { background: oklch(0.962 0.012 80); }
+html[data-qg-theme="dark"]  { background: oklch(0.215 0.008 75); }
 
 /* ─── Spacing scale (4pt) ─────────────────────────────────────────────── */
 [data-qg-surface] {

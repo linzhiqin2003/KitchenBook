@@ -67,7 +67,7 @@
           <div class="qg-console__label" data-mono>Type</div>
           <div class="qg-segment" role="tablist" aria-label="题型">
             <button
-              v-for="qt in QUESTION_TYPES"
+              v-for="qt in availableQuestionTypes"
               :key="qt.value"
               role="tab"
               :aria-selected="selectedQuestionType === qt.value"
@@ -341,6 +341,17 @@ const currentCourseName = computed(() => currentCourse.value.name || '选择课�
 const currentCourseDisplayName = computed(() => currentCourse.value.display_name || currentCourse.value.name || '刷题');
 const currentCourseIcon = computed(() => currentCourse.value.icon || '📚');
 
+// Question types this course supports — backend returns in course config.
+// Default to ['mcq'] for any course that doesn't opt into fill/essay.
+const courseSupportedTypes = computed(() =>
+  Array.isArray(currentCourse.value.question_types) && currentCourse.value.question_types.length
+    ? currentCourse.value.question_types
+    : ['mcq']
+);
+const availableQuestionTypes = computed(() =>
+  QUESTION_TYPES.filter(t => courseSupportedTypes.value.includes(t.value))
+);
+
 // Load available courses
 async function loadCourses() {
   try {
@@ -368,27 +379,35 @@ async function selectCourse(courseId) {
     showCourseDropdown.value = false;
     return;
   }
-  
+
   showCourseDropdown.value = false;
   currentCourseId.value = courseId;
   localStorage.setItem(CURRENT_COURSE_KEY, courseId);
-  
+
+  // Snap selected question type back to mcq if the new course doesn't support
+  // the previously chosen type (e.g. switching from software-engineering to
+  // c-programming while on 'essay').
+  if (!courseSupportedTypes.value.includes(selectedQuestionType.value)) {
+    selectedQuestionType.value = 'mcq';
+    localStorage.setItem(QUESTION_TYPE_KEY, 'mcq');
+  }
+
   // Clear current state
   prefetchedQuestion.value = null;
   seenQuestionIds.value = [];
   selectedTopic.value = 'all';
-  
+
   // Reload topics and questions for new course
   await loadTopics();
   await loadStats();
-  
+
   loading.value = true;
   loadingMessage.value = `正在加载 ${currentCourseName.value} 题目...`;
   error.value = null;
-  
+
   currentQuestion.value = await getSmartNextQuestion();
   loading.value = false;
-  
+
   if (currentQuestion.value) {
     prefetchNextQuestion();
   }
@@ -846,10 +865,17 @@ async function handleQuestionDeleted(questionId) {
 // Initial load
 onMounted(async () => {
   loadHistoryFromStorage();
-  
+
   // Load courses first
   await loadCourses();
-  
+
+  // If the persisted type isn't supported by the current course (e.g. a stale
+  // 'essay' from a prior course), snap to mcq before fetching the first question.
+  if (!courseSupportedTypes.value.includes(selectedQuestionType.value)) {
+    selectedQuestionType.value = 'mcq';
+    localStorage.setItem(QUESTION_TYPE_KEY, 'mcq');
+  }
+
   // Then load topics and stats for the current course
   await loadTopics();
   await loadStats();

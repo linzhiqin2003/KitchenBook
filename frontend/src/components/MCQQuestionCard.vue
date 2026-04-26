@@ -119,7 +119,17 @@ function renderOption(text, index) {
     const re = new RegExp(`^${expectedLetter}\\.\\s*`);
     text = text.replace(re, '');
   }
-  const isCode = /[{};=]/.test(text) && /\b(int|void|return|if|for|while|class|def)\b/.test(text);
+  // Stricter code detection: only treat as <pre> when there's a strong
+  // signal — explicit newlines, paired braces, or a code keyword
+  // adjacent to a brace/paren. Plain English with "for" / ";" no longer
+  // misfires (was: "purpose for it." → mono <pre>).
+  const isCode = (
+    text.includes('\n') ||
+    (text.includes('{') && text.includes('}')) ||
+    /^\s*(SELECT|INSERT|UPDATE|DELETE|grep|awk|sed|cat|ls|cd|sudo|npm|pip|git)\b/i.test(text) ||
+    /\b(int|void|char|return|class|def|function)\b\s*[(){=]/.test(text) ||
+    /=>\s*[{(]/.test(text)
+  );
   if (isCode && !text.trim().startsWith('`')) {
     const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return `<pre><code>${escaped}</code></pre>`;
@@ -205,20 +215,38 @@ defineExpose({
   gap: 8px;
   margin-bottom: 28px;
 }
+.qg-option__text {
+  /* Belt + suspenders: any text or pre inside an option must wrap, never overflow */
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .qg-option__text :deep(pre) {
   margin: 4px 0 0;
   padding: 0;
   background: transparent;
   border: none;
   font-size: 0.875em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
 }
-.qg-option__text :deep(pre code) { background: transparent; padding: 0; }
+.qg-option__text :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .qg-option__text :deep(code) {
   font-family: var(--qg-font-mono);
   font-size: 0.875em;
   background: color-mix(in oklch, currentColor 6%, transparent);
   padding: 1px 6px;
   border-radius: 4px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mcq__footer {

@@ -79,9 +79,11 @@ def get_all_courses():
                     "display_name": config.get("display_name", config.get("name", item.name)),
                     "description": config.get("description", ""),
                     "icon": config.get("icon", "📚"),
+                    # Courses default to mcq-only; opt in to fill/essay via config.json
+                    "question_types": config.get("question_types", ["mcq"]),
                     "exists": True
                 }
-    
+
     return courses
 
 
