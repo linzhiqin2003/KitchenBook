@@ -1,20 +1,11 @@
 <template>
   <article data-qg-surface class="notes">
-    <!-- Topic switcher / header -->
+    <!-- Topic header (read-only — regeneration handled by backend command) -->
     <header class="notes__head">
       <div class="notes__headLeft">
         <span class="qg-pill" data-tint="essay">{{ formattedTopic(currentTopic) }}</span>
         <span v-if="currentCount" class="notes__count" data-mono>{{ currentCount }} POINTS</span>
         <span v-else-if="!loading" class="notes__count notes__count--muted" data-mono>EMPTY</span>
-      </div>
-      <div class="notes__headRight">
-        <button class="qg-btn qg-btn--ghost notes__regen" :disabled="generating" @click="onRegenerate">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 1 1 3 6.7"/>
-            <path d="M3 21v-6h6"/>
-          </svg>
-          {{ generating ? '生成中…' : (currentCount ? '重新生成' : '生成笔记') }}
-        </button>
       </div>
     </header>
 
@@ -29,9 +20,9 @@
       <button class="qg-btn qg-btn--ghost" @click="reload">重试</button>
     </div>
 
-    <div v-else-if="!points.length && !generating" class="notes__empty">
+    <div v-else-if="!points.length" class="notes__empty">
       <p class="notes__emptyTitle">这一章还没有笔记</p>
-      <p class="notes__emptyBody">点击右上角「生成笔记」让 AI 把课件拆成结构化要点。</p>
+      <p class="notes__emptyBody">联系管理员从后台生成（`manage.py` batch-generate）。</p>
     </div>
 
     <div v-else class="notes__body">
@@ -81,7 +72,6 @@ const props = defineProps({
 
 const points = ref([]);
 const loading = ref(false);
-const generating = ref(false);
 const error = ref('');
 const currentTopic = ref(props.topic || null);
 const allCoursewareTopics = ref([]);

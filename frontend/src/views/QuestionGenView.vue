@@ -59,28 +59,10 @@
       </div>
     </section>
 
-    <!-- ─── Practice console: type / mode / source / difficulty in one row ─── -->
+    <!-- ─── Practice console — controls collapse to what the active mode needs ─── -->
     <section class="qg-console">
       <div class="qg-console__inner">
-        <!-- Question type -->
-        <div class="qg-console__group">
-          <div class="qg-console__label" data-mono>Type</div>
-          <div class="qg-segment" role="tablist" aria-label="题型">
-            <button
-              v-for="qt in availableQuestionTypes"
-              :key="qt.value"
-              role="tab"
-              :aria-selected="selectedQuestionType === qt.value"
-              class="qg-segment__btn"
-              @click="setQuestionType(qt.value)"
-            >
-              <span data-mono class="qg-segment__icon">{{ qt.icon }}</span>
-              <span class="qg-segment__txt">{{ qt.label }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Study mode -->
+        <!-- Mode: always visible -->
         <div class="qg-console__group">
           <div class="qg-console__label" data-mono>Mode</div>
           <div class="qg-segment" role="tablist" aria-label="模式">
@@ -97,17 +79,35 @@
           </div>
         </div>
 
-        <!-- Source: random vs topic -->
+        <!-- Question type: questions only -->
+        <div v-if="studyMode !== 'notes'" class="qg-console__group">
+          <div class="qg-console__label" data-mono>Type</div>
+          <div class="qg-segment" role="tablist" aria-label="题型">
+            <button
+              v-for="qt in availableQuestionTypes"
+              :key="qt.value"
+              role="tab"
+              :aria-selected="selectedQuestionType === qt.value"
+              class="qg-segment__btn"
+              @click="setQuestionType(qt.value)"
+            >
+              <span data-mono class="qg-segment__icon">{{ qt.icon }}</span>
+              <span class="qg-segment__txt">{{ qt.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Source / Topic — Random+Topic toggle for questions, just the chapter picker for notes -->
         <div class="qg-console__group">
-          <div class="qg-console__label" data-mono>Source</div>
+          <div class="qg-console__label" data-mono>{{ studyMode === 'notes' ? 'Chapter' : 'Source' }}</div>
           <div class="qg-source">
-            <div class="qg-segment" role="tablist" aria-label="出题源">
+            <div v-if="studyMode !== 'notes'" class="qg-segment" role="tablist" aria-label="出题源">
               <button role="tab" :aria-selected="practiceMode === 'random'" class="qg-segment__btn" @click="setMode('random')">Random</button>
               <button role="tab" :aria-selected="practiceMode === 'topic'" class="qg-segment__btn" @click="setMode('topic')">Topic</button>
             </div>
-            <div v-if="practiceMode === 'topic'" class="qg-topicpick">
+            <div v-if="studyMode === 'notes' || practiceMode === 'topic'" class="qg-topicpick">
               <button class="qg-topicpick__btn" @click="showTopicDropdown = !showTopicDropdown">
-                <span class="qg-topicpick__name">{{ selectedTopic === 'all' ? '选择主题' : formatTopicName(selectedTopic) }}</span>
+                <span class="qg-topicpick__name">{{ selectedTopic === 'all' ? '选择章节' : formatTopicName(selectedTopic) }}</span>
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
               </button>
               <div v-if="showTopicDropdown" class="qg-menu qg-menu--topic">
@@ -126,8 +126,8 @@
           </div>
         </div>
 
-        <!-- Difficulty -->
-        <div class="qg-console__group qg-console__group--right">
+        <!-- Difficulty: questions only -->
+        <div v-if="studyMode !== 'notes'" class="qg-console__group qg-console__group--right">
           <div class="qg-console__label" data-mono>Difficulty</div>
           <div class="qg-difficulty">
             <button
@@ -519,7 +519,11 @@ async function loadTopics() {
         // Try to find chapter number (chapter-N or chapter_N)
         const chapterMatch = str.match(/chapter[-_](\d+)/i);
         if (chapterMatch) return parseInt(chapterMatch[1]);
-        
+
+        // L1, L2 ... L11 style — letter prefix + multi-digit lecture number
+        const lectureMatch = str.match(/^[a-z](\d+)[-_]/i);
+        if (lectureMatch) return parseInt(lectureMatch[1]);
+
         // Try leading number (01-topic, 02-topic)
         const leadingMatch = str.match(/^(\d+)/);
         if (leadingMatch) return parseInt(leadingMatch[1]);
