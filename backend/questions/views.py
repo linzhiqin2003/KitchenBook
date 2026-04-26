@@ -5,13 +5,14 @@ from rest_framework.authentication import SessionAuthentication
 from django.db.models import Count
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import Question
-from .serializers import QuestionSerializer
+from .models import Question, KnowledgePoint
+from .serializers import QuestionSerializer, KnowledgePointSerializer
 from .services.generator import (
     generate_question,
     generate_question_for_topic,
     generate_fill_question,
     generate_essay_question,
+    generate_knowledge_points,
     grade_essay_answer,
     grade_fill_answer,
     batch_generate as batch_generate_service,
@@ -144,7 +145,9 @@ class QuestionViewSet(viewsets.ModelViewSet):
             options=result.get('options', []),
             answer=result.get('answer', ''),
             explanation=result.get('explanation', ''),
-            seed_question=seed
+            seed_question=seed,
+            source_chapter=result.get('source_chapter', ''),
+            source_excerpt=result.get('source_excerpt', ''),
         )
         
         serializer = self.get_serializer(question)
@@ -265,7 +268,9 @@ class QuestionViewSet(viewsets.ModelViewSet):
                 options=result.get('options') if question_type == 'mcq' else None,
                 answer=result.get('answer', ''),
                 explanation=result.get('explanation', ''),
-                seed_question=result.get('seed_question', '')
+                seed_question=result.get('seed_question', ''),
+                source_chapter=result.get('source_chapter', ''),
+                source_excerpt=result.get('source_excerpt', ''),
             )
 
             serializer = self.get_serializer(question)
@@ -334,7 +339,9 @@ class QuestionViewSet(viewsets.ModelViewSet):
                 options=result.get('options') if qtype == 'mcq' else None,
                 answer=result.get('answer', ''),
                 explanation=result.get('explanation', ''),
-                seed_question=result.get('seed_question', '')
+                seed_question=result.get('seed_question', ''),
+                source_chapter=result.get('source_chapter', ''),
+                source_excerpt=result.get('source_excerpt', ''),
             )
             created_questions.append(question)
 
@@ -560,3 +567,127 @@ class QuestionViewSet(viewsets.ModelViewSet):
                 "deleted": False,
                 "reasoning": result.get("reasoning", "Deletion not confirmed by reasoner.")
             })
+
+
+class KnowledgePointViewSet(viewsets.ReadOnlyModelViewSet):
+    """List + lazily-generate study notes (knowledge points) for a course/topic."""
+    queryset = KnowledgePoint.objects.all()
+    serializer_class = KnowledgePointSerializer
+    authentication_classes = [CsrfExemptSessionAuthentication]
+
+    def get_queryset(self):
+        qs = KnowledgePoint.objects.all()
+        course_id = self.request.query_params.get('course_id')
+        topic = self.request.query_params.get('topic')
+        if course_id:
+            qs = qs.filter(course_id=course_id)
+        if topic:
+            qs = qs.filter(topic__iexact=topic)
+        return qs.order_by('topic', 'sequence', 'id')
+
+    @action(detail=False, methods=['get'], url_path='topics')
+    def topics(self, request):
+        """Per-course list of topics with their note counts.
+
+        Returns: {course_id, topics: [{topic, count}], courseware_topics: [...]}
+        """
+        course_id = request.query_params.get('course_id') or get_default_course()
+        ctx = parse_courseware(course_id)
+        courseware_topics = list(ctx.keys())
+
+        counts = {}
+        for row in KnowledgePoint.objects.filter(course_id=course_id).values('topic').annotate(n=Count('id')):
+            counts[row['topic']] = row['n']
+
+        topics = [{"topic": t, "count": counts.get(t, 0)} for t in courseware_topics]
+        return Response({
+            "course_id": course_id,
+            "topics": topics,
+        })
+
+    @action(detail=False, methods=['post'], url_path='generate')
+    def generate(self, request):
+        """Generate (or regenerate) all knowledge points for one course+topic.
+
+        Body: { "course_id": str, "topic": str, "replace": bool=true }
+        """
+        course_id = request.data.get('course_id') or get_default_course()
+        topic = request.data.get('topic')
+        replace = request.data.get('replace', True)
+
+        if not topic:
+            return Response({"error": "topic required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = generate_knowledge_points(topic, course_id)
+        if "error" in result:
+            return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        points = result.get("points", []) or []
+        canonical_topic = result.get("topic", topic)
+
+        if replace:
+            KnowledgePoint.objects.filter(course_id=course_id, topic=canonical_topic).delete()
+
+        created = []
+        for i, p in enumerate(points):
+            kp = KnowledgePoint.objects.create(
+                course_id=course_id,
+                topic=canonical_topic,
+                sequence=i,
+                title=(p.get('title') or '').strip()[:200],
+                definition=(p.get('definition') or '').strip(),
+                details=p.get('details') or [],
+                importance=p.get('importance') if p.get('importance') in ('core', 'supporting') else 'core',
+                source_excerpt=(p.get('source_excerpt') or '').strip(),
+                source_chapter=(p.get('source_chapter') or '').strip()[:200],
+            )
+            created.append(kp)
+
+        serializer = self.get_serializer(created, many=True)
+        return Response({
+            "topic": canonical_topic,
+            "course_id": course_id,
+            "generated": len(created),
+            "points": serializer.data,
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='batch-generate')
+    def batch_generate(self, request):
+        """Generate notes for every topic in a course (skips topics that already have any).
+
+        Body: { "course_id": str, "force": bool=false }
+        """
+        course_id = request.data.get('course_id') or get_default_course()
+        force = bool(request.data.get('force'))
+
+        ctx = parse_courseware(course_id)
+        if not ctx:
+            return Response({"error": "No courseware found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        summary = []
+        for topic in ctx.keys():
+            existing = KnowledgePoint.objects.filter(course_id=course_id, topic=topic).count()
+            if existing and not force:
+                summary.append({"topic": topic, "skipped": True, "existing": existing})
+                continue
+            result = generate_knowledge_points(topic, course_id, ctx)
+            if "error" in result:
+                summary.append({"topic": topic, "error": result["error"]})
+                continue
+            points = result.get("points", []) or []
+            if force:
+                KnowledgePoint.objects.filter(course_id=course_id, topic=topic).delete()
+            for i, p in enumerate(points):
+                KnowledgePoint.objects.create(
+                    course_id=course_id,
+                    topic=topic,
+                    sequence=i,
+                    title=(p.get('title') or '').strip()[:200],
+                    definition=(p.get('definition') or '').strip(),
+                    details=p.get('details') or [],
+                    importance=p.get('importance') if p.get('importance') in ('core', 'supporting') else 'core',
+                    source_excerpt=(p.get('source_excerpt') or '').strip(),
+                    source_chapter=(p.get('source_chapter') or '').strip()[:200],
+                )
+            summary.append({"topic": topic, "generated": len(points)})
+        return Response({"course_id": course_id, "summary": summary})

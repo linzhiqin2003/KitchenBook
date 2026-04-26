@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Question
+from .models import Question, KnowledgePoint
 
 class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,5 +15,25 @@ class QuestionSerializer(serializers.ModelSerializer):
             'answer',
             'explanation',
             'source_files',
+            'source_chapter',
+            'source_excerpt',
+            'created_at',
+        ]
+
+
+class KnowledgePointSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KnowledgePoint
+        fields = [
+            'id',
+            'course_id',
+            'topic',
+            'sequence',
+            'title',
+            'definition',
+            'details',
+            'importance',
+            'source_excerpt',
+            'source_chapter',
             'created_at',
         ]

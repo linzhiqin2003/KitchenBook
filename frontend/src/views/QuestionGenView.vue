@@ -153,9 +153,17 @@
       @click="showCourseDropdown = false; showTopicDropdown = false"
     ></div>
 
-    <!-- ─── Question stage ─── -->
+    <!-- ─── Stage ─── -->
     <main class="qg-stage">
-      <div v-if="loading" class="qg-stage__inner">
+      <!-- Knowledge-point mode swaps the question card for the notes browser -->
+      <div v-if="studyMode === 'notes'" class="qg-stage__inner">
+        <NotesView
+          :course-id="currentCourseId"
+          :topic="selectedTopic === 'all' ? null : selectedTopic"
+        />
+      </div>
+
+      <div v-else-if="loading" class="qg-stage__inner">
         <QuestionSkeleton />
         <p class="qg-stage__loading">{{ loadingMessage }}</p>
       </div>
@@ -265,6 +273,7 @@ import QuestionCard from '../components/QuestionCard.vue';
 import QuestionSkeleton from '../components/QuestionSkeleton.vue';
 import AIChatWindow from '../components/AIChatWindow.vue';
 import QgThemeToggle from '../components/QgThemeToggle.vue';
+import NotesView from '../components/NotesView.vue';
 import { questionApi } from '../api';
 
 // LocalStorage keys
@@ -285,6 +294,7 @@ const QUESTION_TYPES = [
 const STUDY_MODES = [
   { value: 'answer', label: '答题', icon: '🎯' },
   { value: 'memorize', label: '背题', icon: '📖' },
+  { value: 'notes', label: '知识点', icon: '📝' },
 ];
 
 // State

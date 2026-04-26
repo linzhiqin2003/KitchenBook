@@ -26,6 +26,12 @@
           <span class="qg-num essay__rubricMax">满分 10</span>
         </header>
         <div class="qg-prose essay__rubricBody" v-html="renderedRubric"></div>
+        <div v-if="question.source_excerpt || question.source_chapter" class="essay__source">
+          <span class="essay__sourceLabel" data-mono>
+            出处<span v-if="question.source_chapter"> · {{ question.source_chapter }}</span>
+          </span>
+          <span v-if="question.source_excerpt" class="essay__sourceExcerpt">「{{ question.source_excerpt }}」</span>
+        </div>
       </section>
 
       <footer class="essay__footer">
@@ -112,6 +118,12 @@
             <div class="qg-prose essay__referenceBody" v-html="renderedAnswer"></div>
             <hr class="essay__referenceDivider" />
             <div class="qg-prose essay__referenceBody" v-html="renderedRubric"></div>
+            <div v-if="question.source_excerpt || question.source_chapter" class="essay__source">
+              <span class="essay__sourceLabel" data-mono>
+                出处<span v-if="question.source_chapter"> · {{ question.source_chapter }}</span>
+              </span>
+              <span v-if="question.source_excerpt" class="essay__sourceExcerpt">「{{ question.source_excerpt }}」</span>
+            </div>
           </details>
         </section>
       </transition>
@@ -284,6 +296,26 @@ defineExpose({
   color: var(--qg-text-secondary);
   line-height: 1.65;
   max-width: none;
+}
+
+.essay__source {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  margin-top: 14px;
+  border-top: 1px dashed var(--qg-border-default);
+}
+.essay__sourceLabel {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--qg-text-tertiary);
+}
+.essay__sourceExcerpt {
+  font-size: var(--qg-text-sm);
+  line-height: 1.55;
+  color: var(--qg-text-tertiary);
+  font-style: italic;
 }
 
 /* Score feedback after submit */

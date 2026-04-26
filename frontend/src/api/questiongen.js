@@ -60,6 +60,22 @@ export const questionApi = {
         return api.post(`/questions/${questionId}/grade/`, { answer });
     },
 
+    // ─── Knowledge points (study notes) ──────────────────────────────
+    // List points for a course/topic. Returns the raw queryset (no pagination set).
+    getNotes(courseId, topic = null) {
+        const params = { course_id: courseId };
+        if (topic) params.topic = topic;
+        return api.get('/notes/', { params });
+    },
+    // Per-course list of topics + their note counts.
+    getNotesTopics(courseId) {
+        return api.get('/notes/topics/', { params: { course_id: courseId } });
+    },
+    // (Re)generate notes for one course+topic.
+    generateNotes(courseId, topic, replace = true) {
+        return api.post('/notes/generate/', { course_id: courseId, topic, replace });
+    },
+
     // Get available topics for a course
     getTopics(courseId = null) {
         const params = courseId ? { course_id: courseId } : {};

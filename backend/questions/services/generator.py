@@ -100,6 +100,7 @@ The Reference Question is only for understanding the topic and difficulty level.
    - **hard**: Complex scenarios, subtle distinctions, or advanced topics
 4. **Four Options**: Provide exactly 4 plausible options (A, B, C, D). Include common misconceptions as distractors.
 5. **Detailed Explanation**: Explain why the correct answer is right AND why each wrong option is incorrect.
+6. **Citation (REQUIRED)**: Cite the exact section / passage of the Course Material below that justifies the answer.
 
 ## Output Format (JSON only)
 {{
@@ -108,7 +109,9 @@ The Reference Question is only for understanding the topic and difficulty level.
   "question": "A scenario-based question text...",
   "options": ["A. Option", "B. Option", "C. Option", "D. Option"],
   "answer": "A. The full correct option text",
-  "explanation": "Detailed explanation covering all options..."
+  "explanation": "Detailed explanation covering all options...",
+  "source_chapter": "Section / sub-heading of the course material that the answer comes from (e.g. 'L4. UML Class Diagrams § Aggregation')",
+  "source_excerpt": "A short verbatim quote from the Course Material (≤140 chars) that proves the answer."
 }}
 
 **IMPORTANT: Code Formatting**
@@ -251,6 +254,7 @@ Create an **original multiple-choice question** for the topic "{matching_topic}"
    - **hard**: Complex scenarios, subtle distinctions, or advanced topics
 4. **Four Options**: Provide exactly 4 plausible options (A, B, C, D). Include common misconceptions as distractors.
 5. **Detailed Explanation**: Explain why the correct answer is right AND why each wrong option is incorrect.
+6. **Citation (REQUIRED)**: Cite the exact section / passage of the Course Material below that justifies the answer.
 
 ## Output Format (JSON only)
 {{
@@ -259,7 +263,9 @@ Create an **original multiple-choice question** for the topic "{matching_topic}"
   "question": "A scenario-based question text...",
   "options": ["A. Option", "B. Option", "C. Option", "D. Option"],
   "answer": "A. The full correct option text",
-  "explanation": "Detailed explanation covering all options..."
+  "explanation": "Detailed explanation covering all options...",
+  "source_chapter": "Section / sub-heading of the course material that the answer comes from",
+  "source_excerpt": "A short verbatim quote from the Course Material (≤140 chars) that proves the answer."
 }}
 
 **IMPORTANT: Code Formatting**
@@ -375,7 +381,9 @@ Embed any required context (definitions, code, scenarios) directly in the questi
   "question": "Question text with ____ blank(s)",
   "answer": "answer1{('|||answer2' if num_blanks > 1 else '')}",
   "explanation": "Why these answers are correct, citing the relevant concept.",
-  "num_blanks": {num_blanks}
+  "num_blanks": {num_blanks},
+  "source_chapter": "Section / sub-heading of the course material the answer comes from",
+  "source_excerpt": "A short verbatim quote from the Course Material (≤140 chars) that proves the answer."
 }}
 
 ---
@@ -454,7 +462,9 @@ Create an **original ESSAY / DISCUSSION question** for the topic "{matching_topi
   "difficulty": "easy" or "medium" or "hard",
   "question": "The essay prompt (1–3 sentences).",
   "answer": "Model answer in paragraph form, ~200–300 words.",
-  "explanation": "- (X marks) point 1\\n- (Y marks) point 2\\n- (Z marks) point 3 …"
+  "explanation": "- (X marks) point 1\\n- (Y marks) point 2\\n- (Z marks) point 3 …",
+  "source_chapter": "Primary chapter / sub-heading the prompt covers",
+  "source_excerpt": "A short verbatim quote from the Course Material (≤140 chars) anchoring the topic."
 }}
 
 ---
@@ -627,3 +637,170 @@ def batch_generate_typed(course_id, question_type, limit, target_difficulty=None
         if "error" not in result:
             results.append(result)
     return results
+
+
+# ────────── Knowledge points (study notes) ──────────────────────────────
+
+def generate_knowledge_points(topic, course_id=None, context_data=None):
+    """Extract structured study notes from a courseware chapter.
+
+    The model decides how many points are needed to fully cover the chapter
+    — no fixed N. Each point is small enough to memorise in isolation:
+    one concept, one sentence definition, a few supporting bullets, and
+    the source excerpt it was distilled from.
+
+    Returns: {"points": [...], "topic": str} or {"error": str}
+    """
+    client = get_client()
+    if not client:
+        return {"error": "DEEPSEEK_API_KEY not configured"}
+
+    if course_id is None:
+        course_id = get_default_course()
+    if context_data is None:
+        context_data = parse_courseware(course_id)
+
+    course_config = get_course(course_id)
+    course_name = course_config.get("name", "Course") if course_config else "Course"
+
+    matching_topic, snippet = _pick_topic_and_context(topic, course_id, context_data)
+
+    prompt = f"""You are a senior study-notes editor preparing exam-ready memorisation cards from lecture material.
+
+## Course
+{course_name}
+
+## Chapter
+{matching_topic}
+
+## Your Task
+Extract **EVERY distinct knowledge point** in the chapter below. Aim for **complete coverage with no omissions** — if a concept, definition, rule, list, framework, comparison, example, or pitfall appears in the material, it deserves a point. Quantity is determined by the chapter, not by a target count.
+
+Each point must be:
+1. **Atomic** — one concept, ready to memorise on its own.
+2. **Self-contained** — readable without seeing other points.
+3. **Anchored** — backed by a verbatim excerpt from the source.
+
+## Each Point Carries
+- `title`: the concept name (Chinese or English, follow the source).
+- `definition`: ONE sentence that captures the concept precisely. This is the line the student would recite on an exam.
+- `details`: 3–6 markdown-friendly bullets that expand the concept (mechanics, sub-points, examples, comparisons, pitfalls). Each bullet stays a single line.
+- `importance`: `"core"` for concepts that exam questions are likely to ask, `"supporting"` for context / examples / nice-to-know.
+- `source_excerpt`: a verbatim quote (≤200 chars) from the chapter that proves the point.
+- `source_chapter`: the sub-section heading inside the chapter (e.g. `"L4 § Aggregation"`). Use the chapter heading itself if no sub-heading exists.
+
+## Output Format (JSON only)
+{{
+  "topic": "{matching_topic}",
+  "points": [
+    {{
+      "title": "...",
+      "definition": "...",
+      "details": ["...", "...", "..."],
+      "importance": "core" | "supporting",
+      "source_excerpt": "...",
+      "source_chapter": "..."
+    }}
+    // ... as many as the chapter requires; do not invent points not in the source
+  ]
+}}
+
+## CRITICAL
+- Do NOT pad. Do NOT invent. If a point is not in the source, omit it.
+- Do NOT collapse two distinct concepts into one point.
+- Do NOT translate — keep the source language unless mixing aids clarity.
+- Order points the way they appear in the chapter so reading them top-to-bottom feels like reading the chapter.
+
+---
+## Chapter Material
+{snippet}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a meticulous study-notes editor. Output ONLY valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            max_tokens=8000,
+            **non_thinking_kwargs(),
+        )
+        result = json.loads(response.choices[0].message.content)
+        result["course_id"] = course_id
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def add_citation_to_question(question, course_id=None, context_data=None):
+    """Generate `source_chapter` + `source_excerpt` for an existing question.
+
+    Used by `manage.py backfill_citations` to retrofit the citation fields
+    onto questions generated before the citation prompt landed.
+
+    Returns: {"source_chapter": str, "source_excerpt": str} or {"error": str}
+    """
+    client = get_client()
+    if not client:
+        return {"error": "DEEPSEEK_API_KEY not configured"}
+
+    if course_id is None:
+        course_id = question.course_id
+    if context_data is None:
+        context_data = parse_courseware(course_id)
+
+    matching_topic, snippet = _pick_topic_and_context(question.topic, course_id, context_data)
+
+    options_block = ""
+    if question.question_type == "mcq" and isinstance(question.options, list):
+        options_block = "\n## Options\n" + "\n".join(question.options)
+
+    prompt = f"""Locate the exact passage in the course material below that justifies the answer to this question.
+
+## Topic
+{matching_topic}
+
+## Question
+{question.question_text}
+{options_block}
+
+## Stated Answer
+{question.answer}
+
+## Your Task
+Return JSON with two fields:
+- `source_chapter`: the sub-section heading the answer is grounded in (e.g. "L4 § Aggregation").
+- `source_excerpt`: a short verbatim quote (≤140 chars) from the material below that proves the answer.
+
+If the chapter material truly does not contain support for the answer, return:
+{{"source_chapter": "", "source_excerpt": ""}}
+
+## Output (JSON only)
+{{
+  "source_chapter": "...",
+  "source_excerpt": "..."
+}}
+
+---
+## Course Material ({matching_topic})
+{snippet}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a meticulous citation editor. Output ONLY valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=400,
+            **non_thinking_kwargs(),
+        )
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        return {"error": str(e)}

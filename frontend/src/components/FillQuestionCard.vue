@@ -68,6 +68,13 @@
         </div>
 
         <div class="qg-prose fill__explanation" v-html="renderedExplanation"></div>
+
+        <footer v-if="question.source_excerpt || question.source_chapter" class="fill__source">
+          <span class="fill__sourceLabel" data-mono>
+            出处<span v-if="question.source_chapter"> · {{ question.source_chapter }}</span>
+          </span>
+          <span v-if="question.source_excerpt" class="fill__sourceExcerpt">「{{ question.source_excerpt }}」</span>
+        </footer>
       </section>
     </transition>
   </article>
@@ -287,6 +294,26 @@ defineExpose({
   line-height: 1.7;
   border-top: 1px solid var(--qg-border-default);
   padding-top: 16px;
+}
+
+.fill__source {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  margin-top: 14px;
+  border-top: 1px dashed var(--qg-border-default);
+}
+.fill__sourceLabel {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--qg-text-tertiary);
+}
+.fill__sourceExcerpt {
+  font-size: var(--qg-text-sm);
+  line-height: 1.55;
+  color: var(--qg-text-tertiary);
+  font-style: italic;
 }
 
 .qg-reveal-enter-active,

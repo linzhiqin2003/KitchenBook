@@ -60,6 +60,13 @@
           </span>
         </div>
         <div class="qg-prose mcq__explanation" v-html="renderedExplanation"></div>
+
+        <footer v-if="question.source_excerpt || question.source_chapter" class="mcq__source">
+          <span class="mcq__sourceLabel" data-mono>
+            出处<span v-if="question.source_chapter"> · {{ question.source_chapter }}</span>
+          </span>
+          <span v-if="question.source_excerpt" class="mcq__sourceExcerpt">「{{ question.source_excerpt }}」</span>
+        </footer>
       </section>
     </transition>
   </article>
@@ -290,6 +297,26 @@ defineExpose({
   line-height: 1.7;
 }
 .mcq__explanation :deep(strong) { color: var(--qg-text-primary); }
+
+.mcq__source {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  margin-top: 14px;
+  border-top: 1px dashed var(--qg-border-default);
+}
+.mcq__sourceLabel {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--qg-text-tertiary);
+}
+.mcq__sourceExcerpt {
+  font-size: var(--qg-text-sm);
+  line-height: 1.55;
+  color: var(--qg-text-tertiary);
+  font-style: italic;
+}
 
 /* Reveal transition for the explanation */
 .qg-reveal-enter-active,
