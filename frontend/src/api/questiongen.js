@@ -32,23 +32,32 @@ export const questionApi = {
         });
     },
 
-    // Smart next - prioritizes cached questions, filters by topic/difficulty, excludes seen
-    smartNext(seenIds = [], generateIfEmpty = true, topic = null, difficulty = null, courseId = null) {
+    // Smart next - prioritizes cached questions, filters by topic/difficulty/type, excludes seen
+    smartNext(seenIds = [], generateIfEmpty = true, topic = null, difficulty = null, courseId = null, questionType = 'mcq') {
         return api.post('/questions/smart-next/', {
             seen_ids: seenIds,
             generate_if_empty: generateIfEmpty,
             topic: topic,
             difficulty: difficulty,
-            course_id: courseId
+            course_id: courseId,
+            question_type: questionType
         });
     },
 
     // Batch generate questions
-    batchGenerate(limit = 5, courseId = null) {
+    batchGenerate(limit = 5, courseId = null, questionType = 'mcq', topic = null, difficulty = null) {
         return api.post('/questions/batch-generate/', {
             limit,
-            course_id: courseId
+            course_id: courseId,
+            question_type: questionType,
+            topic,
+            difficulty
         });
+    },
+
+    // Grade a fill-in-blank or essay answer (mcq is graded client-side)
+    gradeAnswer(questionId, answer) {
+        return api.post(`/questions/${questionId}/grade/`, { answer });
     },
 
     // Get available topics for a course

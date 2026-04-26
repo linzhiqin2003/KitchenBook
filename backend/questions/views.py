@@ -7,7 +7,16 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .models import Question
 from .serializers import QuestionSerializer
-from .services.generator import generate_question, generate_question_for_topic, batch_generate as batch_generate_service
+from .services.generator import (
+    generate_question,
+    generate_question_for_topic,
+    generate_fill_question,
+    generate_essay_question,
+    grade_essay_answer,
+    grade_fill_answer,
+    batch_generate as batch_generate_service,
+    batch_generate_typed,
+)
 from .services.parser import parse_simulation_questions, parse_courseware, get_all_topics
 from .services.courses import get_all_courses, get_course, get_default_course
 import random
@@ -145,13 +154,14 @@ class QuestionViewSet(viewsets.ModelViewSet):
     def smart_next(self, request):
         """
         Get the next question intelligently.
-        Prioritizes cached questions over generation, filters by topic, and excludes seen questions.
+        Prioritizes cached questions over generation, filters by topic/type/difficulty, excludes seen.
         POST /api/questions/smart-next/
         Body: {
             "seen_ids": [1, 2, 3],
             "generate_if_empty": true,
             "topic": "topic-name",
             "difficulty": "easy" or "medium" or "hard" or null,
+            "question_type": "mcq" | "fill" | "essay" | null  (defaults to "mcq" for back-compat),
             "course_id": "course identifier"
         }
         """
@@ -159,90 +169,110 @@ class QuestionViewSet(viewsets.ModelViewSet):
         generate_if_empty = request.data.get('generate_if_empty', True)
         topic = request.data.get('topic')
         difficulty = request.data.get('difficulty')
+        question_type = request.data.get('question_type') or 'mcq'
         course_id = request.data.get('course_id') or get_default_course()
-        
+
+        if question_type not in ('mcq', 'fill', 'essay'):
+            return Response({"error": f"Invalid question_type: {question_type}"}, status=status.HTTP_400_BAD_REQUEST)
+
         # Build query for cached questions
-        queryset = Question.objects.filter(course_id=course_id)
-        
+        queryset = Question.objects.filter(course_id=course_id, question_type=question_type)
+
         # Exclude seen questions
         if seen_ids:
             queryset = queryset.exclude(id__in=seen_ids)
-        
+
         # Filter by topic if provided (exact match, case-insensitive)
         if topic:
             queryset = queryset.filter(topic__iexact=topic)
-        
+
         # Filter by difficulty if provided
         if difficulty and difficulty in ['easy', 'medium', 'hard']:
             queryset = queryset.filter(difficulty=difficulty)
-        
+
         # Try to get a random cached question
         cached_questions = list(queryset)
-        
+
         if cached_questions:
-            # Return a random cached question
             question = random.choice(cached_questions)
             serializer = self.get_serializer(question)
             data = serializer.data
             data['source'] = 'cached'
             return Response(data)
-        
+
         # No cached questions available
         if not generate_if_empty:
             return Response(
                 {"error": "No questions available", "source": "none"},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
-        # Generate a new question
+
+        # Generate a new question, dispatched by type
         try:
-            if topic:
-                # Generate question for specific topic with target difficulty
-                result = generate_question_for_topic(topic, course_id, target_difficulty=difficulty)
-            else:
-                # Generate question from random seed
-                seeds = parse_simulation_questions(course_id)
-                if not seeds:
-                    return Response(
-                        {"error": "No seed questions available for this course"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                seed = random.choice(seeds)
-                result = generate_question(seed, course_id, target_difficulty=difficulty)
-            
+            if question_type == 'mcq':
+                if topic:
+                    result = generate_question_for_topic(topic, course_id, target_difficulty=difficulty)
+                else:
+                    seeds = parse_simulation_questions(course_id)
+                    if not seeds:
+                        # Fall back to topic-based generation when no seed simulation file exists
+                        ctx = parse_courseware(course_id)
+                        if not ctx:
+                            return Response({"error": "No courseware available for this course"}, status=status.HTTP_400_BAD_REQUEST)
+                        random_topic = random.choice(list(ctx.keys()))
+                        result = generate_question_for_topic(random_topic, course_id, target_difficulty=difficulty)
+                    else:
+                        seed = random.choice(seeds)
+                        result = generate_question(seed, course_id, target_difficulty=difficulty)
+            elif question_type == 'fill':
+                effective_topic = topic
+                if not effective_topic:
+                    ctx = parse_courseware(course_id)
+                    if not ctx:
+                        return Response({"error": "No courseware available"}, status=status.HTTP_400_BAD_REQUEST)
+                    effective_topic = random.choice(list(ctx.keys()))
+                result = generate_fill_question(effective_topic, course_id, target_difficulty=difficulty)
+            else:  # essay
+                effective_topic = topic
+                if not effective_topic:
+                    ctx = parse_courseware(course_id)
+                    if not ctx:
+                        return Response({"error": "No courseware available"}, status=status.HTTP_400_BAD_REQUEST)
+                    effective_topic = random.choice(list(ctx.keys()))
+                result = generate_essay_question(effective_topic, course_id, target_difficulty=difficulty)
+
             if "error" in result:
                 return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            # Check for duplicate before saving
+
+            # Dedupe (only meaningful for mcq/fill — essay prompts are hand-crafted enough)
             new_question_text = result.get('question', '')
-            existing = is_duplicate_question(new_question_text, course_id)
-            if existing:
-                # Return existing question instead of creating duplicate
-                serializer = self.get_serializer(existing)
-                data = serializer.data
-                data['source'] = 'cached'
-                data['deduplicated'] = True
-                return Response(data)
-            
-            # Save to database
-            # Use the user-selected topic if provided, otherwise use AI's inferred topic
+            if question_type in ('mcq', 'fill'):
+                existing = is_duplicate_question(new_question_text, course_id)
+                if existing and existing.question_type == question_type:
+                    serializer = self.get_serializer(existing)
+                    data = serializer.data
+                    data['source'] = 'cached'
+                    data['deduplicated'] = True
+                    return Response(data)
+
             saved_topic = topic if topic else result.get('topic', 'general')
             question = Question.objects.create(
                 course_id=course_id,
                 topic=saved_topic,
+                question_type=question_type,
                 difficulty=result.get('difficulty', 'medium'),
                 question_text=new_question_text,
-                options=result.get('options', []),
+                options=result.get('options') if question_type == 'mcq' else None,
                 answer=result.get('answer', ''),
                 explanation=result.get('explanation', ''),
                 seed_question=result.get('seed_question', '')
             )
-            
+
             serializer = self.get_serializer(question)
             data = serializer.data
             data['source'] = 'generated'
             return Response(data, status=status.HTTP_201_CREATED)
-            
+
         except Exception as e:
             return Response(
                 {"error": str(e)},
@@ -252,38 +282,104 @@ class QuestionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='batch-generate')
     def batch_generate(self, request):
         """
-        Generate multiple questions from all seeds.
+        Generate multiple questions of a chosen type, distributed across topics.
         POST /api/questions/batch-generate/
         Body: {
             "limit": 5,
-            "course_id": "course identifier"
+            "course_id": "course identifier",
+            "question_type": "mcq" | "fill" | "essay" (default "mcq"),
+            "topic": "topic-name"  (optional — restrict to a single topic),
+            "difficulty": "easy" | "medium" | "hard" (optional)
         }
+
+        Back-compat: if question_type is omitted AND no courseware topics are usable
+        AND simulation seeds exist, falls back to legacy seed-based MCQ generation.
         """
-        limit = request.data.get('limit', 5)
+        limit = int(request.data.get('limit', 5))
         course_id = request.data.get('course_id') or get_default_course()
-        
-        results = batch_generate_service(course_id, limit=limit)
-        
+        question_type = request.data.get('question_type') or 'mcq'
+        topic = request.data.get('topic')
+        difficulty = request.data.get('difficulty')
+
+        if question_type not in ('mcq', 'fill', 'essay'):
+            return Response({"error": f"Invalid question_type: {question_type}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Prefer topic-distributed batch generator (works for all types)
+        ctx = parse_courseware(course_id)
+        if ctx:
+            results = batch_generate_typed(course_id, question_type, limit, target_difficulty=difficulty, topic=topic)
+        elif question_type == 'mcq':
+            # Legacy fallback: only mcq supports the old seed-based generator
+            results = batch_generate_service(course_id, limit=limit)
+        else:
+            return Response({"error": "No courseware available for this course"}, status=status.HTTP_400_BAD_REQUEST)
+
         created_questions = []
         for result in results:
-            if "error" not in result:
-                question = Question.objects.create(
-                    course_id=course_id,
-                    topic=result.get('topic', 'general'),
-                    difficulty=result.get('difficulty', 'medium'),
-                    question_text=result.get('question', ''),
-                    options=result.get('options', []),
-                    answer=result.get('answer', ''),
-                    explanation=result.get('explanation', ''),
-                    seed_question=result.get('seed_question', '')
-                )
-                created_questions.append(question)
-        
+            if "error" in result:
+                continue
+            qtype = result.get('question_type', question_type)
+            qtext = result.get('question', '')
+            # Dedupe within mcq/fill before insert
+            if qtype in ('mcq', 'fill'):
+                existing = is_duplicate_question(qtext, course_id)
+                if existing and existing.question_type == qtype:
+                    continue
+            question = Question.objects.create(
+                course_id=course_id,
+                topic=topic if topic else result.get('topic', 'general'),
+                question_type=qtype,
+                difficulty=result.get('difficulty', 'medium'),
+                question_text=qtext,
+                options=result.get('options') if qtype == 'mcq' else None,
+                answer=result.get('answer', ''),
+                explanation=result.get('explanation', ''),
+                seed_question=result.get('seed_question', '')
+            )
+            created_questions.append(question)
+
         serializer = self.get_serializer(created_questions, many=True)
         return Response({
             "generated": len(created_questions),
             "questions": serializer.data
         }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='grade')
+    def grade(self, request, pk=None):
+        """
+        Grade a student's answer for fill or essay questions.
+        POST /api/questions/{id}/grade/
+        Body: {
+            "answer": "the student's answer text"  (for fill: separate multi-blanks with '|||')
+        }
+        Returns:
+            For fill: {correct: bool, per_blank: [bool], expected: [str]}
+            For essay: {score: 0-10, max_score: 10, matched_points: [...], missing_points: [...], feedback: str}
+        """
+        try:
+            question = Question.objects.get(pk=pk)
+        except Question.DoesNotExist:
+            return Response({"error": "Question not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        student_answer = request.data.get('answer', '')
+
+        if question.question_type == 'fill':
+            return Response(grade_fill_answer(question.answer, student_answer))
+
+        if question.question_type == 'essay':
+            result = grade_essay_answer(
+                question.question_text,
+                question.answer,
+                question.explanation,  # rubric stored in explanation
+                student_answer,
+                course_id=question.course_id,
+            )
+            if "error" in result:
+                return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(result)
+
+        # mcq questions are graded client-side; reject explicit grade calls
+        return Response({"error": "MCQ questions are graded client-side"}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['get'], url_path='topics')
     def topics(self, request):
@@ -324,22 +420,32 @@ class QuestionViewSet(viewsets.ModelViewSet):
             queryset = Question.objects.all()
         
         total = queryset.count()
-        
+
         # Count questions by topic
         by_topic = {}
-        topic_counts = queryset.values('topic').annotate(count=Count('id'))
-        for item in topic_counts:
+        for item in queryset.values('topic').annotate(count=Count('id')):
             by_topic[item['topic']] = item['count']
-        
+
+        # Count by question_type within current course
+        by_type = {}
+        for item in queryset.values('question_type').annotate(count=Count('id')):
+            by_type[item['question_type']] = item['count']
+
+        # Count by topic + type (for richer UI breakdown)
+        by_topic_type = {}
+        for item in queryset.values('topic', 'question_type').annotate(count=Count('id')):
+            by_topic_type.setdefault(item['topic'], {})[item['question_type']] = item['count']
+
         # Count by course
         by_course = {}
-        course_counts = Question.objects.values('course_id').annotate(count=Count('id'))
-        for item in course_counts:
+        for item in Question.objects.values('course_id').annotate(count=Count('id')):
             by_course[item['course_id']] = item['count']
-        
+
         return Response({
             "total_cached": total,
             "by_topic": by_topic,
+            "by_type": by_type,
+            "by_topic_type": by_topic_type,
             "by_course": by_course,
             "current_course": course_id
         })

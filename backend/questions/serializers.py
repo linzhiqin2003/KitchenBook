@@ -8,6 +8,7 @@ class QuestionSerializer(serializers.ModelSerializer):
             'id',
             'course_id',
             'topic',
+            'question_type',
             'difficulty',
             'question_text',
             'options',
