@@ -1088,7 +1088,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-dvh w-full fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-violet-50/30 flex overflow-hidden">
+  <div class="h-dvh w-full fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-violet-50 flex overflow-hidden">
     <!-- 侧边栏 -->
     <AiLabSidebar
       :conversations="conversations"
