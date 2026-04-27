@@ -1,52 +1,70 @@
 ---
 name: ailab-interpretation
-description: 同声传译与语音处理——语音转文字（ASR）、多语言翻译。当用户需要转录语音、翻译音频内容、处理录音文件时使用。
+description: 同声传译——实时音频流式转译。支持双 ASR 引擎（VAD 逐句 + Tingwu 实时），WebSocket 流式推送，边听边译边显。当用户需要同声传译、实时翻译会议、听译音频时使用。
 version: 1.0.0
 metadata:
   hermes:
-    tags: [asr, transcription, translation, speech, audio]
+    tags: [interpretation, real-time, asr, translation, speech, websocket]
     category: productivity
     risk_level: low
-    estimated_time: 30s
-    requires_toolsets: [mcp]
+    estimated_time: N/A
+    requires_toolsets: [web]
 ---
 
-# AI Lab 语音处理
+# AI Lab 同声传译
 
-使用 `ailab_transcribe` MCP 工具将语音转为文字。
+这是一套完整的**实时音频流式转译系统**，不是简单的音频文件转文字。
 
-## 功能
+## 架构
 
-1. **语音转录** — 将音频/语音文件转换为文字
-2. 支持多种语言：中文 (zh)、英文 (en)、日文 (ja)、韩文 (ko) 等
+```
+浏览器麦克风 ──WebSocket──→ Daphne (ASGI) ──→ VAD 逐句切分
+                                              ├── Qwen ASR 实时识别
+                                              ├── Qwen MT 翻译
+                                              └── WebSocket 推送结果
+```
 
-## 使用方式
+## 两种工作模式
 
-### 语音转文字
+### 1. 实时同声传译（WebSocket — 主力模式）
+
+部署在 `wss://www.lzqqq.org/ws/interpretation/`（Daphne 服务）。
+
+- **双引擎 ASR**：
+  - Standard (VAD) — 逐句切分，识别后翻译，适合会议场景
+  - Tingwu — 通义听悟实时流式，延迟更低
+- **双管道并行**：快速管道逐句出结果，慢速管道积累上下文后给出更准确版本
+- **多语言支持**：中/英/日/韩/德/法/西/俄/葡/阿拉伯/意大利/印地/印尼/泰/土/乌克兰/越
+- **Django WebSocket Consumer**（`apps/interpretation/consumers.py`）处理全双工通信
+
+访问方式：打开 `https://www.lzqqq.org/ai-lab/studio` 使用浏览器端。
+
+### 2. 文件音频转文字（REST API）
+
+使用 `ailab_transcribe` MCP 工具处理已录制的音频文件：
 
 ```
 mcp ailab ailab_transcribe audio_url="https://example.com/audio.webm" language="zh"
 ```
 
-### 后续翻译
+这是降级模式，适合处理录音文件、语音笔记等非实时场景。
 
-转录完成后，可使用 `ailab-chat` 技能进行翻译：
+## 翻译 & 润色（REST API）
 
-```
-mcp ailab ailab_chat message="请将以下文字翻译成英文：{转录结果}"
-```
+后端 `/api/interpretation/` 还提供：
+- `POST /refine/` — 文本润色
+- `POST /translate/` — 文本翻译
+- `POST /transcribe-translate/` — 文件上传 → 转写 → 翻译 一条龙
 
-## 支持的音频格式
+## 服务运行状态
 
-- WebM（推荐）
-- MP3
-- WAV
-- M4A
-- OGG
+- Daphne WebSocket 服务由 systemd 管理：`sudo systemctl status daphne`
+- Django 路由：`/ws/interpretation/` → `InterpretationConsumer`
+- 前端入口：`AiLabStudioView.vue`（Vue 3 + Tailwind）
 
 ## 注意事项
 
-- 音频时长建议不超过 25MB
-- 中文转录使用 `language="zh"`
-- 转录质量受音频清晰度和背景噪音影响
-- 如需实时同声传译，请使用现有的 Django WebSocket 服务（`/api/interpretation/`）
+- 实时传译需要浏览器麦克风权限（HTTPS）
+- Tingwu 模式依赖阿里云 AccessKey
+- 翻译依赖 DashScope API（DASHSCOPE_API_KEY）
+- 这不是一个可被 Agent "调用"的工具——它是持续运行的 WebSocket 服务
