@@ -349,8 +349,9 @@ async def ailab_search_recipes(query: str = "", limit: int = 10) -> str:
         query: 搜索关键词（菜名、食材等），留空则返回全部
         limit: 返回数量，默认 10
     """
-    @sync_to_async
     def _search():
+        from django.db import connection
+        connection.close_if_unusable_or_obsolete()
         from api.models import Recipe
         try:
             qs = Recipe.objects.filter(is_public=True)
@@ -372,7 +373,7 @@ async def ailab_search_recipes(query: str = "", limit: int = 10) -> str:
         except Exception as e:
             return f"搜索菜谱失败：{str(e)}"
 
-    return await _search()
+    return await asyncio.to_thread(_search)
 
 
 @mcp.tool()
@@ -386,8 +387,9 @@ async def ailab_get_blog_posts(limit: int = 5, category: str = "") -> str:
         limit: 返回数量，默认 5
         category: 按分类筛选，留空则返回全部
     """
-    @sync_to_async
     def _get_posts():
+        from django.db import connection
+        connection.close_if_unusable_or_obsolete()
         from api.models import BlogPost
         try:
             qs = BlogPost.objects.filter(is_published=True)
@@ -408,7 +410,7 @@ async def ailab_get_blog_posts(limit: int = 5, category: str = "") -> str:
         except Exception as e:
             return f"获取博客失败：{str(e)}"
 
-    return await _get_posts()
+    return await asyncio.to_thread(_get_posts)
 
 
 # ==================== 入口 ====================
