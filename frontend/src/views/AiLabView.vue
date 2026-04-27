@@ -1109,7 +1109,7 @@ onMounted(async () => {
     />
 
     <!-- 主内容区 -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0 relative">
       <!-- 移动端顶部栏 -->
       <header class="shrink-0 h-12 border-b flex items-center px-4 gap-3 lg:hidden" style="border-color: var(--theme-200); background: var(--theme-50);">
         <button
