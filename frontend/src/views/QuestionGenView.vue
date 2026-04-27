@@ -1747,6 +1747,20 @@ onBeforeUnmount(() => {
 @media (max-width: 720px) {
   .qg-console__group--right { margin-left: 0; }
   .qg-session { display: none; }
+  /* Topic dropdown: anchor to button's left edge so it doesn't overflow
+     the viewport on narrow screens (button is near the left side). */
+  .qg-menu--topic {
+    left: 0;
+    right: auto;
+    min-width: 0;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+  }
+  .qg-menu--course {
+    min-width: 0;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+  }
 }
 
 /* Below 540px: TYPE segment falls back to icons only (still legible);
