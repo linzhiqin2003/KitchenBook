@@ -2,7 +2,6 @@
 import { ref, nextTick, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import LanguageSelector from '../components/ailab/LanguageSelector.vue'
-import BackgroundOrbs from '../components/ailab/BackgroundOrbs.vue'
 import EmojiGenerator from '../components/ailab/EmojiGenerator.vue'
 import { getAiLabApiBase } from '../config/aiLab'
 import { useStreamingAsr } from '../composables/useStreamingAsr'
@@ -947,13 +946,13 @@ function renderMinutesMarkdown(text) {
     .replace(/<think>[\s\S]*/g, '') // unclosed <think> during streaming
     .trim()
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h4 class="text-[14px] font-semibold text-white/80 mt-3 mb-1.5">$1</h4>')
-    .replace(/^## (.+)$/gm, '<h3 class="text-[15px] font-semibold text-white/90 mt-4 mb-2 first:mt-0">$1</h3>')
-    .replace(/^- \[ \] (.+)$/gm, '<div class="flex items-start gap-2 ml-2 mb-1"><span class="text-white/30 mt-0.5">☐</span><span class="text-[13px] text-white/70">$1</span></div>')
-    .replace(/^- (.+)$/gm, '<div class="flex items-start gap-2 ml-2 mb-1"><span class="text-white/40 mt-0.5">•</span><span class="text-[13px] text-white/70">$1</span></div>')
+    .replace(/^### (.+)$/gm, '<h4 class="text-[14px] font-semibold mt-3 mb-1.5" style="color: var(--theme-700);">$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3 class="text-[15px] font-semibold mt-4 mb-2 first:mt-0" style="color: var(--theme-700);">$1</h3>')
+    .replace(/^- \[ \] (.+)$/gm, '<div class="flex items-start gap-2 ml-2 mb-1"><span style="color: var(--theme-300);" class="mt-0.5">☐</span><span class="text-[13px]" style="color: var(--theme-600);">$1</span></div>')
+    .replace(/^- (.+)$/gm, '<div class="flex items-start gap-2 ml-2 mb-1"><span style="color: var(--theme-400);" class="mt-0.5">•</span><span class="text-[13px]" style="color: var(--theme-600);">$1</span></div>')
     .replace(/\n{2,}/g, '<div class="h-2"></div>')
     .replace(/\n/g, '<br>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white/90">$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color: var(--theme-700);">$1</strong>')
 }
 
 // ── Utilities ──
@@ -1014,53 +1013,47 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="h-screen bg-black text-white selection:bg-ios-blue/30 selection:text-white pb-safe overflow-hidden relative font-ailab flex flex-col">
-    <BackgroundOrbs />
+  <div class="h-screen pb-safe overflow-hidden relative flex flex-col" style="background: var(--theme-50, #f8f8f6); color: var(--theme-700, #2d2d28); font-family: var(--ai-font-body);">
 
     <!-- Header -->
-    <header class="relative z-50 flex-none h-16 backdrop-blur-xl bg-black/30 border-b border-white/5">
-      <div class="max-w-[1240px] mx-auto px-4 h-full flex items-center justify-between">
-        <!-- Left -->
+    <header class="relative z-50 flex-none h-12 flex items-center" style="border-bottom: 1px solid var(--theme-200, #e4e4df);">
+      <div class="max-w-[1240px] mx-auto px-4 w-full flex items-center justify-between">
         <div class="flex items-center gap-3 w-[200px]">
           <router-link
             to="/ai-lab"
-            class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center transition-colors"
+            class="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+            style="color: var(--theme-400);"
             title="返回 AI Lab"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
             </svg>
           </router-link>
-          <span class="text-[15px] font-semibold tracking-tight text-white/90 font-display">Studio</span>
+          <span class="text-[13px] font-semibold tracking-tight" style="color: var(--theme-700);">Studio</span>
         </div>
 
-        <!-- Center: Segmented Control -->
         <div class="flex-1 flex justify-center">
-          <div class="bg-white/10 backdrop-blur-md p-1 rounded-full flex relative">
+          <div class="p-0.5 rounded-lg flex relative" style="background: var(--theme-200);">
             <div
-              class="absolute top-1 bottom-1 rounded-full bg-white/20 shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
-              :class="currentView === 'interpretation' ? 'left-1 w-[100px]' : 'left-[108px] w-[110px]'"
+              class="absolute top-0.5 bottom-0.5 rounded-md shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+              style="background: #fff;"
+              :class="currentView === 'interpretation' ? 'left-0.5 w-[76px]' : 'left-[82px] w-[76px]'"
             ></div>
             <button
               @click="currentView = 'interpretation'"
-              class="relative z-10 px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors duration-200"
-              :class="currentView === 'interpretation' ? 'text-white' : 'text-white/60 hover:text-white/80'"
-            >
-              🎙️ 转录翻译
-            </button>
+              class="relative z-10 px-3 py-1 rounded-md text-[12px] font-medium transition-colors duration-200"
+              :style="currentView === 'interpretation' ? 'color: var(--theme-700);' : 'color: var(--theme-400);'"
+            >转录翻译</button>
             <button
               @click="currentView = 'emoji'"
-              class="relative z-10 px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors duration-200"
-              :class="currentView === 'emoji' ? 'text-white' : 'text-white/60 hover:text-white/80'"
-            >
-              🎭 表情包生成
-            </button>
+              class="relative z-10 px-3 py-1 rounded-md text-[12px] font-medium transition-colors duration-200"
+              :style="currentView === 'emoji' ? 'color: var(--theme-700);' : 'color: var(--theme-400);'"
+            >表情包</button>
           </div>
         </div>
 
-        <!-- Right: Provider badge -->
         <div class="flex items-center justify-end gap-2 w-[200px]">
-          <span class="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[11px] font-medium text-white/40 uppercase tracking-wider">
+          <span class="px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider" style="border: 1px solid var(--theme-200); color: var(--theme-400);">
             {{ currentView === 'interpretation'
               ? (asrProvider === 'tingwu' ? 'Tingwu ASR+Trans' : (asrModel || 'Qwen3-ASR') + ' + Cerebras')
               : 'Emoji-v1' }}
@@ -1082,44 +1075,43 @@ onUnmounted(() => {
               <div class="w-40">
                 <LanguageSelector v-model="sourceLang" label="From" :disabled="isRecording || inflight > 0" />
               </div>
-              <div class="pt-5 text-white/20">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              <div class="pt-5" style="color: var(--theme-300);">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
               </div>
               <div class="w-40">
                 <LanguageSelector v-model="targetLang" label="To" :disabled="isRecording || inflight > 0" :is-target="true" />
               </div>
-              <!-- Provider toggle -->
               <div class="pt-5 ml-2">
-                <div class="bg-white/5 p-0.5 rounded-lg flex text-[11px]">
+                <div class="p-0.5 rounded-lg flex text-[11px]" style="background: var(--theme-200);">
                   <button
                     @click="asrProvider = 'standard'"
                     :disabled="isRecording"
                     class="px-2.5 py-1 rounded-md transition-all"
-                    :class="asrProvider === 'standard'
-                      ? 'bg-white/15 text-white/90 shadow-sm'
-                      : 'text-white/40 hover:text-white/60'"
+                    :style="asrProvider === 'standard'
+                      ? 'background: #fff; color: var(--theme-700); box-shadow: 0 1px 2px rgba(0,0,0,0.05);'
+                      : 'color: var(--theme-400);'"
                   >Standard</button>
                   <button
                     @click="asrProvider = 'tingwu'"
                     :disabled="isRecording"
                     class="px-2.5 py-1 rounded-md transition-all"
-                    :class="asrProvider === 'tingwu'
-                      ? 'bg-emerald-500/20 text-emerald-300 shadow-sm'
-                      : 'text-white/40 hover:text-white/60'"
+                    :style="asrProvider === 'tingwu'
+                      ? 'background: #fff; color: var(--theme-700); box-shadow: 0 1px 2px rgba(0,0,0,0.05);'
+                      : 'color: var(--theme-400);'"
                   >Tingwu</button>
                 </div>
               </div>
             </div>
-            <!-- Action buttons -->
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5">
               <button
                 v-if="canGenerateMinutes"
                 @click="generateMeetingMinutes"
                 :disabled="generatingMinutes"
-                class="px-3 py-2 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 border border-purple-500/20 hover:border-purple-500/30 text-[12px] text-purple-300 hover:text-purple-200 transition-all disabled:opacity-50"
+                class="px-3 py-1.5 rounded-lg text-[12px] transition-all disabled:opacity-50"
+                style="background: var(--ai-accent-soft); color: var(--ai-accent); border: 1px solid var(--theme-200);"
               >
                 <span v-if="generatingMinutes" class="flex items-center gap-1.5">
-                  <span class="w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></span>
+                  <span class="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style="border-color: var(--ai-accent); border-top-color: transparent;"></span>
                   生成中...
                 </span>
                 <span v-else>会议纪要</span>
@@ -1127,79 +1119,72 @@ onUnmounted(() => {
               <button
                 v-if="transcriptionHistory.length"
                 @click="copyAll"
-                class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[12px] text-white/60 hover:text-white transition-colors"
-              >复制全部</button>
+                class="px-3 py-1.5 rounded-lg text-[12px] transition-colors"
+                style="border: 1px solid var(--theme-200); color: var(--theme-500);"
+              >复制</button>
               <button
                 v-if="transcriptionHistory.length"
                 @click="downloadText"
-                class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[12px] text-white/60 hover:text-white transition-colors"
+                class="px-3 py-1.5 rounded-lg text-[12px] transition-colors"
+                style="border: 1px solid var(--theme-200); color: var(--theme-500);"
               >下载</button>
               <button
                 v-if="transcriptionHistory.length"
                 @click="clearHistory"
-                class="px-3 py-2 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/10 text-[12px] text-white/40 hover:text-red-400 transition-colors"
+                class="px-3 py-1.5 rounded-lg text-[12px] transition-colors hover:text-red-500"
+                style="border: 1px solid var(--theme-200); color: var(--theme-400);"
               >清空</button>
             </div>
           </div>
 
           <!-- Input area: Record + Upload + Status -->
-          <div class="flex-none ios-glass rounded-[20px] p-5 ring-1 ring-white/10 relative overflow-hidden">
-            <!-- Waveform visualization canvas (behind everything) -->
+          <div class="flex-none rounded-xl p-4 relative overflow-hidden" style="background: var(--theme-100); border: 1px solid var(--theme-200);">
             <canvas v-show="isRecording" ref="vizCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
             <div class="relative flex items-center justify-center gap-4">
-              <!-- Recording timer -->
-              <div v-if="isRecording" class="text-2xl font-light tabular-nums tracking-tighter text-white/80 font-display w-20 text-center">
+              <div v-if="isRecording" class="text-xl font-light tabular-nums tracking-tighter w-16 text-center" style="color: var(--theme-500);">
                 {{ formatTime(recordingTime) }}
               </div>
 
-              <!-- Record button with attached upload icon -->
               <div class="relative">
                 <button
                   @click="toggleRecording"
-                  class="relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 group"
-                  :class="isRecording
-                    ? 'bg-ios-red shadow-lg shadow-ios-red/30'
-                    : 'bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30'"
+                  class="relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 group"
+                  :style="isRecording
+                    ? 'background: #e53e3e; box-shadow: 0 4px 12px rgba(229,62,62,0.25);'
+                    : 'background: var(--theme-200); color: var(--theme-500);'"
                 >
-                  <!-- Pulse ring when recording -->
-                  <div v-if="isRecording" class="absolute inset-0 rounded-full bg-ios-red/40 animate-ping"></div>
-                  <!-- Mic / Stop icon -->
-                  <svg v-if="!isRecording" class="w-7 h-7 text-white/80 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 10v2a7 7 0 01-14 0v-2"/>
-                    <line x1="12" y1="19" x2="12" y2="23" stroke-width="1.5" stroke-linecap="round"/>
-                    <line x1="8" y1="23" x2="16" y2="23" stroke-width="1.5" stroke-linecap="round"/>
+                  <div v-if="isRecording" class="absolute inset-0 rounded-full animate-ping" style="background: rgba(229,62,62,0.3);"></div>
+                  <svg v-if="!isRecording" class="w-6 h-6 transition-colors" style="color: var(--theme-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
                   </svg>
-                  <svg v-else class="w-6 h-6 text-white relative z-10" fill="currentColor" viewBox="0 0 24 24">
-                    <rect x="6" y="6" width="12" height="12" rx="2"/>
+                  <svg v-else class="w-5 h-5 text-white relative z-10" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="7" y="7" width="10" height="10" rx="2"/>
                   </svg>
                 </button>
 
-                <!-- Upload file: small icon at bottom-right of record button -->
                 <input type="file" ref="fileInput" accept="audio/*,video/*" class="hidden" @change="handleFileSelect">
                 <button
                   v-if="!isRecording"
                   @click="triggerFileSelect"
-                  class="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 hover:border-white/30 flex items-center justify-center transition-all group/upload"
+                  class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center transition-all group/upload"
+                  style="background: var(--theme-200); border: 1px solid var(--theme-300); color: var(--theme-400);"
                   title="上传音频文件"
                 >
-                  <svg class="w-3.5 h-3.5 text-white/50 group-hover/upload:text-white/80 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                  <svg class="w-3 h-3 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
                   </svg>
                 </button>
               </div>
 
-              <!-- Inflight indicator (only show when not recording) -->
-              <div v-if="inflight > 0 && !isRecording" class="flex items-center gap-3 pl-2">
-                <div class="w-5 h-5 border-2 border-ios-blue border-t-transparent rounded-full animate-spin"></div>
-                <span class="text-[13px] text-ios-blue font-medium">
+              <div v-if="inflight > 0 && !isRecording" class="flex items-center gap-2 pl-2">
+                <div class="w-4 h-4 border-2 rounded-full animate-spin" style="border-color: var(--ai-accent); border-top-color: transparent;"></div>
+                <span class="text-[12px] font-medium" style="color: var(--ai-accent);">
                   处理中 ({{ inflight }})
                 </span>
               </div>
-            </div> <!-- /relative -->
+            </div>
 
-            <!-- Error -->
-            <div v-if="errorMsg" class="mt-3 text-center text-[12px] text-red-400">
+            <div v-if="errorMsg" class="mt-2 text-center text-[12px] text-red-500">
               {{ errorMsg }}
             </div>
           </div>
@@ -1207,69 +1192,60 @@ onUnmounted(() => {
           <!-- Results: two-column transcript by paragraphs -->
           <div ref="historyContainer" class="flex-1 overflow-y-auto custom-scrollbar min-h-0 space-y-3">
 
-            <!-- Empty state -->
             <div v-if="!transcriptionHistory.length && inflight === 0 && !showMinutes" class="h-full flex items-center justify-center">
-              <div class="text-center space-y-3 opacity-40">
-                <div class="text-4xl">🎙️</div>
-                <p class="text-[14px] text-white/60">录音或上传音频文件，自动转录并翻译</p>
-                <p class="text-[11px] text-white/30">
+              <div class="text-center space-y-2">
+                <svg class="w-8 h-8 mx-auto" style="color: var(--theme-300);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
+                </svg>
+                <p class="text-[13px]" style="color: var(--theme-400);">录音或上传音频文件，自动转录并翻译</p>
+                <p class="text-[11px]" style="color: var(--theme-300);">
                   {{ asrProvider === 'tingwu'
-                    ? '实时流式识别+翻译 · Powered by 通义听悟'
-                    : '语音自动检测，停顿时自动切分 · Powered by Silero VAD + Qwen3-ASR + Cerebras' }}
+                    ? 'Powered by 通义听悟'
+                    : 'Powered by Silero VAD + Qwen3-ASR + Cerebras' }}
                 </p>
               </div>
             </div>
 
-            <!-- Two-column transcript table (paragraph groups) -->
-            <div v-if="transcriptionHistory.length" class="ios-glass rounded-2xl ring-1 ring-white/10 overflow-hidden">
-              <!-- Column headers -->
-              <div class="grid grid-cols-2 gap-4 px-5 pt-3 pb-2 border-b border-white/5 sticky top-0 bg-black/60 backdrop-blur-md z-10">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-white/30">Original</span>
-                <span class="text-[10px] font-bold uppercase tracking-wider text-ios-blue/60">Translation</span>
+            <div v-if="transcriptionHistory.length" class="rounded-xl overflow-hidden" style="border: 1px solid var(--theme-200);">
+              <div class="grid grid-cols-2 gap-4 px-5 pt-3 pb-2 sticky top-0 z-10" style="border-bottom: 1px solid var(--theme-200); background: var(--theme-100);">
+                <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--theme-400);">Original</span>
+                <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--ai-accent);">Translation</span>
               </div>
 
-              <!-- Continuous text flow -->
-              <div class="grid grid-cols-2 gap-4 px-5 py-3">
-                <!-- Original (left) -->
+              <div class="grid grid-cols-2 gap-4 px-5 py-3" style="background: #fff;">
                 <p class="text-[14px] leading-relaxed">
                   <template v-for="group in paragraphs" :key="'o-' + group.paragraphId">
                     <span
                       @mouseenter="hoveredId = group.paragraphId"
                       @mouseleave="hoveredId = null"
                       class="transition-colors duration-200 rounded px-0.5 -mx-0.5"
-                      :class="[
-                        hoveredId === group.paragraphId ? 'bg-yellow-200/15' : '',
-                        group.isFinal ? 'text-white/80' : 'text-white/35 shimmer-text'
-                      ]"
+                      :class="hoveredId === group.paragraphId ? 'bg-amber-100/60' : ''"
+                      :style="group.isFinal ? 'color: var(--theme-700);' : 'color: var(--theme-300);'"
                     >{{ group.original }}</span>{{ ' ' }}
                   </template>
                   <span v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending" class="inline-flex items-center ml-1 align-middle">
-                    <span class="w-2.5 h-2.5 border-[1.5px] border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
+                    <span class="w-2.5 h-2.5 border-[1.5px] rounded-full animate-spin" style="border-color: var(--ai-accent); border-top-color: transparent;"></span>
                   </span>
                 </p>
 
-                <!-- Translation (right) -->
                 <p class="text-[14px] leading-relaxed">
                   <template v-for="group in paragraphs" :key="'t-' + group.paragraphId">
                     <span
                       @mouseenter="hoveredId = group.paragraphId"
                       @mouseleave="hoveredId = null"
                       class="transition-colors duration-200 rounded px-0.5 -mx-0.5"
-                      :class="[
-                        hoveredId === group.paragraphId ? 'bg-yellow-200/15' : '',
-                        group.isFinal ? 'text-white/90' : 'text-white/30 shimmer-text'
-                      ]"
+                      :class="hoveredId === group.paragraphId ? 'bg-amber-100/60' : ''"
+                      :style="group.isFinal ? 'color: var(--theme-700);' : 'color: var(--theme-300);'"
                     >{{ group.translated }}</span>{{ ' ' }}
                   </template>
                   <span v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending && paragraphs[paragraphs.length - 1].translated" class="inline-flex items-center ml-1 align-middle">
-                    <span class="w-2.5 h-2.5 border-[1.5px] border-ios-blue/50 border-t-transparent rounded-full animate-spin"></span>
+                    <span class="w-2.5 h-2.5 border-[1.5px] rounded-full animate-spin" style="border-color: var(--ai-accent); border-top-color: transparent;"></span>
                   </span>
                 </p>
               </div>
 
-              <!-- Stats footer -->
-              <div class="px-5 py-2 border-t border-white/5 text-center">
-                <span class="text-[11px] text-white/20">{{ totalEntries }} 段记录</span>
+              <div class="px-5 py-2 text-center" style="border-top: 1px solid var(--theme-200);">
+                <span class="text-[11px]" style="color: var(--theme-400);">{{ totalEntries }} 段记录</span>
               </div>
             </div>
           </div>
@@ -1287,49 +1263,29 @@ onUnmounted(() => {
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showMinutes" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="closeMinutes">
-          <!-- Backdrop -->
-          <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-          <!-- Modal content -->
-          <div class="relative w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl p-[1px] bg-gradient-to-br from-purple-500/40 via-blue-500/30 to-cyan-500/20">
-            <div class="flex flex-col bg-[#0d0d14]/95 backdrop-blur-xl rounded-2xl overflow-hidden">
-              <!-- Header -->
-              <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
-                <div class="flex items-center gap-2.5">
-                  <span class="text-[15px] font-semibold text-purple-300">会议纪要</span>
-                  <div v-if="generatingMinutes" class="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-                <button
-                  @click="closeMinutes"
-                  class="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                  </svg>
-                </button>
+          <div class="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+          <div class="relative w-full max-w-2xl max-h-[80vh] flex flex-col rounded-xl overflow-hidden" style="background: #fff; border: 1px solid var(--theme-200); box-shadow: 0 8px 32px rgba(0,0,0,0.08);">
+            <div class="flex items-center justify-between px-6 py-3 shrink-0" style="border-bottom: 1px solid var(--theme-200);">
+              <div class="flex items-center gap-2">
+                <span class="text-[14px] font-semibold" style="color: var(--theme-700);">会议纪要</span>
+                <div v-if="generatingMinutes" class="w-3 h-3 border-2 rounded-full animate-spin" style="border-color: var(--ai-accent); border-top-color: transparent;"></div>
               </div>
-              <!-- Body -->
-              <div class="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
-                <div
-                  v-if="meetingMinutes"
-                  class="text-[13px] leading-relaxed text-white/70"
-                  v-html="renderMinutesMarkdown(meetingMinutes)"
-                ></div>
-                <div v-else-if="generatingMinutes" class="flex items-center gap-2 text-[13px] text-white/30 py-8 justify-center">
-                  <span class="w-4 h-4 border-2 border-purple-400/50 border-t-transparent rounded-full animate-spin"></span>
-                  正在生成会议纪要...
-                </div>
+              <button @click="closeMinutes" class="w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer" style="color: var(--theme-400);">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
+              <div v-if="meetingMinutes" class="text-[13px] leading-relaxed" style="color: var(--theme-600);" v-html="renderMinutesMarkdown(meetingMinutes)"></div>
+              <div v-else-if="generatingMinutes" class="flex items-center gap-2 text-[13px] py-8 justify-center" style="color: var(--theme-400);">
+                <span class="w-4 h-4 border-2 rounded-full animate-spin" style="border-color: var(--ai-accent); border-top-color: transparent;"></span>
+                正在生成会议纪要...
               </div>
-              <!-- Footer -->
-              <div v-if="meetingMinutes && !generatingMinutes" class="px-6 py-3 border-t border-white/5 shrink-0 flex justify-end gap-2">
-                <button
-                  @click="navigator.clipboard.writeText(meetingMinutes); closeMinutes()"
-                  class="px-4 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[12px] text-white/60 hover:text-white/80 transition-colors"
-                >复制纪要</button>
-                <button
-                  @click="closeMinutes"
-                  class="px-4 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-[12px] text-purple-300 hover:text-purple-200 transition-colors"
-                >关闭</button>
-              </div>
+            </div>
+            <div v-if="meetingMinutes && !generatingMinutes" class="px-6 py-3 shrink-0 flex justify-end gap-2" style="border-top: 1px solid var(--theme-200);">
+              <button @click="navigator.clipboard.writeText(meetingMinutes); closeMinutes()" class="px-4 py-1.5 rounded-lg text-[12px] transition-colors" style="border: 1px solid var(--theme-200); color: var(--theme-500);">复制纪要</button>
+              <button @click="closeMinutes" class="px-4 py-1.5 rounded-lg text-[12px] transition-colors" style="background: var(--theme-700); color: var(--theme-50);">关闭</button>
             </div>
           </div>
         </div>
@@ -1344,7 +1300,7 @@ onUnmounted(() => {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.4) 50%,
+    rgba(0, 0, 0, 0.08) 50%,
     transparent 100%
   );
   background-size: 200% 100%;

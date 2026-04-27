@@ -8,7 +8,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-// Source languages — codes match Qwen3-ASR-1.7B language codes
 const sourceLanguages = [
   { code: 'en', name: 'English' },
   { code: 'zh', name: '中文' },
@@ -42,7 +41,6 @@ const sourceLanguages = [
   { code: 'mk', name: 'Македонски' },
 ]
 
-// Target languages — full names for translation prompt
 const targetLanguages = [
   { code: 'Chinese', name: '中文' },
   { code: 'English', name: 'English' },
@@ -78,18 +76,17 @@ const targetLanguages = [
 </script>
 
 <template>
-  <div class="flex flex-col gap-2">
-    <label class="text-[13px] font-medium text-ios-gray ml-1">
+  <div class="flex flex-col gap-1.5">
+    <label class="text-[12px] font-medium ml-0.5" style="color: var(--theme-400);">
       {{ label }}
     </label>
-    <div class="relative group">
+    <div class="relative">
       <select
         :value="modelValue"
         @change="emit('update:modelValue', $event.target?.value || '')"
         :disabled="disabled"
-        class="w-full appearance-none bg-ios-card2 text-white border border-transparent rounded-xl py-3 px-4 pr-10
-               focus:outline-none focus:border-ios-blue transition-colors disabled:opacity-50
-               text-[15px] font-medium"
+        class="w-full appearance-none rounded-lg py-2 px-3 pr-9 focus:outline-none transition-colors disabled:opacity-50 text-[14px] font-medium"
+        style="background: #fff; color: var(--theme-700); border: 1px solid var(--theme-200);"
       >
         <template v-if="isTarget">
           <option v-for="lang in targetLanguages" :key="lang.code" :value="lang.code">
@@ -102,10 +99,8 @@ const targetLanguages = [
           </option>
         </template>
       </select>
-      
-      <!-- Custom Arrow -->
-      <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-ios-gray">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <div class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--theme-400);">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
