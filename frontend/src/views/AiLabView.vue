@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import API_BASE_URL from '../config/api'
+import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
 
 // ===== 会话管理状态 =====
@@ -10,16 +10,6 @@ const currentConversation = ref(null)
 // 移动端默认折叠侧边栏
 const isSidebarCollapsed = ref(window.innerWidth < 1024)
 const isLoadingConversations = ref(false)
-
-// ===== 模型选择 =====
-const MODEL_OPTIONS = [
-  { id: 'deepseek-v4-flash', name: 'Flash', desc: 'Fast', icon: 'bolt' },
-  { id: 'deepseek-v4-pro', name: 'Pro', desc: 'More complex', icon: 'sparkle' },
-]
-const selectedModel = ref('deepseek-v4-flash')
-
-const THINKING_LEVELS = ['none', 'low', 'medium', 'high', 'max']
-const thinkingLevel = ref('low')
 
 // ===== 聊天状态 =====
 const isLoading = ref(false)
@@ -288,7 +278,7 @@ const streamResponse = async () => {
   // 添加空的 AI 消息用于流式填充
   const aiMessageIndex = messages.value.length
   currentStreamingIndex.value = aiMessageIndex
-  const currentModelName = MODEL_OPTIONS.find(m => m.id === selectedModel.value)?.name || selectedModel.value
+  const currentModelName = 'Hermes'
   messages.value.push({
     role: 'assistant',
     content: '',
@@ -642,16 +632,19 @@ const streamResponse = async () => {
   abortController = new AbortController()
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/speciale/`, {
+    const response = await fetch(`${HERMES_API_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: apiMessages, model: selectedModel.value, thinking: thinkingLevel.value }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${HERMES_API_KEY}`,
+      },
+      body: JSON.stringify({ model: 'hermes-agent', messages: apiMessages, stream: true }),
       signal: abortController.signal
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || '请求失败')
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.error || `请求失败 (${response.status})`)
     }
 
     const reader = response.body.getReader()
@@ -668,22 +661,64 @@ const streamResponse = async () => {
       const lines = buffer.split('\n')
       buffer = lines.pop() || ''
 
+      let currentEventType = null
       for (const line of lines) {
         if (!line || line.startsWith(':')) continue
 
+        // Handle named SSE events (event: hermes.reasoning, etc.)
+        if (line.startsWith('event: ')) {
+          currentEventType = line.slice(7).trim()
+          continue
+        }
+
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim()
-          if (data === '[DONE]') break
+          if (data === '[DONE]') {
+            hasDoneEvent = true
+            stats.value.endTime = Date.now()
+            setPhase(STREAM_PHASE.IDLE)
+            break
+          }
           if (!data) continue
 
           try {
             const parsed = JSON.parse(data)
-            handleStreamEvent(parsed)
+
+            if (currentEventType === 'hermes.reasoning') {
+              appendReasoningChunk(parsed.text)
+            } else if (currentEventType === 'hermes.tool.start') {
+              setPhase(STREAM_PHASE.TOOL_EXECUTING)
+              upsertToolCall({
+                id: parsed.id,
+                name: parsed.name,
+                argumentsText: parsed.args,
+                status: TOOL_STATUS.RUNNING,
+              }, { appendArguments: false })
+            } else if (currentEventType === 'hermes.tool.complete') {
+              upsertToolCall({
+                id: parsed.id,
+                name: parsed.name,
+                status: parsed.error ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS,
+                result: parsed.result,
+                error: parsed.error,
+              }, { appendArguments: false })
+            } else if (currentEventType === 'hermes.tool.progress') {
+              setPhase(STREAM_PHASE.TOOL_EXECUTING)
+              upsertToolCall({
+                name: parsed.tool,
+                status: TOOL_STATUS.RUNNING,
+                progressMessage: `${parsed.emoji || ''} ${parsed.label || parsed.tool}`.trim(),
+              }, { appendArguments: false })
+            } else {
+              // Standard OpenAI delta chunk
+              handleOpenAIChunk(parsed)
+            }
           } catch (e) {
             if (!(e instanceof SyntaxError)) {
               throw e
             }
           }
+          currentEventType = null
         }
       }
     }
@@ -1145,9 +1180,6 @@ onMounted(async () => {
       <AiLabWelcome
         v-if="!hasMessages"
         :is-loading="isLoading"
-        :selected-model="selectedModel"
-        :model-options="MODEL_OPTIONS"
-        @update:selected-model="selectedModel = $event"
         @ask="handleQuickAsk"
       />
 
@@ -1227,12 +1259,6 @@ onMounted(async () => {
         :is-ocr-processing="isOcrProcessing"
         :recording-duration="recordingDuration"
         :has-image="!!selectedImage"
-        :selected-model="selectedModel"
-        :model-options="MODEL_OPTIONS"
-        :thinking-level="thinkingLevel"
-        :thinking-levels="THINKING_LEVELS"
-        @update:selected-model="selectedModel = $event"
-        @update:thinking-level="thinkingLevel = $event"
         @send="handleSend"
         @stop="stopGeneration"
         @image-click="triggerFileInput"
