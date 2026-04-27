@@ -29,7 +29,6 @@ django.setup()
 
 from mcp.server.fastmcp import FastMCP
 from django.conf import settings
-from asgiref.sync import sync_to_async
 
 logger = logging.getLogger(__name__)
 
