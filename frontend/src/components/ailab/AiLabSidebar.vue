@@ -263,7 +263,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 底部导航 -->
-    <div class="p-3 border-t border-gray-200 space-y-1">
+    <div class="px-3 pt-3 pb-5 border-t border-gray-200 space-y-1">
       <router-link
         to="/ai-lab/studio"
         :class="[

@@ -63,8 +63,8 @@ const handleFullLogout = () => {
     <RouterView />
   </div>
 
-  <!-- AI Lab 全屏模式 -->
-  <div v-else-if="isAiLabPage" class="min-h-screen">
+  <!-- AI Lab 全屏模式 — bg-slate-50 防止 macOS 窗口圆角露出深色 body -->
+  <div v-else-if="isAiLabPage" class="min-h-screen bg-slate-50">
     <RouterView />
   </div>
   
