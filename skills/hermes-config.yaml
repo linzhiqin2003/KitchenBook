@@ -1,0 +1,27 @@
+# Hermes Agent 配置 — ailab 集成片段
+# 将此内容合并到 ~/.hermes/config.yaml
+
+# ==================== MCP 服务器注册 ====================
+mcp_servers:
+  ailab:
+    command: python
+    args:
+      - -m
+      - mcp_server.server
+    cwd: /Users/linzhiqin/Codespace/MyProject/MyWeb/backend
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+
+# ==================== 技能加载路径 ====================
+# 将项目 skills/ 目录加入技能搜索路径
+skill_paths:
+  - /Users/linzhiqin/Codespace/MyProject/MyWeb/skills
+
+# ==================== 推荐模型配置（可选） ====================
+# 如果使用 DeepSeek 作为默认 AI 对话模型：
+# models:
+#   default: deepseek-v4-flash
+#   providers:
+#     deepseek:
+#       api_key: ${DEEPSEEK_API_KEY}
+#       base_url: https://api.deepseek.com

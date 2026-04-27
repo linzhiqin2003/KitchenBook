@@ -194,7 +194,7 @@ const router = createRouter({
       path: '/ai-lab',
       name: 'ai-lab',
       component: AiLabView,
-      meta: { title: 'AI Lab | DeepSeek Reasoner' }
+      meta: { title: 'AI Lab | 智能对话' }
     },
     {
       path: '/ai-lab/studio',
