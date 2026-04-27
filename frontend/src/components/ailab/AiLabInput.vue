@@ -107,7 +107,7 @@ const formatDuration = (seconds) => {
           :disabled="isLoading || isRecording"
           :placeholder="isRecording ? '录音中…' : '继续对话…'"
           class="w-full bg-transparent resize-none scrollbar-hide outline-none border-none focus:ring-0 focus:outline-none"
-          style="color: var(--theme-700); padding: 10px 48px 10px 80px; min-height: 40px; max-height: 8rem; font-size: 14px; line-height: 1.5;"
+          style="color: var(--theme-700); padding: 9px 48px 9px 76px; min-height: 38px; max-height: 8rem; font-size: 14px; line-height: 20px;"
           rows="1"
         ></textarea>
 

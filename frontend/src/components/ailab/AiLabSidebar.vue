@@ -163,8 +163,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full min-h-0 transition-all duration-300"
-       style="background: #f7f7f8; border-right: 1px solid #ebebed; font-family: var(--ai-font-body);"
+  <div class="flex flex-col transition-all duration-300"
+       style="background: #f7f7f8; border-right: 1px solid #ebebed; font-family: var(--ai-font-body); height: 100vh; height: 100dvh;"
        :class="[
          isCollapsed ? 'w-0 lg:w-16 overflow-hidden' : 'w-60',
          'fixed z-50 lg:relative lg:z-auto'
@@ -254,7 +254,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 底部导航 -->
-    <div class="px-2 pt-2 pb-8 space-y-0.5" style="border-top: 1px solid #ebebed;">
+    <div class="px-2 pt-2 pb-8 space-y-0.5 shrink-0" style="border-top: 1px solid #ebebed;">
       <router-link
         to="/ai-lab/studio"
         :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors hover:bg-black/[0.04]', isCollapsed && 'justify-center']"
