@@ -56,11 +56,11 @@ const formatDuration = (seconds) => {
 </script>
 
 <template>
-  <div class="absolute bottom-0 left-0 right-0 pt-8 pb-5 px-4" style="background: linear-gradient(to top, var(--theme-50) 60%, transparent); font-family: var(--ai-font-body);">
+  <div class="absolute bottom-0 left-0 right-0 pt-4 pb-3 px-4" style="background: linear-gradient(to top, var(--theme-50) 70%, transparent); font-family: var(--ai-font-body);">
     <div class="max-w-3xl mx-auto relative">
-      <div class="relative transition-all" style="background: var(--theme-50); border: 1px solid var(--theme-200); border-radius: 12px;">
+      <div class="relative transition-all" style="background: var(--theme-50); border: 1px solid var(--theme-200); border-radius: 10px;">
         <!-- 左侧按钮组 -->
-        <div class="absolute bottom-2.5 left-2.5 flex items-center gap-0.5">
+        <div class="absolute bottom-1.5 left-2 flex items-center gap-0.5">
           <button
             @click="emit('image-click')"
             :disabled="isLoading || isOcrProcessing || isRecording"
@@ -107,23 +107,23 @@ const formatDuration = (seconds) => {
           :disabled="isLoading || isRecording"
           :placeholder="isRecording ? '录音中…' : '继续对话…'"
           class="w-full bg-transparent resize-none scrollbar-hide outline-none border-none focus:ring-0 focus:outline-none"
-          style="color: var(--theme-700); padding: 14px 52px 14px 88px; min-height: 48px; max-height: 8rem; font-size: 14px; line-height: 1.5;"
+          style="color: var(--theme-700); padding: 10px 48px 10px 80px; min-height: 40px; max-height: 8rem; font-size: 14px; line-height: 1.5;"
           rows="1"
         ></textarea>
 
         <!-- 发送/停止按钮 -->
-        <div class="absolute bottom-2.5 right-2.5">
+        <div class="absolute bottom-1.5 right-2">
           <button v-if="isLoading" @click="emit('stop')"
-            class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+            class="w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
             style="background: var(--theme-200); color: var(--theme-600);">
-            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
               <rect x="6" y="6" width="12" height="12" rx="2"/>
             </svg>
           </button>
           <button v-else @click="emit('send')" :disabled="!localValue.trim() && !hasImage"
-             class="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+             class="w-7 h-7 rounded-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
              style="background: var(--theme-700); color: var(--theme-50);">
-             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18"/>
              </svg>
           </button>
@@ -153,6 +153,12 @@ const formatDuration = (seconds) => {
                 :style="model.id === selectedModel
                   ? 'background: var(--ai-accent-soft); color: var(--ai-accent); font-size: 13px;'
                   : 'color: var(--theme-600); font-size: 13px;'">
+                <svg v-if="model.icon === 'bolt'" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+                </svg>
+                <svg v-else-if="model.icon === 'sparkle'" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                </svg>
                 <span class="flex-1">
                   <span class="font-medium">{{ model.name }}</span>
                   <span v-if="model.desc" style="color: var(--theme-400); margin-left: 4px;">{{ model.desc }}</span>

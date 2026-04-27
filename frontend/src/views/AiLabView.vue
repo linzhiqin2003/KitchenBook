@@ -13,8 +13,8 @@ const isLoadingConversations = ref(false)
 
 // ===== 模型选择 =====
 const MODEL_OPTIONS = [
-  { id: 'deepseek-v4-flash', name: 'Flash', desc: 'Fast' },
-  { id: 'deepseek-v4-pro', name: 'Pro', desc: 'More complex' },
+  { id: 'deepseek-v4-flash', name: 'Flash', desc: 'Fast', icon: 'bolt' },
+  { id: 'deepseek-v4-pro', name: 'Pro', desc: 'More complex', icon: 'sparkle' },
 ]
 const selectedModel = ref('deepseek-v4-flash')
 

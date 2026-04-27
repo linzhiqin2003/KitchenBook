@@ -164,7 +164,7 @@ onUnmounted(() => {
 
 <template>
   <div class="flex flex-col h-full min-h-0 transition-all duration-300"
-       style="background: var(--theme-100); border-right: 1px solid var(--theme-200); font-family: var(--ai-font-body);"
+       style="background: #f7f7f8; border-right: 1px solid #ebebed; font-family: var(--ai-font-body);"
        :class="[
          isCollapsed ? 'w-0 lg:w-16 overflow-hidden' : 'w-60',
          'fixed z-50 lg:relative lg:z-auto'
@@ -191,7 +191,7 @@ onUnmounted(() => {
     <div class="px-3 pb-2">
       <button @click="emit('new')"
               class="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg transition-colors cursor-pointer text-[13px] font-medium"
-              style="background: var(--theme-50); border: 1px solid var(--theme-200); color: var(--theme-600);">
+              style="background: #fff; border: 1px solid #e0e0e3; color: #4a4a4f;">
         <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
         </svg>
@@ -206,7 +206,7 @@ onUnmounted(() => {
       </div>
 
       <template v-for="(group, groupName) in groupedConversations" :key="groupName">
-        <div v-if="!isCollapsed" class="px-2 py-1.5 mt-3 first:mt-0" style="font-size: 11px; font-weight: 500; color: var(--theme-400); letter-spacing: 0.02em;">
+        <div v-if="!isCollapsed" class="px-2 py-1.5 mt-3 first:mt-0" style="font-size: 11px; font-weight: 500; color: #9a9aa0; letter-spacing: 0.02em;">
           {{ groupName }}
         </div>
         <div v-for="chat in group" :key="chat.id"
@@ -215,7 +215,7 @@ onUnmounted(() => {
              :class="[
                isCollapsed ? 'justify-center' : ''
              ]"
-             :style="currentId === chat.id ? 'background: var(--theme-50); color: var(--theme-700);' : 'color: var(--theme-500);'"
+             :style="currentId === chat.id ? 'background: #eeeef0; color: #2c2c30;' : 'color: #6e6e76;'"
              :title="isCollapsed ? chat.title : ''">
 
           <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -254,33 +254,22 @@ onUnmounted(() => {
     </div>
 
     <!-- 底部导航 -->
-    <div class="px-2 pt-2 pb-5 space-y-0.5" style="border-top: 1px solid var(--theme-200);">
+    <div class="px-2 pt-2 pb-8 space-y-0.5" style="border-top: 1px solid #ebebed;">
       <router-link
         to="/ai-lab/studio"
-        :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors', isCollapsed && 'justify-center']"
-        style="color: var(--theme-500); font-size: 13px;"
-        :title="isCollapsed ? '转录翻译' : ''"
+        :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors hover:bg-black/[0.04]', isCollapsed && 'justify-center']"
+        style="color: #8a8a90; font-size: 13px;"
+        :title="isCollapsed ? 'Studio' : ''"
       >
         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
         </svg>
-        <span v-if="!isCollapsed">转录翻译</span>
-      </router-link>
-      <router-link
-        to="/ai-lab/studio?view=emoji"
-        :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors', isCollapsed && 'justify-center']"
-        style="color: var(--theme-500); font-size: 13px;"
-        :title="isCollapsed ? '表情包生成' : ''"
-      >
-        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z"/>
-        </svg>
-        <span v-if="!isCollapsed">表情包</span>
+        <span v-if="!isCollapsed">Studio</span>
       </router-link>
       <router-link
         to="/"
-        :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors', isCollapsed && 'justify-center']"
-        style="color: var(--theme-500); font-size: 13px;"
+        :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors hover:bg-black/[0.04]', isCollapsed && 'justify-center']"
+        style="color: #8a8a90; font-size: 13px;"
       >
         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
