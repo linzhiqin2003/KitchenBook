@@ -30,7 +30,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("ailab", description="AI Lab 智能工具集 — DeepSeek 对话、OCR、语音转录、表情包生成、菜谱搜索")
+mcp = FastMCP("ailab", instructions="AI Lab 智能工具集 — DeepSeek 对话、OCR、语音转录、表情包生成、菜谱搜索")
 
 # ==================== 模型配置（与 views.py 保持一致） ====================
 
