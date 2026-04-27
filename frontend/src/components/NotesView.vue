@@ -180,10 +180,21 @@ function lockDeckHeight() {
     deckRef.value.style.height = `${deckRef.value.scrollHeight}px`;
   }
 }
-function releaseDeckHeight() {
-  if (deckRef.value) {
-    deckRef.value.style.height = '';
-  }
+function releaseDeckHeight(el) {
+  const deck = deckRef.value;
+  if (!deck) return;
+  // Measure new natural height, then animate from locked → new
+  const from = deck.style.height;
+  deck.style.height = 'auto';
+  const to = `${deck.scrollHeight}px`;
+  deck.style.height = from;
+  void deck.offsetHeight; // force reflow so transition fires
+  deck.style.height = to;
+  const onEnd = () => {
+    deck.removeEventListener('transitionend', onEnd);
+    deck.style.height = '';
+  };
+  deck.addEventListener('transitionend', onEnd);
 }
 
 const currentCount = computed(() => points.value.length);
@@ -552,6 +563,7 @@ defineExpose({ reload, regenerate: onRegenerate });
   user-select: none;
   -webkit-user-select: none;
   touch-action: pan-y;
+  transition: height var(--qg-dur-base) var(--qg-ease);
 }
 .notes__card {
   width: 100%;
