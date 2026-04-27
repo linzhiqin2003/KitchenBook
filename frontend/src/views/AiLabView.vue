@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import API_BASE_URL from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
 
@@ -1054,6 +1054,14 @@ const handleQuickAsk = (prompt) => {
 }
 
 // ===== 初始化 =====
+// macOS 窗口圆角会裁切四角，露出 body 背景色；覆盖为浅色，离开时还原
+const _prevBodyBg = document.body.style.backgroundColor
+document.body.style.backgroundColor = '#f8fafc' // slate-50
+
+onUnmounted(() => {
+  document.body.style.backgroundColor = _prevBodyBg
+})
+
 onMounted(async () => {
   // 加载 MathJax
   if (!window.MathJax) {
