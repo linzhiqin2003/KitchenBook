@@ -412,34 +412,22 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
 <template>
   <!-- 用户消息 -->
-  <div v-if="message.role === 'user'" class="w-full py-4 px-6 animate-fade-in flex justify-end">
+  <div v-if="message.role === 'user'" class="w-full py-3 px-6 animate-fade-in flex justify-end" style="font-family: var(--ai-font-body);">
     <div class="flex gap-3 flex-row-reverse max-w-3xl">
-      <!-- 用户头像 -->
-      <div class="flex-shrink-0">
-        <div class="w-9 h-9 rounded-full flex items-center justify-center shadow-lg shadow-violet-500/20 text-white text-sm font-medium"
-             style="background: linear-gradient(135deg, #8b5cf6, #d946ef);">
-          U
-        </div>
-      </div>
-
-      <!-- 消息内容 -->
       <div class="flex flex-col items-end">
-        <div class="text-xs font-medium mb-1.5 text-violet-500">You</div>
-
         <div class="relative group/bubble">
-          <!-- 编辑按钮 -->
           <div v-if="!isEditing"
-               class="absolute -left-10 top-1/2 -translate-y-1/2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+               class="absolute -left-9 top-1/2 -translate-y-1/2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
             <button @click="startEdit"
-                    class="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all cursor-pointer"
+                    class="p-1 rounded-md transition-all cursor-pointer"
+                    style="color: var(--theme-400);"
                     title="编辑消息">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z"/>
               </svg>
             </button>
           </div>
 
-          <!-- 编辑模式 -->
           <div v-if="isEditing" class="flex flex-col items-end gap-2">
             <textarea
               ref="editTextarea"
@@ -448,25 +436,27 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
               @keydown.esc="cancelEdit"
               @input="autoResizeTextarea"
               :style="{ width: editBoxWidth + 'px' }"
-              class="rounded-2xl px-5 py-2.5 bg-white border-2 border-violet-300 text-gray-900 leading-relaxed resize-none focus:outline-none focus:border-violet-400 overflow-hidden"
+              class="rounded-xl px-4 py-3 bg-white leading-relaxed resize-none focus:outline-none overflow-hidden"
+              style="border: 1px solid var(--ai-accent); color: var(--theme-700); font-size: 14px;"
             ></textarea>
             <div class="flex items-center gap-2">
               <button @click="submitEdit"
                       :disabled="!editContent.trim()"
-                      class="px-3 py-1.5 text-xs bg-violet-500 text-white rounded-full hover:bg-violet-600 transition-colors disabled:opacity-50 cursor-pointer">
+                      class="px-3 py-1 text-xs rounded-md transition-colors disabled:opacity-50 cursor-pointer"
+                      style="background: var(--theme-700); color: var(--theme-50);">
                 发送
               </button>
               <button @click="cancelEdit"
-                      class="text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+                      class="text-xs transition-colors cursor-pointer" style="color: var(--theme-400);">
                 取消
               </button>
             </div>
           </div>
 
-          <!-- 正常显示 -->
           <div v-else
                ref="bubbleRef"
-               class="rounded-2xl px-6 py-4 bg-violet-100 text-gray-900 leading-relaxed text-sm whitespace-pre-wrap break-words max-w-[600px]">
+               class="rounded-xl px-4 py-3 leading-relaxed whitespace-pre-wrap break-words max-w-[600px]"
+               style="background: var(--theme-100); color: var(--theme-700); font-size: 14px;">
             {{ message.content }}
           </div>
         </div>
@@ -475,18 +465,10 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   </div>
 
   <!-- AI 消息 -->
-  <div v-else-if="message.role === 'assistant'" class="w-full py-4 px-6 animate-fade-in flex justify-start">
+  <div v-else-if="message.role === 'assistant'" class="w-full py-3 px-6 animate-fade-in flex justify-start" style="font-family: var(--ai-font-body);">
     <div class="flex gap-3 max-w-[calc(100%-48px)]">
-      <!-- AI 头像 -->
-      <div class="flex-shrink-0">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg theme-avatar">
-          <span class="text-white text-sm">✨</span>
-        </div>
-      </div>
-
-      <!-- 消息内容 -->
       <div class="flex flex-col items-start flex-1 min-w-0">
-        <div class="text-xs font-medium mb-2 text-indigo-500">{{ message.modelName || 'DeepSeek Reasoner' }}</div>
+        <div class="mb-1.5" style="font-size: 12px; font-weight: 600; color: var(--theme-400); letter-spacing: 0.01em;">{{ message.modelName || 'AI' }}</div>
 
         <!-- 工具调用时间线 -->
         <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3">
@@ -645,13 +627,12 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
           ></div>
 
           <!-- 加载中状态 -->
-          <div v-else-if="isStreaming && !message.reasoning" class="flex items-center gap-2 text-gray-400 py-1">
+          <div v-else-if="isStreaming && !message.reasoning" class="flex items-center gap-2 py-1" style="color: var(--theme-400);">
             <div class="flex items-center gap-1">
-              <span class="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
-              <span class="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
-              <span class="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+              <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 0ms"></span>
+              <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 150ms"></span>
+              <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 300ms"></span>
             </div>
-            <span class="text-xs">正在连接...</span>
           </div>
 
           <!-- AI 消息操作按钮 -->
@@ -736,11 +717,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   background: rgba(200, 180, 140, 0.6);
 }
 
-/* Theme avatar */
-.theme-avatar {
-  background: var(--theme-gradient);
-  box-shadow: 0 4px 14px var(--theme-shadow);
-}
+/* (avatar removed in redesign) */
 
 /* === Trace Header (整体折叠) === */
 .trace-header {
@@ -773,7 +750,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
 /* === Trace Timeline === */
 .trace-timeline {
-  border-left: 2px solid #e2e8f0;
+  border-left: 1px solid var(--theme-200, #e4e4df);
   padding-left: 0.875rem;
   margin-left: 0.125rem;
 }
@@ -982,14 +959,15 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   50% { opacity: 1; transform: scale(1.2); }
 }
 
-/* Markdown 样式 */
+/* Markdown — The Quiet Studio */
 .markdown-content {
-  color: #1f2937;
-  line-height: 1.75;
+  color: var(--theme-700, #2d2d28);
+  line-height: 1.7;
+  font-size: 14px;
 }
 
 .markdown-content :deep(p) {
-  margin: 0.75em 0;
+  margin: 0.625em 0;
 }
 
 .markdown-content :deep(h1),
@@ -997,139 +975,123 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .markdown-content :deep(h3),
 .markdown-content :deep(h4) {
   font-weight: 600;
-  color: #111827;
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
+  color: var(--theme-700, #2d2d28);
+  margin-top: 1.25em;
+  margin-bottom: 0.4em;
+  letter-spacing: -0.01em;
 }
 
-.markdown-content :deep(h1) { font-size: 1.5em; }
-.markdown-content :deep(h2) { font-size: 1.25em; }
-.markdown-content :deep(h3) { font-size: 1.1em; }
+.markdown-content :deep(h1) { font-size: 1.4em; }
+.markdown-content :deep(h2) { font-size: 1.2em; }
+.markdown-content :deep(h3) { font-size: 1.05em; }
 
 .markdown-content :deep(ul),
 .markdown-content :deep(ol) {
   padding-left: 1.5em;
-  margin: 0.75em 0;
+  margin: 0.625em 0;
 }
 
-.markdown-content :deep(li) {
-  margin: 0.25em 0;
-}
-
-.markdown-content :deep(ul) {
-  list-style-type: disc;
-}
-
-.markdown-content :deep(ul ul) {
-  list-style-type: circle;
-}
+.markdown-content :deep(li) { margin: 0.2em 0; }
+.markdown-content :deep(ul) { list-style-type: disc; }
+.markdown-content :deep(ul ul) { list-style-type: circle; }
 
 .markdown-content :deep(strong) {
   font-weight: 600;
-  color: #111827;
+  color: var(--theme-700, #2d2d28);
 }
 
 .markdown-content :deep(em) {
   font-style: italic;
-  color: #4b5563;
+  color: var(--theme-500, #6b6b63);
 }
 
 .markdown-content :deep(a) {
-  color: #7c3aed;
+  color: var(--ai-accent, #3d7cc9);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: border-color 0.2s;
 }
 
 .markdown-content :deep(a:hover) {
-  border-bottom-color: #7c3aed;
+  border-bottom-color: var(--ai-accent, #3d7cc9);
 }
 
-/* 行内代码 */
 .markdown-content :deep(code:not(pre code)),
 .markdown-content :deep(.inline-code) {
-  background: linear-gradient(135deg, #f3e8ff, #ede9fe);
-  color: #6d28d9;
-  padding: 0.15em 0.4em;
-  border-radius: 0.25em;
-  font-size: 0.9em;
-  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  background: var(--theme-100, #f0f0ed);
+  color: var(--theme-600, #484843);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: var(--ai-font-mono, 'Geist Mono', ui-monospace, monospace);
 }
 
-/* 代码块 */
 .markdown-content :deep(pre),
 .markdown-content :deep(.code-block) {
-  background: linear-gradient(135deg, #1e1e2e, #2d2d3d);
-  border-radius: 0.75em;
-  padding: 1em;
-  margin: 1em 0;
+  background: #1c1c1e;
+  border-radius: 8px;
+  padding: 0.875em 1em;
+  margin: 0.75em 0;
   overflow-x: auto;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .markdown-content :deep(pre code),
 .markdown-content :deep(.code-block code) {
   background: transparent;
-  color: #e2e8f0;
+  color: #d4d4d8;
   padding: 0;
-  font-size: 0.875em;
-  line-height: 1.7;
-  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-size: 0.85em;
+  line-height: 1.65;
+  font-family: var(--ai-font-mono, 'Geist Mono', ui-monospace, monospace);
 }
 
-/* 引用块 */
 .markdown-content :deep(blockquote),
 .markdown-content :deep(.md-quote) {
-  border-left: 4px solid #a78bfa;
-  background: linear-gradient(135deg, #f5f3ff, #faf5ff);
+  background: var(--theme-100, #f0f0ed);
   padding: 0.75em 1em;
-  margin: 1em 0;
-  border-radius: 0 0.5em 0.5em 0;
-  color: #4b5563;
+  margin: 0.75em 0;
+  border-radius: 8px;
+  color: var(--theme-500, #6b6b63);
 }
 
-.markdown-content :deep(blockquote p) {
-  margin: 0;
-}
+.markdown-content :deep(blockquote p) { margin: 0; }
 
-/* 水平线 */
 .markdown-content :deep(hr) {
   border: none;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #d1d5db, transparent);
-  margin: 1.5em 0;
+  background: var(--theme-200, #e4e4df);
+  margin: 1.25em 0;
 }
 
-/* 表格 */
 .markdown-content :deep(table) {
   width: 100%;
   border-collapse: collapse;
-  margin: 1em 0;
+  margin: 0.75em 0;
   font-size: 0.9em;
 }
 
 .markdown-content :deep(th),
 .markdown-content :deep(td) {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--theme-200, #e4e4df);
   padding: 0.5em 0.75em;
   text-align: left;
 }
 
 .markdown-content :deep(th) {
-  background: linear-gradient(135deg, #f9fafb, #f3f4f6);
+  background: var(--theme-100, #f0f0ed);
   font-weight: 600;
-  color: #374151;
+  color: var(--theme-700, #2d2d28);
 }
 
 .markdown-content :deep(tr:nth-child(even)) {
-  background-color: #f9fafb;
+  background: var(--theme-50, #f8f8f6);
 }
 
-/* 图片 */
 .markdown-content :deep(img) {
   max-width: 100%;
-  border-radius: 0.5em;
-  margin: 1em 0;
+  border-radius: 8px;
+  margin: 0.75em 0;
 }
 
 /* 数学公式样式 */
@@ -1179,10 +1141,10 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   justify-content: center;
   font-size: 0.7em;
   font-weight: 600;
-  color: #7c3aed;
-  background: #f3e8ff;
+  color: var(--ai-accent, #3d7cc9);
+  background: var(--ai-accent-soft, #edf2f8);
   padding: 0.05em 0.35em;
-  border-radius: 0.25em;
+  border-radius: 3px;
   text-decoration: none;
   border-bottom: none !important;
   vertical-align: super;
@@ -1191,7 +1153,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 }
 
 .markdown-content :deep(.ref-link:hover) {
-  background: #7c3aed;
+  background: var(--ai-accent, #3d7cc9);
   color: #fff;
   border-bottom: none !important;
 }

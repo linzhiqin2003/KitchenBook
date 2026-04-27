@@ -89,8 +89,8 @@ defineExpose({
 <template>
   <div class="flex-1 flex flex-col overflow-hidden relative">
     <!-- 会话标题栏 -->
-    <div v-if="conversationTitle" class="shrink-0 h-12 border-b border-gray-200 flex items-center px-4 bg-white/80 backdrop-blur-sm">
-      <h2 class="text-sm font-medium text-gray-700 truncate">{{ conversationTitle }}</h2>
+    <div v-if="conversationTitle" class="shrink-0 h-11 flex items-center px-5" style="border-bottom: 1px solid var(--theme-200, #e4e4df);">
+      <h2 class="truncate" style="font-size: 13px; font-weight: 500; color: var(--theme-500, #6b6b63);">{{ conversationTitle }}</h2>
     </div>
 
     <!-- 消息列表 -->
@@ -120,7 +120,8 @@ defineExpose({
       <button
         v-if="!isNearBottom"
         @click="scrollToBottom(true)"
-        class="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/90 backdrop-blur border border-gray-200 rounded-full shadow-lg text-xs text-gray-500 hover:text-gray-700 hover:bg-white transition-all cursor-pointer flex items-center gap-1 z-10"
+        class="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 z-10"
+        style="background: var(--theme-50, #f8f8f6); border: 1px solid var(--theme-200, #e4e4df); font-size: 12px; color: var(--theme-500, #6b6b63);"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>

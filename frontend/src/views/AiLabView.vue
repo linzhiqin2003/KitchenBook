@@ -1056,7 +1056,7 @@ const handleQuickAsk = (prompt) => {
 // ===== 初始化 =====
 // macOS 窗口圆角会裁切四角，露出 body 背景色；覆盖为浅色，离开时还原
 const _prevBodyBg = document.body.style.backgroundColor
-document.body.style.backgroundColor = '#f8fafc' // slate-50
+document.body.style.backgroundColor = '#f8f8f6' // warm stone-50
 
 onUnmounted(() => {
   document.body.style.backgroundColor = _prevBodyBg
@@ -1096,7 +1096,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-dvh w-full fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-violet-50 flex overflow-hidden">
+  <div class="h-dvh w-full fixed inset-0 flex overflow-hidden" style="background: #f8f8f6; font-family: var(--ai-font-body);">
     <!-- 侧边栏 -->
     <AiLabSidebar
       :conversations="conversations"
@@ -1111,31 +1111,30 @@ onMounted(async () => {
     <!-- 主内容区 -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- 移动端顶部栏 -->
-      <header class="shrink-0 h-14 bg-white/80 backdrop-blur-sm border-b border-gray-200 flex items-center px-4 gap-3 lg:hidden">
+      <header class="shrink-0 h-12 border-b flex items-center px-4 gap-3 lg:hidden" style="border-color: var(--theme-200); background: var(--theme-50);">
         <button
           @click="toggleSidebar"
-          class="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer"
+          class="w-8 h-8 rounded-md flex items-center justify-center transition-colors cursor-pointer"
+          style="color: var(--theme-500);"
         >
-          <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/>
           </svg>
         </button>
 
         <div class="flex items-center gap-2 flex-1 min-w-0">
-          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
-            <span class="text-sm">✨</span>
-          </div>
-          <div class="min-w-0">
-            <h1 class="text-sm font-semibold text-gray-800 truncate">AI Lab</h1>
-          </div>
+          <span class="text-[13px] font-semibold tracking-tight" style="color: var(--theme-700);">AI Lab</span>
         </div>
 
         <router-link
           to="/ai-lab/studio"
-          class="w-9 h-9 rounded-lg bg-violet-50 hover:bg-violet-100 flex items-center justify-center transition-colors"
-          title="AI Studio"
+          class="w-8 h-8 rounded-md flex items-center justify-center transition-colors"
+          style="color: var(--theme-400);"
+          title="Studio"
         >
-          <span class="text-sm">🎙️</span>
+          <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
+          </svg>
         </router-link>
       </header>
 
@@ -1248,19 +1247,25 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* 主题变量 */
+/* The Quiet Studio — warm stone neutrals + restrained accent */
 :root {
-  --theme-50: #f5f3ff;
-  --theme-100: #ede9fe;
-  --theme-200: #ddd6fe;
-  --theme-300: #c4b5fd;
-  --theme-400: #a78bfa;
-  --theme-500: #8b5cf6;
-  --theme-600: #7c3aed;
-  --theme-700: #6d28d9;
-  --theme-gradient: linear-gradient(135deg, #8b5cf6, #d946ef);
-  --theme-gradient-btn: linear-gradient(to right, #8b5cf6, #9333ea);
-  --theme-shadow: rgba(139, 92, 246, 0.2);
+  --theme-50: #f8f8f6;
+  --theme-100: #f0f0ed;
+  --theme-200: #e4e4df;
+  --theme-300: #c8c8c1;
+  --theme-400: #9c9c93;
+  --theme-500: #6b6b63;
+  --theme-600: #484843;
+  --theme-700: #2d2d28;
+  --theme-gradient: #2d2d28;
+  --theme-gradient-btn: #2d2d28;
+  --theme-shadow: rgba(45, 45, 40, 0.06);
+  --ai-accent: #3d7cc9;
+  --ai-accent-hover: #2e6ab5;
+  --ai-accent-soft: #edf2f8;
+  --ai-font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --ai-font-body: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --ai-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* 动态视口高度兼容 */
