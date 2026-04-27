@@ -976,8 +976,7 @@ class DeepSeekSpecialeView(APIView):
             'api_key_setting': 'DEEPSEEK_API_KEY',
             'base_url': 'https://api.deepseek.com',
             'model': 'deepseek-v4-flash',
-            # flash 默认开启 thinking 会浪费 token，显式禁用走快速模式
-            'extra_body': {'thinking': {'type': 'disabled'}},
+            'extra_body': {},
             'extra_headers': {},
         },
         'deepseek-v4-pro': {
@@ -985,21 +984,24 @@ class DeepSeekSpecialeView(APIView):
             'api_key_setting': 'DEEPSEEK_API_KEY',
             'base_url': 'https://api.deepseek.com',
             'model': 'deepseek-v4-pro',
-            'extra_body': {
-                'thinking': {'type': 'enabled'},
-                'reasoning_effort': 'high',
-            },
+            'extra_body': {},
             'extra_headers': {},
         },
     }
+
+    VALID_THINKING_LEVELS = {'none', 'low', 'medium', 'high', 'max'}
 
     def post(self, request):
         """处理对话请求（流式响应 + agentic 工具调用循环）"""
         messages = request.data.get('messages', [])
         model_key = request.data.get('model', 'deepseek-v4-pro')
+        thinking_level = request.data.get('thinking', 'low')
 
         if not messages:
             return Response({'error': '消息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if thinking_level not in self.VALID_THINKING_LEVELS:
+            thinking_level = 'low'
 
         # 查找模型配置
         model_config = self.MODEL_CONFIGS.get(model_key)
@@ -1030,7 +1032,12 @@ class DeepSeekSpecialeView(APIView):
 
             client = OpenAI(api_key=api_key, base_url=base_url)
 
-            extra_body = model_config.get('extra_body') or {}
+            extra_body = dict(model_config.get('extra_body') or {})
+            if thinking_level == 'none':
+                extra_body['thinking'] = {'type': 'disabled'}
+            else:
+                extra_body['thinking'] = {'type': 'enabled'}
+                extra_body['reasoning_effort'] = thinking_level
             extra_headers = model_config.get('extra_headers') or {}
             model_name = model_config['model']
 

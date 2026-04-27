@@ -18,6 +18,9 @@ const MODEL_OPTIONS = [
 ]
 const selectedModel = ref('deepseek-v4-flash')
 
+const THINKING_LEVELS = ['none', 'low', 'medium', 'high', 'max']
+const thinkingLevel = ref('low')
+
 // ===== 聊天状态 =====
 const isLoading = ref(false)
 const inputMessage = ref('')
@@ -642,7 +645,7 @@ const streamResponse = async () => {
     const response = await fetch(`${API_BASE_URL}/api/ai/speciale/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: apiMessages, model: selectedModel.value }),
+      body: JSON.stringify({ messages: apiMessages, model: selectedModel.value, thinking: thinkingLevel.value }),
       signal: abortController.signal
     })
 
@@ -1226,7 +1229,10 @@ onMounted(async () => {
         :has-image="!!selectedImage"
         :selected-model="selectedModel"
         :model-options="MODEL_OPTIONS"
+        :thinking-level="thinkingLevel"
+        :thinking-levels="THINKING_LEVELS"
         @update:selected-model="selectedModel = $event"
+        @update:thinking-level="thinkingLevel = $event"
         @send="handleSend"
         @stop="stopGeneration"
         @image-click="triggerFileInput"
