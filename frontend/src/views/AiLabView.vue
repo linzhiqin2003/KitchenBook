@@ -1246,8 +1246,8 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
-/* The Quiet Studio — warm stone neutrals + restrained accent */
+<style>
+/* The Quiet Studio — CSS variables must be unscoped to cascade into child components */
 :root {
   --theme-50: #f8f8f6;
   --theme-100: #f0f0ed;
@@ -1267,6 +1267,9 @@ onMounted(async () => {
   --ai-font-body: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', sans-serif;
   --ai-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+</style>
+
+<style scoped>
 
 /* 动态视口高度兼容 */
 .h-dvh {
