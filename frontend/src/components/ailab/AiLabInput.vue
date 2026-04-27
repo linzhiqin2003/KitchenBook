@@ -32,7 +32,7 @@ const props = defineProps({
   },
   selectedModel: {
     type: String,
-    default: 'deepseek-reasoner'
+    default: 'deepseek-v4-flash'
   },
   modelOptions: {
     type: Array,

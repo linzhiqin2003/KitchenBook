@@ -969,35 +969,34 @@ class DeepSeekSpecialeView(APIView):
             "7. 调用 web_search 时，务必使用 focus 参数传递检索重点，告诉摘要 AI 应该关注提取什么信息。例如搜索公司财报时设置 focus='关注最新季度营收、净利润和同比增长率'。\n"
         )
 
-    # 统一走 OpenRouter，reasoning 字段一致为 model_extra['reasoning']
-    OPENROUTER_HEADERS = {
-        'HTTP-Referer': 'https://www.lzqqq.org',
-        'X-Title': 'AI Lab',
-    }
-
+    # DeepSeek 官方 API（OpenAI 兼容），通过 extra_body.thinking 切换思考模式
     MODEL_CONFIGS = {
-        'deepseek-reasoner': {
-            'label': 'DeepSeek Reasoner',
-            'api_key_setting': 'OPENROUTER_API_KEY',
-            'base_url': 'https://openrouter.ai/api/v1',
-            'model': 'deepseek/deepseek-r1',
-            'extra_body': {},
-            'extra_headers': OPENROUTER_HEADERS,
+        'deepseek-v4-flash': {
+            'label': 'DeepSeek V4 Flash',
+            'api_key_setting': 'DEEPSEEK_API_KEY',
+            'base_url': 'https://api.deepseek.com',
+            'model': 'deepseek-v4-flash',
+            # flash 默认开启 thinking 会浪费 token，显式禁用走快速模式
+            'extra_body': {'thinking': {'type': 'disabled'}},
+            'extra_headers': {},
         },
-        'stepfun-flash': {
-            'label': 'StepFun Flash',
-            'api_key_setting': 'OPENROUTER_API_KEY',
-            'base_url': 'https://openrouter.ai/api/v1',
-            'model': 'stepfun/step-3.5-flash:free',
-            'extra_body': {},
-            'extra_headers': OPENROUTER_HEADERS,
+        'deepseek-v4-pro': {
+            'label': 'DeepSeek V4 Pro',
+            'api_key_setting': 'DEEPSEEK_API_KEY',
+            'base_url': 'https://api.deepseek.com',
+            'model': 'deepseek-v4-pro',
+            'extra_body': {
+                'thinking': {'type': 'enabled'},
+                'reasoning_effort': 'high',
+            },
+            'extra_headers': {},
         },
     }
 
     def post(self, request):
         """处理对话请求（流式响应 + agentic 工具调用循环）"""
         messages = request.data.get('messages', [])
-        model_key = request.data.get('model', 'deepseek-reasoner')
+        model_key = request.data.get('model', 'deepseek-v4-pro')
 
         if not messages:
             return Response({'error': '消息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1075,9 +1074,9 @@ class DeepSeekSpecialeView(APIView):
                         delta = choice.delta
                         finish_reason = choice.finish_reason or finish_reason
 
-                        # 2a. reasoning (OpenRouter 统一字段)
+                        # 2a. reasoning（DeepSeek 直连: model_extra.reasoning_content）
                         extra = getattr(delta, 'model_extra', None) or {}
-                        rc = extra.get('reasoning') or getattr(delta, 'reasoning_content', None)
+                        rc = extra.get('reasoning_content') or extra.get('reasoning') or getattr(delta, 'reasoning_content', None)
                         if rc:
                             if not reasoning_started:
                                 reasoning_started = True

@@ -13,10 +13,10 @@ const isLoadingConversations = ref(false)
 
 // ===== 模型选择 =====
 const MODEL_OPTIONS = [
-  { id: 'stepfun-flash', name: 'StepFun Flash', desc: 'Free' },
-  { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', desc: 'Tool Calling' },
+  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', desc: 'Fast' },
+  { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', desc: 'Reasoning' },
 ]
-const selectedModel = ref('stepfun-flash')
+const selectedModel = ref('deepseek-v4-flash')
 
 // ===== 聊天状态 =====
 const isLoading = ref(false)
