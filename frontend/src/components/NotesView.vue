@@ -85,8 +85,8 @@
 
     <!-- Card / flashcard mode -->
     <div v-else class="notes__cards">
-      <div class="notes__deck" @touchstart.passive="onTouchStart" @touchend.passive="onTouchEnd">
-        <transition :name="`notes-card-${slideDir}`" mode="out-in">
+      <div class="notes__deck" ref="deckRef" @touchstart.passive="onTouchStart" @touchend.passive="onTouchEnd">
+        <transition :name="`notes-card-${slideDir}`" mode="out-in" @before-leave="lockDeckHeight" @after-enter="releaseDeckHeight">
           <article
             :key="currentPoint.id"
             class="notes__card notes__item"
@@ -173,6 +173,18 @@ const viewMode = ref(localStorage.getItem(VIEW_MODE_KEY) === 'card' ? 'card' : '
 const cardIndex = ref(0);
 const slideDir = ref('next'); // 'next' | 'prev' — drives transition direction
 const cardRef = ref(null);
+const deckRef = ref(null);
+
+function lockDeckHeight() {
+  if (deckRef.value) {
+    deckRef.value.style.height = `${deckRef.value.scrollHeight}px`;
+  }
+}
+function releaseDeckHeight() {
+  if (deckRef.value) {
+    deckRef.value.style.height = '';
+  }
+}
 
 const currentCount = computed(() => points.value.length);
 const currentPoint = computed(() => points.value[cardIndex.value] || points.value[0]);
