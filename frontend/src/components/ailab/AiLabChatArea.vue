@@ -25,6 +25,8 @@ const emit = defineEmits(['edit', 'regenerate'])
 
 const messagesContainer = ref(null)
 const reasoningCollapsed = ref({})
+// 记录已经"思维链结束→自动折叠"过的消息 index，避免在用户重新展开后被再次折叠
+const autoCollapsedOnce = new Set()
 const isNearBottom = ref(true)
 
 // 跟踪用户滚动位置
@@ -79,6 +81,20 @@ watch(
 const toggleReasoning = (index) => {
   reasoningCollapsed.value[index] = !reasoningCollapsed.value[index]
 }
+
+// 思维链阶段结束（reasoning → answering）时自动折叠当前流式消息的思维链，
+// 给最终答案让出视觉焦点。每条消息只自动折叠一次，用户后续展开后不再干预。
+watch(
+  () => props.isReasoningPhase,
+  (now, prev) => {
+    if (prev !== true || now !== false) return
+    const idx = props.currentStreamingIndex
+    if (idx == null) return
+    if (autoCollapsedOnce.has(idx)) return
+    autoCollapsedOnce.add(idx)
+    reasoningCollapsed.value[idx] = true
+  }
+)
 
 // 暴露方法给父组件
 defineExpose({
