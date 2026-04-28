@@ -12,6 +12,7 @@ const currentConversation = ref(null)
 const isSidebarCollapsed = ref(window.innerWidth < 1024)
 const isLoadingConversations = ref(false)
 const isPanelOpen = ref(false)
+const panelRef = ref(null)
 
 // ===== 聊天状态 =====
 const isLoading = ref(false)
@@ -810,6 +811,9 @@ const streamResponse = async () => {
 
     renderMath()
 
+    // AI 回复完成后刷新 memory（agent 可能在对话中写入了记忆）
+    panelRef.value?.refreshMemory()
+
   } catch (error) {
     if (error.name === 'AbortError') {
       return
@@ -1322,7 +1326,7 @@ onMounted(async () => {
     </div>
 
     <!-- 右侧面板 -->
-    <AiLabPanel :visible="isPanelOpen" @close="isPanelOpen = false" />
+    <AiLabPanel ref="panelRef" :visible="isPanelOpen" @close="isPanelOpen = false" />
 
     <!-- 面板打开按钮（右上角） -->
     <button

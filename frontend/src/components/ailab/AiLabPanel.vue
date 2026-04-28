@@ -102,6 +102,8 @@ const loadTab = (tab) => {
 }
 
 onMounted(() => { if (props.visible) fetchTools() })
+
+defineExpose({ refreshMemory: fetchMemory })
 </script>
 
 <template>
