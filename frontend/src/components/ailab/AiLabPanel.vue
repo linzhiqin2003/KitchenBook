@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
 
 const props = defineProps({
@@ -84,6 +84,16 @@ const saveMemory = async () => {
   } catch (e) { console.error('Failed to save memory:', e) }
 }
 
+const skillsByCategory = computed(() => {
+  const groups = {}
+  for (const s of skills.value) {
+    const cat = s.category || ''
+    if (!groups[cat]) groups[cat] = []
+    groups[cat].push(s)
+  }
+  return groups
+})
+
 const loadTab = (tab) => {
   activeTab.value = tab
   if (tab === 'tools' && tools.value.length === 0) fetchTools()
@@ -122,49 +132,52 @@ onMounted(() => { if (props.visible) fetchTools() })
 
         <!-- Tools Tab -->
         <template v-if="activeTab === 'tools'">
-          <div v-if="loadingTools" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
-          <div v-else class="space-y-1">
-            <div v-for="tool in tools" :key="tool.name"
-              class="flex items-center justify-between px-3 py-2 rounded-lg"
-              style="background: #fff;">
-              <div class="flex-1 min-w-0">
-                <div class="text-[13px] font-medium truncate" style="color: #2c2c30;">{{ tool.name }}</div>
-                <div class="text-[11px] truncate" style="color: #9a9aa0;">{{ tool.detail || tool.description }}</div>
-              </div>
-              <button @click="toggleTool(tool)" class="shrink-0 ml-2 cursor-pointer"
-                :style="{ width: '36px', height: '20px', borderRadius: '10px', position: 'relative', transition: 'background 0.2s', background: tool.enabled ? '#34c759' : '#d1d1d6' }">
-                <span :style="{ position: 'absolute', top: '2px', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.15)', transition: 'left 0.2s', left: tool.enabled ? '18px' : '2px' }"></span>
-              </button>
-            </div>
-            <div v-for="tool in tools.filter(t => t.type === 'mcp')" :key="'mcp-' + tool.name"
-              class="flex items-center px-3 py-2 rounded-lg" style="background: #fff;">
-              <div class="flex-1 min-w-0">
-                <div class="text-[13px] font-medium truncate" style="color: #2c2c30;">
-                  <span class="px-1 py-0.5 rounded text-[10px] font-semibold mr-1.5" style="background: var(--ai-accent-soft); color: var(--ai-accent);">MCP</span>
-                  {{ tool.name }}
+          <div v-if="loadingTools" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">加载中…</div>
+          <template v-else>
+            <div class="space-y-0.5">
+              <template v-for="tool in tools.filter(t => t.type === 'builtin')" :key="tool.name">
+                <div class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/60 transition-colors">
+                  <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="tool.enabled ? 'background: #2c2c30;' : 'background: #d1d1d6;'"></span>
+                    <span class="text-[13px] truncate" :style="tool.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ tool.name }}</span>
+                  </div>
+                  <button @click="toggleTool(tool)" class="shrink-0 ml-2 cursor-pointer px-2 py-0.5 rounded text-[11px] transition-colors"
+                    :style="tool.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">
+                    {{ tool.enabled ? 'on' : 'off' }}
+                  </button>
                 </div>
+              </template>
+            </div>
+            <!-- MCP section -->
+            <div v-if="tools.some(t => t.type === 'mcp')" class="mt-4">
+              <div class="px-3 pb-1.5" style="font-size: 11px; font-weight: 600; color: #9a9aa0; letter-spacing: 0.03em;">MCP Servers</div>
+              <div v-for="tool in tools.filter(t => t.type === 'mcp')" :key="'mcp-' + tool.name"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/60 transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--ai-accent);"></span>
+                <span class="text-[13px]" style="color: #2c2c30;">{{ tool.name }}</span>
               </div>
             </div>
-          </div>
+          </template>
         </template>
 
         <!-- Skills Tab -->
         <template v-if="activeTab === 'skills'">
-          <div v-if="loadingSkills" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
-          <div v-else-if="skills.length === 0" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">暂无已安装的技能</div>
-          <div v-else class="space-y-1">
-            <div v-for="skill in skills" :key="skill.name"
-              class="flex items-center justify-between px-3 py-2 rounded-lg" style="background: #fff;">
-              <div class="flex-1 min-w-0">
-                <div class="text-[13px] font-medium truncate" style="color: #2c2c30;">{{ skill.name }}</div>
-                <div v-if="skill.category" class="text-[11px] truncate" style="color: #9a9aa0;">{{ skill.category }}</div>
+          <div v-if="loadingSkills" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">加载中…</div>
+          <div v-else-if="skills.length === 0" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">暂无已安装的技能</div>
+          <template v-else>
+            <div v-for="(group, category) in skillsByCategory" :key="category" class="mb-3">
+              <div v-if="category" class="px-3 pb-1 pt-2" style="font-size: 11px; font-weight: 600; color: #9a9aa0; letter-spacing: 0.03em;">{{ category || 'Other' }}</div>
+              <div class="space-y-0.5">
+                <div v-for="skill in group" :key="skill.name"
+                  class="flex items-center justify-between px-3 py-1.5 rounded-lg hover:bg-white/60 transition-colors">
+                  <span class="text-[13px] truncate" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</span>
+                  <span class="text-[11px] shrink-0" :style="skill.enabled ? 'color: #9a9aa0;' : 'color: #d1d1d6;'">
+                    {{ skill.enabled ? 'on' : 'off' }}
+                  </span>
+                </div>
               </div>
-              <span class="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-                :style="skill.enabled ? 'background: #dcfce7; color: #16a34a;' : 'background: #f1f1f1; color: #9a9aa0;'">
-                {{ skill.enabled ? 'on' : 'off' }}
-              </span>
             </div>
-          </div>
+          </template>
         </template>
 
         <!-- Memory Tab -->
