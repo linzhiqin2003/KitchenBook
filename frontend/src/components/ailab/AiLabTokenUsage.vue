@@ -181,34 +181,26 @@ onUnmounted(() => {
             占用 {{ percentLabel }}
           </div>
 
-          <!-- 堆叠进度条：有 breakdown 时按段拆，没有时回退到单色 -->
+          <!-- 堆叠进度条：始终按段拆 + completion，缺数据时空着 -->
           <div class="mt-2 h-1.5 rounded-full overflow-hidden flex" style="background: var(--theme-200);">
-            <template v-if="breakdownSections.length">
-              <div
-                v-for="seg in breakdownSections"
-                :key="seg.key"
-                class="h-full transition-all duration-500"
-                :style="{ width: `${sectionWidthPercent(seg.tokens)}%`, background: seg.color }"
-                :title="`${seg.label}: ${seg.tokens.toLocaleString()} tokens`"
-              ></div>
-              <div
-                class="h-full transition-all duration-500"
-                :style="{ width: `${sectionWidthPercent(completionTokens)}%`, background: '#16a34a' }"
-                :title="`输出 completion: ${completionTokens.toLocaleString()} tokens`"
-              ></div>
-            </template>
-            <template v-else>
-              <div
-                class="h-full rounded-full transition-all duration-500"
-                :style="{ width: `${Math.min(percent, 100)}%`, background: barColor }"
-              ></div>
-            </template>
+            <div
+              v-for="seg in breakdownSections"
+              :key="seg.key"
+              class="h-full transition-all duration-500"
+              :style="{ width: `${sectionWidthPercent(seg.tokens)}%`, background: seg.color }"
+              :title="`${seg.label}: ${seg.tokens.toLocaleString()} tokens`"
+            ></div>
+            <div
+              v-if="completionTokens > 0"
+              class="h-full transition-all duration-500"
+              :style="{ width: `${sectionWidthPercent(completionTokens)}%`, background: '#16a34a' }"
+              :title="`输出 completion: ${completionTokens.toLocaleString()} tokens`"
+            ></div>
           </div>
         </div>
 
-        <!-- Prompt 组成（breakdown） -->
+        <!-- Prompt 组成（breakdown）— 永远展示这个布局，无数据时只显示 completion 行 -->
         <div
-          v-if="breakdownSections.length"
           class="px-4 py-2 space-y-1"
           style="border-top: 1px solid var(--theme-100);"
         >
@@ -220,21 +212,26 @@ onUnmounted(() => {
               {{ breakdownEncoding }}
             </span>
           </div>
-          <div
-            v-for="seg in breakdownSections"
-            :key="seg.key"
-            class="flex items-center justify-between text-[12px]"
-          >
-            <span class="flex items-center gap-1.5 min-w-0" style="color: var(--theme-600);">
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: seg.color }"></span>
-              <span class="truncate">{{ seg.label }}</span>
-            </span>
-            <span class="flex items-center gap-2 shrink-0 font-mono" style="color: var(--theme-700);">
-              <span>{{ formatNumber(seg.tokens) }}</span>
-              <span class="text-[11px]" style="color: var(--theme-400); min-width: 36px; text-align: right;">
-                {{ sectionShareLabel(seg.tokens) }}
+          <template v-if="breakdownSections.length">
+            <div
+              v-for="seg in breakdownSections"
+              :key="seg.key"
+              class="flex items-center justify-between text-[12px]"
+            >
+              <span class="flex items-center gap-1.5 min-w-0" style="color: var(--theme-600);">
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: seg.color }"></span>
+                <span class="truncate">{{ seg.label }}</span>
               </span>
-            </span>
+              <span class="flex items-center gap-2 shrink-0 font-mono" style="color: var(--theme-700);">
+                <span>{{ formatNumber(seg.tokens) }}</span>
+                <span class="text-[11px]" style="color: var(--theme-400); min-width: 36px; text-align: right;">
+                  {{ sectionShareLabel(seg.tokens) }}
+                </span>
+              </span>
+            </div>
+          </template>
+          <div v-else class="text-[12px] py-1" style="color: var(--theme-400);">
+            发出第一条消息后这里会显示 prompt 各段 token 占用
           </div>
           <!-- 输出 completion 单独列出，跟堆叠条对齐 -->
           <div class="flex items-center justify-between text-[12px]">
@@ -246,24 +243,6 @@ onUnmounted(() => {
               <span>{{ formatNumber(completionTokens) }}</span>
               <span class="text-[11px]" style="color: var(--theme-400); min-width: 36px; text-align: right;"></span>
             </span>
-          </div>
-        </div>
-
-        <!-- 无 breakdown 时回退到 prompt / completion 两行 -->
-        <div v-else class="px-4 py-2 space-y-1.5" style="border-top: 1px solid var(--theme-100);">
-          <div class="flex items-center justify-between text-[12px]">
-            <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
-              <span class="w-1.5 h-1.5 rounded-full" style="background: #3d7cc9;"></span>
-              输入 prompt
-            </span>
-            <span class="font-mono" style="color: var(--theme-700);">{{ formatNumber(promptTokens) }}</span>
-          </div>
-          <div class="flex items-center justify-between text-[12px]">
-            <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
-              <span class="w-1.5 h-1.5 rounded-full" style="background: #16a34a;"></span>
-              输出 completion
-            </span>
-            <span class="font-mono" style="color: var(--theme-700);">{{ formatNumber(completionTokens) }}</span>
           </div>
         </div>
 
