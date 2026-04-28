@@ -484,7 +484,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                 </svg>
               </span>
               <span class="trace-header-text">
-                <span class="trace-header-label">思维过程</span>
+                <span class="trace-header-label">已思考</span>
                 <span v-if="traceCollapsed && traceSummary" class="trace-header-summary">{{ traceSummary }}</span>
               </span>
               <span v-if="!traceCollapsed && isStreaming && (currentReasoning || currentToolCall)" class="trace-header-live">Live</span>
@@ -615,7 +615,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
                   </svg>
                   <span class="trace-tool-main">
-                    <span class="trace-tool-name">思考过程</span>
+                    <span class="trace-tool-name">已思考</span>
                   </span>
                   <span v-if="isStreaming && isReasoningPhase" class="trace-status-pill text-amber-600">思考中</span>
                   <span v-else class="trace-meta">{{ message.reasoning.length }} 字</span>
