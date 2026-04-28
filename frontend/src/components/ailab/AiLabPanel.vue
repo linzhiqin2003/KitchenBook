@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
 
 const props = defineProps({
@@ -18,8 +18,16 @@ const loadingSkills = ref(false)
 const loadingMemory = ref(false)
 const editingMemory = ref(false)
 const memoryDraft = ref('')
+const memoryError = ref('')
 
 const headers = { 'Authorization': `Bearer ${HERMES_API_KEY}`, 'Content-Type': 'application/json' }
+
+const responseErrorMessage = (data, fallback) => {
+  if (typeof data?.error === 'string') return data.error
+  if (typeof data?.error?.message === 'string') return data.error.message
+  if (typeof data?.detail === 'string') return data.detail
+  return fallback
+}
 
 const fetchTools = async () => {
   loadingTools.value = true
@@ -57,15 +65,21 @@ const fetchSkills = async () => {
 
 const fetchMemory = async () => {
   loadingMemory.value = true
+  memoryError.value = ''
   try {
     const r = await fetch(`${HERMES_API_URL}/api/memory`, { headers })
-    if (r.ok) {
-      const data = await r.json()
-      memory.value = data.memory || ''
-      userProfile.value = data.user_profile || ''
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok) {
+      throw new Error(responseErrorMessage(data, `Memory 接口请求失败 (${r.status})`))
     }
-  } catch (e) { console.error('Failed to fetch memory:', e) }
-  finally { loadingMemory.value = false }
+    memory.value = data.memory || ''
+    userProfile.value = data.user_profile || ''
+    return true
+  } catch (e) {
+    console.error('Failed to fetch memory:', e)
+    memoryError.value = e.message || '无法读取 Memory，请检查 Hermes /api/memory 接口和服务状态。'
+  } finally { loadingMemory.value = false }
+  return false
 }
 
 const startEditMemory = () => {
@@ -74,14 +88,22 @@ const startEditMemory = () => {
 }
 
 const saveMemory = async () => {
+  memoryError.value = ''
   try {
-    await fetch(`${HERMES_API_URL}/api/memory`, {
+    const r = await fetch(`${HERMES_API_URL}/api/memory`, {
       method: 'POST', headers,
       body: JSON.stringify({ memory: memoryDraft.value })
     })
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok) {
+      throw new Error(responseErrorMessage(data, `Memory 保存失败 (${r.status})`))
+    }
     memory.value = memoryDraft.value
     editingMemory.value = false
-  } catch (e) { console.error('Failed to save memory:', e) }
+  } catch (e) {
+    console.error('Failed to save memory:', e)
+    memoryError.value = e.message || 'Memory 保存失败'
+  }
 }
 
 const skillsByCategory = computed(() => {
@@ -101,7 +123,14 @@ const loadTab = (tab) => {
   if (tab === 'memory') fetchMemory()
 }
 
-onMounted(() => { if (props.visible) fetchTools() })
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) loadTab(activeTab.value)
+  }
+)
+
+onMounted(() => { if (props.visible) loadTab(activeTab.value) })
 
 defineExpose({ refreshMemory: fetchMemory })
 </script>
@@ -186,6 +215,10 @@ defineExpose({ refreshMemory: fetchMemory })
         <template v-if="activeTab === 'memory'">
           <div v-if="loadingMemory" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
           <template v-else>
+            <div v-if="memoryError" class="mb-3 rounded-lg px-3 py-2 text-[12px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
+              {{ memoryError }}
+            </div>
+
             <!-- MEMORY.md -->
             <div class="mb-4">
               <div class="flex items-center justify-between mb-2">

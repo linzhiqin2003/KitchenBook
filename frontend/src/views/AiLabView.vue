@@ -13,6 +13,17 @@ const isSidebarCollapsed = ref(window.innerWidth < 1024)
 const isLoadingConversations = ref(false)
 const isPanelOpen = ref(false)
 const panelRef = ref(null)
+let memoryRefreshTimer = null
+
+const refreshMemoryPanel = (delay = 0) => {
+  if (memoryRefreshTimer) {
+    clearTimeout(memoryRefreshTimer)
+  }
+  memoryRefreshTimer = setTimeout(() => {
+    memoryRefreshTimer = null
+    panelRef.value?.refreshMemory()
+  }, delay)
+}
 
 // ===== 聊天状态 =====
 const isLoading = ref(false)
@@ -27,6 +38,16 @@ const fileType = ref(null)           // 'image' | 'pdf'
 const isFileProcessing = ref(false)
 const fileInputRef = ref(null)
 const isDragging = ref(false)
+
+const selectedAttachment = computed(() => {
+  if (!selectedFile.value) return null
+  return {
+    name: selectedFile.value.name,
+    size: selectedFile.value.size,
+    type: fileType.value,
+    preview: filePreview.value,
+  }
+})
 const isRecording = ref(false)
 const isTranscribing = ref(false)
 const recordingDuration = ref(0)
@@ -317,7 +338,12 @@ const sendMessage = async (content = null) => {
       // 图片：读取 base64，作为多模态内容发给 Hermes
       fileContent = await new Promise((resolve) => {
         const reader = new FileReader()
-        reader.onload = (e) => resolve({ type: 'image', dataUrl: e.target.result })
+        reader.onload = (e) => resolve({
+          type: 'image',
+          dataUrl: e.target.result,
+          filename: selectedFile.value.name,
+          size: selectedFile.value.size,
+        })
         reader.readAsDataURL(selectedFile.value)
       })
     } else if (fileType.value === 'pdf') {
@@ -350,6 +376,7 @@ const sendMessage = async (content = null) => {
   const userMessage = { role: 'user', content: displayText, type: 'text', fileAttachment: fileContent }
   messages.value.push(userMessage)
   inputMessage.value = ''
+  removeFile()
 
   // 保存用户消息到后端
   const savedUserMsg = await saveMessage(currentConversationId.value, 'user', displayText)
@@ -827,6 +854,9 @@ const streamResponse = async (fileContent = null) => {
                 result: parsed.result,
                 error: parsed.error,
               }, { appendArguments: false })
+              if (!parsed.error && parsed.name === 'memory') {
+                refreshMemoryPanel(150)
+              }
             } else if (currentEventType === 'hermes.tool.progress') {
               setPhase(STREAM_PHASE.TOOL_EXECUTING)
               upsertToolCall({
@@ -884,7 +914,7 @@ const streamResponse = async (fileContent = null) => {
     renderMath()
 
     // AI 回复完成后刷新 memory（agent 可能在对话中写入了记忆）
-    panelRef.value?.refreshMemory()
+    refreshMemoryPanel()
 
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -1191,6 +1221,10 @@ const _prevBodyBg = document.body.style.backgroundColor
 document.body.style.backgroundColor = '#f8f8f6' // warm stone-50
 
 onUnmounted(() => {
+  if (memoryRefreshTimer) {
+    clearTimeout(memoryRefreshTimer)
+    memoryRefreshTimer = null
+  }
   document.body.style.backgroundColor = _prevBodyBg
 })
 
@@ -1289,27 +1323,6 @@ onMounted(async () => {
         @regenerate="handleRegenerate"
       />
 
-      <!-- 文件预览 -->
-      <Transition name="fade">
-        <div v-if="selectedFile" class="shrink-0 px-4 pb-2">
-          <div class="max-w-3xl mx-auto flex items-center gap-3 px-3 py-2 rounded-lg" style="background: var(--theme-100); border: 1px solid var(--theme-200);">
-            <img v-if="fileType === 'image' && filePreview" :src="filePreview" class="w-10 h-10 object-cover rounded" />
-            <svg v-else class="w-8 h-8 shrink-0" style="color: var(--theme-400);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-            </svg>
-            <div class="flex-1 min-w-0">
-              <div class="text-[13px] truncate" style="color: var(--theme-700);">{{ selectedFile.name }}</div>
-              <div class="text-[11px]" style="color: var(--theme-400);">{{ (selectedFile.size / 1024).toFixed(0) }} KB</div>
-            </div>
-            <button @click="removeFile" class="p-1 rounded-md cursor-pointer" style="color: var(--theme-400);">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </Transition>
-
       <!-- 拖拽遮罩 -->
       <Transition name="fade">
         <div v-if="isDragging" class="absolute inset-0 z-50 flex items-center justify-center" style="background: rgba(248,248,246,0.9); border: 2px dashed var(--theme-300);">
@@ -1339,8 +1352,10 @@ onMounted(async () => {
         :is-loading="isLoading"
         :is-recording="isRecording"
         :is-transcribing="isTranscribing"
+        :is-ocr-processing="isFileProcessing"
         :recording-duration="recordingDuration"
         :has-image="!!selectedFile"
+        :file-attachment="selectedAttachment"
         :session-tokens="sessionTokens"
         :context-limit="TOKEN_CONTEXT_LIMIT"
         @send="handleSend"
@@ -1348,6 +1363,7 @@ onMounted(async () => {
         @image-click="triggerFileInput"
         @voice-click="toggleRecording"
         @paste="handlePaste"
+        @remove-file="removeFile"
       />
     </div>
 
