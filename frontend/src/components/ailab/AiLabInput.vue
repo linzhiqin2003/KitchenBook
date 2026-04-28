@@ -71,7 +71,7 @@ const formatDuration = (seconds) => {
     :class="floating ? 'absolute bottom-0 left-0 right-0 pt-4 pb-3 px-4' : 'relative w-full'"
     :style="floating ? 'background: linear-gradient(to top, var(--theme-50) 70%, transparent); font-family: var(--ai-font-body);' : 'font-family: var(--ai-font-body);'"
   >
-    <div class="max-w-3xl mx-auto relative">
+    <div class="max-w-4xl mx-auto relative">
       <div class="input-shell transition-all">
         <div v-if="hasAttachment" class="attachment-row">
           <img
@@ -102,41 +102,21 @@ const formatDuration = (seconds) => {
           </button>
         </div>
 
-        <div class="flex items-end gap-2">
+        <div class="input-main-row">
           <!-- 左侧工具按钮 -->
-          <div class="flex items-center gap-0.5 shrink-0 pb-px">
+          <div class="flex items-center gap-1 shrink-0">
             <button
               @click="emit('image-click')"
               :disabled="isLoading || isOcrProcessing || isRecording"
-              class="p-1.5 rounded-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              :style="hasAttachment ? 'color: var(--ai-accent); background: var(--ai-accent-soft);' : 'color: var(--theme-400);'"
+              class="input-icon-button input-add-button"
+              :class="{ active: hasAttachment }"
               title="上传图片或 PDF"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M18 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75zM15.75 9a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
               </svg>
             </button>
-            <button
-              @click="emit('voice-click')"
-              :disabled="isLoading || isOcrProcessing || isTranscribing"
-              class="p-1.5 rounded-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              :style="isRecording ? 'color: #c53030; background: #fff5f5;' : 'color: var(--theme-400);'"
-              :title="isRecording ? '停止录音' : '语音输入'"
-            >
-              <svg v-if="isTranscribing || isOcrProcessing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-              <svg v-else-if="isRecording" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="7" y="7" width="10" height="10" rx="1.5"/>
-              </svg>
-              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
-              </svg>
-            </button>
-            <span v-if="isRecording" class="text-xs font-mono min-w-[36px]" style="color: #c53030;">
-              {{ formatDuration(recordingDuration) }}
-            </span>
+            <span v-if="hasAttachment" class="attachment-count">1</span>
           </div>
 
           <!-- 输入框 -->
@@ -148,24 +128,45 @@ const formatDuration = (seconds) => {
             @paste="handlePaste"
             :disabled="isLoading || isRecording || isOcrProcessing"
             :placeholder="isOcrProcessing ? '正在处理文件…' : isRecording ? '录音中…' : '继续对话…'"
-            class="flex-1 min-w-0 bg-transparent resize-none scrollbar-hide outline-none border-none focus:ring-0 focus:outline-none self-center"
-            style="color: var(--theme-700); font-size: 14px; line-height: 20px; padding: 4px 0; min-height: 28px; max-height: 8rem;"
+            class="input-textarea scrollbar-hide"
             rows="1"
           ></textarea>
 
-          <!-- 发送/停止按钮 -->
-          <div class="shrink-0 pb-px">
+          <!-- 右侧操作 -->
+          <div class="input-actions">
+            <button
+              @click="emit('voice-click')"
+              :disabled="isLoading || isOcrProcessing || isTranscribing"
+              class="input-icon-button input-voice-button"
+              :class="{ recording: isRecording }"
+              :title="isRecording ? '停止录音' : '语音输入'"
+            >
+              <svg v-if="isTranscribing || isOcrProcessing" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <svg v-else-if="isRecording" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="7" y="7" width="10" height="10" rx="1.5"/>
+              </svg>
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
+              </svg>
+            </button>
+            <span v-if="isRecording" class="recording-time">
+              {{ formatDuration(recordingDuration) }}
+            </span>
+
             <button v-if="isLoading" @click="emit('stop')"
-              class="w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-              style="background: var(--theme-200); color: var(--theme-600);">
-              <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
+              class="input-send-button input-stop-button"
+              title="停止生成">
+              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                 <rect x="6" y="6" width="12" height="12" rx="2"/>
               </svg>
             </button>
             <button v-else @click="emit('send')" :disabled="(!localValue.trim() && !hasAttachment) || isOcrProcessing"
-               class="w-7 h-7 rounded-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-               style="background: var(--theme-700); color: var(--theme-50);">
-               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+               class="input-send-button"
+               title="发送">
+               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18"/>
                </svg>
             </button>
@@ -199,21 +200,152 @@ const formatDuration = (seconds) => {
   display: none;
 }
 .input-shell {
-  background: var(--theme-50);
-  border: 1px solid var(--theme-200);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(15, 23, 42, 0.11);
+  border-radius: 28px;
   padding: 6px;
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.08),
+    0 2px 7px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+.input-shell:focus-within {
+  border-color: rgba(0, 122, 255, 0.28);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.08),
+    0 2px 7px rgba(15, 23, 42, 0.08),
+    0 0 0 3px rgba(0, 122, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+.input-main-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px 0 8px;
+}
+.input-textarea {
+  flex: 1;
+  min-width: 0;
+  align-self: center;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #111827;
+  font-size: 15px;
+  line-height: 22px;
+  min-height: 24px;
+  max-height: 8rem;
+  padding: 1px 0;
+}
+.input-textarea::placeholder {
+  color: #9ca3af;
+}
+.input-textarea:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+.input-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.input-icon-button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  color: #111827;
+  background: transparent;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  cursor: pointer;
+}
+.input-icon-button:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.06);
+}
+.input-icon-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.input-icon-button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.input-add-button.active {
+  color: #007aff;
+  background: rgba(0, 122, 255, 0.1);
+}
+.input-voice-button.recording {
+  color: #c53030;
+  background: #fff5f5;
+}
+.attachment-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: -10px;
+  margin-right: 2px;
+  border-radius: 999px;
+  background: #007aff;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+.recording-time {
+  min-width: 36px;
+  color: #c53030;
+  font-family: var(--ai-font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.input-send-button {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #0a84ff;
+  color: white;
+  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.24);
+  transition: transform 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+  cursor: pointer;
+}
+.input-send-button:hover:not(:disabled) {
+  background: #007aff;
+  transform: translateY(-1px);
+}
+.input-send-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.input-send-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.input-stop-button {
+  background: #e5e7eb;
+  color: #374151;
+  box-shadow: none;
 }
 .attachment-row {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  margin-bottom: 6px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: var(--theme-100);
-  border: 1px solid var(--theme-200);
+  margin: 2px 2px 6px;
+  padding: 7px 9px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
 }
 .attachment-thumb,
 .attachment-icon {
