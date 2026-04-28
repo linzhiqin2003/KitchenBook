@@ -475,15 +475,19 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
           <template v-if="hasTraceTimeline">
             <!-- 思维链折叠头 -->
             <button class="trace-header" @click="traceCollapsed = !traceCollapsed">
-              <svg
-                :class="['w-3.5 h-3.5 shrink-0 transition-transform text-slate-400', { 'rotate-90': !traceCollapsed }]"
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-              </svg>
-              <span class="trace-header-label">思维过程</span>
-              <span v-if="traceCollapsed && traceSummary" class="trace-header-summary">{{ traceSummary }}</span>
-              <span v-if="!traceCollapsed && isStreaming && (currentReasoning || currentToolCall)" class="trace-header-live">进行中</span>
+              <span class="trace-header-icon">
+                <svg
+                  :class="['w-3.5 h-3.5 shrink-0 transition-transform', { 'rotate-90': !traceCollapsed }]"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </span>
+              <span class="trace-header-text">
+                <span class="trace-header-label">思维过程</span>
+                <span v-if="traceCollapsed && traceSummary" class="trace-header-summary">{{ traceSummary }}</span>
+              </span>
+              <span v-if="!traceCollapsed && isStreaming && (currentReasoning || currentToolCall)" class="trace-header-live">Live</span>
             </button>
 
             <!-- 展开内容 -->
@@ -495,13 +499,13 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
             >
               <!-- 思考：直接展示，不折叠 -->
               <div v-if="turn.reasoning" class="trace-step">
-                <div v-if="turn.reasoning.length <= 120" class="trace-row trace-row-static">
-                  <span class="trace-label text-slate-400">思考</span>
+                <div v-if="turn.reasoning.length <= 120" class="trace-row trace-row-static trace-row-thought">
+                  <span class="trace-kind">思考</span>
                   <span class="trace-inline-text">{{ turn.reasoning }}</span>
                 </div>
                 <template v-else>
-                  <div class="trace-row trace-row-static">
-                    <span class="trace-label text-slate-400">思考</span>
+                  <div class="trace-row trace-row-static trace-row-thought">
+                    <span class="trace-kind">思考</span>
                     <span class="trace-meta">{{ turn.reasoning.length }} 字</span>
                   </div>
                   <div class="trace-body">{{ turn.reasoning }}</div>
@@ -510,25 +514,31 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
               <!-- 工具调用：整体折叠 -->
               <div v-if="turn.toolCall" class="trace-step">
-                <button class="trace-row" @click="toggleToolCollapse(turn.toolCall, getTurnKey(turn, turnIndex))">
+                <button
+                  :class="['trace-row trace-tool-row', formatToolStatus(turn.toolCall.status).cardClass]"
+                  @click="toggleToolCollapse(turn.toolCall, getTurnKey(turn, turnIndex))"
+                >
+                  <span
+                    :class="['trace-tool-orb', formatToolStatus(turn.toolCall.status).dotClass]"
+                  ></span>
+                  <span class="trace-tool-main">
+                    <span class="trace-tool-name">{{ displayToolName(turn.toolCall) }}</span>
+                    <span class="trace-tool-sub">Tool call</span>
+                  </span>
+                  <span :class="['trace-status-pill', formatToolStatus(turn.toolCall.status).textClass]">{{ formatToolStatus(turn.toolCall.status).label }}</span>
+                  <span v-if="formatToolDuration(turn.toolCall)" class="trace-duration">{{ formatToolDuration(turn.toolCall) }}</span>
                   <svg
-                    :class="['w-3 h-3 shrink-0 transition-transform text-slate-400', { 'rotate-90': !isToolCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
+                    :class="['trace-row-chevron', { 'rotate-90': !isToolCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
                     fill="none" stroke="currentColor" viewBox="0 0 24 24"
                   >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
                   </svg>
-                  <span
-                    :class="['trace-dot', formatToolStatus(turn.toolCall.status).dotClass]"
-                  ></span>
-                  <span class="trace-label font-mono text-slate-700">{{ displayToolName(turn.toolCall) }}</span>
-                  <span :class="['trace-meta', formatToolStatus(turn.toolCall.status).textClass]">{{ formatToolStatus(turn.toolCall.status).label }}</span>
-                  <span v-if="formatToolDuration(turn.toolCall)" class="trace-meta text-slate-400">{{ formatToolDuration(turn.toolCall) }}</span>
                 </button>
                 <Transition name="collapse">
-                  <div v-if="!isToolCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))" class="ml-4 mt-0.5">
+                  <div v-if="!isToolCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))" class="trace-tool-detail">
                     <pre v-if="hasToolArguments(turn.toolCall)" class="trace-code">{{ formatToolArguments(turn.toolCall) }}</pre>
                     <div v-if="formatToolResult(turn.toolCall)"
-                         :class="['trace-result-text mt-1', turn.toolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
+                         :class="['trace-result-text', turn.toolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
                     >{{ formatToolResult(turn.toolCall) }}</div>
                   </div>
                 </Transition>
@@ -537,22 +547,25 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
             <!-- 当前思考（流式） -->
             <div v-if="currentReasoning" class="trace-step">
-              <div class="trace-row">
-                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
-                <span class="trace-label text-amber-600">思考中...</span>
+              <div class="trace-row trace-row-thought">
+                <span class="trace-live-orb"></span>
+                <span class="trace-kind trace-kind-live">思考中</span>
               </div>
               <div class="trace-body trace-body-live">{{ currentReasoning }}</div>
             </div>
 
             <!-- 当前工具调用（流式） -->
             <div v-if="currentToolCall" class="trace-step">
-              <div class="trace-row">
+              <div :class="['trace-row trace-tool-row', formatToolStatus(currentToolCall.status).cardClass]">
                 <span
-                  :class="['trace-dot', formatToolStatus(currentToolCall.status).dotClass, formatToolStatus(currentToolCall.status).spinning && 'animate-pulse']"
+                  :class="['trace-tool-orb', formatToolStatus(currentToolCall.status).dotClass, formatToolStatus(currentToolCall.status).spinning && 'animate-pulse']"
                 ></span>
-                <span class="trace-label font-mono text-slate-700">{{ displayToolName(currentToolCall) }}</span>
-                <span :class="['trace-meta', formatToolStatus(currentToolCall.status).textClass]">{{ formatToolStatus(currentToolCall.status).label }}</span>
-                <span v-if="formatToolDuration(currentToolCall)" class="trace-meta text-slate-400">{{ formatToolDuration(currentToolCall) }}</span>
+                <span class="trace-tool-main">
+                  <span class="trace-tool-name">{{ displayToolName(currentToolCall) }}</span>
+                  <span class="trace-tool-sub">Tool call</span>
+                </span>
+                <span :class="['trace-status-pill', formatToolStatus(currentToolCall.status).textClass]">{{ formatToolStatus(currentToolCall.status).label }}</span>
+                <span v-if="formatToolDuration(currentToolCall)" class="trace-duration">{{ formatToolDuration(currentToolCall) }}</span>
               </div>
               <!-- 工具执行进度：URL 标签 + 文字 -->
               <template v-if="currentToolCall.status === 'running'">
@@ -579,10 +592,10 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                 </div>
               </template>
               <!-- 参数和结果直接展示 -->
-              <div v-if="hasToolArguments(currentToolCall)" class="ml-4 mt-0.5">
+              <div v-if="hasToolArguments(currentToolCall)" class="trace-tool-detail">
                 <pre class="trace-code">{{ formatToolArguments(currentToolCall) }}</pre>
               </div>
-              <div v-if="formatToolResult(currentToolCall)" class="ml-4 mt-0.5">
+              <div v-if="formatToolResult(currentToolCall)" class="trace-tool-detail">
                 <div
                   :class="['trace-result-text', currentToolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
                 >{{ formatToolResult(currentToolCall) }}</div>
@@ -596,15 +609,18 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
           <template v-else-if="shouldShowLegacyReasoning">
             <div class="trace-timeline">
               <div class="trace-step">
-                <button @click="emit('toggle-reasoning', index)" class="trace-row">
+                <button @click="emit('toggle-reasoning', index)" class="trace-row trace-tool-row">
                   <svg
-                    :class="['w-3 h-3 shrink-0 transition-transform text-slate-400', { 'rotate-90': !reasoningCollapsed }]"
+                    :class="['trace-row-chevron', { 'rotate-90': !reasoningCollapsed }]"
                     fill="none" stroke="currentColor" viewBox="0 0 24 24"
                   >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
                   </svg>
-                  <span class="trace-label text-slate-500">思考过程</span>
-                  <span v-if="isStreaming && isReasoningPhase" class="trace-meta text-amber-600">思考中...</span>
+                  <span class="trace-tool-main">
+                    <span class="trace-tool-name">思考过程</span>
+                    <span class="trace-tool-sub">Reasoning trace</span>
+                  </span>
+                  <span v-if="isStreaming && isReasoningPhase" class="trace-status-pill text-amber-600">思考中</span>
                   <span v-else class="trace-meta">{{ message.reasoning.length }} 字</span>
                 </button>
                 <Transition name="collapse">
@@ -721,48 +737,107 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .trace-header {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.25rem 0;
+  gap: 0.5rem;
+  width: min(100%, 46rem);
+  padding: 0.35rem 0.45rem 0.35rem 0.35rem;
   cursor: pointer;
   user-select: none;
-  border: none;
-  background: none;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 0.7rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(248, 250, 252, 0.58)),
+    color-mix(in srgb, var(--theme-50, #fafaf7) 86%, white);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.trace-header:hover {
+  border-color: rgba(100, 116, 139, 0.28);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.055);
+}
+
+.trace-header-icon {
+  display: grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  color: #64748b;
+  border-radius: 0.5rem;
+  background: rgba(241, 245, 249, 0.92);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.trace-header-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .trace-header-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #64748b;
+  color: #334155;
 }
 
 .trace-header-summary {
   font-size: 0.7rem;
   color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .trace-header-live {
-  font-size: 0.65rem;
-  color: #f59e0b;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #b45309;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
   animation: progressPulse 1.2s ease-in-out infinite;
 }
 
 /* === Trace Timeline === */
 .trace-timeline {
-  border-left: 1px solid var(--theme-200, #e4e4df);
-  padding-left: 0.875rem;
-  margin-left: 0.125rem;
+  position: relative;
+  width: min(100%, 46rem);
+  margin-top: 0.45rem;
+  padding: 0.55rem;
+  border: 1px solid rgba(226, 232, 240, 0.82);
+  border-radius: 0.9rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.74)),
+    color-mix(in srgb, var(--theme-50, #fafaf7) 82%, white);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.trace-timeline::before {
+  content: '';
+  position: absolute;
+  top: 1rem;
+  bottom: 1rem;
+  left: 1.05rem;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(148, 163, 184, 0.34), transparent);
 }
 
 .trace-step {
-  padding: 0.2rem 0;
+  position: relative;
+  padding: 0.18rem 0 0.18rem 1.2rem;
 }
 
 .trace-row {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.45rem;
+  min-height: 1.85rem;
   cursor: pointer;
-  padding: 0.1rem 0;
+  padding: 0.12rem 0;
 }
 
 .trace-label {
@@ -771,25 +846,9 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   flex-shrink: 0;
 }
 
-.trace-summary {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
 .trace-meta {
   font-size: 0.65rem;
   color: #94a3b8;
-  flex-shrink: 0;
-}
-
-.trace-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
   flex-shrink: 0;
 }
 
@@ -797,25 +856,55 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   cursor: default;
 }
 
+.trace-row-thought {
+  align-items: flex-start;
+}
+
+.trace-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.35rem;
+  height: 1.25rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  color: #64748b;
+  background: rgba(241, 245, 249, 0.82);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.trace-kind-live {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
 .trace-inline-text {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  line-height: 1.5;
+  padding-top: 0.04rem;
+  font-size: 0.74rem;
+  color: #64748b;
+  line-height: 1.65;
 }
 
 .trace-body {
-  margin: 0.125rem 0 0.25rem 0;
-  padding-left: 1.125rem;
-  font-size: 0.7rem;
-  line-height: 1.6;
-  color: #94a3b8;
+  margin: 0.2rem 0 0.45rem 0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.74rem;
+  line-height: 1.7;
+  color: #64748b;
   max-height: 14rem;
   overflow-y: auto;
   white-space: pre-wrap;
+  border-radius: 0.7rem;
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 .trace-body-live {
-  border-left: 2px solid #f59e0b;
+  border-color: #fde68a;
+  box-shadow: inset 2px 0 0 #f59e0b;
 }
 
 .trace-toggle {
@@ -833,29 +922,146 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 }
 
 .trace-code {
-  margin: 0.25rem 0;
-  padding: 0.4rem 0.5rem;
-  background: #f8fafc;
-  border-radius: 0.375rem;
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+  background: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.88);
+  border-radius: 0.65rem;
   font-size: 0.7rem;
-  line-height: 1.5;
-  color: #334155;
+  line-height: 1.55;
+  color: #dbeafe;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.trace-result-label {
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #94a3b8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .trace-result-text {
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 232, 240, 0.82);
   font-size: 0.75rem;
-  line-height: 1.5;
+  line-height: 1.58;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.trace-tool-row {
+  width: 100%;
+  min-width: 0;
+  padding: 0.38rem 0.48rem;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  border-radius: 0.72rem;
+  background: rgba(255, 255, 255, 0.72);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.trace-tool-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.trace-tool-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.trace-tool-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1e293b;
+  font-family: var(--ai-font-mono);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.trace-tool-sub {
+  color: #94a3b8;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.trace-tool-orb {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+}
+
+.trace-status-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 1.25rem;
+  padding: 0 0.46rem;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  font-size: 0.64rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.trace-duration {
+  color: #94a3b8;
+  font-size: 0.64rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trace-row-chevron {
+  width: 0.82rem;
+  height: 0.82rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.trace-tool-row:hover .trace-row-chevron {
+  color: #64748b;
+}
+
+.trace-tool-detail {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.38rem 0 0.2rem 0;
+}
+
+.trace-live-orb {
+  width: 0.55rem;
+  height: 0.55rem;
+  margin: 0.36rem 0.35rem 0 0.1rem;
+  border-radius: 999px;
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+  animation: progressPulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.tool-step-running {
+  border-color: rgba(96, 165, 250, 0.38);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.86), rgba(255, 255, 255, 0.72));
+}
+
+.tool-step-success {
+  border-color: rgba(52, 211, 153, 0.36);
+}
+
+.tool-step-error {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.72), rgba(255, 255, 255, 0.78));
+}
+
+.tool-step-parsing {
+  border-color: rgba(251, 191, 36, 0.36);
 }
 
 /* URL favicon 标签容器 */
