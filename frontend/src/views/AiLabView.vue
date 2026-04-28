@@ -185,7 +185,7 @@ const selectConversation = async (id) => {
 
 // 删除会话
 const deleteConversation = async (id) => {
-  if (!confirm('确定要删除这个对话吗？')) return
+  // Sidebar 组件已有自定义确认弹窗，此处无需再弹
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${id}/`, {
