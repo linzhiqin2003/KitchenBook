@@ -675,6 +675,8 @@ const streamResponse = async () => {
           const data = line.slice(6).trim()
           if (data === '[DONE]') {
             hasDoneEvent = true
+            stats.value.reasoningLength = currentReasoning.value.length
+            stats.value.contentLength = currentContent.value.length
             stats.value.endTime = Date.now()
             setPhase(STREAM_PHASE.IDLE)
             break
