@@ -3,8 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView,
     BlogPostViewSet, TagViewSet, CategoryViewSet, AiAgentView, DeepSeekSpecialeView,
-    DeepSeekOCRView, WhisperTranscribeView, RecipeStepViewSet, RecipeIngredientViewSet,
-    AiLabConversationViewSet, AiLabMessageViewSet
+    DeepSeekOCRView, WhisperTranscribeView, PDFExtractView, RecipeStepViewSet,
+    RecipeIngredientViewSet, AiLabConversationViewSet, AiLabMessageViewSet
 )
 
 router = DefaultRouter()
@@ -25,6 +25,7 @@ urlpatterns = [
     path('ai/chat/', AiAgentView.as_view(), name='ai-chat'),
     path('ai/speciale/', DeepSeekSpecialeView.as_view(), name='ai-speciale'),
     path('ai/ocr/', DeepSeekOCRView.as_view(), name='ai-ocr'),
+    path('ai/pdf-extract/', PDFExtractView.as_view(), name='ai-pdf-extract'),
     path('ai/transcribe/', WhisperTranscribeView.as_view(), name='ai-transcribe'),
     path('tarot/', include('cards.urls')),
     path('tarot/', include('readings.urls')),

@@ -20,12 +20,13 @@ const inputMessage = ref('')
 const messages = ref([])
 const chatAreaRef = ref(null)
 
-// ===== 图片/语音状态 =====
-const selectedImage = ref(null)
-const imagePreview = ref(null)
-const isOcrProcessing = ref(false)
-const ocrResult = ref(null)
+// ===== 文件/语音状态 =====
+const selectedFile = ref(null)       // File object
+const filePreview = ref(null)        // base64 data URL (images) or filename (PDF)
+const fileType = ref(null)           // 'image' | 'pdf'
+const isFileProcessing = ref(false)
 const fileInputRef = ref(null)
+const isDragging = ref(false)
 const isRecording = ref(false)
 const isTranscribing = ref(false)
 const recordingDuration = ref(0)
@@ -283,20 +284,57 @@ const deleteMessageAndFollowing = async (messageId) => {
 // ===== 消息发送 =====
 const sendMessage = async (content = null) => {
   const text = content || inputMessage.value.trim()
-  if (!text || isLoading.value) return
+  if (!text && !selectedFile.value) return
+  if (isLoading.value) return
 
   // 如果没有当前会话，先创建一个
   if (!currentConversationId.value) {
     await createConversation()
   }
 
-  // 添加用户消息
-  const userMessage = { role: 'user', content: text, type: 'text' }
+  // 处理文件附件
+  let fileContent = null
+  if (selectedFile.value) {
+    if (fileType.value === 'image') {
+      // 图片：读取 base64，作为多模态内容发给 Hermes
+      fileContent = await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve({ type: 'image', dataUrl: e.target.result })
+        reader.readAsDataURL(selectedFile.value)
+      })
+    } else if (fileType.value === 'pdf') {
+      // PDF：后端提取文本
+      isFileProcessing.value = true
+      try {
+        const formData = new FormData()
+        formData.append('file', selectedFile.value)
+        const resp = await fetch(`${API_BASE_URL}/api/ai/pdf-extract/`, { method: 'POST', body: formData })
+        const data = await resp.json()
+        if (!resp.ok) throw new Error(data.error || 'PDF 解析失败')
+        fileContent = { type: 'pdf', text: data.text, filename: data.filename, pages: data.pages }
+      } catch (e) {
+        alert(`文件处理失败: ${e.message}`)
+        isFileProcessing.value = false
+        return
+      }
+      isFileProcessing.value = false
+    }
+  }
+
+  // 构建用户消息展示内容
+  let displayText = text || ''
+  if (fileContent?.type === 'pdf') {
+    displayText = `${text ? text + '\n\n' : ''}📄 ${fileContent.filename} (${fileContent.pages} 页)`
+  } else if (fileContent?.type === 'image') {
+    displayText = text || '(图片)'
+  }
+
+  const userMessage = { role: 'user', content: displayText, type: 'text', fileAttachment: fileContent }
   messages.value.push(userMessage)
   inputMessage.value = ''
 
   // 保存用户消息到后端
-  const savedUserMsg = await saveMessage(currentConversationId.value, 'user', text)
+  const savedUserMsg = await saveMessage(currentConversationId.value, 'user', displayText)
   if (savedUserMsg) {
     userMessage.id = savedUserMsg.id
   }
@@ -304,12 +342,12 @@ const sendMessage = async (content = null) => {
   // 刷新会话列表以更新标题
   fetchConversations()
 
-  // 开始流式响应
-  await streamResponse()
+  // 开始流式响应（传入文件内容供 API 调用使用）
+  await streamResponse(fileContent)
 }
 
 // 流式响应
-const streamResponse = async () => {
+const streamResponse = async (fileContent = null) => {
   isLoading.value = true
   currentReasoning.value = ''
   currentContent.value = ''
@@ -664,10 +702,26 @@ const streamResponse = async () => {
   // 构建 API 消息
   const apiMessages = messages.value
     .filter(m => (m.role === 'user' || m.role === 'assistant') && !m.isStreaming)
-    .map(m => ({
-      role: m.role,
-      content: m.content?.replace(/\n\n\*\[已停止生成\]\*$/, '') || ''
-    }))
+    .map(m => {
+      const text = m.content?.replace(/\n\n\*\[已停止生成\]\*$/, '') || ''
+      // 最后一条用户消息可能有文件附件
+      if (m.role === 'user' && m.fileAttachment) {
+        const att = m.fileAttachment
+        if (att.type === 'image') {
+          // 多模态：图片 + 文字
+          const parts = []
+          if (text && text !== '(图片)') parts.push({ type: 'text', text })
+          parts.push({ type: 'image_url', image_url: { url: att.dataUrl } })
+          return { role: 'user', content: parts }
+        }
+        if (att.type === 'pdf') {
+          // PDF：将提取的文本附加到消息
+          const pdfContext = `[PDF: ${att.filename}, ${att.pages} pages]\n\n${att.text}`
+          return { role: 'user', content: text ? `${text}\n\n${pdfContext}` : pdfContext }
+        }
+      }
+      return { role: m.role, content: text }
+    })
     .filter(m => m.content)
 
   abortController = new AbortController()
@@ -918,104 +972,70 @@ const handleRegenerate = async (messageId, index) => {
   await streamResponse()
 }
 
-// ===== 图片处理 =====
+// ===== 文件处理 =====
 const triggerFileInput = () => {
   fileInputRef.value?.click()
 }
 
-const handleFileSelect = (event) => {
-  const file = event.target.files?.[0]
+const acceptFile = (file) => {
   if (!file) return
-
-  if (!file.type.startsWith('image/')) {
-    alert('请选择图片文件')
+  const isImage = file.type.startsWith('image/')
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+  if (!isImage && !isPdf) {
+    alert('支持图片和 PDF 文件')
     return
   }
-
-  if (file.size > 10 * 1024 * 1024) {
-    alert('图片大小不能超过 10MB')
+  if (file.size > 20 * 1024 * 1024) {
+    alert('文件不能超过 20MB')
     return
   }
-
-  selectedImage.value = file
-
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    imagePreview.value = e.target.result
-  }
-  reader.readAsDataURL(file)
-  ocrResult.value = null
-}
-
-const removeImage = () => {
-  selectedImage.value = null
-  imagePreview.value = null
-  ocrResult.value = null
-  if (fileInputRef.value) {
-    fileInputRef.value.value = ''
+  selectedFile.value = file
+  fileType.value = isImage ? 'image' : 'pdf'
+  if (isImage) {
+    const reader = new FileReader()
+    reader.onload = (e) => { filePreview.value = e.target.result }
+    reader.readAsDataURL(file)
+  } else {
+    filePreview.value = file.name
   }
 }
 
-const processOCR = async () => {
-  if (!selectedImage.value || isOcrProcessing.value) return
+const handleFileSelect = (event) => {
+  acceptFile(event.target.files?.[0])
+}
 
-  isOcrProcessing.value = true
-  ocrResult.value = null
+const removeFile = () => {
+  selectedFile.value = null
+  filePreview.value = null
+  fileType.value = null
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
 
-  try {
-    const formData = new FormData()
-    formData.append('image', selectedImage.value)
-
-    const response = await fetch(`${API_BASE_URL}/api/ai/ocr/`, {
-      method: 'POST',
-      body: formData
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.error || 'OCR 识别失败')
-    }
-
-    ocrResult.value = data.markdown
-    inputMessage.value = `请解答以下题目：\n\n${data.markdown}`
-
-  } catch (error) {
-    alert(`OCR 识别失败: ${error.message}`)
-  } finally {
-    isOcrProcessing.value = false
-  }
+// 拖拽处理
+const handleDragOver = (e) => { e.preventDefault(); isDragging.value = true }
+const handleDragLeave = () => { isDragging.value = false }
+const handleDrop = (e) => {
+  e.preventDefault()
+  isDragging.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) acceptFile(file)
 }
 
 const handlePaste = (event) => {
   const items = event.clipboardData?.items
   if (!items) return
-
   for (const item of items) {
-    if (item.type.startsWith('image/')) {
+    if (item.type.startsWith('image/') || item.type === 'application/pdf') {
       event.preventDefault()
-      const file = item.getAsFile()
-      if (file) {
-        selectedImage.value = file
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          imagePreview.value = e.target.result
-        }
-        reader.readAsDataURL(file)
-        ocrResult.value = null
-      }
+      acceptFile(item.getAsFile())
       break
     }
   }
 }
 
 const handleSend = async () => {
-  if (selectedImage.value && !ocrResult.value) {
-    await processOCR()
-    if (!ocrResult.value) return
-  }
   await sendMessage()
-  removeImage()
+  removeFile()
 }
 
 // ===== 语音录制 =====
@@ -1190,7 +1210,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-dvh w-full fixed inset-0 flex overflow-hidden" style="background: #f8f8f6; font-family: var(--ai-font-body);">
+  <div class="h-dvh w-full fixed inset-0 flex overflow-hidden" style="background: #f8f8f6; font-family: var(--ai-font-body);"
+       @dragover="handleDragOver" @dragleave="handleDragLeave" @drop="handleDrop">
     <!-- 侧边栏 -->
     <AiLabSidebar
       :conversations="conversations"
@@ -1250,48 +1271,36 @@ onMounted(async () => {
         @regenerate="handleRegenerate"
       />
 
-      <!-- 图片预览 -->
+      <!-- 文件预览 -->
       <Transition name="fade">
-        <div v-if="imagePreview" class="shrink-0 px-4 pb-2">
-          <div class="max-w-4xl mx-auto p-3 bg-gray-50 rounded-xl border border-gray-200">
-            <div class="flex items-start gap-3">
-              <div class="relative shrink-0">
-                <img
-                  :src="imagePreview"
-                  alt="预览"
-                  class="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                />
-                <button
-                  @click="removeImage"
-                  class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md cursor-pointer"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                  </svg>
-                </button>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-sm text-gray-600 mb-2 truncate">{{ selectedImage?.name }}</div>
-                <div v-if="ocrResult" class="text-xs text-green-600 flex items-center gap-1">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                  </svg>
-                  已识别
-                </div>
-                <button
-                  v-else
-                  @click="processOCR"
-                  :disabled="isOcrProcessing"
-                  class="px-3 py-1.5 text-xs bg-violet-600 hover:bg-violet-500 text-white rounded-lg disabled:bg-gray-300 cursor-pointer flex items-center gap-1.5"
-                >
-                  <svg v-if="isOcrProcessing" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                  {{ isOcrProcessing ? '识别中...' : '识别图片' }}
-                </button>
-              </div>
+        <div v-if="selectedFile" class="shrink-0 px-4 pb-2">
+          <div class="max-w-3xl mx-auto flex items-center gap-3 px-3 py-2 rounded-lg" style="background: var(--theme-100); border: 1px solid var(--theme-200);">
+            <img v-if="fileType === 'image' && filePreview" :src="filePreview" class="w-10 h-10 object-cover rounded" />
+            <svg v-else class="w-8 h-8 shrink-0" style="color: var(--theme-400);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+            </svg>
+            <div class="flex-1 min-w-0">
+              <div class="text-[13px] truncate" style="color: var(--theme-700);">{{ selectedFile.name }}</div>
+              <div class="text-[11px]" style="color: var(--theme-400);">{{ (selectedFile.size / 1024).toFixed(0) }} KB</div>
             </div>
+            <button @click="removeFile" class="p-1 rounded-md cursor-pointer" style="color: var(--theme-400);">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- 拖拽遮罩 -->
+      <Transition name="fade">
+        <div v-if="isDragging" class="absolute inset-0 z-50 flex items-center justify-center" style="background: rgba(248,248,246,0.9); border: 2px dashed var(--theme-300);">
+          <div class="text-center">
+            <svg class="w-10 h-10 mx-auto mb-2" style="color: var(--theme-400);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+            </svg>
+            <p class="text-[14px]" style="color: var(--theme-500);">拖放文件到此处</p>
+            <p class="text-[12px]" style="color: var(--theme-400);">支持图片和 PDF</p>
           </div>
         </div>
       </Transition>
@@ -1300,7 +1309,7 @@ onMounted(async () => {
       <input
         ref="fileInputRef"
         type="file"
-        accept="image/*"
+        accept="image/*,.pdf,application/pdf"
         class="hidden"
         @change="handleFileSelect"
       />
@@ -1312,9 +1321,8 @@ onMounted(async () => {
         :is-loading="isLoading"
         :is-recording="isRecording"
         :is-transcribing="isTranscribing"
-        :is-ocr-processing="isOcrProcessing"
         :recording-duration="recordingDuration"
-        :has-image="!!selectedImage"
+        :has-image="!!selectedFile"
         :session-tokens="sessionTokens"
         :context-limit="TOKEN_CONTEXT_LIMIT"
         @send="handleSend"

@@ -1415,6 +1415,55 @@ class DeepSeekOCRView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# ==================== PDF 文本提取 ====================
+
+class PDFExtractView(APIView):
+    """提取 PDF 文件中的文本内容"""
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        pdf_file = request.FILES.get('file')
+        if not pdf_file:
+            return Response({'error': '请上传 PDF 文件'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not pdf_file.name.lower().endswith('.pdf'):
+            return Response({'error': '仅支持 PDF 文件'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if pdf_file.size > 20 * 1024 * 1024:  # 20MB limit
+            return Response({'error': 'PDF 文件不能超过 20MB'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            import fitz  # PyMuPDF
+            pdf_bytes = pdf_file.read()
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            pages = []
+            for i, page in enumerate(doc):
+                text = page.get_text("text").strip()
+                if text:
+                    pages.append(f"--- Page {i+1} ---\n{text}")
+            doc.close()
+
+            if not pages:
+                return Response({'error': 'PDF 中未提取到文本内容'}, status=status.HTTP_400_BAD_REQUEST)
+
+            full_text = "\n\n".join(pages)
+            # 截断过长文本（保留前 50000 字符）
+            if len(full_text) > 50000:
+                full_text = full_text[:50000] + f"\n\n... [截断：原文共 {len(full_text)} 字符，已显示前 50000 字符]"
+
+            return Response({
+                'text': full_text,
+                'pages': len(pages),
+                'filename': pdf_file.name,
+                'size': pdf_file.size,
+            })
+        except ImportError:
+            return Response({'error': 'PDF 解析库未安装，请联系管理员'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception as e:
+            return Response({'error': f'PDF 解析失败: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # ==================== 语音转录 (Groq Whisper via OpenAI SDK) ====================
 
 class WhisperTranscribeView(APIView):
