@@ -28,10 +28,10 @@ const emit = defineEmits([
 ])
 
 const examplePrompts = [
-  { title: '数学推理', subtitle: '证明、推导、计算', icon: 'math', prompt: '证明根号2是无理数' },
-  { title: '代码分析', subtitle: '算法、复杂度、调试', icon: 'code', prompt: '解释快速排序算法的时间复杂度' },
-  { title: '深度思考', subtitle: '哲学、辩证、本质', icon: 'spark', prompt: '从哲学角度分析人工智能的本质' },
-  { title: '写作助手', subtitle: '议论、记叙、润色', icon: 'pen',   prompt: '帮我写一段关于科技发展的议论文' }
+  { title: '数学推理', subtitle: '证明 · 推导', icon: 'math', prompt: '证明根号2是无理数' },
+  { title: '代码分析', subtitle: '算法 · 调试', icon: 'code', prompt: '解释快速排序算法的时间复杂度' },
+  { title: '深度思考', subtitle: '哲学 · 辩证', icon: 'spark', prompt: '从哲学角度分析人工智能的本质' },
+  { title: '写作助手', subtitle: '议论 · 润色', icon: 'pen',   prompt: '帮我写一段关于科技发展的议论文' }
 ]
 </script>
 
