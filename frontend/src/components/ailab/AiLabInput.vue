@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
+import AiLabTokenUsage from './AiLabTokenUsage.vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -9,6 +10,17 @@ const props = defineProps({
   isOcrProcessing: { type: Boolean, default: false },
   recordingDuration: { type: Number, default: 0 },
   hasImage: { type: Boolean, default: false },
+  sessionTokens: {
+    type: Object,
+    default: () => ({
+      promptTokens: 0,
+      completionTokens: 0,
+      totalPromptTokens: 0,
+      totalCompletionTokens: 0,
+      turnCount: 0,
+    }),
+  },
+  contextLimit: { type: Number, default: 1_000_000 },
 })
 
 const emit = defineEmits([
@@ -116,9 +128,18 @@ const formatDuration = (seconds) => {
         </div>
       </div>
 
-      <!-- 底部标识 -->
-      <div class="flex items-center justify-center mt-1.5" style="font-size: 12px; color: var(--theme-400);">
+      <!-- 底部状态栏：模型标识 + token 用量 -->
+      <div class="flex items-center justify-center gap-3 mt-1.5" style="font-size: 12px; color: var(--theme-400);">
         <span>Hermes Agent</span>
+        <span style="color: var(--theme-300);">·</span>
+        <AiLabTokenUsage
+          :prompt-tokens="sessionTokens.promptTokens"
+          :completion-tokens="sessionTokens.completionTokens"
+          :total-prompt-tokens="sessionTokens.totalPromptTokens"
+          :total-completion-tokens="sessionTokens.totalCompletionTokens"
+          :turn-count="sessionTokens.turnCount"
+          :context-limit="contextLimit"
+        />
       </div>
     </div>
   </div>

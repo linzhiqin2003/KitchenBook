@@ -658,7 +658,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
           </div>
         </div>
 
-        <!-- 统计信息 -->
+        <!-- 耗时信息（token 用量统一在底部状态栏展示） -->
         <div v-if="message.stats && message.stats.endTime" class="flex items-center gap-4 mt-2 text-xs text-gray-400 animate-fade-in-soft">
           <span class="flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -666,8 +666,6 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
             </svg>
             {{ ((message.stats.endTime - message.stats.startTime) / 1000).toFixed(1) }}s
           </span>
-          <span>思考 {{ message.stats.reasoningLength }} 字</span>
-          <span>回答 {{ message.stats.contentLength }} 字</span>
         </div>
       </div>
     </div>
