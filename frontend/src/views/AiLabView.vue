@@ -87,6 +87,10 @@ const sessionTokens = ref({
   breakdown: null,
 })
 
+// breakdown 不进数据库，但用户在多个会话之间切换时不该丢——缓存到模块作用域，
+// 按 conversation id 存上一次拿到的 breakdown，切回这个会话时恢复。
+const breakdownCache = new Map()
+
 const resetSessionTokens = () => {
   sessionTokens.value = {
     promptTokens: 0,
@@ -118,13 +122,18 @@ const recordUsage = (usage) => {
   if (prompt === 0 && completion === 0) return
   // Hermes 扩展字段：{ sections: { key: {label, tokens} }, total_local, encoding }
   const breakdown = (usage.breakdown && typeof usage.breakdown === 'object') ? usage.breakdown : null
+  const nextBreakdown = breakdown || sessionTokens.value.breakdown
   sessionTokens.value = {
     promptTokens: prompt,
     completionTokens: completion,
     totalPromptTokens: sessionTokens.value.totalPromptTokens + prompt,
     totalCompletionTokens: sessionTokens.value.totalCompletionTokens + completion,
     turnCount: sessionTokens.value.turnCount + 1,
-    breakdown: breakdown || sessionTokens.value.breakdown,
+    breakdown: nextBreakdown,
+  }
+  // 缓存当前会话的 breakdown，切走再切回来时还能用
+  if (nextBreakdown && currentConversationId.value) {
+    breakdownCache.set(currentConversationId.value, nextBreakdown)
   }
   saveTokenUsage()
 }
@@ -233,7 +242,11 @@ const fetchConversation = async (id) => {
       messages.value = normalizeMessagesForUI(data.messages || [])
       // 恢复持久化的 token 用量
       if (data.token_usage && typeof data.token_usage === 'object' && Object.keys(data.token_usage).length > 0) {
-        sessionTokens.value = data.token_usage
+        sessionTokens.value = {
+          ...data.token_usage,
+          // breakdown 没进库；如果本会话之前在内存里有缓存，切回来时恢复，否则置 null
+          breakdown: breakdownCache.get(id) || null,
+        }
       } else {
         resetSessionTokens()
       }
@@ -293,6 +306,7 @@ const deleteConversation = async (id) => {
     })
     if (response.ok) {
       conversations.value = conversations.value.filter(c => c.id !== id)
+      breakdownCache.delete(id)
       if (currentConversationId.value === id) {
         currentConversationId.value = null
         currentConversation.value = null
