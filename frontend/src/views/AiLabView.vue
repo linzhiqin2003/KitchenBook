@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
+import AiLabPanel from '../components/ailab/AiLabPanel.vue'
 
 // ===== 会话管理状态 =====
 const conversations = ref([])
@@ -10,6 +11,7 @@ const currentConversation = ref(null)
 // 移动端默认折叠侧边栏
 const isSidebarCollapsed = ref(window.innerWidth < 1024)
 const isLoadingConversations = ref(false)
+const isPanelOpen = ref(false)
 
 // ===== 聊天状态 =====
 const isLoading = ref(false)
@@ -47,6 +49,42 @@ const stats = ref({
   startTime: null,
   endTime: null
 })
+
+// ===== Token 用量统计（session 级别） =====
+const TOKEN_CONTEXT_LIMIT = 1_000_000
+const sessionTokens = ref({
+  // 最近一次请求的 token 数（代表当前 context 占用）
+  promptTokens: 0,
+  completionTokens: 0,
+  // session 累计
+  totalPromptTokens: 0,
+  totalCompletionTokens: 0,
+  turnCount: 0,
+})
+
+const resetSessionTokens = () => {
+  sessionTokens.value = {
+    promptTokens: 0,
+    completionTokens: 0,
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
+    turnCount: 0,
+  }
+}
+
+const recordUsage = (usage) => {
+  if (!usage || typeof usage !== 'object') return
+  const prompt = Number(usage.prompt_tokens) || 0
+  const completion = Number(usage.completion_tokens) || 0
+  if (prompt === 0 && completion === 0) return
+  sessionTokens.value = {
+    promptTokens: prompt,
+    completionTokens: completion,
+    totalPromptTokens: sessionTokens.value.totalPromptTokens + prompt,
+    totalCompletionTokens: sessionTokens.value.totalCompletionTokens + completion,
+    turnCount: sessionTokens.value.turnCount + 1,
+  }
+}
 
 // ===== 计算属性 =====
 const hasMessages = computed(() => messages.value.length > 0)
@@ -180,6 +218,7 @@ const createConversation = async () => {
 // 选择会话
 const selectConversation = async (id) => {
   currentConversationId.value = id
+  resetSessionTokens()
   await fetchConversation(id)
 }
 
@@ -197,6 +236,7 @@ const deleteConversation = async (id) => {
         currentConversationId.value = null
         currentConversation.value = null
         messages.value = []
+        resetSessionTokens()
       }
     }
   } catch (error) {
@@ -638,7 +678,12 @@ const streamResponse = async () => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${HERMES_API_KEY}`,
       },
-      body: JSON.stringify({ model: 'hermes-agent', messages: apiMessages, stream: true }),
+      body: JSON.stringify({
+        model: 'hermes-agent',
+        messages: apiMessages,
+        stream: true,
+        stream_options: { include_usage: true }
+      }),
       signal: abortController.signal
     })
 
@@ -685,6 +730,11 @@ const streamResponse = async () => {
 
           try {
             const parsed = JSON.parse(data)
+
+            // 捕获 OpenAI 风格 usage 字段（include_usage:true 的最终 chunk，或 Hermes 自带的 usage）
+            if (parsed && parsed.usage) {
+              recordUsage(parsed.usage)
+            }
 
             if (currentEventType === 'hermes.reasoning') {
               appendReasoningChunk(parsed.text)
@@ -1261,6 +1311,8 @@ onMounted(async () => {
         :is-ocr-processing="isOcrProcessing"
         :recording-duration="recordingDuration"
         :has-image="!!selectedImage"
+        :session-tokens="sessionTokens"
+        :context-limit="TOKEN_CONTEXT_LIMIT"
         @send="handleSend"
         @stop="stopGeneration"
         @image-click="triggerFileInput"
@@ -1268,6 +1320,22 @@ onMounted(async () => {
         @paste="handlePaste"
       />
     </div>
+
+    <!-- 右侧面板 -->
+    <AiLabPanel :visible="isPanelOpen" @close="isPanelOpen = false" />
+
+    <!-- 面板打开按钮（右上角） -->
+    <button
+      v-if="!isPanelOpen"
+      @click="isPanelOpen = true"
+      class="fixed top-3 right-4 z-30 p-1.5 rounded-md cursor-pointer transition-colors hover:bg-black/[0.04] hidden lg:flex items-center justify-center"
+      style="color: #9a9aa0;"
+      title="Agent Panel"
+    >
+      <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
+      </svg>
+    </button>
 
     <!-- 移动端侧边栏遮罩 -->
     <Transition name="fade">
