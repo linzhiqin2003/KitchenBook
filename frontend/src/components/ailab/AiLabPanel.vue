@@ -197,7 +197,7 @@ defineExpose({ refreshMemory: fetchMemory })
       <div class="flex px-3 pb-2 gap-1">
         <button v-for="tab in ['tools', 'skills', 'memory']" :key="tab"
           @click="loadTab(tab)"
-          class="px-3 py-1 rounded-md text-[12px] font-medium transition-colors cursor-pointer"
+          class="px-3 py-1 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
           :style="activeTab === tab ? 'background: #fff; color: #2c2c30; box-shadow: 0 1px 2px rgba(0,0,0,0.05);' : 'color: #9a9aa0;'">
           {{ tab === 'tools' ? 'Tools' : tab === 'skills' ? 'Skills' : 'Memory' }}
         </button>
@@ -215,9 +215,9 @@ defineExpose({ refreshMemory: fetchMemory })
                 <div class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/60 transition-colors">
                   <div class="flex items-center gap-2 flex-1 min-w-0">
                     <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="tool.enabled ? 'background: #2c2c30;' : 'background: #d1d1d6;'"></span>
-                    <span class="text-[13px] truncate" :style="tool.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ tool.name }}</span>
+                    <span class="text-[14px] truncate" :style="tool.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ tool.name }}</span>
                   </div>
-                  <button @click="toggleTool(tool)" class="shrink-0 ml-2 cursor-pointer px-2 py-0.5 rounded text-[11px] transition-colors"
+                  <button @click="toggleTool(tool)" class="shrink-0 ml-2 cursor-pointer px-2 py-0.5 rounded text-[12px] transition-colors"
                     :style="tool.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">
                     {{ tool.enabled ? 'on' : 'off' }}
                   </button>
@@ -230,7 +230,7 @@ defineExpose({ refreshMemory: fetchMemory })
               <div v-for="tool in tools.filter(t => t.type === 'mcp')" :key="'mcp-' + tool.name"
                 class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/60 transition-colors">
                 <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--ai-accent);"></span>
-                <span class="text-[13px]" style="color: #2c2c30;">{{ tool.name }}</span>
+                <span class="text-[14px]" style="color: #2c2c30;">{{ tool.name }}</span>
               </div>
             </div>
           </template>
@@ -246,8 +246,8 @@ defineExpose({ refreshMemory: fetchMemory })
               <div class="space-y-0.5">
                 <div v-for="skill in group" :key="skill.name"
                   class="flex items-center justify-between px-3 py-1.5 rounded-lg hover:bg-white/60 transition-colors">
-                  <span class="text-[13px] truncate" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</span>
-                  <span class="text-[11px] shrink-0" :style="skill.enabled ? 'color: #9a9aa0;' : 'color: #d1d1d6;'">
+                  <span class="text-[14px] truncate" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</span>
+                  <span class="text-[12px] shrink-0" :style="skill.enabled ? 'color: #9a9aa0;' : 'color: #d1d1d6;'">
                     {{ skill.enabled ? 'on' : 'off' }}
                   </span>
                 </div>
@@ -260,20 +260,20 @@ defineExpose({ refreshMemory: fetchMemory })
         <template v-if="activeTab === 'memory'">
           <div v-if="loadingMemory" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
           <template v-else>
-            <div v-if="memoryError" class="mb-3 rounded-lg px-3 py-2 text-[12px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
+            <div v-if="memoryError" class="mb-3 rounded-lg px-3 py-2 text-[13px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
               {{ memoryError }}
             </div>
 
             <!-- MEMORY.md -->
             <div class="mb-4">
               <div class="flex items-center justify-between mb-2">
-                <span class="text-[12px] font-semibold" style="color: #6e6e76;">MEMORY.md</span>
+                <span class="text-[13px] font-semibold" style="color: #6e6e76;">MEMORY.md</span>
                 <button v-if="!editingMemory" @click="startEditMemory"
-                  class="text-[11px] px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                  class="text-[12px] px-2 py-0.5 rounded-md cursor-pointer transition-colors"
                   style="color: var(--ai-accent); border: 1px solid var(--ai-accent-soft);">编辑</button>
                 <div v-else class="flex gap-1">
-                  <button @click="saveMemory" class="text-[11px] px-2 py-0.5 rounded-md cursor-pointer" style="background: var(--theme-700); color: #fff;">保存</button>
-                  <button @click="editingMemory = false" class="text-[11px] px-2 py-0.5 rounded-md cursor-pointer" style="color: #9a9aa0;">取消</button>
+                  <button @click="saveMemory" class="text-[12px] px-2 py-0.5 rounded-md cursor-pointer" style="background: var(--theme-700); color: #fff;">保存</button>
+                  <button @click="editingMemory = false" class="text-[12px] px-2 py-0.5 rounded-md cursor-pointer" style="color: #9a9aa0;">取消</button>
                 </div>
               </div>
               <textarea v-if="editingMemory" v-model="memoryDraft"
@@ -286,8 +286,8 @@ defineExpose({ refreshMemory: fetchMemory })
             <!-- USER.md -->
             <div>
               <div class="flex items-center mb-2">
-                <span class="text-[12px] font-semibold" style="color: #6e6e76;">USER.md</span>
-                <span class="text-[10px] ml-2" style="color: #b0b0b6;">agent 自动维护</span>
+                <span class="text-[13px] font-semibold" style="color: #6e6e76;">USER.md</span>
+                <span class="text-[11px] ml-2" style="color: #b0b0b6;">agent 自动维护</span>
               </div>
               <pre class="rounded-lg p-3 whitespace-pre-wrap break-words"
                 style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; min-height: 60px; font-family: var(--ai-font-mono);">{{ userProfile || '(空)' }}</pre>

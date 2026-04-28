@@ -83,6 +83,8 @@ const sessionTokens = ref({
   totalPromptTokens: 0,
   totalCompletionTokens: 0,
   turnCount: 0,
+  // 最近一次的 prompt 组成（来自 Hermes usage.breakdown，仅前端缓存，不持久化）
+  breakdown: null,
 })
 
 const resetSessionTokens = () => {
@@ -92,16 +94,19 @@ const resetSessionTokens = () => {
     totalPromptTokens: 0,
     totalCompletionTokens: 0,
     turnCount: 0,
+    breakdown: null,
   }
 }
 
 const saveTokenUsage = async () => {
   if (!currentConversationId.value) return
   try {
+    // breakdown 是临时 UI 状态，不进数据库
+    const { breakdown: _omit, ...persisted } = sessionTokens.value
     await fetch(`${API_BASE_URL}/api/ai/conversations/${currentConversationId.value}/token-usage/`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sessionTokens.value)
+      body: JSON.stringify(persisted)
     })
   } catch (e) { /* silent */ }
 }
@@ -111,12 +116,15 @@ const recordUsage = (usage) => {
   const prompt = Number(usage.prompt_tokens) || 0
   const completion = Number(usage.completion_tokens) || 0
   if (prompt === 0 && completion === 0) return
+  // Hermes 扩展字段：{ sections: { key: {label, tokens} }, total_local, encoding }
+  const breakdown = (usage.breakdown && typeof usage.breakdown === 'object') ? usage.breakdown : null
   sessionTokens.value = {
     promptTokens: prompt,
     completionTokens: completion,
     totalPromptTokens: sessionTokens.value.totalPromptTokens + prompt,
     totalCompletionTokens: sessionTokens.value.totalCompletionTokens + completion,
     turnCount: sessionTokens.value.turnCount + 1,
+    breakdown: breakdown || sessionTokens.value.breakdown,
   }
   saveTokenUsage()
 }
@@ -1302,7 +1310,7 @@ onMounted(async () => {
         </button>
 
         <div class="flex items-center gap-2 flex-1 min-w-0">
-          <span class="text-[13px] font-semibold tracking-tight" style="color: var(--theme-700);">AI Lab</span>
+          <span class="text-[14px] font-semibold tracking-tight" style="color: var(--theme-700);">AI Lab</span>
         </div>
 
         <router-link

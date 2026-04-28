@@ -11,6 +11,8 @@ const props = defineProps({
   turnCount: { type: Number, default: 0 },
   // context 上限
   contextLimit: { type: Number, default: 1_000_000 },
+  // Hermes 扩展：{ sections: { key: {label, tokens} }, total_local, encoding }
+  breakdown: { type: Object, default: null },
 })
 
 const isExpanded = ref(false)
@@ -55,6 +57,56 @@ const formatLimit = (n) => {
 
 const contextLabel = computed(() => formatNumber(contextTokens.value))
 const limitLabel = computed(() => formatLimit(props.contextLimit))
+
+// ── Breakdown ──────────────────────────────────────────────────────────
+// 每段固定一个颜色，跟 Claude Code 的拆解面板观感对齐。
+const SECTION_COLOR = {
+  identity: '#3d7cc9',
+  user_system: '#5b8dd6',
+  tool_guidance: '#7aa3e0',
+  memory_files: '#a78bfa',
+  skills: '#ec4899',
+  context_files: '#f59e0b',
+  env_meta: '#84cc16',
+  ephemeral_system: '#14b8a6',
+  tools: '#10b981',
+  messages: '#22c55e',
+}
+
+const breakdownSections = computed(() => {
+  const raw = props.breakdown && props.breakdown.sections
+  if (!raw || typeof raw !== 'object') return []
+  // sections 已经是有序对象（Hermes 端按 BREAKDOWN_LABELS 顺序输出）
+  return Object.entries(raw).map(([key, info]) => ({
+    key,
+    label: info?.label || key,
+    tokens: Number(info?.tokens) || 0,
+    color: SECTION_COLOR[key] || '#94a3b8',
+  })).filter(s => s.tokens > 0)
+})
+
+const breakdownTotalLocal = computed(() => {
+  if (!props.breakdown) return 0
+  return Number(props.breakdown.total_local) || breakdownSections.value.reduce((a, b) => a + b.tokens, 0)
+})
+
+const breakdownEncoding = computed(() => props.breakdown?.encoding || '')
+
+// 进度条以 contextLimit 为分母，每段的宽度 = tokens / contextLimit
+const sectionWidthPercent = (tokens) => {
+  if (!props.contextLimit) return 0
+  return (tokens / props.contextLimit) * 100
+}
+
+// 列表里展示的"占比"：相对 prompt_tokens（API 真值）
+const sectionShareLabel = (tokens) => {
+  const denom = props.promptTokens || breakdownTotalLocal.value
+  if (!denom) return ''
+  const p = (tokens / denom) * 100
+  if (p < 0.1) return '<0.1%'
+  if (p < 10) return `${p.toFixed(1)}%`
+  return `${p.toFixed(0)}%`
+}
 
 const togglePanel = () => {
   isExpanded.value = !isExpanded.value
@@ -103,7 +155,7 @@ onUnmounted(() => {
     <Transition name="panel">
       <div
         v-if="isExpanded"
-        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[320px] rounded-xl shadow-lg overflow-hidden z-30"
+        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[340px] rounded-xl shadow-lg overflow-hidden z-30"
         style="background: var(--theme-50); border: 1px solid var(--theme-200);"
         @click.stop
       >
@@ -128,17 +180,77 @@ onUnmounted(() => {
           <div class="text-[11px] mt-1" style="color: var(--theme-500);">
             占用 {{ percentLabel }}
           </div>
-          <!-- 进度条 -->
-          <div class="mt-2 h-1.5 rounded-full overflow-hidden" style="background: var(--theme-200);">
-            <div
-              class="h-full rounded-full transition-all duration-500"
-              :style="{ width: `${Math.min(percent, 100)}%`, background: barColor }"
-            ></div>
+
+          <!-- 堆叠进度条：有 breakdown 时按段拆，没有时回退到单色 -->
+          <div class="mt-2 h-1.5 rounded-full overflow-hidden flex" style="background: var(--theme-200);">
+            <template v-if="breakdownSections.length">
+              <div
+                v-for="seg in breakdownSections"
+                :key="seg.key"
+                class="h-full transition-all duration-500"
+                :style="{ width: `${sectionWidthPercent(seg.tokens)}%`, background: seg.color }"
+                :title="`${seg.label}: ${seg.tokens.toLocaleString()} tokens`"
+              ></div>
+              <div
+                class="h-full transition-all duration-500"
+                :style="{ width: `${sectionWidthPercent(completionTokens)}%`, background: '#16a34a' }"
+                :title="`输出 completion: ${completionTokens.toLocaleString()} tokens`"
+              ></div>
+            </template>
+            <template v-else>
+              <div
+                class="h-full rounded-full transition-all duration-500"
+                :style="{ width: `${Math.min(percent, 100)}%`, background: barColor }"
+              ></div>
+            </template>
           </div>
         </div>
 
-        <!-- 分段细节 -->
-        <div class="px-4 py-2 space-y-1.5" style="border-top: 1px solid var(--theme-100);">
+        <!-- Prompt 组成（breakdown） -->
+        <div
+          v-if="breakdownSections.length"
+          class="px-4 py-2 space-y-1"
+          style="border-top: 1px solid var(--theme-100);"
+        >
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[11px] font-semibold tracking-wide uppercase" style="color: var(--theme-500);">
+              Prompt 组成
+            </span>
+            <span v-if="breakdownEncoding" class="text-[10px] font-mono" style="color: var(--theme-400);">
+              {{ breakdownEncoding }}
+            </span>
+          </div>
+          <div
+            v-for="seg in breakdownSections"
+            :key="seg.key"
+            class="flex items-center justify-between text-[12px]"
+          >
+            <span class="flex items-center gap-1.5 min-w-0" style="color: var(--theme-600);">
+              <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: seg.color }"></span>
+              <span class="truncate">{{ seg.label }}</span>
+            </span>
+            <span class="flex items-center gap-2 shrink-0 font-mono" style="color: var(--theme-700);">
+              <span>{{ formatNumber(seg.tokens) }}</span>
+              <span class="text-[11px]" style="color: var(--theme-400); min-width: 36px; text-align: right;">
+                {{ sectionShareLabel(seg.tokens) }}
+              </span>
+            </span>
+          </div>
+          <!-- 输出 completion 单独列出，跟堆叠条对齐 -->
+          <div class="flex items-center justify-between text-[12px]">
+            <span class="flex items-center gap-1.5 min-w-0" style="color: var(--theme-600);">
+              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: #16a34a;"></span>
+              <span class="truncate">输出 completion</span>
+            </span>
+            <span class="flex items-center gap-2 shrink-0 font-mono" style="color: var(--theme-700);">
+              <span>{{ formatNumber(completionTokens) }}</span>
+              <span class="text-[11px]" style="color: var(--theme-400); min-width: 36px; text-align: right;"></span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 无 breakdown 时回退到 prompt / completion 两行 -->
+        <div v-else class="px-4 py-2 space-y-1.5" style="border-top: 1px solid var(--theme-100);">
           <div class="flex items-center justify-between text-[12px]">
             <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
               <span class="w-1.5 h-1.5 rounded-full" style="background: #3d7cc9;"></span>

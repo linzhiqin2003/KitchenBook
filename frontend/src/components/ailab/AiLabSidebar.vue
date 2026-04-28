@@ -276,9 +276,9 @@ onUnmounted(() => {
                    @keyup.esc="cancelInlineEdit"
                    @blur="saveInlineEdit(chat)"
                    type="text"
-                   class="flex-1 px-2 py-0.5 text-[13px] rounded-md bg-white focus:outline-none"
+                   class="flex-1 px-2 py-0.5 text-[14px] rounded-md bg-white focus:outline-none"
                    style="border: 1px solid var(--ai-accent); color: var(--theme-700);" />
-            <span v-else class="truncate text-[13px]">
+            <span v-else class="truncate text-[14px]">
               {{ formatTitle(chat.title) }}
             </span>
           </div>

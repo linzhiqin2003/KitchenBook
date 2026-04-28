@@ -437,7 +437,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
               @input="autoResizeTextarea"
               :style="{ width: editBoxWidth + 'px' }"
               class="rounded-xl px-4 py-3 bg-white leading-relaxed resize-none focus:outline-none overflow-hidden"
-              style="border: 1px solid var(--ai-accent); color: var(--theme-700); font-size: 14px;"
+              style="border: 1px solid var(--ai-accent); color: var(--theme-700); font-size: 15px;"
             ></textarea>
             <div class="flex items-center gap-2">
               <button @click="submitEdit"
@@ -456,7 +456,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
           <div v-else
                ref="bubbleRef"
                class="rounded-xl px-4 py-3 leading-relaxed whitespace-pre-wrap break-words max-w-[600px]"
-               style="background: var(--theme-100); color: var(--theme-700); font-size: 14px;">
+               style="background: var(--theme-100); color: var(--theme-700); font-size: 15.5px;">
             {{ message.content }}
           </div>
         </div>
@@ -468,7 +468,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   <div v-else-if="message.role === 'assistant'" class="w-full py-3 px-6 animate-fade-in flex justify-start" style="font-family: var(--ai-font-body);">
     <div class="flex gap-3 max-w-[calc(100%-48px)]">
       <div class="flex flex-col items-start flex-1 min-w-0">
-        <div class="mb-1.5" style="font-size: 12px; font-weight: 600; color: var(--theme-400); letter-spacing: 0.01em;">{{ message.modelName || 'AI' }}</div>
+        <div class="mb-1.5" style="font-size: 13px; font-weight: 600; color: var(--theme-400); letter-spacing: 0.01em;">{{ message.modelName || 'AI' }}</div>
 
         <!-- 工具调用时间线 -->
         <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3">
@@ -1185,7 +1185,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .markdown-content {
   color: var(--theme-700, #2d2d28);
   line-height: 1.7;
-  font-size: 14px;
+  font-size: 15.5px;
 }
 
 .markdown-content :deep(p) {

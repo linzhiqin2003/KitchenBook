@@ -86,8 +86,8 @@ const formatDuration = (seconds) => {
             </svg>
           </div>
           <div class="min-w-0 flex-1">
-            <div class="truncate text-[13px] leading-4" style="color: var(--theme-700);">{{ fileAttachment.name }}</div>
-            <div class="text-[11px] leading-4" style="color: var(--theme-400);">{{ fileAttachment.type === 'image' ? '图片' : 'PDF' }}<span v-if="fileSizeLabel"> · {{ fileSizeLabel }}</span></div>
+            <div class="truncate text-[14px] leading-5" style="color: var(--theme-700);">{{ fileAttachment.name }}</div>
+            <div class="text-[12px] leading-4" style="color: var(--theme-400);">{{ fileAttachment.type === 'image' ? '图片' : 'PDF' }}<span v-if="fileSizeLabel"> · {{ fileSizeLabel }}</span></div>
           </div>
           <button
             @click="emit('remove-file')"
@@ -175,7 +175,7 @@ const formatDuration = (seconds) => {
       </div>
 
       <!-- 底部状态栏：模型标识 + token 用量 -->
-      <div v-if="floating" class="flex items-center justify-center gap-3 mt-1.5" style="font-size: 12px; color: var(--theme-400);">
+      <div v-if="floating" class="flex items-center justify-center gap-3 mt-1.5" style="font-size: 13px; color: var(--theme-400);">
         <span>Hermes Agent</span>
         <span style="color: var(--theme-300);">·</span>
         <AiLabTokenUsage
@@ -185,6 +185,7 @@ const formatDuration = (seconds) => {
           :total-completion-tokens="sessionTokens.totalCompletionTokens"
           :turn-count="sessionTokens.turnCount"
           :context-limit="contextLimit"
+          :breakdown="sessionTokens.breakdown"
         />
       </div>
     </div>
@@ -233,9 +234,9 @@ const formatDuration = (seconds) => {
   outline: none;
   background: transparent;
   color: #111827;
-  font-size: 15px;
-  line-height: 22px;
-  min-height: 24px;
+  font-size: 16px;
+  line-height: 24px;
+  min-height: 26px;
   max-height: 8rem;
   padding: 1px 0;
 }
