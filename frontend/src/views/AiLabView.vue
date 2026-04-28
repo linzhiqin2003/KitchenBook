@@ -1308,8 +1308,23 @@ onMounted(async () => {
       <!-- 欢迎屏 / 聊天区域 -->
       <AiLabWelcome
         v-if="!hasMessages"
+        v-model="inputMessage"
         :is-loading="isLoading"
+        :is-recording="isRecording"
+        :is-transcribing="isTranscribing"
+        :is-ocr-processing="isFileProcessing"
+        :recording-duration="recordingDuration"
+        :has-image="!!selectedFile"
+        :file-attachment="selectedAttachment"
+        :session-tokens="sessionTokens"
+        :context-limit="TOKEN_CONTEXT_LIMIT"
         @ask="handleQuickAsk"
+        @send="handleSend"
+        @stop="stopGeneration"
+        @image-click="triggerFileInput"
+        @voice-click="toggleRecording"
+        @paste="handlePaste"
+        @remove-file="removeFile"
       />
 
       <AiLabChatArea
@@ -1345,7 +1360,7 @@ onMounted(async () => {
         @change="handleFileSelect"
       />
 
-      <!-- 输入区域（有消息时显示） -->
+      <!-- 输入区域 -->
       <AiLabInput
         v-if="hasMessages"
         v-model="inputMessage"

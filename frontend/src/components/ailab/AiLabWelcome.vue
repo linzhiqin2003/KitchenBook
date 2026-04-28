@@ -1,13 +1,31 @@
 <script setup>
-import { ref } from 'vue'
+import AiLabInput from './AiLabInput.vue'
 
 const props = defineProps({
-  isLoading: { type: Boolean, default: false }
+  modelValue: { type: String, default: '' },
+  isLoading: { type: Boolean, default: false },
+  isRecording: { type: Boolean, default: false },
+  isTranscribing: { type: Boolean, default: false },
+  isOcrProcessing: { type: Boolean, default: false },
+  recordingDuration: { type: Number, default: 0 },
+  hasImage: { type: Boolean, default: false },
+  fileAttachment: { type: Object, default: null },
+  sessionTokens: {
+    type: Object,
+    default: () => ({
+      promptTokens: 0,
+      completionTokens: 0,
+      totalPromptTokens: 0,
+      totalCompletionTokens: 0,
+      turnCount: 0,
+    }),
+  },
+  contextLimit: { type: Number, default: 1_000_000 },
 })
 
-const emit = defineEmits(['ask', 'toggle-sidebar'])
-
-const inputValue = ref('')
+const emit = defineEmits([
+  'update:modelValue', 'ask', 'send', 'stop', 'image-click', 'voice-click', 'paste', 'remove-file', 'toggle-sidebar'
+])
 
 const examplePrompts = [
   { title: '数学推理', prompt: '证明根号2是无理数' },
@@ -15,23 +33,6 @@ const examplePrompts = [
   { title: '深度思考', prompt: '从哲学角度分析人工智能的本质' },
   { title: '写作助手', prompt: '帮我写一段关于科技发展的议论文' }
 ]
-
-function handleEnter(e) {
-  if (e.isComposing || e.keyCode === 229) return
-  if (e.shiftKey) return
-  e.preventDefault()
-  submit()
-}
-
-function submit() {
-  if (!inputValue.value.trim() || props.isLoading) return
-  emit('ask', inputValue.value)
-  inputValue.value = ''
-}
-
-function setPrompt(prompt) {
-  inputValue.value = prompt
-}
 </script>
 
 <template>
@@ -47,41 +48,36 @@ function setPrompt(prompt) {
     </h1>
 
     <div class="w-full" style="max-width: 38rem;">
-      <div class="relative transition-all" style="background: var(--theme-50); border: 1px solid var(--theme-200); border-radius: 12px;">
-        <textarea
-          v-model="inputValue"
-          @keydown.enter="handleEnter"
-          placeholder="开始对话…"
-          class="w-full bg-transparent resize-none scrollbar-hide outline-none border-none focus:ring-0 focus:outline-none"
-          style="color: var(--theme-700); padding: 14px 52px 14px 16px; min-height: 48px; max-height: 8rem; font-size: 14px; line-height: 1.5;"
-          rows="1"
-        ></textarea>
-
-        <div class="absolute bottom-2.5 right-2.5">
-          <button @click="submit" :disabled="!inputValue.trim() || isLoading"
-             class="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-             style="background: var(--theme-700); color: var(--theme-50);">
-             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-               <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18"/>
-             </svg>
-          </button>
-        </div>
-      </div>
+      <AiLabInput
+        :model-value="modelValue"
+        :floating="false"
+        :is-loading="isLoading"
+        :is-recording="isRecording"
+        :is-transcribing="isTranscribing"
+        :is-ocr-processing="isOcrProcessing"
+        :recording-duration="recordingDuration"
+        :has-image="hasImage"
+        :file-attachment="fileAttachment"
+        :session-tokens="sessionTokens"
+        :context-limit="contextLimit"
+        @update:model-value="emit('update:modelValue', $event)"
+        @send="emit('send')"
+        @stop="emit('stop')"
+        @image-click="emit('image-click')"
+        @voice-click="emit('voice-click')"
+        @paste="emit('paste', $event)"
+        @remove-file="emit('remove-file')"
+      />
 
       <div class="mt-4 flex flex-wrap justify-center gap-2">
         <button v-for="example in examplePrompts" :key="example.title"
-             @click="setPrompt(example.prompt)"
+             @click="!isLoading && emit('ask', example.prompt)"
+             :disabled="isLoading"
              class="px-3 py-1 transition-all cursor-pointer rounded-md"
              style="font-size: 13px; color: var(--theme-500); border: 1px solid var(--theme-200); background: transparent;">
           {{ example.title }}
         </button>
       </div>
-    </div>
-
-    <div class="absolute bottom-5 text-center" style="font-size: 12px; color: var(--theme-400);">
-      <span>Hermes Agent</span>
-      <span style="color: var(--theme-300); margin: 0 6px;">·</span>
-      <span>AI 可能产生不准确信息，请核实重要内容</span>
     </div>
   </div>
 </template>

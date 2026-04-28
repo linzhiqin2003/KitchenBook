@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
 
 const props = defineProps({
@@ -19,8 +19,36 @@ const loadingMemory = ref(false)
 const editingMemory = ref(false)
 const memoryDraft = ref('')
 const memoryError = ref('')
+const MIN_PANEL_WIDTH = 280
+const MAX_PANEL_WIDTH = 560
+const DEFAULT_PANEL_WIDTH = 320
+const panelWidth = ref(DEFAULT_PANEL_WIDTH)
+const isResizing = ref(false)
 
 const headers = { 'Authorization': `Bearer ${HERMES_API_KEY}`, 'Content-Type': 'application/json' }
+
+const clampPanelWidth = (width) => Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, width))
+
+const handleResizeMove = (event) => {
+  if (!isResizing.value) return
+  panelWidth.value = clampPanelWidth(window.innerWidth - event.clientX)
+}
+
+const stopResize = () => {
+  if (!isResizing.value) return
+  isResizing.value = false
+  document.body.style.userSelect = ''
+  window.removeEventListener('pointermove', handleResizeMove)
+  window.removeEventListener('pointerup', stopResize)
+}
+
+const startResize = (event) => {
+  event.preventDefault()
+  isResizing.value = true
+  document.body.style.userSelect = 'none'
+  window.addEventListener('pointermove', handleResizeMove)
+  window.addEventListener('pointerup', stopResize)
+}
 
 const responseErrorMessage = (data, fallback) => {
   if (typeof data?.error === 'string') return data.error
@@ -132,12 +160,29 @@ watch(
 
 onMounted(() => { if (props.visible) loadTab(activeTab.value) })
 
+onUnmounted(stopResize)
+
 defineExpose({ refreshMemory: fetchMemory })
 </script>
 
 <template>
   <Transition name="slide">
-    <div v-if="visible" class="flex flex-col" style="width: 320px; min-width: 320px; height: 100dvh; background: #f7f7f8; border-left: 1px solid #ebebed; font-family: var(--ai-font-body);">
+    <div
+      v-if="visible"
+      class="panel-shell flex flex-col"
+      :class="{ resizing: isResizing }"
+      :style="{ width: `${panelWidth}px`, minWidth: `${panelWidth}px` }"
+    >
+      <div
+        class="resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        :aria-valuemin="MIN_PANEL_WIDTH"
+        :aria-valuemax="MAX_PANEL_WIDTH"
+        :aria-valuenow="panelWidth"
+        title="拖动调整宽度"
+        @pointerdown="startResize"
+      ></div>
       <!-- Header -->
       <div class="flex items-center justify-between px-4 pt-3 pb-2">
         <span class="text-[14px] font-semibold" style="color: #2c2c30;">Agent Panel</span>
@@ -255,6 +300,37 @@ defineExpose({ refreshMemory: fetchMemory })
 </template>
 
 <style scoped>
+.panel-shell {
+  position: relative;
+  height: 100dvh;
+  background: #f7f7f8;
+  border-left: 1px solid #ebebed;
+  font-family: var(--ai-font-body);
+}
+.resize-handle {
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 2;
+}
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 3px;
+  width: 1px;
+  height: 100%;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.resize-handle:hover::after,
+.resizing .resize-handle::after {
+  background: var(--ai-accent);
+}
 .slide-enter-active, .slide-leave-active {
   transition: all 0.25s ease;
 }

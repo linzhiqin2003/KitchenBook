@@ -11,6 +11,7 @@ const props = defineProps({
   recordingDuration: { type: Number, default: 0 },
   hasImage: { type: Boolean, default: false },
   fileAttachment: { type: Object, default: null },
+  floating: { type: Boolean, default: true },
   sessionTokens: {
     type: Object,
     default: () => ({
@@ -66,7 +67,10 @@ const formatDuration = (seconds) => {
 </script>
 
 <template>
-  <div class="absolute bottom-0 left-0 right-0 pt-4 pb-3 px-4" style="background: linear-gradient(to top, var(--theme-50) 70%, transparent); font-family: var(--ai-font-body);">
+  <div
+    :class="floating ? 'absolute bottom-0 left-0 right-0 pt-4 pb-3 px-4' : 'relative w-full'"
+    :style="floating ? 'background: linear-gradient(to top, var(--theme-50) 70%, transparent); font-family: var(--ai-font-body);' : 'font-family: var(--ai-font-body);'"
+  >
     <div class="max-w-3xl mx-auto relative">
       <div class="input-shell transition-all">
         <div v-if="hasAttachment" class="attachment-row">
@@ -170,7 +174,7 @@ const formatDuration = (seconds) => {
       </div>
 
       <!-- 底部状态栏：模型标识 + token 用量 -->
-      <div class="flex items-center justify-center gap-3 mt-1.5" style="font-size: 12px; color: var(--theme-400);">
+      <div v-if="floating" class="flex items-center justify-center gap-3 mt-1.5" style="font-size: 12px; color: var(--theme-400);">
         <span>Hermes Agent</span>
         <span style="color: var(--theme-300);">·</span>
         <AiLabTokenUsage
