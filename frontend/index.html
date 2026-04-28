@@ -26,6 +26,11 @@
     <script>
       // 在 Vue 挂载前同步设置背景色，防止主题闪烁
       (function(){
+        var p = location.pathname;
+        if (p.startsWith('/ai-lab') || p.startsWith('/questiongen')) {
+          document.body.style.backgroundColor = '#f8f8f6';
+          return;
+        }
         var t = localStorage.getItem('blog_theme');
         if (t === 'light') document.body.style.backgroundColor = '#fcfbf7';
         else if (t === 'dark' || !t) document.body.style.backgroundColor = '#0a0a0f';
