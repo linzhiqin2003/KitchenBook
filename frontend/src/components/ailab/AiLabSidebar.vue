@@ -207,43 +207,52 @@ onUnmounted(() => {
          'fixed z-50 lg:relative lg:z-auto'
        ]">
     <!-- Header -->
-    <div class="px-4 py-3 flex items-center" :class="isCollapsed ? 'justify-center' : 'justify-between'">
-      <div v-if="!isCollapsed" class="flex items-center gap-2">
-        <span class="text-[13px] font-semibold tracking-tight" style="color: var(--theme-700);">AI Lab</span>
-      </div>
-      <button @click="emit('toggle-collapse')"
-              class="p-1 rounded-md transition-all cursor-pointer"
-              style="color: var(--theme-400);"
-              :title="isCollapsed ? '展开侧边栏' : '折叠侧边栏'">
-        <svg v-if="!isCollapsed" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+    <div class="px-3 pt-3 pb-1 flex items-center" :class="isCollapsed ? 'justify-center' : 'justify-between'">
+      <div v-if="!isCollapsed" class="flex items-center gap-1.5">
+        <svg class="w-4 h-4" style="color: #6e6e76;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
         </svg>
-        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+        <span class="text-[14px] font-semibold" style="color: #2c2c30;">Chat</span>
+      </div>
+      <div v-if="!isCollapsed" class="flex items-center gap-0.5">
+        <button @click="emit('toggle-collapse')"
+                class="p-1.5 rounded-md transition-all cursor-pointer hover:bg-black/[0.04]"
+                style="color: #9a9aa0;"
+                title="折叠侧边栏">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+          </svg>
+        </button>
+      </div>
+      <button v-else @click="emit('toggle-collapse')"
+              class="p-1.5 rounded-md transition-all cursor-pointer"
+              style="color: #9a9aa0;" title="展开侧边栏">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
         </svg>
       </button>
     </div>
 
-    <!-- New Chat Button -->
-    <div class="px-3 pb-2">
+    <!-- 菜单项 -->
+    <div v-if="!isCollapsed" class="px-2 pb-1">
       <button @click="emit('new')"
-              class="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg transition-colors cursor-pointer text-[13px] font-medium"
-              style="background: #fff; border: 1px solid #e0e0e3; color: #4a4a4f;">
-        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/[0.04]"
+              style="font-size: 14px; color: #2c2c30;">
+        <svg class="w-4 h-4 shrink-0" style="color: #6e6e76;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
         </svg>
-        <span v-if="!isCollapsed">新对话</span>
+        新对话
       </button>
     </div>
 
     <!-- 会话列表 -->
     <div class="flex-1 min-h-0 overflow-y-auto px-2 py-1 custom-scrollbar">
-      <div v-if="conversations.length === 0 && !isCollapsed" class="text-center mt-10 px-4" style="color: var(--theme-400); font-size: 13px;">
+      <div v-if="conversations.length === 0 && !isCollapsed" class="text-center mt-8 px-4" style="color: #b0b0b6; font-size: 13px;">
         暂无历史记录
       </div>
 
       <template v-for="(group, groupName) in groupedConversations" :key="groupName">
-        <div v-if="!isCollapsed" class="px-2 py-1.5 mt-3 first:mt-0" style="font-size: 11px; font-weight: 500; color: #9a9aa0; letter-spacing: 0.02em;">
+        <div v-if="!isCollapsed" class="px-2.5 pt-4 pb-1" style="font-size: 12px; font-weight: 500; color: #9a9aa0;">
           {{ groupName }}
         </div>
         <div v-for="chat in group" :key="chat.id"
