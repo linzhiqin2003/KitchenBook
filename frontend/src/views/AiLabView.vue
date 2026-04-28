@@ -238,7 +238,7 @@ const fetchConversation = async (id) => {
   }
 }
 
-// 创建新会话
+// 创建新会话（实际写入后端 — 仅在用户首条消息发送时调用）
 const createConversation = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/`, {
@@ -249,11 +249,23 @@ const createConversation = async () => {
     if (response.ok) {
       const data = await response.json()
       conversations.value.unshift(data)
-      await selectConversation(data.id)
+      currentConversationId.value = data.id
+      currentConversation.value = data
     }
   } catch (error) {
     console.error('创建会话失败:', error)
   }
+}
+
+// 进入"新对话"欢迎态：仅清空本地视图，不写后端、不进 sidebar
+// 用户发送首条消息时才真正 createConversation()
+const startNewConversation = () => {
+  currentConversationId.value = null
+  currentConversation.value = null
+  messages.value = []
+  resetSessionTokens()
+  inputMessage.value = ''
+  removeFile?.()
 }
 
 // 选择会话
@@ -1270,7 +1282,7 @@ onMounted(async () => {
       :current-id="currentConversationId"
       :is-collapsed="isSidebarCollapsed"
       @select="selectConversation"
-      @new="createConversation"
+      @new="startNewConversation"
       @delete="deleteConversation"
       @toggle-collapse="toggleSidebar"
     />

@@ -210,11 +210,11 @@ const formatDuration = (seconds) => {
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 .input-shell:focus-within {
-  border-color: rgba(0, 122, 255, 0.28);
+  border-color: rgba(45, 45, 40, 0.22);
   box-shadow:
     0 18px 42px rgba(15, 23, 42, 0.08),
     0 2px 7px rgba(15, 23, 42, 0.08),
-    0 0 0 3px rgba(0, 122, 255, 0.08),
+    0 0 0 3px rgba(45, 45, 40, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 .input-main-row {
@@ -276,8 +276,8 @@ const formatDuration = (seconds) => {
   cursor: not-allowed;
 }
 .input-add-button.active {
-  color: #007aff;
-  background: rgba(0, 122, 255, 0.1);
+  color: var(--theme-700);
+  background: var(--theme-100);
 }
 .input-voice-button.recording {
   color: #c53030;
@@ -292,7 +292,7 @@ const formatDuration = (seconds) => {
   margin-left: -10px;
   margin-right: 2px;
   border-radius: 999px;
-  background: #007aff;
+  background: var(--theme-700);
   color: white;
   font-size: 10px;
   font-weight: 700;
@@ -313,14 +313,14 @@ const formatDuration = (seconds) => {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 999px;
-  background: #0a84ff;
+  background: var(--theme-700);
   color: white;
-  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.24);
+  box-shadow: 0 6px 14px rgba(45, 45, 40, 0.18);
   transition: transform 0.16s ease, background 0.16s ease, opacity 0.16s ease;
   cursor: pointer;
 }
 .input-send-button:hover:not(:disabled) {
-  background: #007aff;
+  background: var(--theme-600);
   transform: translateY(-1px);
 }
 .input-send-button:active:not(:disabled) {

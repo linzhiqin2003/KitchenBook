@@ -149,15 +149,15 @@ const traceSummary = computed(() => {
 const formatToolStatus = (status = 'parsing') => {
   switch (status) {
     case 'running':
-      return { label: '执行中', dotClass: 'bg-blue-500', textClass: 'text-blue-600', cardClass: 'tool-step-running', spinning: true }
+      return { label: '执行中', icon: 'dot', iconClass: 'trace-orb-running', textClass: 'trace-pill-muted', cardClass: 'tool-step-running', spinning: true }
     case 'success':
-      return { label: '已完成', dotClass: 'bg-emerald-500', textClass: 'text-emerald-600', cardClass: 'tool-step-success', spinning: false }
+      return { label: '已完成', icon: 'check', iconClass: 'trace-orb-check', textClass: 'trace-pill-muted', cardClass: 'tool-step-success', spinning: false }
     case 'error':
-      return { label: '失败', dotClass: 'bg-red-500', textClass: 'text-red-600', cardClass: 'tool-step-error', spinning: false }
+      return { label: '失败', icon: 'cross', iconClass: 'trace-orb-cross', textClass: 'trace-pill-error', cardClass: 'tool-step-error', spinning: false }
     case 'pending':
-      return { label: '等待执行', dotClass: 'bg-slate-500', textClass: 'text-slate-500', cardClass: 'tool-step-pending', spinning: false }
+      return { label: '等待执行', icon: 'dot', iconClass: 'trace-orb-neutral', textClass: 'trace-pill-muted', cardClass: 'tool-step-pending', spinning: false }
     default:
-      return { label: '参数拼接中', dotClass: 'bg-amber-500', textClass: 'text-amber-600', cardClass: 'tool-step-parsing', spinning: false }
+      return { label: '参数拼接中', icon: 'dot', iconClass: 'trace-orb-neutral', textClass: 'trace-pill-muted', cardClass: 'tool-step-parsing', spinning: false }
   }
 }
 
@@ -518,9 +518,14 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                   :class="['trace-row trace-tool-row', formatToolStatus(turn.toolCall.status).cardClass]"
                   @click="toggleToolCollapse(turn.toolCall, getTurnKey(turn, turnIndex))"
                 >
-                  <span
-                    :class="['trace-tool-orb', formatToolStatus(turn.toolCall.status).dotClass]"
-                  ></span>
+                  <span :class="['trace-tool-orb', formatToolStatus(turn.toolCall.status).iconClass]">
+                    <svg v-if="formatToolStatus(turn.toolCall.status).icon === 'check'" viewBox="0 0 12 12" fill="none" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
+                    </svg>
+                    <svg v-else-if="formatToolStatus(turn.toolCall.status).icon === 'cross'" viewBox="0 0 12 12" fill="none" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l6 6M9 3l-6 6"/>
+                    </svg>
+                  </span>
                   <span class="trace-tool-main">
                     <span class="trace-tool-name">{{ displayToolName(turn.toolCall) }}</span>
                   </span>
@@ -556,9 +561,14 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
             <!-- 当前工具调用（流式） -->
             <div v-if="currentToolCall" class="trace-step">
               <div :class="['trace-row trace-tool-row', formatToolStatus(currentToolCall.status).cardClass]">
-                <span
-                  :class="['trace-tool-orb', formatToolStatus(currentToolCall.status).dotClass, formatToolStatus(currentToolCall.status).spinning && 'animate-pulse']"
-                ></span>
+                <span :class="['trace-tool-orb', formatToolStatus(currentToolCall.status).iconClass, formatToolStatus(currentToolCall.status).spinning && 'animate-pulse']">
+                  <svg v-if="formatToolStatus(currentToolCall.status).icon === 'check'" viewBox="0 0 12 12" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
+                  </svg>
+                  <svg v-else-if="formatToolStatus(currentToolCall.status).icon === 'cross'" viewBox="0 0 12 12" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l6 6M9 3l-6 6"/>
+                  </svg>
+                </span>
                 <span class="trace-tool-main">
                   <span class="trace-tool-name">{{ displayToolName(currentToolCall) }}</span>
                 </span>
@@ -956,11 +966,55 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 }
 
 .trace-tool-orb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 0.42rem;
   height: 0.42rem;
   border-radius: 999px;
   flex-shrink: 0;
   box-shadow: none;
+  color: transparent;
+}
+
+.trace-tool-orb svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+/* 中性灰点（pending / parsing） */
+.trace-orb-neutral {
+  background: var(--theme-300, #c8c8c0);
+}
+
+/* 运行中：保留蓝色脉动作为唯一动态强调 */
+.trace-orb-running {
+  background: #3b82f6;
+}
+
+/* 已完成：极小灰色对勾，无填充背景 */
+.trace-orb-check {
+  width: 0.7rem;
+  height: 0.7rem;
+  background: transparent;
+  color: var(--theme-400, #9a9a91);
+}
+
+/* 失败：红色叉，整体仍克制 */
+.trace-orb-cross {
+  width: 0.7rem;
+  height: 0.7rem;
+  background: transparent;
+  color: #b91c1c;
+}
+
+/* 状态文字配色 */
+.trace-pill-muted {
+  color: var(--theme-400, #9a9a91);
+}
+
+.trace-pill-error {
+  color: #b91c1c;
 }
 
 .trace-status-pill {
