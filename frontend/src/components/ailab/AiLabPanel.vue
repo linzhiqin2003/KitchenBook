@@ -91,6 +91,18 @@ const fetchSkills = async () => {
   finally { loadingSkills.value = false }
 }
 
+const toggleSkill = async (skill) => {
+  const next = !skill.enabled
+  try {
+    const r = await fetch(`${HERMES_API_URL}/api/skills/toggle`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ name: skill.name, enable: next })
+    })
+    if (!r.ok) throw new Error(`toggle failed (${r.status})`)
+    skill.enabled = next
+  } catch (e) { console.error('Failed to toggle skill:', e) }
+}
+
 const fetchMemory = async () => {
   loadingMemory.value = true
   memoryError.value = ''
@@ -247,9 +259,11 @@ defineExpose({ refreshMemory: fetchMemory })
                 <div v-for="skill in group" :key="skill.name"
                   class="flex items-center justify-between px-3 py-1.5 rounded-lg hover:bg-white/60 transition-colors">
                   <span class="text-[14px] truncate" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</span>
-                  <span class="text-[12px] shrink-0" :style="skill.enabled ? 'color: #9a9aa0;' : 'color: #d1d1d6;'">
+                  <button @click="toggleSkill(skill)"
+                    class="shrink-0 ml-2 cursor-pointer px-2 py-0.5 rounded text-[12px] transition-colors"
+                    :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">
                     {{ skill.enabled ? 'on' : 'off' }}
-                  </span>
+                  </button>
                 </div>
               </div>
             </div>
