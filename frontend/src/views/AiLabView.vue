@@ -74,6 +74,17 @@ const resetSessionTokens = () => {
   }
 }
 
+const saveTokenUsage = async () => {
+  if (!currentConversationId.value) return
+  try {
+    await fetch(`${API_BASE_URL}/api/ai/conversations/${currentConversationId.value}/token-usage/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sessionTokens.value)
+    })
+  } catch (e) { /* silent */ }
+}
+
 const recordUsage = (usage) => {
   if (!usage || typeof usage !== 'object') return
   const prompt = Number(usage.prompt_tokens) || 0
@@ -86,6 +97,7 @@ const recordUsage = (usage) => {
     totalCompletionTokens: sessionTokens.value.totalCompletionTokens + completion,
     turnCount: sessionTokens.value.turnCount + 1,
   }
+  saveTokenUsage()
 }
 
 // ===== 计算属性 =====
@@ -190,6 +202,12 @@ const fetchConversation = async (id) => {
       const data = await response.json()
       currentConversation.value = data
       messages.value = normalizeMessagesForUI(data.messages || [])
+      // 恢复持久化的 token 用量
+      if (data.token_usage && typeof data.token_usage === 'object' && Object.keys(data.token_usage).length > 0) {
+        sessionTokens.value = data.token_usage
+      } else {
+        resetSessionTokens()
+      }
       await nextTick()
       chatAreaRef.value?.scrollToBottom(true)
       renderMath()

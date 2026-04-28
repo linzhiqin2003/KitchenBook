@@ -1629,6 +1629,14 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=True, methods=['patch'], url_path='token-usage')
+    def update_token_usage(self, request, pk=None):
+        """更新会话的 token 用量"""
+        conversation = self.get_object()
+        conversation.token_usage = request.data
+        conversation.save(update_fields=['token_usage'])
+        return Response(conversation.token_usage)
+
 
 class AiLabMessageViewSet(viewsets.ModelViewSet):
     """AI Lab 消息管理"""

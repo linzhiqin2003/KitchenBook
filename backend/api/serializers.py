@@ -234,4 +234,4 @@ class AiLabConversationDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AiLabConversation
-        fields = ['id', 'title', 'created_at', 'updated_at', 'messages']
+        fields = ['id', 'title', 'created_at', 'updated_at', 'messages', 'token_usage']

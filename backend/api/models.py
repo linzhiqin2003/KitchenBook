@@ -138,6 +138,8 @@ class AiLabConversation(models.Model):
     title = models.CharField(max_length=200, default="新对话")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Token 用量持久化
+    token_usage = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ['-updated_at']
