@@ -523,7 +523,6 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                   ></span>
                   <span class="trace-tool-main">
                     <span class="trace-tool-name">{{ displayToolName(turn.toolCall) }}</span>
-                    <span class="trace-tool-sub">Tool call</span>
                   </span>
                   <span :class="['trace-status-pill', formatToolStatus(turn.toolCall.status).textClass]">{{ formatToolStatus(turn.toolCall.status).label }}</span>
                   <span v-if="formatToolDuration(turn.toolCall)" class="trace-duration">{{ formatToolDuration(turn.toolCall) }}</span>
@@ -562,7 +561,6 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                 ></span>
                 <span class="trace-tool-main">
                   <span class="trace-tool-name">{{ displayToolName(currentToolCall) }}</span>
-                  <span class="trace-tool-sub">Tool call</span>
                 </span>
                 <span :class="['trace-status-pill', formatToolStatus(currentToolCall.status).textClass]">{{ formatToolStatus(currentToolCall.status).label }}</span>
                 <span v-if="formatToolDuration(currentToolCall)" class="trace-duration">{{ formatToolDuration(currentToolCall) }}</span>
@@ -618,7 +616,6 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                   </svg>
                   <span class="trace-tool-main">
                     <span class="trace-tool-name">思考过程</span>
-                    <span class="trace-tool-sub">Reasoning trace</span>
                   </span>
                   <span v-if="isStreaming && isReasoningPhase" class="trace-status-pill text-amber-600">思考中</span>
                   <span v-else class="trace-meta">{{ message.reasoning.length }} 字</span>
@@ -737,34 +734,26 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .trace-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  width: min(100%, 46rem);
-  padding: 0.35rem 0.45rem 0.35rem 0.35rem;
+  gap: 0.35rem;
+  width: min(100%, 42rem);
+  padding: 0.18rem 0;
   cursor: pointer;
   user-select: none;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 0.7rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(248, 250, 252, 0.58)),
-    color-mix(in srgb, var(--theme-50, #fafaf7) 86%, white);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  border: 0;
+  background: transparent;
+  transition: color 0.16s ease;
 }
 
 .trace-header:hover {
-  border-color: rgba(100, 116, 139, 0.28);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.055);
+  color: var(--theme-600);
 }
 
 .trace-header-icon {
   display: grid;
   place-items: center;
-  width: 1.45rem;
-  height: 1.45rem;
-  color: #64748b;
-  border-radius: 0.5rem;
-  background: rgba(241, 245, 249, 0.92);
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--theme-400);
 }
 
 .trace-header-text {
@@ -778,12 +767,12 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .trace-header-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--theme-500);
 }
 
 .trace-header-summary {
   font-size: 0.7rem;
-  color: #94a3b8;
+  color: var(--theme-400);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -791,53 +780,42 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 }
 
 .trace-header-live {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: #b45309;
-  text-transform: uppercase;
-  padding: 0.12rem 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--ai-accent);
+  padding: 0 0.3rem;
   border-radius: 999px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  background: var(--ai-accent-soft);
+  border: 0;
   animation: progressPulse 1.2s ease-in-out infinite;
 }
 
 /* === Trace Timeline === */
 .trace-timeline {
   position: relative;
-  width: min(100%, 46rem);
-  margin-top: 0.45rem;
-  padding: 0.55rem;
-  border: 1px solid rgba(226, 232, 240, 0.82);
-  border-radius: 0.9rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.74)),
-    color-mix(in srgb, var(--theme-50, #fafaf7) 82%, white);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  width: min(100%, 42rem);
+  margin-top: 0.2rem;
+  padding: 0.15rem 0 0.1rem 0.8rem;
+  border-left: 1px solid var(--theme-200, #e4e4df);
+  background: transparent;
 }
 
 .trace-timeline::before {
-  content: '';
-  position: absolute;
-  top: 1rem;
-  bottom: 1rem;
-  left: 1.05rem;
-  width: 1px;
-  background: linear-gradient(180deg, transparent, rgba(148, 163, 184, 0.34), transparent);
+  display: none;
 }
 
 .trace-step {
   position: relative;
-  padding: 0.18rem 0 0.18rem 1.2rem;
+  padding: 0.12rem 0;
 }
 
 .trace-row {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  min-height: 1.85rem;
+  gap: 0.4rem;
+  min-height: 1.45rem;
   cursor: pointer;
-  padding: 0.12rem 0;
+  padding: 0.08rem 0;
 }
 
 .trace-label {
@@ -864,47 +842,44 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.35rem;
-  height: 1.25rem;
-  padding: 0 0.45rem;
-  border-radius: 999px;
-  color: #64748b;
-  background: rgba(241, 245, 249, 0.82);
-  border: 1px solid rgba(226, 232, 240, 0.92);
+  min-width: 1.9rem;
+  height: 1.1rem;
+  padding: 0;
+  color: var(--theme-400);
+  background: transparent;
+  border: 0;
   font-size: 0.66rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .trace-kind-live {
-  color: #b45309;
-  background: #fffbeb;
-  border-color: #fde68a;
+  color: var(--ai-accent);
+  background: transparent;
 }
 
 .trace-inline-text {
   padding-top: 0.04rem;
   font-size: 0.74rem;
-  color: #64748b;
+  color: var(--theme-400);
   line-height: 1.65;
 }
 
 .trace-body {
-  margin: 0.2rem 0 0.45rem 0;
-  padding: 0.65rem 0.75rem;
+  margin: 0.12rem 0 0.35rem 0;
+  padding: 0 0 0 2.15rem;
   font-size: 0.74rem;
-  line-height: 1.7;
-  color: #64748b;
+  line-height: 1.65;
+  color: var(--theme-400);
   max-height: 14rem;
   overflow-y: auto;
   white-space: pre-wrap;
-  border-radius: 0.7rem;
-  background: rgba(248, 250, 252, 0.8);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 0;
+  background: transparent;
+  border: 0;
 }
 
 .trace-body-live {
-  border-color: #fde68a;
-  box-shadow: inset 2px 0 0 #f59e0b;
+  box-shadow: none;
 }
 
 .trace-toggle {
@@ -923,23 +898,22 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
 .trace-code {
   margin: 0;
-  padding: 0.6rem 0.7rem;
-  background: #0f172a;
-  border: 1px solid rgba(15, 23, 42, 0.88);
-  border-radius: 0.65rem;
+  padding: 0.45rem 0.55rem;
+  background: var(--theme-50);
+  border: 1px solid var(--theme-200);
+  border-radius: 0.45rem;
   font-size: 0.7rem;
   line-height: 1.55;
-  color: #dbeafe;
+  color: var(--theme-500);
   white-space: pre-wrap;
   word-break: break-word;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .trace-result-text {
-  padding: 0.6rem 0.7rem;
-  border-radius: 0.65rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(226, 232, 240, 0.82);
+  padding: 0.15rem 0 0 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
   font-size: 0.75rem;
   line-height: 1.58;
   white-space: pre-wrap;
@@ -949,18 +923,17 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .trace-tool-row {
   width: 100%;
   min-width: 0;
-  padding: 0.38rem 0.48rem;
-  border: 1px solid rgba(226, 232, 240, 0.86);
-  border-radius: 0.72rem;
-  background: rgba(255, 255, 255, 0.72);
-  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+  padding: 0.08rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  transition: color 0.16s ease;
 }
 
 .trace-tool-row:hover {
-  transform: translateY(-1px);
-  border-color: rgba(148, 163, 184, 0.42);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  transform: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .trace-tool-main {
@@ -976,37 +949,30 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #1e293b;
+  color: var(--theme-600);
   font-family: var(--ai-font-mono);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 
-.trace-tool-sub {
-  color: #94a3b8;
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
 .trace-tool-orb {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.42rem;
+  height: 0.42rem;
   border-radius: 999px;
   flex-shrink: 0;
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+  box-shadow: none;
 }
 
 .trace-status-pill {
   display: inline-flex;
   align-items: center;
-  height: 1.25rem;
-  padding: 0 0.46rem;
+  height: auto;
+  padding: 0;
   border-radius: 999px;
-  background: rgba(248, 250, 252, 0.9);
-  border: 1px solid rgba(226, 232, 240, 0.86);
+  background: transparent;
+  border: 0;
   font-size: 0.64rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -1026,42 +992,40 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 }
 
 .trace-tool-row:hover .trace-row-chevron {
-  color: #64748b;
+  color: var(--theme-500);
 }
 
 .trace-tool-detail {
   display: grid;
-  gap: 0.45rem;
-  margin: 0.38rem 0 0.2rem 0;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0.25rem 1rem;
 }
 
 .trace-live-orb {
-  width: 0.55rem;
-  height: 0.55rem;
-  margin: 0.36rem 0.35rem 0 0.1rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  margin: 0.38rem 0.3rem 0 0.12rem;
   border-radius: 999px;
-  background: #f59e0b;
-  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+  background: var(--ai-accent);
+  box-shadow: none;
   animation: progressPulse 1.2s ease-in-out infinite;
   flex-shrink: 0;
 }
 
 .tool-step-running {
-  border-color: rgba(96, 165, 250, 0.38);
-  background: linear-gradient(180deg, rgba(239, 246, 255, 0.86), rgba(255, 255, 255, 0.72));
+  background: transparent;
 }
 
 .tool-step-success {
-  border-color: rgba(52, 211, 153, 0.36);
+  background: transparent;
 }
 
 .tool-step-error {
-  border-color: rgba(248, 113, 113, 0.42);
-  background: linear-gradient(180deg, rgba(254, 242, 242, 0.72), rgba(255, 255, 255, 0.78));
+  background: transparent;
 }
 
 .tool-step-parsing {
-  border-color: rgba(251, 191, 36, 0.36);
+  background: transparent;
 }
 
 /* URL favicon 标签容器 */
