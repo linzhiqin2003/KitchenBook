@@ -18,6 +18,35 @@ const props = defineProps({
 
 const emit = defineEmits(['select', 'new', 'delete', 'toggle-collapse', 'rename'])
 
+// 拖动调整宽度
+const sidebarWidth = ref(280)
+const isResizing = ref(false)
+const MIN_WIDTH = 200
+const MAX_WIDTH = 420
+
+const startResize = (e) => {
+  if (props.isCollapsed) return
+  isResizing.value = true
+  const startX = e.clientX
+  const startWidth = sidebarWidth.value
+
+  const onMove = (ev) => {
+    const delta = ev.clientX - startX
+    sidebarWidth.value = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta))
+  }
+  const onUp = () => {
+    isResizing.value = false
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
 // 下拉菜单状态
 const activeMenuId = ref(null)
 const menuButtonRefs = ref({})
@@ -163,10 +192,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col transition-all duration-300"
-       style="background: #f7f7f8; border-right: 1px solid #ebebed; font-family: var(--ai-font-body); height: 100vh; height: 100dvh;"
+  <div class="flex flex-col relative"
+       :style="{
+         background: '#f7f7f8',
+         borderRight: '1px solid #ebebed',
+         fontFamily: 'var(--ai-font-body)',
+         height: '100dvh',
+         width: isCollapsed ? '0px' : sidebarWidth + 'px',
+         minWidth: isCollapsed ? '0px' : sidebarWidth + 'px',
+         transition: isResizing ? 'none' : 'width 0.3s, min-width 0.3s',
+       }"
        :class="[
-         isCollapsed ? 'w-0 lg:w-16 overflow-hidden' : 'w-60',
+         isCollapsed ? 'overflow-hidden lg:!w-16 lg:!min-w-16' : '',
          'fixed z-50 lg:relative lg:z-auto'
        ]">
     <!-- Header -->
@@ -276,6 +313,15 @@ onUnmounted(() => {
         </svg>
         <span v-if="!isCollapsed">首页</span>
       </router-link>
+    </div>
+
+    <!-- 拖动 resize 手柄 -->
+    <div
+      v-if="!isCollapsed"
+      @mousedown.prevent="startResize"
+      class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hidden lg:block group"
+    >
+      <div class="w-full h-full transition-colors group-hover:bg-black/10" :class="isResizing ? 'bg-black/15' : ''"></div>
     </div>
   </div>
 
