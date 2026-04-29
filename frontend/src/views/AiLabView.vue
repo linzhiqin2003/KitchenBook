@@ -117,9 +117,11 @@ const sessionTokens = ref({
   // 最近一次请求的 token 数（代表当前 context 占用）
   promptTokens: 0,
   completionTokens: 0,
+  cacheTokens: 0,
   // session 累计
   totalPromptTokens: 0,
   totalCompletionTokens: 0,
+  totalCacheTokens: 0,
   turnCount: 0,
   // 最近一次的 prompt 组成（来自 Hermes usage.breakdown，仅前端缓存，不持久化）
   breakdown: null,
@@ -133,8 +135,10 @@ const resetSessionTokens = () => {
   sessionTokens.value = {
     promptTokens: 0,
     completionTokens: 0,
+    cacheTokens: 0,
     totalPromptTokens: 0,
     totalCompletionTokens: 0,
+    totalCacheTokens: 0,
     turnCount: 0,
     breakdown: null,
   }
@@ -161,6 +165,8 @@ const recordUsage = (usage) => {
   const billedPrompt = Number(usage.prompt_tokens) || 0
   const lastPrompt = Number(usage.last_prompt_tokens) || billedPrompt
   const completion = Number(usage.completion_tokens) || 0
+  // patch12 透传：cache_tokens = cache_read + cache_write（不分读写）
+  const cache = Number(usage.cache_tokens) || 0
   if (billedPrompt === 0 && completion === 0) return
   // Hermes 扩展字段：{ sections: { key: {label, tokens} }, total_local, encoding }
   const breakdown = (usage.breakdown && typeof usage.breakdown === 'object') ? usage.breakdown : null
@@ -169,9 +175,11 @@ const recordUsage = (usage) => {
     // promptTokens 用作 Context Window 的当前值 —— 反映最后一次发给模型的 prompt 大小
     promptTokens: lastPrompt,
     completionTokens: completion,
+    cacheTokens: cache,
     // 累计走计费量（每次内部调用都计），便于对账消耗
     totalPromptTokens: sessionTokens.value.totalPromptTokens + billedPrompt,
     totalCompletionTokens: sessionTokens.value.totalCompletionTokens + completion,
+    totalCacheTokens: sessionTokens.value.totalCacheTokens + cache,
     turnCount: sessionTokens.value.turnCount + 1,
     breakdown: nextBreakdown,
   }
@@ -309,6 +317,9 @@ const fetchConversation = async (id) => {
       // 恢复持久化的 token 用量
       if (data.token_usage && typeof data.token_usage === 'object' && Object.keys(data.token_usage).length > 0) {
         sessionTokens.value = {
+          // 兜底：老会话没有 cacheTokens / totalCacheTokens 字段，避免显示成 NaN
+          cacheTokens: 0,
+          totalCacheTokens: 0,
           ...data.token_usage,
           // breakdown 没进库；如果本会话之前在内存里有缓存，切回来时恢复，否则置 null
           breakdown: breakdownCache.get(id) || null,

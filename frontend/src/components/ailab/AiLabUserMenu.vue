@@ -88,6 +88,8 @@ const formatRelative = (iso) => {
 const totalTokensLabel = computed(() => formatNumber(stats.value?.total_tokens))
 const promptTokensLabel = computed(() => formatNumber(stats.value?.total_prompt_tokens))
 const completionTokensLabel = computed(() => formatNumber(stats.value?.total_completion_tokens))
+const cacheTokensLabel = computed(() => formatNumber(stats.value?.total_cache_tokens))
+const nonCacheInputLabel = computed(() => formatNumber(stats.value?.non_cache_input_tokens))
 const promptCompletionRatio = computed(() => {
   const p = Number(stats.value?.total_prompt_tokens) || 0
   const c = Number(stats.value?.total_completion_tokens) || 0
@@ -95,6 +97,34 @@ const promptCompletionRatio = computed(() => {
   if (!sum) return { p: 0, c: 0 }
   return { p: (p / sum) * 100, c: (c / sum) * 100 }
 })
+
+// prompt 段内 cache vs 非 cache 占比（用于细分进度条）
+const promptCacheRatio = computed(() => {
+  const p = Number(stats.value?.total_prompt_tokens) || 0
+  if (!p) return { cache: 0, nonCache: 0 }
+  const cache = Math.min(Number(stats.value?.total_cache_tokens) || 0, p)
+  return { cache: (cache / p) * 100, nonCache: ((p - cache) / p) * 100 }
+})
+
+const cost = computed(() => stats.value?.cost || null)
+const totalCostLabel = computed(() => {
+  const c = cost.value
+  if (!c) return '—'
+  const total = Number(c.total)
+  if (!isFinite(total)) return '—'
+  if (total < 0.0001) return '< ¥0.0001'
+  if (total < 0.01) return `¥${total.toFixed(4)}`
+  if (total < 1) return `¥${total.toFixed(3)}`
+  return `¥${total.toFixed(2)}`
+})
+const formatCost = (v) => {
+  const n = Number(v)
+  if (!isFinite(n) || n === 0) return '¥0'
+  if (n < 0.0001) return '< ¥0.0001'
+  if (n < 0.01) return `¥${n.toFixed(4)}`
+  if (n < 1) return `¥${n.toFixed(3)}`
+  return `¥${n.toFixed(2)}`
+}
 
 const initials = computed(() => {
   const name = me.value?.nickname || me.value?.username || me.value?.email || '?'
@@ -271,60 +301,86 @@ onUnmounted(() => {
             </span>
           </div>
 
-          <!-- 总 Tokens 大数字 + 输入/输出占比条 -->
+          <!-- 估算费用 大数字 -->
           <div class="px-4 pt-3 pb-3">
-            <div class="text-[10px] font-semibold tracking-wide uppercase" style="color: var(--theme-400);">
-              累计 Tokens
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-semibold tracking-wide uppercase" style="color: var(--theme-400);">
+                估算开销
+              </span>
+              <span class="text-[10px] font-mono" style="color: var(--theme-400);" :title="cost?.model || ''">
+                {{ cost?.model || '—' }}
+              </span>
             </div>
             <div class="flex items-baseline gap-1.5 mt-0.5">
               <span class="text-[24px] font-semibold font-mono leading-none" style="color: var(--theme-700);">
-                {{ totalTokensLabel }}
+                {{ totalCostLabel }}
               </span>
               <span class="text-[11px]" style="color: var(--theme-400);">
                 跨 {{ stats?.session_count || 0 }} 个会话
               </span>
             </div>
 
-            <!-- 输入/输出占比堆叠条 -->
+            <!-- 输入/输出占比堆叠条（输入段内再细分 cache vs 非 cache） -->
             <div class="mt-2.5 h-1.5 rounded-full overflow-hidden flex" style="background: var(--theme-200);">
+              <!-- 非缓存输入段 -->
               <div
                 class="h-full transition-all duration-500"
-                :style="{ width: `${promptCompletionRatio.p}%`, background: 'var(--ai-accent, #3d7cc9)' }"
-                title="输入"
+                :style="{ width: `${promptCompletionRatio.p * promptCacheRatio.nonCache / 100}%`, background: 'var(--ai-accent, #3d7cc9)' }"
+                title="非缓存输入"
               ></div>
+              <!-- 缓存命中段 -->
+              <div
+                class="h-full transition-all duration-500"
+                :style="{ width: `${promptCompletionRatio.p * promptCacheRatio.cache / 100}%`, background: '#a78bfa' }"
+                title="缓存命中"
+              ></div>
+              <!-- 输出段 -->
               <div
                 class="h-full transition-all duration-500"
                 :style="{ width: `${promptCompletionRatio.c}%`, background: '#16a34a' }"
                 title="输出"
               ></div>
             </div>
-            <div class="flex items-center justify-between mt-1.5 text-[11px]">
-              <span class="flex items-center gap-1" style="color: var(--theme-500);">
-                <span class="w-1.5 h-1.5 rounded-full" style="background: var(--ai-accent, #3d7cc9);"></span>
-                输入 <span class="font-mono" style="color: var(--theme-700);">{{ promptTokensLabel }}</span>
-              </span>
-              <span class="flex items-center gap-1" style="color: var(--theme-500);">
-                <span class="w-1.5 h-1.5 rounded-full" style="background: #16a34a;"></span>
-                输出 <span class="font-mono" style="color: var(--theme-700);">{{ completionTokensLabel }}</span>
-              </span>
+            <div class="flex items-center justify-between mt-1.5 text-[10px]" style="color: var(--theme-500);">
+              <span>tokens {{ formatNumber(stats?.total_tokens) }}</span>
             </div>
           </div>
 
-          <!-- 明细 -->
+          <!-- Token + 费用细项 -->
           <div class="px-4 py-2.5 space-y-1" style="border-top: 1px solid var(--theme-100); background: var(--theme-100);">
             <div class="flex items-center justify-between text-[12px]">
-              <span style="color: var(--theme-500);">总轮次</span>
-              <span class="font-mono" style="color: var(--theme-700);">{{ stats?.total_turns || 0 }}</span>
-            </div>
-            <div class="flex items-center justify-between text-[12px]">
-              <span style="color: var(--theme-500);">活跃会话</span>
-              <span class="font-mono" style="color: var(--theme-700);">
-                {{ stats?.active_session_count || 0 }} / {{ stats?.session_count || 0 }}
+              <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
+                <span class="w-1.5 h-1.5 rounded-full" style="background: var(--ai-accent, #3d7cc9);"></span>
+                输入（非缓存）
+              </span>
+              <span class="font-mono shrink-0" style="color: var(--theme-700);">
+                {{ nonCacheInputLabel }}
+                <span style="color: var(--theme-400);">· {{ formatCost(cost?.input) }}</span>
               </span>
             </div>
             <div class="flex items-center justify-between text-[12px]">
-              <span style="color: var(--theme-500);">最近活跃</span>
-              <span class="font-mono" style="color: var(--theme-700);">{{ formatRelative(stats?.last_active) }}</span>
+              <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
+                <span class="w-1.5 h-1.5 rounded-full" style="background: #a78bfa;"></span>
+                缓存命中
+              </span>
+              <span class="font-mono shrink-0" style="color: var(--theme-700);">
+                {{ cacheTokensLabel }}
+                <span style="color: var(--theme-400);">· {{ formatCost(cost?.cache) }}</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-[12px]">
+              <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
+                <span class="w-1.5 h-1.5 rounded-full" style="background: #16a34a;"></span>
+                输出
+              </span>
+              <span class="font-mono shrink-0" style="color: var(--theme-700);">
+                {{ completionTokensLabel }}
+                <span style="color: var(--theme-400);">· {{ formatCost(cost?.output) }}</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-[12px] pt-1.5 mt-1" style="border-top: 1px dashed var(--theme-200); color: var(--theme-500);">
+              <span>{{ stats?.total_turns || 0 }} 轮 · {{ stats?.active_session_count || 0 }}/{{ stats?.session_count || 0 }} 活跃</span>
+              <span class="font-mono">{{ formatRelative(stats?.last_active) }}</span>
             </div>
           </div>
         </template>

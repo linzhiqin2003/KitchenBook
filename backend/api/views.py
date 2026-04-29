@@ -2026,10 +2026,12 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='stats')
     def stats(self, request):
-        """聚合当前用户全部会话的 token 用量 — 实时统计"""
+        """聚合当前用户全部会话的 token 用量 — 实时统计 + cost 估算"""
+        from common.pricing import estimate_cost, DEFAULT_MODEL, CURRENCY
         qs = self.get_queryset().only('token_usage', 'updated_at')
         total_prompt = 0
         total_completion = 0
+        total_cache = 0
         total_turns = 0
         session_count = 0
         active_session_count = 0
@@ -2039,22 +2041,41 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
             usage = conv.token_usage or {}
             tp = int(usage.get('totalPromptTokens') or 0)
             tc = int(usage.get('totalCompletionTokens') or 0)
+            tk = int(usage.get('totalCacheTokens') or 0)
             tn = int(usage.get('turnCount') or 0)
             if tn > 0 or tp > 0 or tc > 0:
                 active_session_count += 1
             total_prompt += tp
             total_completion += tc
+            total_cache += tk
             total_turns += tn
             if conv.updated_at and (last_active is None or conv.updated_at > last_active):
                 last_active = conv.updated_at
+
+        cost = estimate_cost(
+            prompt_tokens=total_prompt,
+            completion_tokens=total_completion,
+            cache_tokens=total_cache,
+            model=DEFAULT_MODEL,
+        )
         return Response({
             'session_count': session_count,
             'active_session_count': active_session_count,
             'total_prompt_tokens': total_prompt,
             'total_completion_tokens': total_completion,
+            'total_cache_tokens': total_cache,
+            'non_cache_input_tokens': cost['non_cache_input_tokens'],
             'total_tokens': total_prompt + total_completion,
             'total_turns': total_turns,
             'last_active': last_active.isoformat() if last_active else None,
+            'cost': {
+                'currency': CURRENCY,
+                'model': cost['model'],
+                'input': cost['input_cost'],
+                'cache': cost['cache_cost'],
+                'output': cost['output_cost'],
+                'total': cost['total_cost'],
+            },
         })
 
     # 内部回写端点拆出去 → ailab_internal_add_message（function view）
