@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* AI Lab "Quiet Studio" theme tokens — must be globally available so any
+   AI Lab route (including /ai-lab/studio entered via direct refresh) can
+   resolve var(--theme-*) without depending on AiLabView being mounted. */
+:root {
+  --theme-50: #f8f8f6;
+  --theme-100: #f0f0ed;
+  --theme-200: #e4e4df;
+  --theme-300: #c8c8c1;
+  --theme-400: #9c9c93;
+  --theme-500: #6b6b63;
+  --theme-600: #484843;
+  --theme-700: #2d2d28;
+  --theme-gradient: #2d2d28;
+  --theme-gradient-btn: #2d2d28;
+  --theme-shadow: rgba(45, 45, 40, 0.06);
+  --ai-accent: #3d7cc9;
+  --ai-accent-hover: #2e6ab5;
+  --ai-accent-soft: #edf2f8;
+  --ai-font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --ai-font-body: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --ai-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 /* 安全区域支持 - iOS 刘海屏等 */
 .pb-safe {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
