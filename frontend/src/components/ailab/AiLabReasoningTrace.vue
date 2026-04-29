@@ -209,7 +209,7 @@ watch(
   <div v-if="hasTraceTimeline" class="w-full">
     <!-- 折叠头：流式中显示当前活动；完成后显示聚合摘要 -->
     <button class="trace-header" @click="traceCollapsed = !traceCollapsed">
-      <span :class="['trace-header-text', { 'trace-shimmer-text': isLive && traceCollapsed }]">{{ headerLabel }}</span>
+      <span :class="['trace-header-text', { 'trace-shimmer-text': isLive }]">{{ headerLabel }}</span>
       <svg
         :class="['trace-chevron', { 'is-open': !traceCollapsed }]"
         fill="none" stroke="currentColor" viewBox="0 0 24 24"
