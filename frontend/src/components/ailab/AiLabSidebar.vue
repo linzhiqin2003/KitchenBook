@@ -212,15 +212,15 @@ onUnmounted(() => {
         <!-- MyAgent logo: 描边的"M"和右上方一个独立的实心圆点 ——
              M 是 Wordmark 首字母，dot 代表 agent 本体（一个有意识的"我"）。
              几何化、对称、跟暖色低饱和主题协调 -->
-        <!-- MyAgent logo: 一颗实心的 agent 核 + 双层渐变轨迹 ——
-             "使者彗星"——突出 agent 的自主、方向感与执行痕迹 -->
+        <!-- MyAgent logo: 简化的"使者剪影" —— 圆头 + 肩 + 一个微小的思考闪念。
+             直白传达 "为你做事的小家伙" -->
         <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color: #2c2c30;">
-          <!-- 主轨迹 -->
-          <path d="M4.5 19.5C9 14.5 14 10 18.5 5.5" stroke="currentColor" stroke-width="2" opacity="0.85"/>
-          <!-- 次级轨迹（更虚，呈现"动态模糊"质感） -->
-          <path d="M8.5 19.5C11 17 14 14 16 12" stroke="currentColor" stroke-width="1.5" opacity="0.35"/>
-          <!-- agent 核：领航的蓝点 -->
-          <circle cx="18.5" cy="5.5" r="2.6" fill="var(--ai-accent, #3d7cc9)"/>
+          <!-- 思考闪念：右上方虚化小点，暗示 agent 的"念头" -->
+          <circle cx="19" cy="4" r="1.1" fill="currentColor" opacity="0.55"/>
+          <!-- 头：accent 蓝实心圆 -->
+          <circle cx="12" cy="9" r="3.4" fill="var(--ai-accent, #3d7cc9)"/>
+          <!-- 肩 / 上半身：经典 user 剪影的下半弧 -->
+          <path d="M5 20.5c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="currentColor" stroke-width="1.8"/>
         </svg>
         <span class="text-[14px] font-semibold" style="color: #2c2c30;">MyAgent</span>
       </div>
