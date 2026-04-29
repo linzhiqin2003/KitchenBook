@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import AiLabTokenUsage from './AiLabTokenUsage.vue'
 
 const props = defineProps({
@@ -30,9 +30,32 @@ const emit = defineEmits([
 ])
 
 const localValue = ref(props.modelValue)
+const textareaRef = ref(null)
 
-watch(() => props.modelValue, (val) => { localValue.value = val })
-watch(localValue, (val) => { emit('update:modelValue', val) })
+// 输入框最大高度 — 单行 24px 行高 × ~9 行 ≈ 220px。超出后内部滚动。
+const TEXTAREA_MAX_HEIGHT = 220
+
+const autoResize = () => {
+  const el = textareaRef.value
+  if (!el) return
+  // 先 reset 到 auto 让 scrollHeight 反映"自然"高度，再 clamp 到上限
+  el.style.height = 'auto'
+  const next = Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT)
+  el.style.height = `${next}px`
+  el.style.overflowY = el.scrollHeight > TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden'
+}
+
+watch(() => props.modelValue, (val) => {
+  localValue.value = val
+  // 外部清空（发送后）后高度也要回缩
+  nextTick(autoResize)
+})
+watch(localValue, (val) => {
+  emit('update:modelValue', val)
+  nextTick(autoResize)
+})
+
+onMounted(() => { autoResize() })
 
 const composing = ref(false)
 const onCompositionStart = () => { composing.value = true }
@@ -45,6 +68,11 @@ const handleKeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     emit('send')
+    return
+  }
+  // Shift+Enter / 普通输入：让 textarea 立刻按当前内容撑高
+  if (e.key === 'Enter' && e.shiftKey) {
+    nextTick(autoResize)
   }
 }
 
@@ -121,14 +149,16 @@ const formatDuration = (seconds) => {
 
           <!-- 输入框 -->
           <textarea
+            ref="textareaRef"
             v-model="localValue"
             @keydown="handleKeydown"
+            @input="autoResize"
             @compositionstart="onCompositionStart"
             @compositionend="onCompositionEnd"
             @paste="handlePaste"
             :disabled="isLoading || isRecording || isOcrProcessing"
             :placeholder="isOcrProcessing ? '正在处理文件…' : isRecording ? '录音中…' : '继续对话…'"
-            class="input-textarea scrollbar-hide"
+            class="input-textarea"
             rows="1"
           ></textarea>
 
@@ -237,8 +267,18 @@ const formatDuration = (seconds) => {
   font-size: 16px;
   line-height: 24px;
   min-height: 26px;
-  max-height: 8rem;
+  /* JS 端 autoResize 会精确控制高度（最高约 220px ≈ 9 行）。
+     这里 max-height 兜底，避免极端情况撑爆容器 */
+  max-height: 220px;
   padding: 1px 0;
+  overflow-y: hidden;
+}
+.input-textarea::-webkit-scrollbar {
+  width: 4px;
+}
+.input-textarea::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.18);
+  border-radius: 2px;
 }
 .input-textarea::placeholder {
   color: #9ca3af;
