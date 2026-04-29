@@ -248,6 +248,11 @@ GOOGLE_CSE_CX = os.environ.get('GOOGLE_CSE_CX', '')
 # Cerebras API 配置 (用于 AI Lab 快速 AI 提取，极速推理)
 CEREBRAS_API_KEY_POOL = os.environ.get('CEREBRAS_API_KEY_POOL', '')
 
+# Hermes ↔ Django 内部回写 token：客户端断开后 Hermes 在后台跑完 agent，
+# 用这个 secret 调 Django 的 messages/internal/ 端点把最终结果落库。
+# Hermes systemd unit 需 export 同名环境变量。
+HERMES_INTERNAL_TOKEN = os.environ.get('HERMES_INTERNAL_TOKEN', '')
+
 # Fernet encryption key for sensitive fields (API keys stored in DB)
 # Auto-generated on first run and persisted to .env
 FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')

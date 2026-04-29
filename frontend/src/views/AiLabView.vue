@@ -928,9 +928,15 @@ const streamResponse = async (fileContent = null) => {
   abortController = new AbortController()
 
   try {
+    // 把当前对话 ID 传给 Hermes —— 用户关掉浏览器后 Hermes 后台跑完会用它
+    // 把最终消息回写到 Django 的 messages/internal/ 端点
+    const chatHeaders = hermesHeaders({ 'Content-Type': 'application/json' })
+    if (currentConversationId.value) {
+      chatHeaders['X-AILab-Conversation-Id'] = String(currentConversationId.value)
+    }
     const response = await fetch(`${HERMES_API_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: hermesHeaders({ 'Content-Type': 'application/json' }),
+      headers: chatHeaders,
       body: JSON.stringify({
         model: 'hermes-agent',
         messages: apiMessages,
