@@ -888,10 +888,12 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   margin: 0.25rem 0;
   padding: 0.25rem 0;
   position: relative;
-  /* 用 ::before 在 icon 中心位置画一条虚线，从上到下串起所有步骤 */
+  /* 多步骤模式下用 ::before 在 icon 中心位置画一条虚线连接 dots；
+     单步骤模式下没有 dots，detail 直接平铺，虚线会穿过文本，所以只在
+     trace-list 实际包含 .trace-item 时才渲染线 */
 }
 
-.trace-list::before {
+.trace-list:has(.trace-item)::before {
   content: '';
   position: absolute;
   /* icon 列：宽 0.85rem 居中于 0.425rem，加上左 padding 0.25rem -> 中心 ≈ 0.675rem */

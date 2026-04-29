@@ -224,10 +224,21 @@ const normalizeAssistantMessage = (message) => {
   const subTurns = Array.isArray(message.subTurns) ? message.subTurns
     : Array.isArray(message.sub_turns) ? message.sub_turns
     : []
+  // segments 是新结构（可能从后端回传，也可能由历史数据合成出唯一一段）
+  let segments = Array.isArray(message.segments) ? message.segments : null
+  if (!segments || segments.length === 0) {
+    // 历史消息：合成单段 segment 兜底，保证 UI 始终走新版渲染路径
+    segments = [{
+      id: 'legacy-0',
+      subTurns,
+      content: message.content || '',
+    }]
+  }
   return {
     ...message,
     phase: message.phase || STREAM_PHASE.IDLE,
     subTurns,
+    segments,
     modelName: message.modelName || message.model_name || null,
     currentReasoning: message.currentReasoning || '',
     currentToolCall: message.currentToolCall || null
@@ -484,26 +495,62 @@ const streamResponse = async (fileContent = null) => {
   let activeToolIndex = null
   let hasDoneEvent = false
   let activeReasoningStartedAt = null
-  const streamSubTurns = []
+  // Agent 输出文字 → 又 think/tool → 再输出文字 时，希望两段文字之间穿插各自的 trace。
+  // segments 是已归档的段；segmentSubTurns / segmentContent 是当前活动段。
+  const messageSegments = []
+  let segmentSubTurns = []
+  let segmentContent = ''
   const streamToolCalls = new Map()
 
   const getAiMessage = () => messages.value[aiMessageIndex]
+
+  const archiveSegmentIfBoundary = () => {
+    // 在新一段 reasoning / tool 之前调用：如果当前段已经产出了文本（content），
+    // 把它冻结成一段历史 segment，开新段承接接下来的 think/tool。
+    if (!segmentContent && segmentSubTurns.length === 0) return
+    if (!segmentContent) return  // 还没有内容的话先攒着，不切段
+    messageSegments.push({
+      id: createTraceId(),
+      subTurns: segmentSubTurns,
+      content: segmentContent,
+    })
+    segmentSubTurns = []
+    segmentContent = ''
+  }
 
   const syncTraceState = () => {
     const aiMsg = getAiMessage()
     if (!aiMsg) return
     aiMsg.phase = streamPhase
-    aiMsg.subTurns = streamSubTurns.map(turn => ({
+    const liveSubTurns = segmentSubTurns.map(turn => ({
       ...turn,
-      toolCall: turn.toolCall ? { ...turn.toolCall } : null
+      toolCall: turn.toolCall ? { ...turn.toolCall } : null,
     }))
-    aiMsg.currentReasoning = activeReasoning
-    if (activeToolIndex === null) {
-      aiMsg.currentToolCall = null
-      return
+    const liveToolCall = activeToolIndex === null
+      ? null
+      : (streamToolCalls.get(activeToolIndex) ? { ...streamToolCalls.get(activeToolIndex) } : null)
+    const liveSegment = {
+      id: 'live',
+      subTurns: liveSubTurns,
+      content: segmentContent,
+      currentReasoning: activeReasoning,
+      currentToolCall: liveToolCall,
     }
-    const activeCall = streamToolCalls.get(activeToolIndex)
-    aiMsg.currentToolCall = activeCall ? { ...activeCall } : null
+    aiMsg.segments = [
+      ...messageSegments.map(s => ({
+        ...s,
+        subTurns: s.subTurns.map(t => ({ ...t, toolCall: t.toolCall ? { ...t.toolCall } : null })),
+      })),
+      liveSegment,
+    ]
+    // 兼容字段：旧的 content / subTurns 仍是扁平拼接，方便持久化和搜索
+    aiMsg.content = messageSegments.map(s => s.content).join('') + segmentContent
+    aiMsg.subTurns = [
+      ...messageSegments.flatMap(s => s.subTurns),
+      ...liveSubTurns,
+    ]
+    aiMsg.currentReasoning = activeReasoning
+    aiMsg.currentToolCall = liveToolCall
   }
 
   const pushSubTurns = () => {
@@ -517,7 +564,7 @@ const streamResponse = async (fileContent = null) => {
 
     const orderedToolCalls = Array.from(streamToolCalls.values()).sort((a, b) => a.index - b.index)
     if (orderedToolCalls.length === 0) {
-      streamSubTurns.push({
+      segmentSubTurns.push({
         id: createTraceId(),
         reasoning: activeReasoning.trim(),
         reasoningStartedAt,
@@ -526,7 +573,7 @@ const streamResponse = async (fileContent = null) => {
       })
     } else {
       orderedToolCalls.forEach((toolCall, index) => {
-        streamSubTurns.push({
+        segmentSubTurns.push({
           id: createTraceId(),
           reasoning: index === 0 ? activeReasoning.trim() : '',
           reasoningStartedAt: index === 0 ? reasoningStartedAt : null,
@@ -569,6 +616,9 @@ const streamResponse = async (fileContent = null) => {
   const upsertToolCall = (fragment = {}, options = {}) => {
     const appendArguments = options.appendArguments !== false
     const index = Number.isInteger(fragment.index) ? fragment.index : (activeToolIndex ?? 0)
+    // 内容已经输出过、又开始新一轮工具调用 → 切段
+    const isNewCall = !streamToolCalls.has(index)
+    if (isNewCall && segmentContent) archiveSegmentIfBoundary()
     const existing = streamToolCalls.get(index) || {
       id: fragment.id || `call_${createTraceId()}`,
       index,
@@ -665,6 +715,8 @@ const streamResponse = async (fileContent = null) => {
 
   const appendReasoningChunk = (chunk) => {
     if (!chunk) return
+    // 文本段已经产出过 → 这是新一轮 think，归档前一段
+    if (segmentContent) archiveSegmentIfBoundary()
     setPhase(STREAM_PHASE.REASONING)
     if (activeReasoningStartedAt === null) {
       activeReasoningStartedAt = Date.now()
@@ -682,10 +734,7 @@ const streamResponse = async (fileContent = null) => {
     if (!chunk) return
     setPhase(STREAM_PHASE.ANSWERING)
     currentContent.value += chunk
-    const aiMsg = getAiMessage()
-    if (aiMsg) {
-      aiMsg.content = currentContent.value
-    }
+    segmentContent += chunk
     syncTraceState()
     renderMath()
   }
