@@ -21,7 +21,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['edit', 'regenerate'])
+const emit = defineEmits(['edit', 'regenerate', 'near-bottom-change'])
 
 const messagesContainer = ref(null)
 const reasoningCollapsed = ref({})
@@ -54,6 +54,7 @@ const handleScroll = () => {
     // 用户向上滑离了底部 → 锁住自动跟随
     userScrolledUp.value = true
   }
+  emit('near-bottom-change', near)
 }
 
 // 防抖滚动：force=true 强制滚动，否则仅在用户跟随状态下滚动
@@ -70,6 +71,7 @@ const scrollToBottom = (force = false) => {
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
         isNearBottom.value = true
         if (force) userScrolledUp.value = false
+        emit('near-bottom-change', true)
       }
     })
   })
@@ -152,21 +154,6 @@ defineExpose({
         />
       </div>
     </div>
-
-    <!-- 回到底部按钮 -->
-    <Transition name="fade-up">
-      <button
-        v-if="!isNearBottom"
-        @click="scrollToBottom(true)"
-        class="scroll-bottom-btn absolute bottom-1 left-1/2 -translate-x-1/2 px-2 py-1 cursor-pointer flex items-center gap-1 z-10"
-        style="font-size: 12px; color: var(--theme-400, #8a8a82); background: transparent; border: none;"
-      >
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
-        </svg>
-        回到底部
-      </button>
-    </Transition>
   </div>
 </template>
 
@@ -186,21 +173,4 @@ defineExpose({
   background: rgba(150, 150, 170, 0.5);
 }
 
-.fade-up-enter-active,
-.fade-up-leave-active {
-  transition: all 0.2s ease;
-}
-.fade-up-enter-from,
-.fade-up-leave-to {
-  opacity: 0;
-  transform: translate(-50%, 8px);
-}
-
-.scroll-bottom-btn {
-  transition: color 0.15s ease, transform 0.15s ease;
-}
-.scroll-bottom-btn:hover {
-  color: var(--theme-600, #5a5a52);
-  transform: translate(-50%, -1px);
-}
 </style>

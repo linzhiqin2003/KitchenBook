@@ -23,10 +23,11 @@ const props = defineProps({
     }),
   },
   contextLimit: { type: Number, default: 1_000_000 },
+  showScrollBottom: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
-  'update:modelValue', 'send', 'stop', 'image-click', 'voice-click', 'paste', 'remove-file'
+  'update:modelValue', 'send', 'stop', 'image-click', 'voice-click', 'paste', 'remove-file', 'scroll-bottom'
 ])
 
 const localValue = ref(props.modelValue)
@@ -100,6 +101,21 @@ const formatDuration = (seconds) => {
     :style="floating ? 'background: linear-gradient(to top, var(--theme-50) 70%, transparent); font-family: var(--ai-font-body);' : 'font-family: var(--ai-font-body);'"
   >
     <div class="max-w-4xl mx-auto relative">
+      <Transition name="fade-up">
+        <div v-if="floating && showScrollBottom" class="scroll-bottom-wrap">
+          <button
+            @click="emit('scroll-bottom')"
+            class="scroll-bottom-btn cursor-pointer flex items-center gap-1"
+            title="回到底部"
+          >
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+            回到底部
+          </button>
+        </div>
+      </Transition>
+
       <div class="input-shell transition-all">
         <div v-if="hasAttachment" class="attachment-row">
           <div
@@ -243,6 +259,38 @@ const formatDuration = (seconds) => {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+.scroll-bottom-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.scroll-bottom-btn {
+  border: none;
+  background: rgba(248, 248, 246, 0.92);
+  color: var(--theme-400, #8a8a82);
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 999px;
+  box-shadow:
+    0 8px 22px rgba(15, 23, 42, 0.08),
+    0 1px 3px rgba(15, 23, 42, 0.06);
+  transition: color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.scroll-bottom-btn:hover {
+  color: var(--theme-600, #5a5a52);
+  background: rgba(255, 255, 255, 0.98);
+  transform: translateY(-1px);
+}
+.fade-up-enter-active,
+.fade-up-leave-active {
+  transition: all 0.2s ease;
+}
+.fade-up-enter-from,
+.fade-up-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 .input-shell {
   background: rgba(255, 255, 255, 0.94);

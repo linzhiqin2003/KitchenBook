@@ -68,6 +68,7 @@ const isLoading = ref(false)
 const inputMessage = ref('')
 const messages = ref([])
 const chatAreaRef = ref(null)
+const isChatNearBottom = ref(true)
 
 // ===== 文件/语音状态 =====
 const selectedFile = ref(null)       // File object
@@ -1290,6 +1291,10 @@ const stopGeneration = async () => {
   currentStreamingIndex.value = null
 }
 
+const handleScrollBottom = () => {
+  chatAreaRef.value?.scrollToBottom(true)
+}
+
 // 编辑消息（删除原 user 消息及后续 → 重新发起）
 const handleEditMessage = async (messageId, newContent, index) => {
   if (!messageId || !newContent) return
@@ -1654,6 +1659,7 @@ onMounted(async () => {
         :conversation-title="conversationTitle"
         @edit="handleEditMessage"
         @regenerate="handleRegenerate"
+        @near-bottom-change="isChatNearBottom = $event"
       />
 
       <!-- 拖拽遮罩 -->
@@ -1691,8 +1697,10 @@ onMounted(async () => {
         :file-attachment="selectedAttachment"
         :session-tokens="sessionTokens"
         :context-limit="TOKEN_CONTEXT_LIMIT"
+        :show-scroll-bottom="!isChatNearBottom"
         @send="handleSend"
         @stop="stopGeneration"
+        @scroll-bottom="handleScrollBottom"
         @image-click="triggerFileInput"
         @voice-click="toggleRecording"
         @paste="handlePaste"

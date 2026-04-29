@@ -410,9 +410,36 @@ const escapeHtml = (text) => {
   return div.innerHTML
 }
 
+const LOCAL_FS_IMAGE_RE = /^\/(?:private|tmp|var|Users|home|root|mnt|Volumes)\//i
+const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|bmp|svg)(?:\?[^)\s]*)?$/i
+
+const isUnpublishedLocalImage = (url) => {
+  if (!url || typeof url !== 'string') return false
+  return LOCAL_FS_IMAGE_RE.test(url) && IMAGE_EXT_RE.test(url)
+}
+
+const buildStreamingImagePlaceholder = (alt = '', detail = '图片生成中，完成后自动显示') => {
+  const safeAlt = escapeHtml((alt || '图片').trim() || '图片')
+  const safeDetail = escapeHtml(detail)
+  return `
+    <figure class="md-asset-placeholder is-loading">
+      <div class="md-asset-placeholder__visual" aria-hidden="true">
+        <span class="md-asset-placeholder__dot"></span>
+        <span class="md-asset-placeholder__dot"></span>
+        <span class="md-asset-placeholder__dot"></span>
+      </div>
+      <figcaption class="md-asset-placeholder__caption">
+        <span class="md-asset-placeholder__title">${safeAlt}</span>
+        <span class="md-asset-placeholder__meta">${safeDetail}</span>
+      </figcaption>
+    </figure>
+  `
+}
+
 // Markdown 解析
-const parseMarkdown = (markdown) => {
+const parseMarkdown = (markdown, options = {}) => {
   if (!markdown) return ''
+  const isStreaming = Boolean(options.isStreaming)
 
   let html = markdown
 
@@ -476,6 +503,9 @@ const parseMarkdown = (markdown) => {
   html = html.replace(
     /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
     (m, alt, url, title) => {
+      if (isStreaming && isUnpublishedLocalImage(url)) {
+        return buildStreamingImagePlaceholder(alt)
+      }
       const safeUrl = escapeHtml(url)
       const safeAlt = escapeHtml(alt || '')
       const titleAttr = title ? ` title="${escapeHtml(title)}"` : (alt ? ` title="${safeAlt}"` : '')
@@ -483,6 +513,17 @@ const parseMarkdown = (markdown) => {
       return `<img src="${safeUrl}" alt="${safeAlt}"${titleAttr} class="md-img" loading="lazy" data-preview="${safeUrl}" />`
     }
   )
+
+  // 流式中 markdown 图片可能还没闭合完，先用占位块代替半截语法。
+  if (isStreaming) {
+    html = html.replace(
+      /!\[([^\]]*)\]\(([^)\n]*)$/g,
+      (m, alt, partialUrl) => buildStreamingImagePlaceholder(
+        alt,
+        partialUrl ? '图片链接还在生成中…' : '图片占位已创建，等待内容补全…'
+      )
+    )
+  }
 
   // 链接
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="md-link" target="_blank" rel="noopener">$1</a>')
@@ -592,13 +633,13 @@ const parseMarkdown = (markdown) => {
   return html
 }
 
-const parsedContent = computed(() => parseMarkdown(props.message.content))
+const parsedContent = computed(() => parseMarkdown(props.message.content, { isStreaming: props.isStreaming }))
 
 // 段列表：每段 = 一组 subTurns（思考/工具调用）+ 一段文本。
 // AiLabView.normalizeAssistantMessage 已保证 message.segments 一定存在。
 const segments = computed(() => Array.isArray(props.message.segments) ? props.message.segments : [])
 const isLastSegment = (idx) => idx === segments.value.length - 1
-const parseSegmentContent = (text) => parseMarkdown(text || '')
+const parseSegmentContent = (text, options = {}) => parseMarkdown(text || '', options)
 
 // 用户消息里点击图片附件 → 新窗打开看大图
 const openImage = (dataUrl) => {
@@ -724,7 +765,7 @@ const openImage = (dataUrl) => {
             <div
               v-if="seg.content"
               class="markdown-content prose prose-sm max-w-none leading-relaxed text-gray-900"
-              v-html="parseSegmentContent(seg.content)"
+              v-html="parseSegmentContent(seg.content, { isStreaming: isStreaming && isLastSegment(segIdx) })"
               @click="onMarkdownClick"
             ></div>
 
@@ -1417,6 +1458,66 @@ const openImage = (dataUrl) => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.markdown-content :deep(.md-asset-placeholder) {
+  margin: 0.65rem 0;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--theme-200, #e4e4df);
+  border-radius: 0.85rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 248, 246, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.markdown-content :deep(.md-asset-placeholder__visual) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  min-height: 120px;
+  border-radius: 0.65rem;
+  background:
+    radial-gradient(circle at top, rgba(61, 124, 201, 0.08), transparent 45%),
+    rgba(240, 240, 237, 0.88);
+  border: 1px dashed rgba(138, 138, 130, 0.3);
+}
+
+.markdown-content :deep(.md-asset-placeholder__dot) {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--theme-400, #8a8a82);
+  opacity: 0.45;
+  animation: mdAssetPulse 1.2s ease-in-out infinite;
+}
+
+.markdown-content :deep(.md-asset-placeholder__dot:nth-child(2)) {
+  animation-delay: 0.15s;
+}
+
+.markdown-content :deep(.md-asset-placeholder__dot:nth-child(3)) {
+  animation-delay: 0.3s;
+}
+
+.markdown-content :deep(.md-asset-placeholder__caption) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  margin-top: 0.75rem;
+}
+
+.markdown-content :deep(.md-asset-placeholder__title) {
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--theme-700, #2d2d28);
+}
+
+.markdown-content :deep(.md-asset-placeholder__meta) {
+  font-size: 0.84rem;
+  color: var(--theme-400, #8a8a82);
+}
+
 /* === 用户消息附件 === */
 .user-attachment-image img {
   display: block;
@@ -1513,5 +1614,16 @@ const openImage = (dataUrl) => {
 .lightbox-enter-from .img-lightbox__img,
 .lightbox-leave-to .img-lightbox__img {
   transform: scale(0.95);
+}
+
+@keyframes mdAssetPulse {
+  0%, 80%, 100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }
 </style>
