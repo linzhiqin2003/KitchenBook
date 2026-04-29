@@ -22,6 +22,9 @@ const djangoHeaders = (extra = {}) => {
 
 // 给 Hermes 请求带上当前用户标识 —— 服务器据此把 memory / config 路径
 // scope 到 ~/.hermes/users/<uid>/。无 user 时退回到匿名共享路径。
+// session_id 必须按 conversation 隔离 —— 否则用户跨对话切换时 Hermes
+// 会把所有消息堆到同一 session，message history 无限累积。memory / config
+// 仍然走 user-scope，所以这里多带 conv_id 不影响其他隔离。
 const hermesHeaders = (extra = {}) => {
   const uid = authStore.user?.id
   const h = {
@@ -29,7 +32,8 @@ const hermesHeaders = (extra = {}) => {
     ...extra,
   }
   if (uid) {
-    const sid = `ailab-user-${uid}`
+    const cid = currentConversationId.value
+    const sid = cid ? `ailab-user-${uid}-conv-${cid}` : `ailab-user-${uid}`
     h['X-Hermes-User-Id'] = String(uid)
     h['X-Hermes-Session-Id'] = sid
   }
