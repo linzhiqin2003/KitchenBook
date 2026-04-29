@@ -1,5 +1,5 @@
 # API Views for KitchenBook
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
 from rest_framework.views import APIView
@@ -1589,11 +1589,157 @@ class WhisperTranscribeView(APIView):
 
 # ==================== AI Lab 会话管理 ====================
 
-from .models import AiLabConversation, AiLabMessage, AiLabNotification
+from .models import AiLabConversation, AiLabMessage, AiLabNotification, AiLabInvite
 from .serializers import (
     AiLabConversationListSerializer, AiLabConversationDetailSerializer, AiLabMessageSerializer,
     AiLabNotificationSerializer,
 )
+
+
+# ============================================================================
+# MyAgent 访问门禁 —— owner 检测 + ai_lab_enabled 闸门
+# ============================================================================
+
+def is_ai_lab_owner(user):
+    """主人账号判定：is_superuser、或 username/email 在 AI_LAB_OWNER_USERNAMES 列表里"""
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser:
+        return True
+    raw = (getattr(settings, 'AI_LAB_OWNER_USERNAMES', '') or '').strip()
+    if not raw:
+        return False
+    owners = {x.strip().lower() for x in raw.split(',') if x.strip()}
+    return (user.username or '').lower() in owners or (user.email or '').lower() in owners
+
+
+def has_ai_lab_access(user):
+    """是否允许使用 AI Lab：owner 永远是 True，普通用户要 profile.ai_lab_enabled"""
+    if is_ai_lab_owner(user):
+        return True
+    profile = getattr(user, 'profile', None)
+    return bool(profile and getattr(profile, 'ai_lab_enabled', False))
+
+
+class AiLabAccessPermission(permissions.BasePermission):
+    """门禁 permission：未登录 401、登录但没开通 403。owner 直接放过"""
+    message = 'AI Lab access not enabled. Redeem an invite code to activate.'
+
+    def has_permission(self, request, view):
+        u = request.user
+        if not getattr(u, 'is_authenticated', False):
+            return False
+        return has_ai_lab_access(u)
+
+
+@api_view(['GET'])
+def ailab_me(request):
+    """GET /api/ai/me/  —— 当前登录用户在 AI Lab 视角下的状态"""
+    u = request.user
+    if not getattr(u, 'is_authenticated', False):
+        return Response({"error": "unauthenticated"}, status=status.HTTP_401_UNAUTHORIZED)
+    profile = getattr(u, 'profile', None)
+    nickname = getattr(profile, 'nickname', '') or u.username
+    avatar_url = ''
+    if profile:
+        if profile.avatar:
+            try:
+                avatar_url = request.build_absolute_uri(profile.avatar.url)
+            except Exception:
+                avatar_url = ''
+        if not avatar_url:
+            avatar_url = profile.avatar_url or ''
+    return Response({
+        'id': u.id,
+        'username': u.username,
+        'email': u.email,
+        'nickname': nickname,
+        'avatar_url': avatar_url,
+        'is_owner': is_ai_lab_owner(u),
+        'ai_lab_enabled': has_ai_lab_access(u),
+    })
+
+
+@api_view(['POST'])
+def ailab_redeem_invite(request):
+    """POST /api/ai/invites/redeem/  body {code}  —— 兑换邀请码、激活 AI Lab"""
+    u = request.user
+    if not getattr(u, 'is_authenticated', False):
+        return Response({"error": "unauthenticated"}, status=status.HTTP_401_UNAUTHORIZED)
+    if has_ai_lab_access(u):
+        return Response({"ok": True, "already_enabled": True})
+    code = (request.data.get('code') or '').strip()
+    if not code:
+        return Response({"error": "code required"}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        invite = AiLabInvite.objects.select_for_update().get(code=code)
+    except AiLabInvite.DoesNotExist:
+        return Response({"error": "invalid code"}, status=status.HTTP_404_NOT_FOUND)
+    if invite.is_used:
+        return Response({"error": "code already used"}, status=status.HTTP_400_BAD_REQUEST)
+    if invite.is_expired:
+        return Response({"error": "code expired"}, status=status.HTTP_400_BAD_REQUEST)
+
+    from django.db import transaction
+    from django.utils import timezone as _tz
+    from accounts.models import UserProfile
+    with transaction.atomic():
+        profile, _ = UserProfile.objects.get_or_create(user=u)
+        profile.ai_lab_enabled = True
+        profile.ai_lab_activated_at = _tz.now()
+        profile.save(update_fields=['ai_lab_enabled', 'ai_lab_activated_at'])
+        invite.used_by = u
+        invite.used_at = _tz.now()
+        invite.save(update_fields=['used_by', 'used_at'])
+    return Response({"ok": True, "ai_lab_enabled": True})
+
+
+@api_view(['GET', 'POST'])
+def ailab_invites(request):
+    """owner-only:
+       GET  /api/ai/invites/   列出所有邀请码（含未用/已用）
+       POST /api/ai/invites/   body {note?, expires_at?}  生成新码
+    """
+    u = request.user
+    if not getattr(u, 'is_authenticated', False):
+        return Response({"error": "unauthenticated"}, status=status.HTTP_401_UNAUTHORIZED)
+    if not is_ai_lab_owner(u):
+        return Response({"error": "owner only"}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'GET':
+        items = AiLabInvite.objects.select_related('used_by').all()[:200]
+        return Response({
+            'results': [
+                {
+                    'id': it.id,
+                    'code': it.code,
+                    'note': it.note,
+                    'created_at': it.created_at,
+                    'used_at': it.used_at,
+                    'expires_at': it.expires_at,
+                    'is_used': it.is_used,
+                    'is_expired': it.is_expired,
+                    'used_by': it.used_by.username if it.used_by else None,
+                }
+                for it in items
+            ]
+        })
+
+    # POST 生成
+    import secrets
+    note = (request.data.get('note') or '')[:200]
+    expires_at = request.data.get('expires_at') or None
+    code = secrets.token_urlsafe(9)
+    invite = AiLabInvite.objects.create(
+        code=code, note=note, expires_at=expires_at, created_by=u,
+    )
+    return Response({
+        'id': invite.id,
+        'code': invite.code,
+        'note': invite.note,
+        'created_at': invite.created_at,
+        'expires_at': invite.expires_at,
+    }, status=status.HTTP_201_CREATED)
 
 
 def _kickoff_ai_title_generation(conversation, first_user_message: str) -> None:
@@ -1735,7 +1881,7 @@ class AiLabNotificationViewSet(viewsets.ReadOnlyModelViewSet):
     from rest_framework_simplejwt.authentication import JWTAuthentication
     from rest_framework.permissions import IsAuthenticated
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, AiLabAccessPermission]
 
     def get_queryset(self):
         qs = AiLabNotification.objects.filter(user=self.request.user)
@@ -1819,7 +1965,7 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
     from rest_framework_simplejwt.authentication import JWTAuthentication
     from rest_framework.permissions import IsAuthenticated
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, AiLabAccessPermission]
 
     def get_queryset(self):
         return AiLabConversation.objects.filter(user=self.request.user)
@@ -1870,7 +2016,7 @@ class AiLabMessageViewSet(viewsets.ModelViewSet):
     from rest_framework_simplejwt.authentication import JWTAuthentication
     from rest_framework.permissions import IsAuthenticated
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, AiLabAccessPermission]
 
     def get_queryset(self):
         return AiLabMessage.objects.filter(conversation__user=self.request.user)

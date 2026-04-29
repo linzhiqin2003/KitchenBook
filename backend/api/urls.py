@@ -6,6 +6,7 @@ from .views import (
     DeepSeekOCRView, WhisperTranscribeView, PDFExtractView, RecipeStepViewSet,
     RecipeIngredientViewSet, AiLabConversationViewSet, AiLabMessageViewSet,
     AiLabNotificationViewSet, ailab_internal_add_message, ailab_internal_push_notification,
+    ailab_me, ailab_redeem_invite, ailab_invites,
 )
 
 router = DefaultRouter()
@@ -35,6 +36,10 @@ urlpatterns = [
     # 路径不能放在 router 注册的 ai/notifications/ 下面 —— router 会把 "internal"
     # 当成 retrieve 的 pk，被 viewset 的 JWT 拦截。改成独立 ai/internal/ 前缀
     path('ai/internal/notifications/', ailab_internal_push_notification, name='ai-notification-internal'),
+    # MyAgent 用户身份 / 邀请码闸门
+    path('ai/me/', ailab_me, name='ai-me'),
+    path('ai/invites/', ailab_invites, name='ai-invites'),
+    path('ai/invites/redeem/', ailab_redeem_invite, name='ai-invites-redeem'),
     path('tarot/', include('cards.urls')),
     path('tarot/', include('readings.urls')),
     path('tarot/', include('oracle.urls')),

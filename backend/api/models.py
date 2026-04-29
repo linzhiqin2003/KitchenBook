@@ -182,6 +182,40 @@ class AiLabMessage(models.Model):
         return f"{self.role}: {self.content[:50]}..."
 
 
+class AiLabInvite(models.Model):
+    """MyAgent 邀请码 —— owner 生成、访客兑换后开启 AI Lab 访问权限。"""
+    code = models.CharField(max_length=40, unique=True, db_index=True)
+    note = models.CharField(max_length=200, blank=True, default='', help_text='给谁用的备注')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='ailab_invites_created',
+    )
+    used_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='ailab_invites_used',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    @property
+    def is_used(self):
+        return self.used_by_id is not None
+
+    @property
+    def is_expired(self):
+        if not self.expires_at:
+            return False
+        from django.utils import timezone as _tz
+        return _tz.now() > self.expires_at
+
+    def __str__(self):
+        return f"{self.code} ({'used' if self.is_used else 'open'})"
+
+
 class AiLabNotification(models.Model):
     """MyAgent 通知收件箱
 

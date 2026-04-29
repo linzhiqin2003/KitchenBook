@@ -13,6 +13,11 @@ class UserProfile(models.Model):
     avatar_url = models.URLField(blank=True)
     avatar = models.ImageField(upload_to="avatars/", blank=True)
     groq_api_key = EncryptedCharField(max_length=256, blank=True, default="")
+    # MyAgent 访问门禁 —— 默认 False，需用 owner 发的邀请码兑换后才能用。
+    # owner（settings.AI_LAB_OWNER_USERNAMES 列出的用户名 / email、或 is_superuser）
+    # 不受此字段约束。
+    ai_lab_enabled = models.BooleanField(default=False)
+    ai_lab_activated_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
         return self.nickname or self.user.username

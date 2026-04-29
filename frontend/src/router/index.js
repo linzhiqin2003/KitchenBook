@@ -202,6 +202,18 @@ const router = createRouter({
       component: AiLabStudioView,
       meta: { title: 'AI Studio | LZQ' }
     },
+    {
+      path: '/ai-lab/activate',
+      name: 'ai-lab-activate',
+      component: () => import('../views/AiLabActivateView.vue'),
+      meta: { title: '激活 MyAgent' }
+    },
+    {
+      path: '/ai-lab/admin/invites',
+      name: 'ai-lab-admin-invites',
+      component: () => import('../views/AiLabAdminInvitesView.vue'),
+      meta: { title: 'MyAgent 邀请码管理' }
+    },
 
     // ========================================
     // Games 模块 - /games 路径下

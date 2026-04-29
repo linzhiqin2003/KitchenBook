@@ -4,6 +4,10 @@ import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
 import AiLabPanel from '../components/ailab/AiLabPanel.vue'
 import AiLabNotificationBell from '../components/ailab/AiLabNotificationBell.vue'
+import AiLabUserMenu from '../components/ailab/AiLabUserMenu.vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 import { useAuthStore } from '../store/auth'
 
 const authStore = useAuthStore()
@@ -1394,7 +1398,22 @@ onUnmounted(() => {
   document.body.style.backgroundColor = _prevBodyBg
 })
 
+// 进入 AI Lab 前先检查是否已开通；未开通的访客送到激活页
+const verifyAiLabAccess = async () => {
+  try {
+    const r = await fetch(`${API_BASE_URL}/api/ai/me/`, { headers: djangoHeaders() })
+    if (!r.ok) return
+    const me = await r.json()
+    if (!me.is_owner && !me.ai_lab_enabled) {
+      router.replace('/ai-lab/activate')
+    }
+  } catch { /* silent */ }
+}
+
 onMounted(async () => {
+  // 门禁优先 —— 未开通用户拉对话列表会 403，不如直接跳激活页
+  await verifyAiLabAccess()
+
   // 加载 MathJax
   if (!window.MathJax) {
     window.MathJax = {
@@ -1460,6 +1479,7 @@ onMounted(async () => {
         </div>
 
         <AiLabNotificationBell />
+        <AiLabUserMenu />
 
         <router-link
           to="/ai-lab/studio"

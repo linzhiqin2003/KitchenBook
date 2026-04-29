@@ -253,6 +253,10 @@ CEREBRAS_API_KEY_POOL = os.environ.get('CEREBRAS_API_KEY_POOL', '')
 # Hermes systemd unit 需 export 同名环境变量。
 HERMES_INTERNAL_TOKEN = os.environ.get('HERMES_INTERNAL_TOKEN', '')
 
+# MyAgent 主人账号 —— 可以无限制使用 AI Lab、生成邀请码、看到所有 admin UI。
+# 逗号分隔的 username 或 email；is_superuser=True 也算 owner。
+AI_LAB_OWNER_USERNAMES = os.environ.get('AI_LAB_OWNER_USERNAMES', '').strip()
+
 # Fernet encryption key for sensitive fields (API keys stored in DB)
 # Auto-generated on first run and persisted to .env
 FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
