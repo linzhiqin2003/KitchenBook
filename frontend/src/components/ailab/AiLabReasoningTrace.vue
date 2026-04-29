@@ -154,9 +154,18 @@ const stepMeta = (step) => {
 }
 
 const formatToolDuration = (toolCall) => {
-  if (!toolCall?.startedAt || !toolCall?.finishedAt) return ''
-  const seconds = (toolCall.finishedAt - toolCall.startedAt) / 1000
-  if (!Number.isFinite(seconds) || seconds < 0) return ''
+  if (!toolCall) return ''
+  // Hermes 已经在 tool.completed 事件里给了准确耗时（秒级），优先用它；
+  // 没有时再退回到 startedAt/finishedAt 差值
+  let ms = null
+  if (Number.isFinite(toolCall.durationMs) && toolCall.durationMs >= 0) {
+    ms = toolCall.durationMs
+  } else if (toolCall.startedAt && toolCall.finishedAt) {
+    ms = toolCall.finishedAt - toolCall.startedAt
+  }
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return ''
+  const seconds = ms / 1000
+  if (seconds < 0.1) return '<0.1s'
   return `${seconds.toFixed(1)}s`
 }
 

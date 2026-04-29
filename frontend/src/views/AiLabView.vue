@@ -687,8 +687,14 @@ const streamResponse = async (fileContent = null) => {
     if (fragment.finishedAt) {
       existing.finishedAt = fragment.finishedAt
     }
-    if (fragment.durationMs && !existing.finishedAt) {
-      existing.finishedAt = existing.startedAt + fragment.durationMs
+    // Hermes 服务端给的 durationMs 是权威值（涵盖整个工具实际执行耗时），
+    // 优先把它存到对象上让 formatToolDuration 直接用，比 JS 端 Date.now() 差值更准。
+    if (Number.isFinite(fragment.durationMs) && fragment.durationMs > 0) {
+      existing.durationMs = fragment.durationMs
+      // 同步把 finishedAt 推算到 startedAt + duration，保证两个口径一致
+      if (existing.startedAt) {
+        existing.finishedAt = existing.startedAt + fragment.durationMs
+      }
     }
     if (fragment.progressMessage !== undefined) {
       existing.progressMessage = fragment.progressMessage
@@ -990,12 +996,18 @@ const streamResponse = async (fileContent = null) => {
                 status: TOOL_STATUS.RUNNING,
               }, { appendArguments: false })
             } else if (currentEventType === 'hermes.tool.complete') {
+              // Hermes 在 tool.completed 事件里给了 duration（秒），优先用它当工具耗时，
+              // 别用 JS 端 Date.now() 减出来的差（SSE 批量到达时差近 0 → 显示 0.0s）
+              const completeDurationMs = Number.isFinite(parsed.duration)
+                ? Math.round(parsed.duration * 1000)
+                : (Number.isFinite(parsed.duration_ms) ? parsed.duration_ms : null)
               upsertToolCall({
                 id: parsed.id,
                 name: parsed.name,
                 status: parsed.error ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS,
                 result: parsed.result,
                 error: parsed.error,
+                durationMs: completeDurationMs,
               }, { appendArguments: false })
               if (!parsed.error && parsed.name === 'memory') {
                 refreshMemoryPanel(150)
