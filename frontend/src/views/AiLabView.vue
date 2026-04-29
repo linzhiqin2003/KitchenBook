@@ -1130,6 +1130,13 @@ const streamResponse = async (fileContent = null, options = {}) => {
     )
     if (savedAiMsg) {
       messages.value[aiMessageIndex].id = savedAiMsg.id
+      // 后端 asset_publish 会把 /tmp/foo.png 改写成 /media/ailab/...
+      // 流式期间前端拿的是 agent 原始路径，图片加载会失败 —— 用持久化后的
+      // content 替换前端这条，让图片立即可显示，不必切换会话再回来。
+      if (savedAiMsg.content && savedAiMsg.content !== currentContent.value) {
+        messages.value[aiMessageIndex].content = savedAiMsg.content
+        currentContent.value = savedAiMsg.content
+      }
     }
 
     renderMath()
