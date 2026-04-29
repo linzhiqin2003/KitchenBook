@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 class Ingredient(models.Model):
@@ -134,7 +135,14 @@ class Category(models.Model):
 # ==================== AI Lab 会话模块 ====================
 
 class AiLabConversation(models.Model):
-    """AI Lab 会话"""
+    """AI Lab 会话 — 每个会话归属一个登录用户"""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="ailab_conversations",
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=200, default="新对话")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

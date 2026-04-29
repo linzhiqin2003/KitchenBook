@@ -1595,10 +1595,15 @@ from .serializers import (
 
 
 class AiLabConversationViewSet(viewsets.ModelViewSet):
-    """AI Lab 会话管理"""
+    """AI Lab 会话管理 — 严格按登录用户隔离"""
     queryset = AiLabConversation.objects.all()
-    authentication_classes = []
-    permission_classes = []
+    from rest_framework_simplejwt.authentication import JWTAuthentication
+    from rest_framework.permissions import IsAuthenticated
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return AiLabConversation.objects.filter(user=self.request.user)
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -1606,7 +1611,7 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
         return AiLabConversationDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(user=self.request.user)
 
     @action(detail=True, methods=['post'], url_path='messages')
     def add_message(self, request, pk=None):
@@ -1639,11 +1644,16 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
 
 
 class AiLabMessageViewSet(viewsets.ModelViewSet):
-    """AI Lab 消息管理"""
+    """AI Lab 消息管理 — 仅允许操作自己会话下的消息"""
     queryset = AiLabMessage.objects.all()
     serializer_class = AiLabMessageSerializer
-    authentication_classes = []
-    permission_classes = []
+    from rest_framework_simplejwt.authentication import JWTAuthentication
+    from rest_framework.permissions import IsAuthenticated
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return AiLabMessage.objects.filter(conversation__user=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
         """删除消息及其后续所有消息"""

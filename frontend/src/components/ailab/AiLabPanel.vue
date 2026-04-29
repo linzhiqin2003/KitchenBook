@@ -1,6 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
+import { useAuthStore } from '../../store/auth'
+
+const authStore = useAuthStore()
 
 const props = defineProps({
   visible: { type: Boolean, default: false }
@@ -25,7 +28,19 @@ const DEFAULT_PANEL_WIDTH = 320
 const panelWidth = ref(DEFAULT_PANEL_WIDTH)
 const isResizing = ref(false)
 
-const headers = { 'Authorization': `Bearer ${HERMES_API_KEY}`, 'Content-Type': 'application/json' }
+// 把当前登录用户的 id 透传给 Hermes，让服务端 scope memory / config 路径
+const headers = computed(() => {
+  const uid = authStore.user?.id
+  const h = {
+    'Authorization': `Bearer ${HERMES_API_KEY}`,
+    'Content-Type': 'application/json',
+  }
+  if (uid) {
+    h['X-Hermes-User-Id'] = String(uid)
+    h['X-Hermes-Session-Id'] = `ailab-user-${uid}`
+  }
+  return h
+})
 
 const clampPanelWidth = (width) => Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, width))
 
@@ -60,7 +75,7 @@ const responseErrorMessage = (data, fallback) => {
 const fetchTools = async () => {
   loadingTools.value = true
   try {
-    const r = await fetch(`${HERMES_API_URL}/api/tools`, { headers })
+    const r = await fetch(`${HERMES_API_URL}/api/tools`, { headers: headers.value })
     if (r.ok) {
       const data = await r.json()
       tools.value = data.tools || []
@@ -72,7 +87,7 @@ const fetchTools = async () => {
 const toggleTool = async (tool) => {
   try {
     await fetch(`${HERMES_API_URL}/api/tools/toggle`, {
-      method: 'POST', headers,
+      method: 'POST', headers: headers.value,
       body: JSON.stringify({ name: tool.name, enable: !tool.enabled })
     })
     tool.enabled = !tool.enabled
@@ -82,7 +97,7 @@ const toggleTool = async (tool) => {
 const fetchSkills = async () => {
   loadingSkills.value = true
   try {
-    const r = await fetch(`${HERMES_API_URL}/api/skills`, { headers })
+    const r = await fetch(`${HERMES_API_URL}/api/skills`, { headers: headers.value })
     if (r.ok) {
       const data = await r.json()
       skills.value = data.skills || []
@@ -95,7 +110,7 @@ const toggleSkill = async (skill) => {
   const next = !skill.enabled
   try {
     const r = await fetch(`${HERMES_API_URL}/api/skills/toggle`, {
-      method: 'POST', headers,
+      method: 'POST', headers: headers.value,
       body: JSON.stringify({ name: skill.name, enable: next })
     })
     if (!r.ok) throw new Error(`toggle failed (${r.status})`)
@@ -107,7 +122,7 @@ const fetchMemory = async () => {
   loadingMemory.value = true
   memoryError.value = ''
   try {
-    const r = await fetch(`${HERMES_API_URL}/api/memory`, { headers })
+    const r = await fetch(`${HERMES_API_URL}/api/memory`, { headers: headers.value })
     const data = await r.json().catch(() => ({}))
     if (!r.ok) {
       throw new Error(responseErrorMessage(data, `Memory 接口请求失败 (${r.status})`))
@@ -131,7 +146,7 @@ const saveMemory = async () => {
   memoryError.value = ''
   try {
     const r = await fetch(`${HERMES_API_URL}/api/memory`, {
-      method: 'POST', headers,
+      method: 'POST', headers: headers.value,
       body: JSON.stringify({ memory: memoryDraft.value })
     })
     const data = await r.json().catch(() => ({}))

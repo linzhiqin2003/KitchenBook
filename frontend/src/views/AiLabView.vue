@@ -3,6 +3,33 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
 import AiLabPanel from '../components/ailab/AiLabPanel.vue'
+import { useAuthStore } from '../store/auth'
+
+const authStore = useAuthStore()
+
+// 给 Django /api/ai/... 请求带上 JWT —— 后端按 request.user 过滤会话
+const djangoHeaders = (extra = {}) => {
+  const token = localStorage.getItem('access_token') || ''
+  const h = { ...extra }
+  if (token) h['Authorization'] = `Bearer ${token}`
+  return h
+}
+
+// 给 Hermes 请求带上当前用户标识 —— 服务器据此把 memory / config 路径
+// scope 到 ~/.hermes/users/<uid>/。无 user 时退回到匿名共享路径。
+const hermesHeaders = (extra = {}) => {
+  const uid = authStore.user?.id
+  const h = {
+    'Authorization': `Bearer ${HERMES_API_KEY}`,
+    ...extra,
+  }
+  if (uid) {
+    const sid = `ailab-user-${uid}`
+    h['X-Hermes-User-Id'] = String(uid)
+    h['X-Hermes-Session-Id'] = sid
+  }
+  return h
+}
 
 // ===== 会话管理状态 =====
 const conversations = ref([])
@@ -109,7 +136,7 @@ const saveTokenUsage = async () => {
     const { breakdown: _omit, ...persisted } = sessionTokens.value
     await fetch(`${API_BASE_URL}/api/ai/conversations/${currentConversationId.value}/token-usage/`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: djangoHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(persisted)
     })
   } catch (e) { /* silent */ }
@@ -221,7 +248,7 @@ const normalizeMessagesForUI = (list) => {
 const fetchConversations = async () => {
   isLoadingConversations.value = true
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/conversations/`)
+    const response = await fetch(`${API_BASE_URL}/api/ai/conversations/`, { headers: djangoHeaders() })
     if (response.ok) {
       conversations.value = await response.json()
     }
@@ -235,7 +262,7 @@ const fetchConversations = async () => {
 // 获取会话详情（含消息）
 const fetchConversation = async (id) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${id}/`)
+    const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${id}/`, { headers: djangoHeaders() })
     if (response.ok) {
       const data = await response.json()
       currentConversation.value = data
@@ -264,7 +291,7 @@ const createConversation = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: djangoHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ title: '新对话' })
     })
     if (response.ok) {
@@ -302,7 +329,8 @@ const deleteConversation = async (id) => {
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${id}/`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: djangoHeaders()
     })
     if (response.ok) {
       conversations.value = conversations.value.filter(c => c.id !== id)
@@ -331,7 +359,7 @@ const saveMessage = async (conversationId, role, content, reasoning = null, subT
     }
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${conversationId}/messages/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: djangoHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body)
     })
     if (response.ok) {
@@ -347,7 +375,8 @@ const saveMessage = async (conversationId, role, content, reasoning = null, subT
 const deleteMessageAndFollowing = async (messageId) => {
   try {
     await fetch(`${API_BASE_URL}/api/ai/messages/${messageId}/`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: djangoHeaders()
     })
   } catch (error) {
     console.error('删除消息失败:', error)
@@ -808,10 +837,7 @@ const streamResponse = async (fileContent = null) => {
   try {
     const response = await fetch(`${HERMES_API_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${HERMES_API_KEY}`,
-      },
+      headers: hermesHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         model: 'hermes-agent',
         messages: apiMessages,
