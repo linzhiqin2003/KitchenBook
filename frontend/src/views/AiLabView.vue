@@ -47,6 +47,15 @@ const isPanelOpen = ref(false)
 const panelRef = ref(null)
 let memoryRefreshTimer = null
 
+// 通知未读数从右侧 Panel 内部的轮询拿，铃铛上显示 badge
+const panelUnreadCount = computed(() => panelRef.value?.notificationsUnread ?? 0)
+
+const openInbox = () => {
+  isPanelOpen.value = true
+  // panel 渲染后才有 ref；用 nextTick 等一帧再切 tab
+  nextTick(() => panelRef.value?.openNotifications?.())
+}
+
 const refreshMemoryPanel = (delay = 0) => {
   if (memoryRefreshTimer) {
     clearTimeout(memoryRefreshTimer)
@@ -1480,7 +1489,7 @@ onMounted(async () => {
         <!-- 桌面端会话标题占据中间位置 -->
         <div class="hidden lg:flex flex-1 min-w-0"></div>
 
-        <AiLabNotificationBell />
+        <AiLabNotificationBell :unread-count="panelUnreadCount" @click="openInbox" />
         <AiLabUserMenu />
 
         <router-link
