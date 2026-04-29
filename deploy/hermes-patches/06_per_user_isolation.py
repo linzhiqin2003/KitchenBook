@@ -189,6 +189,33 @@ def main() -> int:
     else:
         print("WARN: executor anchor not found — contextvars may not propagate", file=sys.stderr)
 
+    # 4) Replace hardcoded memory + config paths in the panel handlers so they
+    #    honor the per-user override too.  Without this, /api/memory and
+    #    /api/skills/toggle still touch the global files.
+    substitutions = [
+        (
+            'memory_path = os.path.expanduser("~/.hermes/memories/MEMORY.md")',
+            'import tools.memory_tool as _mt_pu_mod  # per-user-aware\n'
+            '        memory_path = str(_mt_pu_mod.get_memory_dir() / "MEMORY.md")',
+        ),
+        (
+            'user_path = os.path.expanduser("~/.hermes/memories/USER.md")',
+            'user_path = str(_mt_pu_mod.get_memory_dir() / "USER.md")',
+        ),
+        (
+            'config_path = os.path.expanduser("~/.hermes/config.yaml")',
+            'import hermes_constants as _hc_pu_mod  # per-user-aware\n'
+            '        config_path = str(_hc_pu_mod.get_config_path())',
+        ),
+    ]
+    for old, new in substitutions:
+        n = text.count(old)
+        if n == 0:
+            print(f"WARN: substitution anchor not found: {old[:60]}...", file=sys.stderr)
+            continue
+        text = text.replace(old, new)
+        print(f"  scoped {n} occurrence(s) of: {old[:60]}...")
+
     bak = P.with_suffix(P.suffix + ".peruser.bak")
     if not bak.exists():
         shutil.copy2(P, bak)
