@@ -525,6 +525,12 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 const segments = computed(() => Array.isArray(props.message.segments) ? props.message.segments : [])
 const isLastSegment = (idx) => idx === segments.value.length - 1
 const parseSegmentContent = (text) => parseMarkdown(text || '')
+
+// 用户消息里点击图片附件 → 新窗打开看大图
+const openImage = (dataUrl) => {
+  if (!dataUrl) return
+  try { window.open(dataUrl, '_blank', 'noopener') } catch (e) { /* ignore */ }
+}
 </script>
 
 <template>
@@ -572,9 +578,36 @@ const parseSegmentContent = (text) => parseMarkdown(text || '')
 
           <div v-else
                ref="bubbleRef"
-               class="rounded-xl px-4 py-3 leading-relaxed whitespace-pre-wrap break-words max-w-[600px]"
+               class="rounded-xl px-4 py-3 leading-relaxed break-words max-w-[600px]"
                style="background: var(--theme-100); color: var(--theme-700); font-size: 15.5px;">
-            {{ message.content }}
+            <!-- 图片附件缩略图 -->
+            <div
+              v-if="message.fileAttachment && message.fileAttachment.type === 'image' && message.fileAttachment.dataUrl"
+              :class="['user-attachment-image', message.content && message.content !== '(图片)' ? 'mb-2' : '']"
+            >
+              <img
+                :src="message.fileAttachment.dataUrl"
+                :alt="message.fileAttachment.filename || 'image'"
+                @click="openImage(message.fileAttachment.dataUrl)"
+              />
+            </div>
+            <!-- PDF 附件标签 -->
+            <div
+              v-else-if="message.fileAttachment && message.fileAttachment.type === 'pdf'"
+              class="user-attachment-pdf"
+              :class="message.content ? 'mb-2' : ''"
+            >
+              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m-7 5h8a2 2 0 002-2V8.5L15.5 3H7a2 2 0 00-2 2v14a2 2 0 002 2zm6-18v5h5"/>
+              </svg>
+              <span class="truncate">{{ message.fileAttachment.filename || 'document.pdf' }}</span>
+              <span v-if="message.fileAttachment.pages" class="opacity-60 shrink-0">· {{ message.fileAttachment.pages }} 页</span>
+            </div>
+            <!-- 文本内容（"（图片）"占位符不渲染，避免和缩略图重复显示无意义文字） -->
+            <div
+              v-if="message.content && !(message.fileAttachment?.type === 'image' && message.content === '(图片)')"
+              class="whitespace-pre-wrap"
+            >{{ message.content }}</div>
           </div>
         </div>
       </div>
@@ -1248,5 +1281,27 @@ const parseSegmentContent = (text) => parseMarkdown(text || '')
   border-radius: 0.25em;
   vertical-align: super;
   line-height: 1;
+}
+
+/* === 用户消息附件 === */
+.user-attachment-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 0.5rem;
+  cursor: zoom-in;
+  object-fit: cover;
+}
+
+.user-attachment-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--theme-700);
+  font-size: 13px;
+  max-width: 100%;
 }
 </style>
