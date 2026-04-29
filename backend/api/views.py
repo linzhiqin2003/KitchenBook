@@ -1879,11 +1879,14 @@ def ailab_internal_add_message(request, pk):
 # MyAgent 通知收件箱 —— 跟 conversation 解耦的 agent push 消息
 # ============================================================================
 
-class AiLabNotificationViewSet(viewsets.ReadOnlyModelViewSet):
+class AiLabNotificationViewSet(viewsets.ModelViewSet):
     """GET /api/ai/notifications/      — 当前用户的通知，倒序
        GET /api/ai/notifications/?unread=1  — 仅未读
+       DELETE /api/ai/notifications/<id>/   — 删除单条
        POST /api/ai/notifications/mark-read/   — body: {ids: [...]} 或 {all: true}
+       POST /api/ai/notifications/clear-all/   — 清空当前用户所有通知
     """
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
     serializer_class = AiLabNotificationSerializer
     from rest_framework_simplejwt.authentication import JWTAuthentication
     from rest_framework.permissions import IsAuthenticated
@@ -1919,6 +1922,16 @@ class AiLabNotificationViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(id__in=ids)
         n = qs.update(is_read=True)
         return Response({"updated": n})
+
+    @action(detail=False, methods=['post'], url_path='clear-all')
+    def clear_all(self, request):
+        """删除当前用户所有通知"""
+        n, _ = AiLabNotification.objects.filter(user=request.user).delete()
+        return Response({"deleted": n})
+
+    def destroy(self, request, *args, **kwargs):
+        """DELETE /api/ai/notifications/<id>/ — 删除单条通知"""
+        return super().destroy(request, *args, **kwargs)
 
 
 @csrf_exempt

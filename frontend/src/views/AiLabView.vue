@@ -3,7 +3,6 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
 import AiLabPanel from '../components/ailab/AiLabPanel.vue'
-import AiLabNotificationBell from '../components/ailab/AiLabNotificationBell.vue'
 import AiLabUserMenu from '../components/ailab/AiLabUserMenu.vue'
 import { useRouter } from 'vue-router'
 
@@ -51,14 +50,8 @@ const isPanelOpen = ref(false)
 const panelRef = ref(null)
 let memoryRefreshTimer = null
 
-// 通知未读数从右侧 Panel 内部的轮询拿，铃铛上显示 badge
+// 通知未读数从右侧 Panel 内部的轮询拿，badge 显示在 Panel 切换按钮上
 const panelUnreadCount = computed(() => panelRef.value?.notificationsUnread ?? 0)
-
-const openInbox = () => {
-  isPanelOpen.value = true
-  // panel 渲染后才有 ref；用 nextTick 等一帧再切 tab
-  nextTick(() => panelRef.value?.openNotifications?.())
-}
 
 const refreshMemoryPanel = (delay = 0) => {
   if (memoryRefreshTimer) {
@@ -1485,19 +1478,23 @@ onMounted(async () => {
         <!-- 桌面端会话标题占据中间位置 -->
         <div class="hidden lg:flex flex-1 min-w-0"></div>
 
-        <AiLabNotificationBell :unread-count="panelUnreadCount" @click="openInbox" />
         <AiLabUserMenu />
 
-        <!-- Agent Panel 入口（Tools / Skills / Memory / Inbox） —— Studio 入口在侧边栏底部，这里不再重复 -->
+        <!-- Agent Panel 入口（Tools / Skills / Memory / Inbox）+ Inbox 未读 badge -->
         <button
           @click="isPanelOpen = !isPanelOpen"
-          class="w-8 h-8 rounded-md flex items-center justify-center transition-colors cursor-pointer"
+          class="w-8 h-8 rounded-md flex items-center justify-center transition-colors cursor-pointer relative"
           :style="isPanelOpen ? 'color: var(--theme-700); background: var(--theme-100);' : 'color: var(--theme-400);'"
           title="Agent Panel"
         >
           <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
           </svg>
+          <span
+            v-if="panelUnreadCount > 0"
+            class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full text-[10px] font-semibold flex items-center justify-center px-1"
+            style="background: #ef4444; color: #fff;"
+          >{{ panelUnreadCount > 99 ? '99+' : panelUnreadCount }}</span>
         </button>
       </header>
 

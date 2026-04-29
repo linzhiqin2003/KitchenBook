@@ -231,6 +231,28 @@ const handleNotifClick = (n) => {
   if (!n.is_read) markNotificationRead(n.id)
 }
 
+const deleteNotification = async (id) => {
+  try {
+    const r = await fetch(`${API_BASE_URL}/api/ai/notifications/${id}/`, {
+      method: 'DELETE', headers: djangoHeaders()
+    })
+    if (!r.ok && r.status !== 204) throw new Error(`HTTP ${r.status}`)
+    notifications.value = notifications.value.filter(n => n.id !== id)
+    notificationsUnread.value = notifications.value.filter(n => !n.is_read).length
+  } catch { /* silent */ }
+}
+
+const clearAllNotifications = async () => {
+  if (!confirm('清空所有通知？此操作不可撤销。')) return
+  try {
+    await fetch(`${API_BASE_URL}/api/ai/notifications/clear-all/`, {
+      method: 'POST', headers: djangoHeaders()
+    })
+    notifications.value = []
+    notificationsUnread.value = 0
+  } catch { /* silent */ }
+}
+
 const formatNotifTime = (iso) => {
   if (!iso) return ''
   const d = new Date(iso)
@@ -431,12 +453,20 @@ defineExpose({
             <span class="text-[13px]" style="color: #6e6e76;">
               {{ notifications.length === 0 ? '暂无通知' : `共 ${notifications.length} 条` }}
             </span>
-            <button
-              v-if="notificationsUnread > 0"
-              @click="markNotificationRead('all')"
-              class="text-[12px] cursor-pointer hover:underline"
-              style="color: var(--theme-500);"
-            >全部已读</button>
+            <div class="flex items-center gap-3">
+              <button
+                v-if="notificationsUnread > 0"
+                @click="markNotificationRead('all')"
+                class="text-[12px] cursor-pointer hover:underline"
+                style="color: var(--theme-500);"
+              >全部已读</button>
+              <button
+                v-if="notifications.length > 0"
+                @click="clearAllNotifications"
+                class="text-[12px] cursor-pointer hover:underline"
+                style="color: var(--theme-500);"
+              >清空</button>
+            </div>
           </div>
           <div v-if="notificationsLoading && notifications.length === 0" class="text-center py-8 text-[12px]" style="color: #b0b0b6;">加载中…</div>
           <div v-else-if="notificationsError" class="text-center py-8 text-[12px]" style="color: #b91c1c;">{{ notificationsError }}</div>
@@ -446,7 +476,7 @@ defineExpose({
               v-for="n in notifications"
               :key="n.id"
               @click="handleNotifClick(n)"
-              class="rounded-lg px-3 py-2.5 cursor-pointer transition-colors"
+              class="rounded-lg px-3 py-2.5 cursor-pointer transition-colors group/notif relative"
               :style="n.is_read
                 ? 'background: #fff; border: 1px solid var(--theme-200);'
                 : 'background: rgba(61, 124, 201, 0.06); border: 1px solid rgba(61, 124, 201, 0.25);'"
@@ -461,6 +491,16 @@ defineExpose({
                 <span class="ml-auto text-[11px] shrink-0" style="color: var(--theme-400);">
                   {{ formatNotifTime(n.created_at) }}
                 </span>
+                <button
+                  @click.stop="deleteNotification(n.id)"
+                  class="opacity-0 group-hover/notif:opacity-100 transition-opacity p-0.5 rounded cursor-pointer hover:bg-black/[0.06] shrink-0"
+                  style="color: var(--theme-400);"
+                  title="删除"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                  </svg>
+                </button>
               </div>
               <div
                 class="text-[13px] leading-relaxed whitespace-pre-wrap break-words"
