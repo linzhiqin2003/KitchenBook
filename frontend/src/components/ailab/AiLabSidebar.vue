@@ -209,10 +209,14 @@ onUnmounted(() => {
     <!-- Header -->
     <div class="px-3 pt-3 pb-1 flex items-center" :class="isCollapsed ? 'justify-center' : 'justify-between'">
       <div v-if="!isCollapsed" class="flex items-center gap-1.5">
-        <svg class="w-4 h-4" style="color: #6e6e76;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
+        <!-- MyAgent logo: 描边的"M"和右上方一个独立的实心圆点 ——
+             M 是 Wordmark 首字母，dot 代表 agent 本体（一个有意识的"我"）。
+             几何化、对称、跟暖色低饱和主题协调 -->
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="color: #2c2c30;">
+          <path d="M4 18V7l4.2 5.5L12.5 7v11" stroke="currentColor"/>
+          <circle cx="18.5" cy="8.5" r="2.4" fill="var(--ai-accent, #3d7cc9)"/>
         </svg>
-        <span class="text-[14px] font-semibold" style="color: #2c2c30;">Chat</span>
+        <span class="text-[14px] font-semibold" style="color: #2c2c30;">MyAgent</span>
       </div>
       <div v-if="!isCollapsed" class="flex items-center gap-0.5">
         <button @click="emit('toggle-collapse')"
