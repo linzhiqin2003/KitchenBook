@@ -102,32 +102,46 @@ const formatDuration = (seconds) => {
     <div class="max-w-4xl mx-auto relative">
       <div class="input-shell transition-all">
         <div v-if="hasAttachment" class="attachment-row">
-          <img
-            v-if="fileAttachment.type === 'image' && fileAttachment.preview"
-            :src="fileAttachment.preview"
-            class="attachment-thumb"
-            alt=""
-          />
-          <div v-else class="attachment-icon">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-            </svg>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="truncate text-[14px] leading-5" style="color: var(--theme-700);">{{ fileAttachment.name }}</div>
-            <div class="text-[12px] leading-4" style="color: var(--theme-400);">{{ fileAttachment.type === 'image' ? '图片' : 'PDF' }}<span v-if="fileSizeLabel"> · {{ fileSizeLabel }}</span></div>
-          </div>
-          <button
-            @click="emit('remove-file')"
-            :disabled="isLoading || isOcrProcessing"
-            class="shrink-0 p-1.5 rounded-md cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/[0.04]"
-            style="color: var(--theme-400);"
-            title="移除文件"
+          <div
+            class="attachment-card"
+            :class="{ 'is-pdf': fileAttachment.type !== 'image' }"
+            :title="fileAttachment.name + (fileSizeLabel ? ' · ' + fileSizeLabel : '')"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
+            <!-- 图片：直接铺满 -->
+            <img
+              v-if="fileAttachment.type === 'image' && fileAttachment.preview"
+              :src="fileAttachment.preview"
+              class="attachment-card__img"
+              alt=""
+            />
+            <!-- PDF：页面 + 角标 -->
+            <template v-else>
+              <div class="attachment-card__pdf-page">
+                <svg class="attachment-card__pdf-glyph" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                </svg>
+                <div class="attachment-card__pdf-name">{{ fileAttachment.name }}</div>
+              </div>
+              <span class="attachment-card__pdf-badge">PDF</span>
+            </template>
+            <!-- hover 关闭按钮 -->
+            <button
+              @click="emit('remove-file')"
+              :disabled="isLoading || isOcrProcessing"
+              class="attachment-card__remove"
+              title="移除文件"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+            <!-- OCR 处理时的 loading 遮罩 -->
+            <div v-if="isOcrProcessing" class="attachment-card__loading">
+              <svg class="w-4 h-4 attachment-card__spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+              </svg>
+            </div>
+          </div>
         </div>
 
         <div class="input-main-row">
@@ -379,30 +393,126 @@ const formatDuration = (seconds) => {
 }
 .attachment-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  margin: 2px 2px 6px;
-  padding: 7px 9px;
-  border-radius: 18px;
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 2px 8px;
+  padding: 0 6px;
 }
-.attachment-thumb,
-.attachment-icon {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  border-radius: 7px;
+.attachment-card {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--theme-100, #f5f4f1);
+  border: 1px solid var(--theme-200, #e6e4dd);
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.attachment-thumb {
+.attachment-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.attachment-card__img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  display: block;
 }
-.attachment-icon {
+
+/* PDF 卡片：模拟一页文档 */
+.attachment-card.is-pdf {
+  background: #fff;
+}
+.attachment-card__pdf-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px 18px;
+  gap: 4px;
+}
+.attachment-card__pdf-glyph {
+  width: 22px;
+  height: 22px;
+  color: var(--theme-400, #b3b1a6);
+  flex-shrink: 0;
+}
+.attachment-card__pdf-name {
+  font-size: 9px;
+  line-height: 1.2;
+  color: var(--theme-500, #888578);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+  max-width: 100%;
+}
+.attachment-card__pdf-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #dc2626;
+  color: #fff;
+  line-height: 1;
+}
+
+/* 关闭按钮 — hover 才显示 */
+.attachment-card__remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--theme-400);
-  background: var(--theme-50);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  border: none;
+  padding: 0;
+}
+.attachment-card:hover .attachment-card__remove {
+  opacity: 1;
+  transform: scale(1);
+}
+.attachment-card__remove:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.attachment-card__remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* OCR 处理 loading 遮罩 */
+.attachment-card__loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-600);
+}
+.attachment-card__spin {
+  animation: attachment-spin 0.9s linear infinite;
+}
+@keyframes attachment-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>
