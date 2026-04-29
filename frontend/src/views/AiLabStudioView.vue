@@ -1041,12 +1041,12 @@ onUnmounted(() => {
             ></div>
             <button
               @click="currentView = 'interpretation'"
-              class="relative z-10 px-3 py-1 rounded-md text-[12px] font-medium transition-colors duration-200"
+              class="relative z-10 px-3 py-1 rounded-md text-[12px] font-medium transition-colors duration-200 focus:outline-none"
               :style="currentView === 'interpretation' ? 'color: var(--theme-700);' : 'color: var(--theme-400);'"
             >转录翻译</button>
             <button
               @click="currentView = 'emoji'"
-              class="relative z-10 px-3 py-1 rounded-md text-[12px] font-medium transition-colors duration-200"
+              class="relative z-10 px-3 py-1 rounded-md text-[12px] font-medium transition-colors duration-200 focus:outline-none"
               :style="currentView === 'emoji' ? 'color: var(--theme-700);' : 'color: var(--theme-400);'"
             >表情包</button>
           </div>
@@ -1086,7 +1086,7 @@ onUnmounted(() => {
                   <button
                     @click="asrProvider = 'standard'"
                     :disabled="isRecording"
-                    class="px-2.5 py-1 rounded-md transition-all"
+                    class="px-2.5 py-1 rounded-md transition-all focus:outline-none"
                     :style="asrProvider === 'standard'
                       ? 'background: #fff; color: var(--theme-700); box-shadow: 0 1px 2px rgba(0,0,0,0.05);'
                       : 'color: var(--theme-400);'"
@@ -1094,7 +1094,7 @@ onUnmounted(() => {
                   <button
                     @click="asrProvider = 'tingwu'"
                     :disabled="isRecording"
-                    class="px-2.5 py-1 rounded-md transition-all"
+                    class="px-2.5 py-1 rounded-md transition-all focus:outline-none"
                     :style="asrProvider === 'tingwu'
                       ? 'background: #fff; color: var(--theme-700); box-shadow: 0 1px 2px rgba(0,0,0,0.05);'
                       : 'color: var(--theme-400);'"
