@@ -1193,10 +1193,7 @@ onUnmounted(() => {
           <div ref="historyContainer" class="flex-1 overflow-y-auto custom-scrollbar min-h-0 space-y-3">
 
             <div v-if="!transcriptionHistory.length && inflight === 0 && !showMinutes" class="h-full flex items-center justify-center">
-              <div class="text-center space-y-2">
-                <svg class="w-8 h-8 mx-auto" style="color: var(--theme-300);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
-                </svg>
+              <div class="text-center space-y-1.5">
                 <p class="text-[13px]" style="color: var(--theme-400);">录音或上传音频文件，自动转录并翻译</p>
                 <p class="text-[11px]" style="color: var(--theme-300);">
                   {{ asrProvider === 'tingwu'
