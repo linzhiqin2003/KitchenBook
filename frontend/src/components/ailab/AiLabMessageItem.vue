@@ -162,6 +162,9 @@ const toggleStep = (id) => {
   expandedSteps.value = { ...expandedSteps.value, [id]: !isStepExpanded(id) }
 }
 
+// 当只有一个步骤时，顶层展开后直接显示该步骤的详情，不再嵌套子折叠
+const singleStep = computed(() => steps.value.length === 1 ? steps.value[0] : null)
+
 // 折叠态显示的标签：流式中显示当前活动，否则显示总结
 const headerLabel = computed(() => {
   if (isLive.value) {
@@ -548,91 +551,122 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
         <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3">
           <template v-if="hasTraceTimeline">
             <!-- 思维链折叠头：流式中显示当前活动 -->
-            <button :class="['trace-header', { 'trace-shimmer': isLive && traceCollapsed }]" @click="traceCollapsed = !traceCollapsed">
+            <button class="trace-header" @click="traceCollapsed = !traceCollapsed">
               <svg
                 :class="['trace-chevron', { 'is-open': !traceCollapsed }]"
                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
               >
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
               </svg>
-              <span class="trace-header-text">{{ headerLabel }}</span>
+              <span :class="['trace-header-text', { 'trace-shimmer-text': isLive && traceCollapsed }]">{{ headerLabel }}</span>
             </button>
 
-            <!-- 展开后：步骤列表 -->
+            <!-- 展开后 -->
             <Transition name="collapse">
               <div v-if="!traceCollapsed" class="trace-list">
-                <div
-                  v-for="step in steps"
-                  :key="step.id"
-                  class="trace-item"
-                >
-                  <button
-                    :class="['trace-item-row', { 'trace-shimmer': step.live }]"
-                    @click="toggleStep(step.id)"
-                  >
-                    <svg
-                      :class="['trace-chevron', 'trace-chevron-sm', { 'is-open': isStepExpanded(step.id) }]"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                <!-- 单步骤：直接展示详情，不嵌套子折叠 -->
+                <template v-if="singleStep">
+                  <!-- 思考详情 -->
+                  <div v-if="singleStep.kind === 'thinking'" class="trace-thinking-text">{{ singleStep.text }}</div>
+
+                  <!-- 工具调用详情 -->
+                  <template v-else-if="singleStep.kind === 'tool'">
+                    <pre v-if="hasToolArguments(singleStep.toolCall)" class="trace-code">{{ formatToolArguments(singleStep.toolCall) }}</pre>
+                    <div
+                      v-if="singleStep.live && singleStep.toolCall.progressUrls && singleStep.toolCall.progressUrls.length"
+                      class="trace-url-tags"
                     >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
-                    </svg>
-
-                    <!-- 状态指示 -->
-                    <span class="trace-step-icon">
-                      <svg v-if="step.kind === 'tool' && step.status === 'success'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-check">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
-                      </svg>
-                      <svg v-else-if="step.kind === 'tool' && step.status === 'error'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-cross">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l6 6M9 3l-6 6"/>
-                      </svg>
-                      <span v-else-if="step.live" class="trace-icon-live"></span>
-                      <span v-else class="trace-icon-dot"></span>
-                    </span>
-
-                    <span :class="['trace-step-label', step.kind === 'tool' && 'trace-step-label-mono']">{{ stepLabel(step) }}</span>
-                    <span v-if="stepMeta(step)" class="trace-step-meta">{{ stepMeta(step) }}</span>
-                  </button>
-
-                  <!-- 子步骤展开内容 -->
-                  <Transition name="collapse">
-                    <div v-if="isStepExpanded(step.id)" class="trace-item-detail">
-                      <!-- 思考详情 -->
-                      <div v-if="step.kind === 'thinking'" class="trace-thinking-text">{{ step.text }}</div>
-
-                      <!-- 工具调用详情 -->
-                      <template v-else-if="step.kind === 'tool'">
-                        <pre v-if="hasToolArguments(step.toolCall)" class="trace-code">{{ formatToolArguments(step.toolCall) }}</pre>
-
-                        <!-- URL 进度标签 -->
-                        <div
-                          v-if="step.live && step.toolCall.progressUrls && step.toolCall.progressUrls.length"
-                          class="trace-url-tags"
-                        >
-                          <span
-                            v-for="(u, ui) in step.toolCall.progressUrls"
-                            :key="ui"
-                            :class="['url-tag', u.status === 'done' ? 'url-tag-done' : u.status === 'fail' ? 'url-tag-fail' : 'url-tag-pending']"
-                          >
-                            <img
-                              :src="`https://www.google.com/s2/favicons?domain=${u.domain}&sz=16`"
-                              class="url-tag-icon"
-                              loading="lazy"
-                              @error="$event.target.style.display='none'"
-                            />
-                            <span class="url-tag-text">{{ u.domain }}</span>
-                            <svg v-if="u.status === 'done'" class="url-tag-check" viewBox="0 0 16 16" fill="currentColor"><path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z"/></svg>
-                            <span v-else-if="u.status === 'pending'" class="url-tag-spinner"></span>
-                          </span>
-                        </div>
-
-                        <div
-                          v-if="formatToolResult(step.toolCall)"
-                          :class="['trace-result-text', step.toolCall.status === 'error' ? 'text-red-600' : '']"
-                        >{{ formatToolResult(step.toolCall) }}</div>
-                      </template>
+                      <span
+                        v-for="(u, ui) in singleStep.toolCall.progressUrls"
+                        :key="ui"
+                        :class="['url-tag', u.status === 'done' ? 'url-tag-done' : u.status === 'fail' ? 'url-tag-fail' : 'url-tag-pending']"
+                      >
+                        <img
+                          :src="`https://www.google.com/s2/favicons?domain=${u.domain}&sz=16`"
+                          class="url-tag-icon"
+                          loading="lazy"
+                          @error="$event.target.style.display='none'"
+                        />
+                        <span class="url-tag-text">{{ u.domain }}</span>
+                        <svg v-if="u.status === 'done'" class="url-tag-check" viewBox="0 0 16 16" fill="currentColor"><path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z"/></svg>
+                        <span v-else-if="u.status === 'pending'" class="url-tag-spinner"></span>
+                      </span>
                     </div>
-                  </Transition>
-                </div>
+                    <div
+                      v-if="formatToolResult(singleStep.toolCall)"
+                      :class="['trace-result-text', singleStep.toolCall.status === 'error' ? 'text-red-600' : '']"
+                    >{{ formatToolResult(singleStep.toolCall) }}</div>
+                  </template>
+                </template>
+
+                <!-- 多步骤：列表 + 子折叠 -->
+                <template v-else>
+                  <div
+                    v-for="step in steps"
+                    :key="step.id"
+                    class="trace-item"
+                  >
+                    <button
+                      class="trace-item-row"
+                      @click="toggleStep(step.id)"
+                    >
+                      <svg
+                        :class="['trace-chevron', 'trace-chevron-sm', { 'is-open': isStepExpanded(step.id) }]"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
+                      </svg>
+
+                      <span class="trace-step-icon">
+                        <svg v-if="step.kind === 'tool' && step.status === 'success'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-check">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
+                        </svg>
+                        <svg v-else-if="step.kind === 'tool' && step.status === 'error'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-cross">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l6 6M9 3l-6 6"/>
+                        </svg>
+                        <span v-else-if="step.live" class="trace-icon-live"></span>
+                        <span v-else class="trace-icon-dot"></span>
+                      </span>
+
+                      <span :class="['trace-step-label', step.kind === 'tool' && 'trace-step-label-mono', { 'trace-shimmer-text': step.live }]">{{ stepLabel(step) }}</span>
+                      <span v-if="stepMeta(step)" class="trace-step-meta">{{ stepMeta(step) }}</span>
+                    </button>
+
+                    <Transition name="collapse">
+                      <div v-if="isStepExpanded(step.id)" class="trace-item-detail">
+                        <div v-if="step.kind === 'thinking'" class="trace-thinking-text">{{ step.text }}</div>
+
+                        <template v-else-if="step.kind === 'tool'">
+                          <pre v-if="hasToolArguments(step.toolCall)" class="trace-code">{{ formatToolArguments(step.toolCall) }}</pre>
+                          <div
+                            v-if="step.live && step.toolCall.progressUrls && step.toolCall.progressUrls.length"
+                            class="trace-url-tags"
+                          >
+                            <span
+                              v-for="(u, ui) in step.toolCall.progressUrls"
+                              :key="ui"
+                              :class="['url-tag', u.status === 'done' ? 'url-tag-done' : u.status === 'fail' ? 'url-tag-fail' : 'url-tag-pending']"
+                            >
+                              <img
+                                :src="`https://www.google.com/s2/favicons?domain=${u.domain}&sz=16`"
+                                class="url-tag-icon"
+                                loading="lazy"
+                                @error="$event.target.style.display='none'"
+                              />
+                              <span class="url-tag-text">{{ u.domain }}</span>
+                              <svg v-if="u.status === 'done'" class="url-tag-check" viewBox="0 0 16 16" fill="currentColor"><path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z"/></svg>
+                              <span v-else-if="u.status === 'pending'" class="url-tag-spinner"></span>
+                            </span>
+                          </div>
+                          <div
+                            v-if="formatToolResult(step.toolCall)"
+                            :class="['trace-result-text', step.toolCall.status === 'error' ? 'text-red-600' : '']"
+                          >{{ formatToolResult(step.toolCall) }}</div>
+                        </template>
+                      </div>
+                    </Transition>
+                  </div>
+                </template>
               </div>
             </Transition>
           </template>
@@ -953,27 +987,27 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   overflow-y: auto;
 }
 
-/* === 流光动画（运行中） === */
-.trace-shimmer::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -60%;
-  width: 60%;
-  height: 100%;
+/* === 字体流光（运行中） === */
+.trace-shimmer-text {
   background: linear-gradient(
     90deg,
-    transparent,
-    color-mix(in srgb, var(--ai-accent, #3d7cc9) 18%, transparent),
-    transparent
+    var(--theme-400, #9a9a91) 0%,
+    var(--theme-400, #9a9a91) 35%,
+    var(--theme-700, #2d2d28) 50%,
+    var(--theme-400, #9a9a91) 65%,
+    var(--theme-400, #9a9a91) 100%
   );
-  animation: traceShimmer 1.6s ease-in-out infinite;
-  pointer-events: none;
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: textShimmer 1.8s linear infinite;
 }
 
-@keyframes traceShimmer {
-  0% { left: -60%; }
-  100% { left: 110%; }
+@keyframes textShimmer {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
 }
 
 /* URL favicon 标签容器 */
