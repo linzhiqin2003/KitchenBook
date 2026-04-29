@@ -1,5 +1,6 @@
 # API Views for KitchenBook
 from rest_framework import viewsets, status, permissions
+from rest_framework_simplejwt.authentication import JWTAuthentication as _JWTAuth
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
 from rest_framework.views import APIView
@@ -1633,6 +1634,8 @@ class AiLabAccessPermission(permissions.BasePermission):
 
 
 @api_view(['GET'])
+@authentication_classes([_JWTAuth])
+@permission_classes([])
 def ailab_me(request):
     """GET /api/ai/me/  —— 当前登录用户在 AI Lab 视角下的状态"""
     u = request.user
@@ -1661,6 +1664,8 @@ def ailab_me(request):
 
 
 @api_view(['POST'])
+@authentication_classes([_JWTAuth])
+@permission_classes([])
 def ailab_redeem_invite(request):
     """POST /api/ai/invites/redeem/  body {code}  —— 兑换邀请码、激活 AI Lab"""
     u = request.user
@@ -1695,6 +1700,8 @@ def ailab_redeem_invite(request):
 
 
 @api_view(['GET', 'POST'])
+@authentication_classes([_JWTAuth])
+@permission_classes([])
 def ailab_invites(request):
     """owner-only:
        GET  /api/ai/invites/   列出所有邀请码（含未用/已用）

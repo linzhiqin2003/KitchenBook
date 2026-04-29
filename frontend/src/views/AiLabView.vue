@@ -1462,11 +1462,11 @@ onMounted(async () => {
 
     <!-- 主内容区 -->
     <div class="flex-1 flex flex-col min-w-0 relative">
-      <!-- 移动端顶部栏 -->
-      <header class="shrink-0 h-12 border-b flex items-center px-4 gap-3 lg:hidden" style="border-color: var(--theme-200); background: var(--theme-50);">
+      <!-- 顶部栏（所有屏幕都显示；汉堡按钮仍然只在移动端） -->
+      <header class="shrink-0 h-12 border-b flex items-center px-4 gap-3" style="border-color: var(--theme-200); background: var(--theme-50);">
         <button
           @click="toggleSidebar"
-          class="w-8 h-8 rounded-md flex items-center justify-center transition-colors cursor-pointer"
+          class="w-8 h-8 rounded-md items-center justify-center transition-colors cursor-pointer flex lg:hidden"
           style="color: var(--theme-500);"
         >
           <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -1474,9 +1474,11 @@ onMounted(async () => {
           </svg>
         </button>
 
-        <div class="flex items-center gap-2 flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-1 min-w-0 lg:hidden">
           <span class="text-[14px] font-semibold tracking-tight" style="color: var(--theme-700);">MyAgent</span>
         </div>
+        <!-- 桌面端会话标题占据中间位置 -->
+        <div class="hidden lg:flex flex-1 min-w-0"></div>
 
         <AiLabNotificationBell />
         <AiLabUserMenu />
