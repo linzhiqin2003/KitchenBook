@@ -406,7 +406,7 @@ watch(
   border-radius: 0.45rem;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 18rem;
+  max-height: 22rem;
   overflow-y: auto;
 }
 .trace-code {
@@ -419,7 +419,7 @@ watch(
   color: var(--theme-700);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 18rem;
+  max-height: 22rem;
   overflow-y: auto;
 }
 .trace-result-text {
@@ -431,8 +431,39 @@ watch(
   border-radius: 0.45rem;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 18rem;
+  max-height: 22rem;
   overflow-y: auto;
+}
+
+/* 把这几个细节框的滚动条做细做淡 —— 默认那条 macOS 灰白滚动条
+   太抢戏，跟 trace 的轻量风格冲突 */
+.trace-thinking-text,
+.trace-code,
+.trace-result-text {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+}
+.trace-thinking-text::-webkit-scrollbar,
+.trace-code::-webkit-scrollbar,
+.trace-result-text::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.trace-thinking-text::-webkit-scrollbar-track,
+.trace-code::-webkit-scrollbar-track,
+.trace-result-text::-webkit-scrollbar-track {
+  background: transparent;
+}
+.trace-thinking-text::-webkit-scrollbar-thumb,
+.trace-code::-webkit-scrollbar-thumb,
+.trace-result-text::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.18);
+  border-radius: 2px;
+}
+.trace-thinking-text:hover::-webkit-scrollbar-thumb,
+.trace-code:hover::-webkit-scrollbar-thumb,
+.trace-result-text:hover::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.3);
 }
 
 .trace-shimmer-text {
