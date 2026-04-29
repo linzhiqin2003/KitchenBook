@@ -1492,7 +1492,7 @@ onMounted(async () => {
         <AiLabNotificationBell :unread-count="panelUnreadCount" @click="openInbox" />
         <AiLabUserMenu />
 
-        <!-- Agent Panel 入口（Tools / Skills / Memory / Inbox） -->
+        <!-- Agent Panel 入口（Tools / Skills / Memory / Inbox） —— Studio 入口在侧边栏底部，这里不再重复 -->
         <button
           @click="isPanelOpen = !isPanelOpen"
           class="w-8 h-8 rounded-md flex items-center justify-center transition-colors cursor-pointer"
@@ -1503,18 +1503,6 @@ onMounted(async () => {
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
           </svg>
         </button>
-
-        <router-link
-          to="/ai-lab/studio"
-          class="w-8 h-8 rounded-md flex items-center justify-center transition-colors"
-          style="color: var(--theme-400);"
-          title="Studio"
-        >
-          <!-- Heroicons sparkles —— AI Studio 创作向的视觉 -->
-          <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/>
-          </svg>
-        </router-link>
       </header>
 
       <!-- 欢迎屏 / 聊天区域 -->
