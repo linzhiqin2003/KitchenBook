@@ -410,6 +410,17 @@ const parseMarkdown = (markdown) => {
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
 
+  // 图片 ![alt](url) — 必须在普通链接规则之前，否则 ! 之后的 [](url) 会被先吃掉
+  html = html.replace(
+    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
+    (m, alt, url, title) => {
+      const safeUrl = escapeHtml(url)
+      const safeAlt = escapeHtml(alt || '')
+      const titleAttr = title ? ` title="${escapeHtml(title)}"` : (alt ? ` title="${safeAlt}"` : '')
+      return `<a href="${safeUrl}" target="_blank" rel="noopener" class="md-img-link"><img src="${safeUrl}" alt="${safeAlt}"${titleAttr} class="md-img" loading="lazy" /></a>`
+    }
+  )
+
   // 链接
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="md-link" target="_blank" rel="noopener">$1</a>')
 
@@ -1292,6 +1303,29 @@ const openImage = (dataUrl) => {
   border-radius: 0.25em;
   vertical-align: super;
   line-height: 1;
+}
+
+/* === Agent 发的图片（markdown image） === */
+.markdown-content :deep(.md-img-link) {
+  display: inline-block;
+  margin: 0.5em 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  text-decoration: none;
+  background: rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.markdown-content :deep(.md-img-link:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.markdown-content :deep(.md-img) {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  border-radius: 0.5rem;
+  object-fit: contain;
+  cursor: zoom-in;
 }
 
 /* === 用户消息附件 === */
