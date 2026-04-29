@@ -49,7 +49,7 @@ else
 fi
 
 # 3) Run each numbered patch script — they're all idempotent
-for script in "$SRC"/0*.py; do
+for script in "$SRC"/[0-9]*.py; do
   out=$("$PY" "$script")
   echo "$out" | sed 's/^/  /'
   if echo "$out" | grep -q "patched"; then

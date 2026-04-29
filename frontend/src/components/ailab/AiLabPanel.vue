@@ -162,6 +162,13 @@ const saveMemory = async () => {
   }
 }
 
+const isCurrentTabLoading = computed(() => {
+  if (activeTab.value === 'tools') return loadingTools.value
+  if (activeTab.value === 'skills') return loadingSkills.value
+  if (activeTab.value === 'memory') return loadingMemory.value
+  return false
+})
+
 const skillsByCategory = computed(() => {
   const groups = {}
   for (const s of skills.value) {
@@ -262,8 +269,10 @@ const sourceLabel = (s) => ({
 
 const loadTab = (tab) => {
   activeTab.value = tab
-  if (tab === 'tools' && tools.value.length === 0) fetchTools()
-  if (tab === 'skills' && skills.value.length === 0) fetchSkills()
+  // 每次切换都重新拉，保证显示与后端真实状态一致（新装的 skill 立刻可见，
+  // 别处改了 disabled 列表也能反映过来）
+  if (tab === 'tools') fetchTools()
+  if (tab === 'skills') fetchSkills()
   if (tab === 'memory') fetchMemory()
   if (tab === 'notifications') fetchNotifications()
 }
@@ -329,7 +338,7 @@ defineExpose({
       </div>
 
       <!-- Tabs -->
-      <div class="flex px-3 pb-2 gap-1">
+      <div class="flex items-center px-3 pb-2 gap-1">
         <button v-for="tab in ['tools', 'skills', 'memory', 'notifications']" :key="tab"
           @click="loadTab(tab)"
           class="px-3 py-1 rounded-md text-[13px] font-medium transition-colors cursor-pointer relative"
@@ -340,6 +349,19 @@ defineExpose({
             class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full text-[9px] font-semibold flex items-center justify-center px-1"
             style="background: #ef4444; color: #fff;"
           >{{ notificationsUnread > 99 ? '99+' : notificationsUnread }}</span>
+        </button>
+        <!-- 刷新当前 tab —— 让用户手动触发同步，不必等切 tab -->
+        <button
+          v-if="activeTab !== 'notifications'"
+          @click="loadTab(activeTab)"
+          class="ml-auto p-1 rounded-md cursor-pointer transition-colors hover:bg-black/[0.04]"
+          :class="{ 'is-refreshing': isCurrentTabLoading }"
+          :title="`刷新 ${activeTab}`"
+          style="color: #9a9aa0;"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+          </svg>
         </button>
       </div>
 
@@ -511,6 +533,13 @@ defineExpose({
   background: #f7f7f8;
   border-left: 1px solid #ebebed;
   font-family: var(--ai-font-body);
+}
+.is-refreshing svg {
+  animation: refresh-spin 0.8s linear infinite;
+}
+@keyframes refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 .resize-handle {
   position: absolute;
