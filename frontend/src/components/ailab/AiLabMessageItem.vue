@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, onUnmounted } from 'vue'
 import AiLabReasoningTrace from './AiLabReasoningTrace.vue'
 
 const props = defineProps({
@@ -86,6 +86,68 @@ const copyContent = async () => {
     console.error('复制失败:', e)
   }
 }
+
+// ── 图片预览 lightbox ──────────────────────────────────────────────────
+const previewSrc = ref(null)
+const isDownloading = ref(false)
+
+const openPreview = (src) => {
+  previewSrc.value = src
+  document.body.style.overflow = 'hidden'
+  document.addEventListener('keydown', onPreviewKey)
+}
+const closePreview = () => {
+  previewSrc.value = null
+  isDownloading.value = false
+  document.body.style.overflow = ''
+  document.removeEventListener('keydown', onPreviewKey)
+}
+const onPreviewKey = (e) => {
+  if (e.key === 'Escape') closePreview()
+}
+
+// 委托点击：markdown-content 里的 .md-img 被点 → 打开预览
+const onMarkdownClick = (e) => {
+  const el = e.target
+  if (!el || el.tagName !== 'IMG') return
+  if (!el.classList.contains('md-img')) return
+  e.preventDefault()
+  e.stopPropagation()
+  const src = el.getAttribute('data-preview') || el.src
+  openPreview(src)
+}
+
+const downloadPreview = async () => {
+  const url = previewSrc.value
+  if (!url) return
+  isDownloading.value = true
+  try {
+    // 同源（/media/...）和 CORS 友好的 URL：fetch → blob → 触发下载
+    const r = await fetch(url, { mode: 'cors' })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const blob = await r.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    // 从 URL 末尾抠文件名做 download attr 默认值
+    const guess = (url.split('/').pop() || 'image').split('?')[0] || 'image'
+    a.download = guess
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1500)
+  } catch {
+    // CORS 等失败 → 退化到新窗口打开
+    window.open(url, '_blank', 'noopener')
+  } finally {
+    isDownloading.value = false
+  }
+}
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', onPreviewKey)
+  document.body.style.overflow = ''
+})
 
 // 整体思维链折叠（默认折叠）
 const traceCollapsed = ref(true)
@@ -417,7 +479,8 @@ const parseMarkdown = (markdown) => {
       const safeUrl = escapeHtml(url)
       const safeAlt = escapeHtml(alt || '')
       const titleAttr = title ? ` title="${escapeHtml(title)}"` : (alt ? ` title="${safeAlt}"` : '')
-      return `<a href="${safeUrl}" target="_blank" rel="noopener" class="md-img-link"><img src="${safeUrl}" alt="${safeAlt}"${titleAttr} class="md-img" loading="lazy" /></a>`
+      // 不再包 <a> — 由 markdown-content 上的点击委托打开预览（避免新窗口下载）
+      return `<img src="${safeUrl}" alt="${safeAlt}"${titleAttr} class="md-img" loading="lazy" data-preview="${safeUrl}" />`
     }
   )
 
@@ -662,6 +725,7 @@ const openImage = (dataUrl) => {
               v-if="seg.content"
               class="markdown-content prose prose-sm max-w-none leading-relaxed text-gray-900"
               v-html="parseSegmentContent(seg.content)"
+              @click="onMarkdownClick"
             ></div>
 
             <!-- 流式起始时尚无任何 trace 也无内容 → 显示三点加载 -->
@@ -714,6 +778,37 @@ const openImage = (dataUrl) => {
       </div>
     </div>
   </div>
+
+  <!-- 图片预览 lightbox（点击 markdown image 触发） -->
+  <Teleport to="body">
+    <Transition name="lightbox">
+      <div v-if="previewSrc" class="img-lightbox" @click.self="closePreview">
+        <img :src="previewSrc" class="img-lightbox__img" @click.stop alt="" />
+        <div class="img-lightbox__toolbar" @click.stop>
+          <button
+            @click="downloadPreview"
+            :disabled="isDownloading"
+            class="img-lightbox__btn"
+            title="下载"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+            </svg>
+            <span>{{ isDownloading ? '下载中…' : '下载' }}</span>
+          </button>
+          <button
+            @click="closePreview"
+            class="img-lightbox__btn img-lightbox__close"
+            title="关闭 (Esc)"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -1306,29 +1401,20 @@ const openImage = (dataUrl) => {
 }
 
 /* === Agent 发的图片（markdown image） === */
-.markdown-content :deep(.md-img-link) {
-  display: block;            /* inline-block 会留 baseline 间距 */
-  margin: 0.5em 0;
-  border-radius: 0.5rem;
-  overflow: hidden;
-  text-decoration: none;
-  width: fit-content;
-  max-width: 100%;
-  line-height: 0;            /* 杀掉文字行高造成的额外间隙 */
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.markdown-content :deep(.md-img-link:hover) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
 .markdown-content :deep(.md-img) {
   display: block;
   max-width: 100%;
   max-height: 420px;
   width: auto;
   height: auto;
+  margin: 0.5em 0;
   border-radius: 0.5rem;
   cursor: zoom-in;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.markdown-content :deep(.md-img:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* === 用户消息附件 === */
@@ -1351,5 +1437,81 @@ const openImage = (dataUrl) => {
   color: var(--theme-700);
   font-size: 13px;
   max-width: 100%;
+}
+
+/* === 图片预览 lightbox === */
+.img-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5vh 5vw;
+  cursor: zoom-out;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.img-lightbox__img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  cursor: default;
+  user-select: none;
+}
+.img-lightbox__toolbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  cursor: default;
+}
+.img-lightbox__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.15s ease;
+}
+.img-lightbox__btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.img-lightbox__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.img-lightbox__close {
+  width: 36px;
+  padding: 7px;
+  justify-content: center;
+}
+
+.lightbox-enter-active,
+.lightbox-leave-active {
+  transition: opacity 0.18s ease;
+}
+.lightbox-enter-active .img-lightbox__img,
+.lightbox-leave-active .img-lightbox__img {
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lightbox-enter-from,
+.lightbox-leave-to {
+  opacity: 0;
+}
+.lightbox-enter-from .img-lightbox__img,
+.lightbox-leave-to .img-lightbox__img {
+  transform: scale(0.95);
 }
 </style>
