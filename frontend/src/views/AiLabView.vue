@@ -548,10 +548,15 @@ const streamResponse = async (fileContent = null) => {
       return
     }
 
-    // 工具调用结束后切回 reasoning/answering 时，归档本轮 sub-turn
+    const leavingReasoning =
+      streamPhase === STREAM_PHASE.REASONING && nextPhase !== STREAM_PHASE.REASONING
+
+    // 1) 离开 REASONING 阶段时，如果有积累的思考内容就归档 → 让 UI 立即停止流光、显示耗时
+    // 2) 工具调用结束后切回 reasoning/answering/idle 时，把这一轮的 sub-turn 归档
     if (
-      (nextPhase === STREAM_PHASE.REASONING || nextPhase === STREAM_PHASE.ANSWERING || nextPhase === STREAM_PHASE.IDLE) &&
-      streamToolCalls.size > 0
+      (leavingReasoning && activeReasoning.trim()) ||
+      ((nextPhase === STREAM_PHASE.REASONING || nextPhase === STREAM_PHASE.ANSWERING || nextPhase === STREAM_PHASE.IDLE) &&
+        streamToolCalls.size > 0)
     ) {
       pushSubTurns()
     }
