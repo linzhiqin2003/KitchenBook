@@ -2024,6 +2024,39 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
         conversation.save(update_fields=['token_usage'])
         return Response(conversation.token_usage)
 
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """聚合当前用户全部会话的 token 用量 — 实时统计"""
+        qs = self.get_queryset().only('token_usage', 'updated_at')
+        total_prompt = 0
+        total_completion = 0
+        total_turns = 0
+        session_count = 0
+        active_session_count = 0
+        last_active = None
+        for conv in qs:
+            session_count += 1
+            usage = conv.token_usage or {}
+            tp = int(usage.get('totalPromptTokens') or 0)
+            tc = int(usage.get('totalCompletionTokens') or 0)
+            tn = int(usage.get('turnCount') or 0)
+            if tn > 0 or tp > 0 or tc > 0:
+                active_session_count += 1
+            total_prompt += tp
+            total_completion += tc
+            total_turns += tn
+            if conv.updated_at and (last_active is None or conv.updated_at > last_active):
+                last_active = conv.updated_at
+        return Response({
+            'session_count': session_count,
+            'active_session_count': active_session_count,
+            'total_prompt_tokens': total_prompt,
+            'total_completion_tokens': total_completion,
+            'total_tokens': total_prompt + total_completion,
+            'total_turns': total_turns,
+            'last_active': last_active.isoformat() if last_active else None,
+        })
+
     # 内部回写端点拆出去 → ailab_internal_add_message（function view）
     # 因为 JWT 认证写在 viewset class 级上，@action 的 authentication_classes
     # 在某些 DRF 版本里覆盖不掉，导致 401 token_not_valid。
