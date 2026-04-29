@@ -322,11 +322,15 @@ watch(
   color: var(--theme-400);
   flex-shrink: 0;
   transition: transform 0.18s ease, color 0.18s ease;
+  /* header chevron 仍然要被推到行尾 */
   margin-left: auto;
 }
 .trace-chevron.is-open { transform: rotate(90deg); }
 .trace-chevron-sm { width: 0.7rem; height: 0.7rem; }
-.trace-chevron-end { margin-left: auto; }
+/* trace-item 行内 chevron 紧贴文字尾部即可，不再 margin-left:auto */
+.trace-chevron-end {
+  margin-left: 0.45rem;
+}
 
 .trace-list {
   width: min(100%, 42rem);
