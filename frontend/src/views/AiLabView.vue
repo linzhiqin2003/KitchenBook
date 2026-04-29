@@ -430,7 +430,7 @@ const deleteMessageAndFollowing = async (messageId) => {
 }
 
 // ===== 消息发送 =====
-const sendMessage = async (content = null) => {
+const sendMessage = async (content = null, options = {}) => {
   const text = content || inputMessage.value.trim()
   if (!text && !selectedFile.value) return
   if (isLoading.value) return
@@ -497,7 +497,7 @@ const sendMessage = async (content = null) => {
   fetchConversations()
 
   // 开始流式响应（传入文件内容供 API 调用使用）
-  await streamResponse(fileContent)
+  await streamResponse(fileContent, options)
 
   // AI 标题在后端是异步生成（DeepSeek 1-2s 出结果），流式响应结束后
   // 再拉一次会话列表，把"新对话"换成生成出的真实标题
@@ -505,7 +505,10 @@ const sendMessage = async (content = null) => {
 }
 
 // 流式响应
-const streamResponse = async (fileContent = null) => {
+const streamResponse = async (fileContent = null, options = {}) => {
+  // options.useRequestHistory: 让 Hermes 用 request body 的 messages 而不是
+  // state.db 里的旧 history。edit / regenerate 删消息后调用必须设 true，
+  // 否则 agent 会按 DB 里的旧消息回应，跟前端展示的对不上。
   isLoading.value = true
   currentReasoning.value = ''
   currentContent.value = ''
@@ -952,6 +955,10 @@ const streamResponse = async (fileContent = null) => {
     if (currentConversationId.value) {
       chatHeaders['X-AILab-Conversation-Id'] = String(currentConversationId.value)
     }
+    if (options.useRequestHistory) {
+      // edit / regenerate 后让 Hermes 信任请求体里的 messages，不要从 state.db 重放旧消息
+      chatHeaders['X-Hermes-History-Source'] = 'request'
+    }
     const response = await fetch(`${HERMES_API_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: chatHeaders,
@@ -1165,42 +1172,27 @@ const stopGeneration = async () => {
   currentStreamingIndex.value = null
 }
 
-// 编辑消息
+// 编辑消息（删除原 user 消息及后续 → 重新发起）
 const handleEditMessage = async (messageId, newContent, index) => {
   if (!messageId || !newContent) return
-
-  // 删除该消息及后续
   await deleteMessageAndFollowing(messageId)
-
-  // 从本地移除该消息及后续
   messages.value = messages.value.slice(0, index)
-
-  // 重新发送
-  await sendMessage(newContent)
+  // sendMessage 会调 streamResponse；这里要让 Hermes 用 request body 而不是 DB 历史
+  await sendMessage(newContent, { useRequestHistory: true })
 }
 
-// 重新生成
+// 重新生成（删除目标 AI 消息及后续 → 直接 streamResponse）
 const handleRegenerate = async (messageId, index) => {
   if (!messageId) return
-
-  // 找到对应的用户消息
   let userMessageIndex = index - 1
   while (userMessageIndex >= 0 && messages.value[userMessageIndex].role !== 'user') {
     userMessageIndex--
   }
-
   if (userMessageIndex < 0) return
-
-  const userContent = messages.value[userMessageIndex].content
-
-  // 删除 AI 消息
   await deleteMessageAndFollowing(messageId)
-
-  // 从本地移除该消息及后续
   messages.value = messages.value.slice(0, index)
-
-  // 重新生成
-  await streamResponse()
+  // 让 Hermes 把请求体的 messages 当成真实的对话历史
+  await streamResponse(null, { useRequestHistory: true })
 }
 
 // ===== 文件处理 =====
