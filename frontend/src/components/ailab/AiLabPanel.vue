@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
+import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
 import { useAuthStore } from '../../store/auth'
+import api from '../../api/client'
 
 const authStore = useAuthStore()
 
@@ -188,13 +189,11 @@ const fetchNotifications = async () => {
   notificationsLoading.value = true
   notificationsError.value = ''
   try {
-    const r = await fetch(`${API_BASE_URL}/api/ai/notifications/?limit=100`, { headers: djangoHeaders() })
-    if (!r.ok) throw new Error(`HTTP ${r.status}`)
-    const data = await r.json()
+    const { data } = await api.get('/ai/notifications/', { params: { limit: 100 } })
     notifications.value = data.results || []
     notificationsUnread.value = Number(data.unread_count) || 0
   } catch (e) {
-    notificationsError.value = e.message
+    notificationsError.value = e?.response ? `HTTP ${e.response.status}` : (e.message || '加载失败')
   } finally {
     notificationsLoading.value = false
   }
@@ -203,9 +202,7 @@ const fetchNotifications = async () => {
 // 单独的轻量轮询：只拿未读数，用于铃铛 badge
 const pollNotificationsUnread = async () => {
   try {
-    const r = await fetch(`${API_BASE_URL}/api/ai/notifications/?unread=1&limit=1`, { headers: djangoHeaders() })
-    if (!r.ok) return
-    const data = await r.json()
+    const { data } = await api.get('/ai/notifications/', { params: { unread: 1, limit: 1 } })
     notificationsUnread.value = Number(data.unread_count) || 0
   } catch { /* silent */ }
 }
@@ -213,9 +210,7 @@ const pollNotificationsUnread = async () => {
 const markNotificationRead = async (ids) => {
   try {
     const body = ids === 'all' ? { all: true } : { ids: Array.isArray(ids) ? ids : [ids] }
-    await fetch(`${API_BASE_URL}/api/ai/notifications/mark-read/`, {
-      method: 'POST', headers: djangoHeaders(), body: JSON.stringify(body)
-    })
+    await api.post('/ai/notifications/mark-read/', body)
     if (ids === 'all') {
       notifications.value.forEach(n => n.is_read = true)
       notificationsUnread.value = 0
@@ -233,10 +228,7 @@ const handleNotifClick = (n) => {
 
 const deleteNotification = async (id) => {
   try {
-    const r = await fetch(`${API_BASE_URL}/api/ai/notifications/${id}/`, {
-      method: 'DELETE', headers: djangoHeaders()
-    })
-    if (!r.ok && r.status !== 204) throw new Error(`HTTP ${r.status}`)
+    await api.delete(`/ai/notifications/${id}/`)
     notifications.value = notifications.value.filter(n => n.id !== id)
     notificationsUnread.value = notifications.value.filter(n => !n.is_read).length
   } catch { /* silent */ }
@@ -245,9 +237,7 @@ const deleteNotification = async (id) => {
 const clearAllNotifications = async () => {
   if (!confirm('清空所有通知？此操作不可撤销。')) return
   try {
-    await fetch(`${API_BASE_URL}/api/ai/notifications/clear-all/`, {
-      method: 'POST', headers: djangoHeaders()
-    })
+    await api.post('/ai/notifications/clear-all/')
     notifications.value = []
     notificationsUnread.value = 0
   } catch { /* silent */ }

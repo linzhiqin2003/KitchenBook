@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
-import API_BASE_URL from '../../config/api'
+import api from '../../api/client'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -17,25 +17,18 @@ const stats = ref(null)
 const statsLoading = ref(false)
 let statsTimer = null
 
-const headers = () => {
-  const t = localStorage.getItem('access_token') || ''
-  const h = { 'Content-Type': 'application/json' }
-  if (t) h['Authorization'] = `Bearer ${t}`
-  return h
-}
-
 const fetchMe = async () => {
   try {
-    const r = await fetch(`${API_BASE_URL}/api/ai/me/`, { headers: headers() })
-    if (r.ok) me.value = await r.json()
+    const { data } = await api.get('/ai/me/')
+    me.value = data
   } catch { /* silent */ }
 }
 
 const fetchStats = async ({ silent = false } = {}) => {
   if (!silent) statsLoading.value = true
   try {
-    const r = await fetch(`${API_BASE_URL}/api/ai/conversations/stats/`, { headers: headers() })
-    if (r.ok) stats.value = await r.json()
+    const { data } = await api.get('/ai/conversations/stats/')
+    stats.value = data
   } catch { /* silent */ } finally {
     statsLoading.value = false
   }
