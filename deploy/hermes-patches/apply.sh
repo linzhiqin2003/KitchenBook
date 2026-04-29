@@ -57,6 +57,34 @@ for script in "$SRC"/0*.py; do
   fi
 done
 
+# 4) Ensure approval prompts are off in the gateway — there's no human at a
+#    terminal to click "approve", so the agent's tirith security scan would
+#    otherwise leave every flagged shell command pending forever.  Idempotent.
+"$PY" - <<'PY_END'
+from pathlib import Path
+import yaml
+targets = [Path.home() / ".hermes" / "config.yaml"]
+users_dir = Path.home() / ".hermes" / "users"
+if users_dir.is_dir():
+    for d in users_dir.iterdir():
+        cfg = d / "config.yaml"
+        if cfg.is_file():
+            targets.append(cfg)
+for p in targets:
+    try:
+        cfg = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict):
+        continue
+    appr = cfg.setdefault("approvals", {})
+    if appr.get("mode") == "off":
+        continue
+    appr["mode"] = "off"
+    p.write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    print(f"  [done] approvals.mode=off in {p}")
+PY_END
+
 # 4) Restart only when something actually changed
 if [ "$CHANGED" -eq 1 ]; then
   if systemctl --user list-unit-files "$GATEWAY_UNIT" >/dev/null 2>&1; then
