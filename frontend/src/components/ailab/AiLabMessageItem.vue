@@ -86,10 +86,10 @@ const copyContent = async () => {
   }
 }
 
-// 整体思维链折叠（非流式默认折叠）
-const traceCollapsed = ref(!props.isStreaming)
-// 单个工具调用整体折叠
-const toolCollapsed = ref({})
+// 整体思维链折叠（默认折叠）
+const traceCollapsed = ref(true)
+// 单个步骤展开
+const expandedSteps = ref({})
 
 const subTurns = computed(() => Array.isArray(props.message.subTurns) ? props.message.subTurns : [])
 const currentReasoning = computed(() => props.message.currentReasoning || '')
@@ -107,44 +107,118 @@ const getTurnKey = (turn, turnIndex) => {
   return turn?.id || `${props.index}-${turnIndex}`
 }
 
-const getToolKey = (toolCall, fallback = '') => {
-  return toolCall?.id || `${fallback || `tool-${props.index}`}-${toolCall?.index ?? 0}`
-}
-
-// 流式结束后自动折叠思维链
-watch(() => props.isStreaming, (streaming, wasStreaming) => {
-  if (wasStreaming && !streaming && hasTraceTimeline.value) {
-    traceCollapsed.value = true
-  }
+// 是否正在直播（流式生成中）
+const isLive = computed(() => {
+  return props.isStreaming && (Boolean(currentReasoning.value) || Boolean(currentToolCall.value))
 })
 
-// 工具调用整体折叠（完成的默认折叠，进行中的展开）
-const isToolCollapsed = (toolCall, fallback = '') => {
-  const key = getToolKey(toolCall, fallback)
-  if (toolCollapsed.value[key] === undefined) {
-    return toolCall?.status === 'success' || toolCall?.status === 'error'
+// 统一的步骤列表（已完成的 subTurns + 当前流式的）
+const steps = computed(() => {
+  const result = []
+  subTurns.value.forEach((turn, turnIndex) => {
+    const baseKey = getTurnKey(turn, turnIndex)
+    if (turn.reasoning) {
+      result.push({
+        id: `${baseKey}-r`,
+        kind: 'thinking',
+        text: turn.reasoning,
+        status: 'done',
+        live: false
+      })
+    }
+    if (turn.toolCall) {
+      result.push({
+        id: `${baseKey}-t`,
+        kind: 'tool',
+        toolCall: turn.toolCall,
+        status: turn.toolCall.status,
+        live: false
+      })
+    }
+  })
+  if (currentReasoning.value) {
+    result.push({
+      id: 'live-reasoning',
+      kind: 'thinking',
+      text: currentReasoning.value,
+      status: 'running',
+      live: true
+    })
   }
-  return toolCollapsed.value[key]
-}
-
-const toggleToolCollapse = (toolCall, fallback = '') => {
-  const key = getToolKey(toolCall, fallback)
-  toolCollapsed.value[key] = !isToolCollapsed(toolCall, fallback)
-}
-
-// 折叠时的摘要文字
-const traceSummary = computed(() => {
-  const tools = subTurns.value.filter(t => t.toolCall)
-  if (!tools.length) {
-    const total = subTurns.value.reduce((s, t) => s + (t.reasoning?.length || 0), 0)
-    return total ? `${total} 字思考` : ''
+  if (currentToolCall.value) {
+    result.push({
+      id: 'live-tool',
+      kind: 'tool',
+      toolCall: currentToolCall.value,
+      status: currentToolCall.value.status,
+      live: currentToolCall.value.status === 'running' || currentToolCall.value.status === 'parsing'
+    })
   }
-  const names = [...new Set(tools.map(t => displayToolName(t.toolCall)))]
-  if (names.length === 1) {
-    return tools.length > 1 ? `${tools.length}x ${names[0]}` : names[0]
-  }
-  return `${tools.length}次工具调用`
+  return result
 })
+
+const isStepExpanded = (id) => Boolean(expandedSteps.value[id])
+const toggleStep = (id) => {
+  expandedSteps.value = { ...expandedSteps.value, [id]: !isStepExpanded(id) }
+}
+
+// 折叠态显示的标签：流式中显示当前活动，否则显示总结
+const headerLabel = computed(() => {
+  if (isLive.value) {
+    if (currentToolCall.value) {
+      const name = currentToolCall.value.name || 'tool'
+      const status = currentToolCall.value.status
+      if (status === 'parsing' || status === 'pending') return `Calling ${name}`
+      if (status === 'running') return `Running ${name}`
+      return name
+    }
+    if (currentReasoning.value) return 'Thinking…'
+  }
+  // 完成后：按工具类型聚合的概况
+  const tools = subTurns.value.filter(t => t.toolCall).map(t => t.toolCall)
+  const totalThinking = subTurns.value.reduce((s, t) => s + (t.reasoning?.length || 0), 0)
+  const parts = []
+  if (totalThinking) parts.push(`thought ${totalThinking} chars`)
+  if (tools.length) {
+    const counts = {}
+    for (const t of tools) {
+      const name = t.name || 'tool'
+      counts[name] = (counts[name] || 0) + 1
+    }
+    for (const [name, count] of Object.entries(counts)) {
+      parts.push(count > 1 ? `called ${name} ${count}x` : `called ${name}`)
+    }
+  }
+  if (!parts.length) return '已思考'
+  return parts.join(', ').replace(/^./, c => c.toUpperCase())
+})
+
+// 单步骤的标签
+const stepLabel = (step) => {
+  if (step.kind === 'thinking') {
+    if (step.live) return 'Thinking…'
+    return 'Thought'
+  }
+  if (step.kind === 'tool') {
+    const name = step.toolCall?.name || 'tool'
+    if (step.live) {
+      if (step.status === 'parsing' || step.status === 'pending') return `Calling ${name}`
+      return `Running ${name}`
+    }
+    return name
+  }
+  return ''
+}
+
+const stepMeta = (step) => {
+  if (step.kind === 'thinking') {
+    return step.text ? `${step.text.length} 字` : ''
+  }
+  if (step.kind === 'tool') {
+    return formatToolDuration(step.toolCall)
+  }
+  return ''
+}
 
 const formatToolStatus = (status = 'parsing') => {
   switch (status) {
@@ -473,168 +547,114 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
         <!-- 工具调用时间线 -->
         <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3">
           <template v-if="hasTraceTimeline">
-            <!-- 思维链折叠头 -->
-            <button class="trace-header" @click="traceCollapsed = !traceCollapsed">
-              <span class="trace-header-icon">
-                <svg
-                  :class="['w-3.5 h-3.5 shrink-0 transition-transform', { 'rotate-90': !traceCollapsed }]"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
-                </svg>
-              </span>
-              <span class="trace-header-text">
-                <span class="trace-header-label">已思考</span>
-                <span v-if="traceCollapsed && traceSummary" class="trace-header-summary">{{ traceSummary }}</span>
-              </span>
-              <span v-if="!traceCollapsed && isStreaming && (currentReasoning || currentToolCall)" class="trace-header-live">Live</span>
+            <!-- 思维链折叠头：流式中显示当前活动 -->
+            <button :class="['trace-header', { 'trace-shimmer': isLive && traceCollapsed }]" @click="traceCollapsed = !traceCollapsed">
+              <svg
+                :class="['trace-chevron', { 'is-open': !traceCollapsed }]"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
+              </svg>
+              <span class="trace-header-text">{{ headerLabel }}</span>
             </button>
 
-            <!-- 展开内容 -->
+            <!-- 展开后：步骤列表 -->
             <Transition name="collapse">
-            <div v-if="!traceCollapsed" class="trace-timeline">
-            <div
-              v-for="(turn, turnIndex) in subTurns"
-              :key="getTurnKey(turn, turnIndex)"
-            >
-              <!-- 思考：直接展示，不折叠 -->
-              <div v-if="turn.reasoning" class="trace-step">
-                <div v-if="turn.reasoning.length <= 120" class="trace-row trace-row-static trace-row-thought">
-                  <span class="trace-kind">思考</span>
-                  <span class="trace-inline-text">{{ turn.reasoning }}</span>
-                </div>
-                <template v-else>
-                  <div class="trace-row trace-row-static trace-row-thought">
-                    <span class="trace-kind">思考</span>
-                    <span class="trace-meta">{{ turn.reasoning.length }} 字</span>
-                  </div>
-                  <div class="trace-body">{{ turn.reasoning }}</div>
-                </template>
-              </div>
-
-              <!-- 工具调用：整体折叠 -->
-              <div v-if="turn.toolCall" class="trace-step">
-                <button
-                  :class="['trace-row trace-tool-row', formatToolStatus(turn.toolCall.status).cardClass]"
-                  @click="toggleToolCollapse(turn.toolCall, getTurnKey(turn, turnIndex))"
-                >
-                  <span :class="['trace-tool-orb', formatToolStatus(turn.toolCall.status).iconClass]">
-                    <svg v-if="formatToolStatus(turn.toolCall.status).icon === 'check'" viewBox="0 0 12 12" fill="none" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
-                    </svg>
-                    <svg v-else-if="formatToolStatus(turn.toolCall.status).icon === 'cross'" viewBox="0 0 12 12" fill="none" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l6 6M9 3l-6 6"/>
-                    </svg>
-                  </span>
-                  <span class="trace-tool-main">
-                    <span class="trace-tool-name">{{ displayToolName(turn.toolCall) }}</span>
-                  </span>
-                  <span :class="['trace-status-pill', formatToolStatus(turn.toolCall.status).textClass]">{{ formatToolStatus(turn.toolCall.status).label }}</span>
-                  <span v-if="formatToolDuration(turn.toolCall)" class="trace-duration">{{ formatToolDuration(turn.toolCall) }}</span>
-                  <svg
-                    :class="['trace-row-chevron', { 'rotate-90': !isToolCollapsed(turn.toolCall, getTurnKey(turn, turnIndex)) }]"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
-                  </svg>
-                </button>
-                <Transition name="collapse">
-                  <div v-if="!isToolCollapsed(turn.toolCall, getTurnKey(turn, turnIndex))" class="trace-tool-detail">
-                    <pre v-if="hasToolArguments(turn.toolCall)" class="trace-code">{{ formatToolArguments(turn.toolCall) }}</pre>
-                    <div v-if="formatToolResult(turn.toolCall)"
-                         :class="['trace-result-text', turn.toolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
-                    >{{ formatToolResult(turn.toolCall) }}</div>
-                  </div>
-                </Transition>
-              </div>
-            </div>
-
-            <!-- 当前思考（流式） -->
-            <div v-if="currentReasoning" class="trace-step">
-              <div class="trace-row trace-row-thought">
-                <span class="trace-live-orb"></span>
-                <span class="trace-kind trace-kind-live">思考中</span>
-              </div>
-              <div class="trace-body trace-body-live">{{ currentReasoning }}</div>
-            </div>
-
-            <!-- 当前工具调用（流式） -->
-            <div v-if="currentToolCall" class="trace-step">
-              <div :class="['trace-row trace-tool-row', formatToolStatus(currentToolCall.status).cardClass]">
-                <span :class="['trace-tool-orb', formatToolStatus(currentToolCall.status).iconClass, formatToolStatus(currentToolCall.status).spinning && 'animate-pulse']">
-                  <svg v-if="formatToolStatus(currentToolCall.status).icon === 'check'" viewBox="0 0 12 12" fill="none" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
-                  </svg>
-                  <svg v-else-if="formatToolStatus(currentToolCall.status).icon === 'cross'" viewBox="0 0 12 12" fill="none" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l6 6M9 3l-6 6"/>
-                  </svg>
-                </span>
-                <span class="trace-tool-main">
-                  <span class="trace-tool-name">{{ displayToolName(currentToolCall) }}</span>
-                </span>
-                <span :class="['trace-status-pill', formatToolStatus(currentToolCall.status).textClass]">{{ formatToolStatus(currentToolCall.status).label }}</span>
-                <span v-if="formatToolDuration(currentToolCall)" class="trace-duration">{{ formatToolDuration(currentToolCall) }}</span>
-              </div>
-              <!-- 工具执行进度：URL 标签 + 文字 -->
-              <template v-if="currentToolCall.status === 'running'">
-                <div v-if="currentToolCall.progressUrls && currentToolCall.progressUrls.length" class="trace-url-tags">
-                  <span
-                    v-for="(u, ui) in currentToolCall.progressUrls"
-                    :key="ui"
-                    :class="['url-tag', u.status === 'done' ? 'url-tag-done' : u.status === 'fail' ? 'url-tag-fail' : 'url-tag-pending']"
-                  >
-                    <img
-                      :src="`https://www.google.com/s2/favicons?domain=${u.domain}&sz=16`"
-                      class="url-tag-icon"
-                      loading="lazy"
-                      @error="$event.target.style.display='none'"
-                    />
-                    <span class="url-tag-text">{{ u.domain }}</span>
-                    <svg v-if="u.status === 'done'" class="url-tag-check" viewBox="0 0 16 16" fill="currentColor"><path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z"/></svg>
-                    <span v-else-if="u.status === 'pending'" class="url-tag-spinner"></span>
-                  </span>
-                </div>
-                <div v-if="currentToolCall.progressMessage" class="trace-progress">
-                  <span class="trace-progress-dot"></span>
-                  {{ currentToolCall.progressMessage }}
-                </div>
-              </template>
-              <!-- 参数和结果直接展示 -->
-              <div v-if="hasToolArguments(currentToolCall)" class="trace-tool-detail">
-                <pre class="trace-code">{{ formatToolArguments(currentToolCall) }}</pre>
-              </div>
-              <div v-if="formatToolResult(currentToolCall)" class="trace-tool-detail">
+              <div v-if="!traceCollapsed" class="trace-list">
                 <div
-                  :class="['trace-result-text', currentToolCall.status === 'error' ? 'text-red-600' : 'text-slate-700']"
-                >{{ formatToolResult(currentToolCall) }}</div>
+                  v-for="step in steps"
+                  :key="step.id"
+                  class="trace-item"
+                >
+                  <button
+                    :class="['trace-item-row', { 'trace-shimmer': step.live }]"
+                    @click="toggleStep(step.id)"
+                  >
+                    <svg
+                      :class="['trace-chevron', 'trace-chevron-sm', { 'is-open': isStepExpanded(step.id) }]"
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
+                    </svg>
+
+                    <!-- 状态指示 -->
+                    <span class="trace-step-icon">
+                      <svg v-if="step.kind === 'tool' && step.status === 'success'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-check">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
+                      </svg>
+                      <svg v-else-if="step.kind === 'tool' && step.status === 'error'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-cross">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l6 6M9 3l-6 6"/>
+                      </svg>
+                      <span v-else-if="step.live" class="trace-icon-live"></span>
+                      <span v-else class="trace-icon-dot"></span>
+                    </span>
+
+                    <span :class="['trace-step-label', step.kind === 'tool' && 'trace-step-label-mono']">{{ stepLabel(step) }}</span>
+                    <span v-if="stepMeta(step)" class="trace-step-meta">{{ stepMeta(step) }}</span>
+                  </button>
+
+                  <!-- 子步骤展开内容 -->
+                  <Transition name="collapse">
+                    <div v-if="isStepExpanded(step.id)" class="trace-item-detail">
+                      <!-- 思考详情 -->
+                      <div v-if="step.kind === 'thinking'" class="trace-thinking-text">{{ step.text }}</div>
+
+                      <!-- 工具调用详情 -->
+                      <template v-else-if="step.kind === 'tool'">
+                        <pre v-if="hasToolArguments(step.toolCall)" class="trace-code">{{ formatToolArguments(step.toolCall) }}</pre>
+
+                        <!-- URL 进度标签 -->
+                        <div
+                          v-if="step.live && step.toolCall.progressUrls && step.toolCall.progressUrls.length"
+                          class="trace-url-tags"
+                        >
+                          <span
+                            v-for="(u, ui) in step.toolCall.progressUrls"
+                            :key="ui"
+                            :class="['url-tag', u.status === 'done' ? 'url-tag-done' : u.status === 'fail' ? 'url-tag-fail' : 'url-tag-pending']"
+                          >
+                            <img
+                              :src="`https://www.google.com/s2/favicons?domain=${u.domain}&sz=16`"
+                              class="url-tag-icon"
+                              loading="lazy"
+                              @error="$event.target.style.display='none'"
+                            />
+                            <span class="url-tag-text">{{ u.domain }}</span>
+                            <svg v-if="u.status === 'done'" class="url-tag-check" viewBox="0 0 16 16" fill="currentColor"><path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z"/></svg>
+                            <span v-else-if="u.status === 'pending'" class="url-tag-spinner"></span>
+                          </span>
+                        </div>
+
+                        <div
+                          v-if="formatToolResult(step.toolCall)"
+                          :class="['trace-result-text', step.toolCall.status === 'error' ? 'text-red-600' : '']"
+                        >{{ formatToolResult(step.toolCall) }}</div>
+                      </template>
+                    </div>
+                  </Transition>
+                </div>
               </div>
-            </div>
-            </div>
             </Transition>
           </template>
 
           <!-- 兼容旧数据结构 -->
           <template v-else-if="shouldShowLegacyReasoning">
-            <div class="trace-timeline">
-              <div class="trace-step">
-                <button @click="emit('toggle-reasoning', index)" class="trace-row trace-tool-row">
-                  <svg
-                    :class="['trace-row-chevron', { 'rotate-90': !reasoningCollapsed }]"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
-                  </svg>
-                  <span class="trace-tool-main">
-                    <span class="trace-tool-name">已思考</span>
-                  </span>
-                  <span v-if="isStreaming && isReasoningPhase" class="trace-status-pill text-amber-600">思考中</span>
-                  <span v-else class="trace-meta">{{ message.reasoning.length }} 字</span>
-                </button>
-                <Transition name="collapse">
-                  <div v-if="!reasoningCollapsed" class="trace-body">{{ message.reasoning }}</div>
-                </Transition>
+            <button class="trace-header" @click="emit('toggle-reasoning', index)">
+              <svg
+                :class="['trace-chevron', { 'is-open': !reasoningCollapsed }]"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
+              </svg>
+              <span class="trace-header-text">
+                {{ isStreaming && isReasoningPhase ? 'Thinking…' : `已思考 ${message.reasoning.length} 字` }}
+              </span>
+            </button>
+            <Transition name="collapse">
+              <div v-if="!reasoningCollapsed" class="trace-list">
+                <div class="trace-thinking-text">{{ message.reasoning }}</div>
               </div>
-            </div>
+            </Transition>
           </template>
         </div>
 
@@ -740,346 +760,220 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
 /* (avatar removed in redesign) */
 
-/* === Trace Header (整体折叠) === */
+/* === Trace Header (顶层折叠) === */
 .trace-header {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  width: min(100%, 42rem);
-  padding: 0.18rem 0;
+  gap: 0.4rem;
+  max-width: min(100%, 42rem);
+  padding: 0.2rem 0.5rem 0.2rem 0.25rem;
+  margin-left: -0.25rem;
   cursor: pointer;
   user-select: none;
   border: 0;
   background: transparent;
-  transition: color 0.16s ease;
+  border-radius: 0.4rem;
+  transition: background 0.16s ease, color 0.16s ease;
+  color: var(--theme-500);
+  position: relative;
+  overflow: hidden;
 }
 
 .trace-header:hover {
-  color: var(--theme-600);
-}
-
-.trace-header-icon {
-  display: grid;
-  place-items: center;
-  width: 0.95rem;
-  height: 0.95rem;
-  color: var(--theme-400);
+  background: var(--theme-100);
+  color: var(--theme-700);
 }
 
 .trace-header-text {
-  display: flex;
-  align-items: baseline;
-  gap: 0.45rem;
-  min-width: 0;
-  flex: 1;
-}
-
-.trace-header-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--theme-500);
-}
-
-.trace-header-summary {
-  font-size: 0.7rem;
-  color: var(--theme-400);
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
 }
 
-.trace-header-live {
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: var(--ai-accent);
-  padding: 0 0.3rem;
-  border-radius: 999px;
-  background: var(--ai-accent-soft);
-  border: 0;
-  animation: progressPulse 1.2s ease-in-out infinite;
+.trace-chevron {
+  width: 0.78rem;
+  height: 0.78rem;
+  color: var(--theme-400);
+  flex-shrink: 0;
+  transition: transform 0.18s ease, color 0.18s ease;
 }
 
-/* === Trace Timeline === */
-.trace-timeline {
-  position: relative;
+.trace-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.trace-chevron-sm {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+/* === 步骤列表 === */
+.trace-list {
   width: min(100%, 42rem);
-  margin-top: 0.2rem;
-  padding: 0.15rem 0 0.1rem 0.8rem;
+  margin: 0.25rem 0 0.25rem 0;
+  padding: 0.25rem 0 0.25rem 0.6rem;
   border-left: 1px solid var(--theme-200, #e4e4df);
-  background: transparent;
 }
 
-.trace-timeline::before {
-  display: none;
-}
-
-.trace-step {
+.trace-item {
   position: relative;
-  padding: 0.12rem 0;
 }
 
-.trace-row {
-  display: flex;
+.trace-item-row {
+  display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  min-height: 1.45rem;
+  max-width: 100%;
+  padding: 0.18rem 0.5rem 0.18rem 0.25rem;
+  margin-left: -0.25rem;
+  border: 0;
+  background: transparent;
+  border-radius: 0.4rem;
   cursor: pointer;
-  padding: 0.08rem 0;
+  text-align: left;
+  color: var(--theme-500);
+  transition: background 0.16s ease, color 0.16s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.trace-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  flex-shrink: 0;
+.trace-item-row:hover {
+  background: var(--theme-100);
+  color: var(--theme-700);
 }
 
-.trace-meta {
-  font-size: 0.65rem;
-  color: #94a3b8;
-  flex-shrink: 0;
-}
-
-.trace-row-static {
-  cursor: default;
-}
-
-.trace-row-thought {
-  align-items: flex-start;
-}
-
-.trace-kind {
+.trace-step-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.9rem;
-  height: 1.1rem;
-  padding: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+}
+
+.trace-icon-check {
+  width: 0.8rem;
+  height: 0.8rem;
   color: var(--theme-400);
-  background: transparent;
-  border: 0;
-  font-size: 0.66rem;
+}
+
+.trace-icon-cross {
+  width: 0.8rem;
+  height: 0.8rem;
+  color: #b91c1c;
+}
+
+.trace-icon-dot {
+  width: 0.32rem;
+  height: 0.32rem;
+  border-radius: 999px;
+  background: var(--theme-300, #c8c8c0);
+}
+
+.trace-icon-live {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--ai-accent, #3d7cc9);
+  animation: progressPulse 1.2s ease-in-out infinite;
+}
+
+.trace-step-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.trace-step-label-mono {
+  font-family: var(--ai-font-mono, ui-monospace, monospace);
   font-weight: 600;
+  color: var(--theme-600);
 }
 
-.trace-kind-live {
-  color: var(--ai-accent);
-  background: transparent;
-}
-
-.trace-inline-text {
-  padding-top: 0.04rem;
-  font-size: 0.74rem;
+.trace-step-meta {
+  font-size: 0.68rem;
   color: var(--theme-400);
-  line-height: 1.65;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.trace-body {
-  margin: 0.12rem 0 0.35rem 0;
-  padding: 0 0 0 2.15rem;
-  font-size: 0.74rem;
-  line-height: 1.65;
-  color: var(--theme-400);
-  max-height: 14rem;
-  overflow-y: auto;
+/* === 步骤详情 === */
+.trace-item-detail {
+  margin: 0.25rem 0 0.45rem 1.55rem;
+  display: grid;
+  gap: 0.4rem;
+  animation: fadeInSoft 0.18s ease-out;
+}
+
+.trace-thinking-text {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.76rem;
+  line-height: 1.7;
+  color: var(--theme-500);
+  background: var(--theme-50, #f8f8f6);
+  border-radius: 0.45rem;
   white-space: pre-wrap;
-  border-radius: 0;
-  background: transparent;
-  border: 0;
-}
-
-.trace-body-live {
-  box-shadow: none;
-}
-
-.trace-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.65rem;
-  color: #94a3b8;
-  cursor: pointer;
-  transition: color 0.15s;
-}
-
-.trace-toggle:hover {
-  color: #64748b;
+  word-break: break-word;
+  max-height: 18rem;
+  overflow-y: auto;
 }
 
 .trace-code {
   margin: 0;
-  padding: 0.45rem 0.55rem;
+  padding: 0.5rem 0.6rem;
   background: var(--theme-50);
   border: 1px solid var(--theme-200);
   border-radius: 0.45rem;
   font-size: 0.7rem;
   line-height: 1.55;
   color: var(--theme-500);
+  font-family: var(--ai-font-mono, ui-monospace, monospace);
   white-space: pre-wrap;
   word-break: break-word;
+  max-height: 16rem;
+  overflow-y: auto;
 }
 
 .trace-result-text {
-  padding: 0.15rem 0 0 0;
-  border-radius: 0;
-  background: transparent;
-  border: 0;
+  padding: 0.4rem 0.55rem;
+  background: var(--theme-50, #f8f8f6);
+  border-radius: 0.45rem;
   font-size: 0.75rem;
-  line-height: 1.58;
+  line-height: 1.6;
+  color: var(--theme-600);
   white-space: pre-wrap;
   word-break: break-word;
+  max-height: 18rem;
+  overflow-y: auto;
 }
 
-.trace-tool-row {
-  width: 100%;
-  min-width: 0;
-  padding: 0.08rem 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  transition: color 0.16s ease;
+/* === 流光动画（运行中） === */
+.trace-shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--ai-accent, #3d7cc9) 18%, transparent),
+    transparent
+  );
+  animation: traceShimmer 1.6s ease-in-out infinite;
+  pointer-events: none;
 }
 
-.trace-tool-row:hover {
-  transform: none;
-  background: transparent;
-  box-shadow: none;
-}
-
-.trace-tool-main {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  min-width: 0;
-  flex: 1;
-}
-
-.trace-tool-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--theme-600);
-  font-family: var(--ai-font-mono);
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.trace-tool-orb {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 0.42rem;
-  height: 0.42rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-  box-shadow: none;
-  color: transparent;
-}
-
-.trace-tool-orb svg {
-  width: 0.7rem;
-  height: 0.7rem;
-}
-
-/* 中性灰点（pending / parsing） */
-.trace-orb-neutral {
-  background: var(--theme-300, #c8c8c0);
-}
-
-/* 运行中：保留蓝色脉动作为唯一动态强调 */
-.trace-orb-running {
-  background: #3b82f6;
-}
-
-/* 已完成：极小灰色对勾，无填充背景 */
-.trace-orb-check {
-  width: 0.7rem;
-  height: 0.7rem;
-  background: transparent;
-  color: var(--theme-400, #9a9a91);
-}
-
-/* 失败：红色叉，整体仍克制 */
-.trace-orb-cross {
-  width: 0.7rem;
-  height: 0.7rem;
-  background: transparent;
-  color: #b91c1c;
-}
-
-/* 状态文字配色 */
-.trace-pill-muted {
-  color: var(--theme-400, #9a9a91);
-}
-
-.trace-pill-error {
-  color: #b91c1c;
-}
-
-.trace-status-pill {
-  display: inline-flex;
-  align-items: center;
-  height: auto;
-  padding: 0;
-  border-radius: 999px;
-  background: transparent;
-  border: 0;
-  font-size: 0.64rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.trace-duration {
-  color: #94a3b8;
-  font-size: 0.64rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.trace-row-chevron {
-  width: 0.82rem;
-  height: 0.82rem;
-  color: #94a3b8;
-  flex-shrink: 0;
-  transition: transform 0.18s ease, color 0.18s ease;
-}
-
-.trace-tool-row:hover .trace-row-chevron {
-  color: var(--theme-500);
-}
-
-.trace-tool-detail {
-  display: grid;
-  gap: 0.35rem;
-  margin: 0.25rem 0 0.25rem 1rem;
-}
-
-.trace-live-orb {
-  width: 0.42rem;
-  height: 0.42rem;
-  margin: 0.38rem 0.3rem 0 0.12rem;
-  border-radius: 999px;
-  background: var(--ai-accent);
-  box-shadow: none;
-  animation: progressPulse 1.2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-.tool-step-running {
-  background: transparent;
-}
-
-.tool-step-success {
-  background: transparent;
-}
-
-.tool-step-error {
-  background: transparent;
-}
-
-.tool-step-parsing {
-  background: transparent;
+@keyframes traceShimmer {
+  0% { left: -60%; }
+  100% { left: 110%; }
 }
 
 /* URL favicon 标签容器 */
@@ -1087,7 +981,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
-  margin: 0.35rem 0 0.25rem 1rem;
+  margin: 0;
   animation: fadeInSoft 0.2s ease-out;
 }
 
