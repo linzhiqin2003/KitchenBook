@@ -126,6 +126,11 @@ const formatCost = (v) => {
   return `¥${n.toFixed(2)}`
 }
 
+const getModelBucketLabel = (bucket) => {
+  if (!bucket) return 'unknown'
+  return bucket.priced ? (bucket.model || bucket.raw_model || 'unknown') : (bucket.raw_model || bucket.model || 'unknown')
+}
+
 const initials = computed(() => {
   const name = me.value?.nickname || me.value?.username || me.value?.email || '?'
   // 中文取第一个字、英文取首字母
@@ -399,8 +404,12 @@ onUnmounted(() => {
               class="space-y-0.5"
             >
               <div class="flex items-center justify-between text-[12px] gap-2">
-                <span class="font-mono truncate min-w-0" style="color: var(--theme-700);" :title="m.raw_model || m.model">
-                  {{ m.model }}<span
+                <span
+                  class="font-mono truncate min-w-0"
+                  style="color: var(--theme-700);"
+                  :title="m.priced ? (m.raw_model || m.model) : `${m.raw_model || m.model}（按 ${m.model} 价格估算）`"
+                >
+                  {{ getModelBucketLabel(m) }}<span
                     v-if="!m.priced"
                     class="ml-1 text-[9px] px-1 py-0.5 rounded align-middle"
                     style="background: #fff4e0; color: #b45309;"

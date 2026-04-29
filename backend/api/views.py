@@ -2045,7 +2045,12 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
         汇总 + 各自走 PRICING 表算价。
         """
         from django.db.models import Sum, Count, Max
-        from common.pricing import estimate_cost, DEFAULT_MODEL, CURRENCY
+        from common.pricing import (
+            estimate_cost,
+            normalize_model_name,
+            DEFAULT_MODEL,
+            CURRENCY,
+        )
 
         msg_qs = AiLabMessage.objects.filter(
             conversation__user=request.user,
@@ -2065,6 +2070,7 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
             .order_by('-prompt')
         )
 
+        merged_model_rows = {}
         models_breakdown = []
         total_prompt = 0
         total_completion = 0
@@ -2080,6 +2086,29 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
             # 没有 token 流过的模型桶（旧消息全是 0）跳过，避免噪音条目
             if tp == 0 and tc == 0 and tk == 0:
                 continue
+            raw_model_name = row['model_name']
+            model_name = normalize_model_name(raw_model_name)
+            bucket = merged_model_rows.setdefault(model_name, {
+                'model_name': model_name,
+                'raw_model': model_name if raw_model_name != model_name else (raw_model_name or model_name),
+                'prompt': 0,
+                'completion': 0,
+                'cache': 0,
+                'turns': 0,
+                'last_at': None,
+            })
+            bucket['prompt'] += tp
+            bucket['completion'] += tc
+            bucket['cache'] += tk
+            bucket['turns'] += turns
+            if row['last_at'] and (bucket['last_at'] is None or row['last_at'] > bucket['last_at']):
+                bucket['last_at'] = row['last_at']
+
+        for row in sorted(merged_model_rows.values(), key=lambda item: item['prompt'], reverse=True):
+            tp = int(row['prompt'] or 0)
+            tc = int(row['completion'] or 0)
+            tk = int(row['cache'] or 0)
+            turns = int(row['turns'] or 0)
             model_name = row['model_name'] or DEFAULT_MODEL
             cost = estimate_cost(
                 prompt_tokens=tp,
@@ -2089,7 +2118,7 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
             )
             models_breakdown.append({
                 'model': cost['model'],         # PRICING 中存在的规范名 / 默认模型
-                'raw_model': model_name,         # Hermes 实际汇报的字符串（可能未配 pricing）
+                'raw_model': row['raw_model'],   # Hermes 实际汇报的字符串（可能已归一化）
                 'priced': cost['model'] == model_name,  # False 表示走了默认价兜底
                 'prompt_tokens': tp,
                 'completion_tokens': tc,

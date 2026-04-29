@@ -19,6 +19,7 @@ AiLabMessage 的 per-row 字段，方便新版 stats() 端点按 model 分桶统
 from django.core.management.base import BaseCommand
 
 from api.models import AiLabConversation
+from common.pricing import normalize_model_name
 
 
 DEFAULT_MODEL = 'deepseek-v4-flash'  # 部署前唯一基座，归属合理
@@ -73,7 +74,7 @@ class Command(BaseCommand):
             # 把 delta 一次性记到最后一条 assistant 消息上
             target = assistant_msgs[-1]
             old_model = target.model_name
-            new_model = old_model if old_model and old_model not in ('', 'Hermes') else DEFAULT_MODEL
+            new_model = normalize_model_name(old_model)
 
             self.stdout.write(
                 f"conv={conv.id:<5} +p={delta_p:<8} +c={delta_c:<6} +k={delta_k:<8} "

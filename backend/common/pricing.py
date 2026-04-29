@@ -1,4 +1,4 @@
-"""模型计费表与开销估算。
+"""模型计费表、模型归一化与开销估算。
 
 价格按"每百万 token 多少 RMB"配置。cache_tokens 按 cache 价计，
 prompt_tokens 中扣掉 cache_tokens 后的部分按 input 价计。
@@ -29,12 +29,24 @@ PRICING: Dict[str, Dict[str, Decimal]] = {
 
 DEFAULT_MODEL = "deepseek-v4-flash"
 CURRENCY = "CNY"
+MODEL_ALIASES: Dict[str, str] = {
+    "Hermes": DEFAULT_MODEL,
+    "hermes-agent": DEFAULT_MODEL,
+}
+
+
+def normalize_model_name(model: Optional[str]) -> str:
+    """把历史路由名/空值归一化成统计用的模型名。"""
+    if not model:
+        return DEFAULT_MODEL
+    return MODEL_ALIASES.get(model, model)
 
 
 def get_pricing(model: Optional[str]) -> Dict[str, Decimal]:
     """返回指定模型的价格表，未知模型回退到默认模型。"""
-    if model and model in PRICING:
-        return PRICING[model]
+    normalized = normalize_model_name(model)
+    if normalized in PRICING:
+        return PRICING[normalized]
     return PRICING[DEFAULT_MODEL]
 
 
@@ -68,7 +80,8 @@ def estimate_cost(
     cache_tokens = min(cache_tokens, prompt_tokens)  # 防御：cache 不会超过 prompt
     non_cache_input = prompt_tokens - cache_tokens
 
-    pricing = get_pricing(model)
+    normalized_model = normalize_model_name(model)
+    pricing = get_pricing(normalized_model)
     million = Decimal("1000000")
     input_cost = (Decimal(non_cache_input) / million) * pricing["input"]
     cache_cost = (Decimal(cache_tokens) / million) * pricing["cache"]
@@ -78,7 +91,7 @@ def estimate_cost(
     # 量化到 6 位小数（够看清几分钱）
     q = Decimal("0.000001")
     return {
-        "model": model if (model and model in PRICING) else DEFAULT_MODEL,
+        "model": normalized_model if normalized_model in PRICING else DEFAULT_MODEL,
         "currency": CURRENCY,
         "input_cost": str(input_cost.quantize(q)),
         "cache_cost": str(cache_cost.quantize(q)),
