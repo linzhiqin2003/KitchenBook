@@ -1,12 +1,13 @@
 # API Views for KitchenBook
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
 from rest_framework.views import APIView
 from django.conf import settings
 from django.utils import timezone
 from django.db.models import Sum
 from django.http import StreamingHttpResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.core.files.storage import default_storage
 import hashlib
 import time
@@ -1674,6 +1675,52 @@ def _kickoff_ai_title_generation(conversation, first_user_message: str) -> None:
     threading.Thread(target=_run, daemon=True).start()
 
 
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+def ailab_internal_add_message(request, pk):
+    """Hermes ↔ Django 内部回写端点。
+
+    用户关掉浏览器导致 SSE 断开后，Hermes 在后台跑完 agent，
+    通过这个端点把最终的 assistant 消息写回 Django，让用户下次回来
+    能看到完整答案。
+
+    鉴权：
+      - Authorization: Bearer <HERMES_INTERNAL_TOKEN>
+      - X-Hermes-User-Id: <django user id>  → 用作 conversation owner 校验
+    """
+    from django.conf import settings as _s
+    from django.contrib.auth import get_user_model
+
+    token = (request.META.get('HTTP_AUTHORIZATION') or '').strip()
+    expected = (getattr(_s, 'HERMES_INTERNAL_TOKEN', '') or '').strip()
+    if not expected or token != f"Bearer {expected}":
+        return Response({"error": "unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user_id = (request.META.get('HTTP_X_HERMES_USER_ID') or '').strip()
+    if not user_id.isdigit():
+        return Response({"error": "missing or invalid X-Hermes-User-Id"}, status=status.HTTP_400_BAD_REQUEST)
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(pk=int(user_id))
+    except User.DoesNotExist:
+        return Response({"error": "user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        conversation = AiLabConversation.objects.get(pk=pk, user=user)
+    except AiLabConversation.DoesNotExist:
+        return Response({"error": "conversation not found for this user"}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = AiLabMessageSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    serializer.save(conversation=conversation)
+    conversation.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
 class AiLabConversationViewSet(viewsets.ModelViewSet):
     """AI Lab 会话管理 — 严格按登录用户隔离"""
     queryset = AiLabConversation.objects.all()
@@ -1719,56 +1766,9 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
         conversation.save(update_fields=['token_usage'])
         return Response(conversation.token_usage)
 
-    @action(
-        detail=True,
-        methods=['post'],
-        url_path='messages/internal',
-        authentication_classes=[],
-        permission_classes=[],
-    )
-    def add_message_internal(self, request, pk=None):
-        """Hermes ↔ Django 内部回写端点。
-
-        用户关掉浏览器导致 SSE 断开后，Hermes 在后台跑完 agent，
-        通过这个端点把最终的 assistant 消息写回 Django，让用户下次回来
-        能看到完整答案。
-
-        鉴权：
-          - Authorization: Bearer <HERMES_INTERNAL_TOKEN>
-          - X-Hermes-User-Id: <django user id>  -> 用作 conversation owner 校验
-
-        Body：和普通 add_message 接受的字段一致（role/content/sub_turns/...）。
-        """
-        from django.conf import settings as _s
-        from django.contrib.auth import get_user_model
-
-        token = (request.META.get('HTTP_AUTHORIZATION') or '').strip()
-        expected = (getattr(_s, 'HERMES_INTERNAL_TOKEN', '') or '').strip()
-        if not expected or token != f"Bearer {expected}":
-            return Response({"error": "unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
-
-        user_id = (request.META.get('HTTP_X_HERMES_USER_ID') or '').strip()
-        if not user_id.isdigit():
-            return Response({"error": "missing or invalid X-Hermes-User-Id"}, status=status.HTTP_400_BAD_REQUEST)
-
-        User = get_user_model()
-        try:
-            user = User.objects.get(pk=int(user_id))
-        except User.DoesNotExist:
-            return Response({"error": "user not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # 严格按 owner 找 conversation —— 防止跨用户写入
-        try:
-            conversation = AiLabConversation.objects.get(pk=pk, user=user)
-        except AiLabConversation.DoesNotExist:
-            return Response({"error": "conversation not found for this user"}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = AiLabMessageSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save(conversation=conversation)
-        conversation.save()  # 触发 auto_now
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    # 内部回写端点拆出去 → ailab_internal_add_message（function view）
+    # 因为 JWT 认证写在 viewset class 级上，@action 的 authentication_classes
+    # 在某些 DRF 版本里覆盖不掉，导致 401 token_not_valid。
 
 
 class AiLabMessageViewSet(viewsets.ModelViewSet):

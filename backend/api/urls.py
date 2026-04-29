@@ -4,7 +4,8 @@ from .views import (
     RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView,
     BlogPostViewSet, TagViewSet, CategoryViewSet, AiAgentView, DeepSeekSpecialeView,
     DeepSeekOCRView, WhisperTranscribeView, PDFExtractView, RecipeStepViewSet,
-    RecipeIngredientViewSet, AiLabConversationViewSet, AiLabMessageViewSet
+    RecipeIngredientViewSet, AiLabConversationViewSet, AiLabMessageViewSet,
+    ailab_internal_add_message,
 )
 
 router = DefaultRouter()
@@ -27,6 +28,8 @@ urlpatterns = [
     path('ai/ocr/', DeepSeekOCRView.as_view(), name='ai-ocr'),
     path('ai/pdf-extract/', PDFExtractView.as_view(), name='ai-pdf-extract'),
     path('ai/transcribe/', WhisperTranscribeView.as_view(), name='ai-transcribe'),
+    # 内部端点：Hermes 在客户端断开后的回写通道（token 认证，绕过 JWT）
+    path('ai/conversations/<int:pk>/messages/internal/', ailab_internal_add_message, name='ai-conversation-messages-internal'),
     path('tarot/', include('cards.urls')),
     path('tarot/', include('readings.urls')),
     path('tarot/', include('oracle.urls')),
