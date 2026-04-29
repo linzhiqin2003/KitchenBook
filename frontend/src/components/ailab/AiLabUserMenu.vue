@@ -66,16 +66,16 @@ onUnmounted(() => {
       @click.stop="open = !open"
       class="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer relative overflow-hidden"
       :style="open
-        ? 'background: var(--theme-200); color: var(--theme-700);'
-        : 'background: var(--theme-100); color: var(--theme-600);'"
+        ? 'background: var(--theme-700); color: var(--theme-50); border: 1px solid var(--theme-700);'
+        : 'background: #fff; color: var(--theme-700); border: 1px solid var(--theme-300);'"
       :title="displayName"
     >
       <img v-if="me?.avatar_url" :src="me.avatar_url" class="w-full h-full object-cover" />
       <span v-else class="text-[12px] font-semibold tracking-tight">{{ initials }}</span>
       <span
         v-if="me?.is_owner"
-        class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full"
-        style="background: var(--ai-accent, #3d7cc9); border: 1.5px solid var(--theme-50);"
+        class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full"
+        style="background: var(--ai-accent, #3d7cc9); border: 1.5px solid #fff;"
         title="Owner"
       ></span>
     </button>
