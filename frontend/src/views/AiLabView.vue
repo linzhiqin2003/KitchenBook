@@ -144,16 +144,22 @@ const saveTokenUsage = async () => {
 
 const recordUsage = (usage) => {
   if (!usage || typeof usage !== 'object') return
-  const prompt = Number(usage.prompt_tokens) || 0
+  // prompt_tokens 是 Hermes 一轮所有内部 LLM 调用的 prompt 累加（计费量），
+  // 上下文窗口要的是最后一次调用真正发给模型的 prompt 大小 —— 用 last_prompt_tokens。
+  // 旧版网关没这个字段时回退到 prompt_tokens。
+  const billedPrompt = Number(usage.prompt_tokens) || 0
+  const lastPrompt = Number(usage.last_prompt_tokens) || billedPrompt
   const completion = Number(usage.completion_tokens) || 0
-  if (prompt === 0 && completion === 0) return
+  if (billedPrompt === 0 && completion === 0) return
   // Hermes 扩展字段：{ sections: { key: {label, tokens} }, total_local, encoding }
   const breakdown = (usage.breakdown && typeof usage.breakdown === 'object') ? usage.breakdown : null
   const nextBreakdown = breakdown || sessionTokens.value.breakdown
   sessionTokens.value = {
-    promptTokens: prompt,
+    // promptTokens 用作 Context Window 的当前值 —— 反映最后一次发给模型的 prompt 大小
+    promptTokens: lastPrompt,
     completionTokens: completion,
-    totalPromptTokens: sessionTokens.value.totalPromptTokens + prompt,
+    // 累计走计费量（每次内部调用都计），便于对账消耗
+    totalPromptTokens: sessionTokens.value.totalPromptTokens + billedPrompt,
     totalCompletionTokens: sessionTokens.value.totalCompletionTokens + completion,
     turnCount: sessionTokens.value.turnCount + 1,
     breakdown: nextBreakdown,
