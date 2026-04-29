@@ -173,6 +173,11 @@ class AiLabMessage(models.Model):
     reasoning = models.TextField(blank=True, null=True, help_text="AI 思维链内容")
     sub_turns = models.JSONField(blank=True, null=True, help_text="工具调用时间线 [{reasoning, toolCall}]")
     model_name = models.CharField(max_length=50, blank=True, null=True, help_text="使用的模型名称")
+    # Per-turn billing — populated for assistant messages only. Sum across messages
+    # gives cross-session usage; group-by model_name gives per-model breakdown.
+    prompt_tokens = models.PositiveIntegerField(default=0, help_text="该轮计费 prompt tokens（包含 cache hit）")
+    completion_tokens = models.PositiveIntegerField(default=0, help_text="该轮 completion tokens")
+    cache_tokens = models.PositiveIntegerField(default=0, help_text="该轮命中 / 写入 cache 的 tokens")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

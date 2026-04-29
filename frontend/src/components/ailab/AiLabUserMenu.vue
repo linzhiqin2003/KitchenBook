@@ -307,8 +307,8 @@ onUnmounted(() => {
               <span class="text-[10px] font-semibold tracking-wide uppercase" style="color: var(--theme-400);">
                 估算开销
               </span>
-              <span class="text-[10px] font-mono" style="color: var(--theme-400);" :title="cost?.model || ''">
-                {{ cost?.model || '—' }}
+              <span class="text-[10px] font-mono" style="color: var(--theme-400);" v-if="stats?.models?.length">
+                {{ stats.models.length }} 模型
               </span>
             </div>
             <div class="flex items-baseline gap-1.5 mt-0.5">
@@ -381,6 +381,40 @@ onUnmounted(() => {
             <div class="flex items-center justify-between text-[12px] pt-1.5 mt-1" style="border-top: 1px dashed var(--theme-200); color: var(--theme-500);">
               <span>{{ stats?.total_turns || 0 }} 轮 · {{ stats?.active_session_count || 0 }}/{{ stats?.session_count || 0 }} 活跃</span>
               <span class="font-mono">{{ formatRelative(stats?.last_active) }}</span>
+            </div>
+          </div>
+
+          <!-- 按模型分桶（聚合费用 + token） -->
+          <div
+            v-if="stats?.models?.length"
+            class="px-4 py-2.5 space-y-2"
+            style="border-top: 1px solid var(--theme-100);"
+          >
+            <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: var(--theme-400);">
+              按模型
+            </div>
+            <div
+              v-for="m in stats.models"
+              :key="m.raw_model || m.model"
+              class="space-y-0.5"
+            >
+              <div class="flex items-center justify-between text-[12px] gap-2">
+                <span class="font-mono truncate min-w-0" style="color: var(--theme-700);" :title="m.raw_model || m.model">
+                  {{ m.model }}<span
+                    v-if="!m.priced"
+                    class="ml-1 text-[9px] px-1 py-0.5 rounded align-middle"
+                    style="background: #fff4e0; color: #b45309;"
+                    title="未配价格，按默认模型估算"
+                  >无价</span>
+                </span>
+                <span class="font-mono shrink-0" style="color: var(--theme-700);">{{ formatCost(m.cost?.total) }}</span>
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-mono" style="color: var(--theme-400);">
+                <span>
+                  {{ formatNumber(m.non_cache_input_tokens) }} in · {{ formatNumber(m.cache_tokens) }} cache · {{ formatNumber(m.completion_tokens) }} out
+                </span>
+                <span>{{ m.turns }} 轮</span>
+              </div>
             </div>
           </div>
         </template>

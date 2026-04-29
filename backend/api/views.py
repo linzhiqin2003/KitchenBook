@@ -2038,56 +2038,113 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='stats')
     def stats(self, request):
-        """聚合当前用户全部会话的 token 用量 — 实时统计 + cost 估算"""
+        """聚合当前用户全部会话的 token 用量 — 按模型拆分，附 cost 估算。
+
+        数据源：AiLabMessage (assistant rows)。每条助手消息记录了那一轮的
+        prompt/completion/cache tokens 以及 model_name，按 model_name 分桶
+        汇总 + 各自走 PRICING 表算价。
+        """
+        from django.db.models import Sum, Count, Max
         from common.pricing import estimate_cost, DEFAULT_MODEL, CURRENCY
-        qs = self.get_queryset().only('token_usage', 'updated_at')
+
+        msg_qs = AiLabMessage.objects.filter(
+            conversation__user=request.user,
+            role='assistant',
+        )
+
+        # 按 model 分桶
+        per_model_rows = (
+            msg_qs.values('model_name')
+            .annotate(
+                prompt=Sum('prompt_tokens'),
+                completion=Sum('completion_tokens'),
+                cache=Sum('cache_tokens'),
+                turns=Count('id'),
+                last_at=Max('created_at'),
+            )
+            .order_by('-prompt')
+        )
+
+        models_breakdown = []
         total_prompt = 0
         total_completion = 0
         total_cache = 0
         total_turns = 0
-        session_count = 0
-        active_session_count = 0
         last_active = None
-        for conv in qs:
-            session_count += 1
-            usage = conv.token_usage or {}
-            tp = int(usage.get('totalPromptTokens') or 0)
-            tc = int(usage.get('totalCompletionTokens') or 0)
-            tk = int(usage.get('totalCacheTokens') or 0)
-            tn = int(usage.get('turnCount') or 0)
-            if tn > 0 or tp > 0 or tc > 0:
-                active_session_count += 1
+
+        for row in per_model_rows:
+            tp = int(row['prompt'] or 0)
+            tc = int(row['completion'] or 0)
+            tk = int(row['cache'] or 0)
+            turns = int(row['turns'] or 0)
+            # 没有 token 流过的模型桶（旧消息全是 0）跳过，避免噪音条目
+            if tp == 0 and tc == 0 and tk == 0:
+                continue
+            model_name = row['model_name'] or DEFAULT_MODEL
+            cost = estimate_cost(
+                prompt_tokens=tp,
+                completion_tokens=tc,
+                cache_tokens=tk,
+                model=model_name,
+            )
+            models_breakdown.append({
+                'model': cost['model'],         # PRICING 中存在的规范名 / 默认模型
+                'raw_model': model_name,         # Hermes 实际汇报的字符串（可能未配 pricing）
+                'priced': cost['model'] == model_name,  # False 表示走了默认价兜底
+                'prompt_tokens': tp,
+                'completion_tokens': tc,
+                'cache_tokens': tk,
+                'non_cache_input_tokens': cost['non_cache_input_tokens'],
+                'turns': turns,
+                'last_active': row['last_at'].isoformat() if row['last_at'] else None,
+                'cost': {
+                    'currency': CURRENCY,
+                    'input': cost['input_cost'],
+                    'cache': cost['cache_cost'],
+                    'output': cost['output_cost'],
+                    'total': cost['total_cost'],
+                },
+            })
             total_prompt += tp
             total_completion += tc
             total_cache += tk
-            total_turns += tn
-            if conv.updated_at and (last_active is None or conv.updated_at > last_active):
-                last_active = conv.updated_at
+            total_turns += turns
+            if row['last_at'] and (last_active is None or row['last_at'] > last_active):
+                last_active = row['last_at']
 
-        cost = estimate_cost(
-            prompt_tokens=total_prompt,
-            completion_tokens=total_completion,
-            cache_tokens=total_cache,
-            model=DEFAULT_MODEL,
-        )
+        # session 计数仍取自 AiLabConversation（与 token_usage JSON 的旧逻辑独立）
+        conv_qs = self.get_queryset().only('updated_at')
+        session_count = conv_qs.count()
+        active_session_count = msg_qs.filter(
+            prompt_tokens__gt=0
+        ).values('conversation').distinct().count()
+
+        # 总费用 = 各模型分桶 cost 字符串相加（保留 6 位精度）
+        from decimal import Decimal
+        q = Decimal('0.000001')
+        sum_input = sum((Decimal(b['cost']['input']) for b in models_breakdown), Decimal('0'))
+        sum_cache = sum((Decimal(b['cost']['cache']) for b in models_breakdown), Decimal('0'))
+        sum_output = sum((Decimal(b['cost']['output']) for b in models_breakdown), Decimal('0'))
+        sum_total = sum_input + sum_cache + sum_output
+
         return Response({
             'session_count': session_count,
             'active_session_count': active_session_count,
             'total_prompt_tokens': total_prompt,
             'total_completion_tokens': total_completion,
             'total_cache_tokens': total_cache,
-            'non_cache_input_tokens': cost['non_cache_input_tokens'],
+            'non_cache_input_tokens': total_prompt - total_cache,
             'total_tokens': total_prompt + total_completion,
             'total_turns': total_turns,
             'last_active': last_active.isoformat() if last_active else None,
             'cost': {
                 'currency': CURRENCY,
-                'model': cost['model'],
-                'input': cost['input_cost'],
-                'cache': cost['cache_cost'],
-                'output': cost['output_cost'],
-                'total': cost['total_cost'],
+                'input': str(sum_input.quantize(q)),
+                'cache': str(sum_cache.quantize(q)),
+                'output': str(sum_output.quantize(q)),
+                'total': str(sum_total.quantize(q)),
             },
+            'models': models_breakdown,
         })
 
     # 内部回写端点拆出去 → ailab_internal_add_message（function view）

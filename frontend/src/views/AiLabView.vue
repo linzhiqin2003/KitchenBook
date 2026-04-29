@@ -131,6 +131,14 @@ const sessionTokens = ref({
 // 按 conversation id 存上一次拿到的 breakdown，切回这个会话时恢复。
 const breakdownCache = new Map()
 
+// 单轮（user → assistant）的 token 计费累加器。Hermes 多步 agent 一轮可能
+// 产生多次内部 LLM 调用（每次都 emit 一个 usage 事件），此处把它们叠加到同一
+// 轮次，等流式结束后随 saveMessage 一起持久化到 AiLabMessage。
+const turnUsage = ref({ promptTokens: 0, completionTokens: 0, cacheTokens: 0, modelName: '' })
+const resetTurnUsage = () => {
+  turnUsage.value = { promptTokens: 0, completionTokens: 0, cacheTokens: 0, modelName: '' }
+}
+
 const resetSessionTokens = () => {
   sessionTokens.value = {
     promptTokens: 0,
@@ -157,7 +165,7 @@ const saveTokenUsage = async () => {
   } catch (e) { /* silent */ }
 }
 
-const recordUsage = (usage) => {
+const recordUsage = (usage, parsedChunk = null) => {
   if (!usage || typeof usage !== 'object') return
   // prompt_tokens 是 Hermes 一轮所有内部 LLM 调用的 prompt 累加（计费量），
   // 上下文窗口要的是最后一次调用真正发给模型的 prompt 大小 —— 用 last_prompt_tokens。
@@ -168,6 +176,15 @@ const recordUsage = (usage) => {
   // patch12 透传：cache_tokens = cache_read + cache_write（不分读写）
   const cache = Number(usage.cache_tokens) || 0
   if (billedPrompt === 0 && completion === 0) return
+
+  // 累加到本轮（多步 agent 一轮多次 LLM 调用，每次都来一条 usage）
+  const reportedModel = (parsedChunk && typeof parsedChunk.model === 'string' && parsedChunk.model.trim()) || ''
+  turnUsage.value = {
+    promptTokens: turnUsage.value.promptTokens + billedPrompt,
+    completionTokens: turnUsage.value.completionTokens + completion,
+    cacheTokens: turnUsage.value.cacheTokens + cache,
+    modelName: reportedModel || turnUsage.value.modelName,
+  }
   // Hermes 扩展字段：{ sections: { key: {label, tokens} }, total_local, encoding }
   const breakdown = (usage.breakdown && typeof usage.breakdown === 'object') ? usage.breakdown : null
   const nextBreakdown = breakdown || sessionTokens.value.breakdown
@@ -398,7 +415,7 @@ const deleteConversation = async (id) => {
 }
 
 // 保存消息到后端
-const saveMessage = async (conversationId, role, content, reasoning = null, subTurns = null, modelName = null) => {
+const saveMessage = async (conversationId, role, content, reasoning = null, subTurns = null, modelName = null, usage = null) => {
   try {
     const body = { role, content, reasoning }
     if (subTurns && subTurns.length > 0) {
@@ -406,6 +423,11 @@ const saveMessage = async (conversationId, role, content, reasoning = null, subT
     }
     if (modelName) {
       body.model_name = modelName
+    }
+    if (usage && (usage.promptTokens || usage.completionTokens || usage.cacheTokens)) {
+      body.prompt_tokens = usage.promptTokens || 0
+      body.completion_tokens = usage.completionTokens || 0
+      body.cache_tokens = usage.cacheTokens || 0
     }
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${conversationId}/messages/`, {
       method: 'POST',
@@ -518,6 +540,7 @@ const streamResponse = async (fileContent = null, options = {}) => {
   currentContent.value = ''
   isReasoningPhase.value = false
   stats.value = { reasoningLength: 0, contentLength: 0, startTime: Date.now(), endTime: null }
+  resetTurnUsage()
 
   // 添加空的 AI 消息用于流式填充
   const aiMessageIndex = messages.value.length
@@ -1021,7 +1044,7 @@ const streamResponse = async (fileContent = null, options = {}) => {
 
             // 捕获 OpenAI 风格 usage 字段（include_usage:true 的最终 chunk，或 Hermes 自带的 usage）
             if (parsed && parsed.usage) {
-              recordUsage(parsed.usage)
+              recordUsage(parsed.usage, parsed)
             }
 
             if (currentEventType === 'hermes.reasoning') {
@@ -1092,14 +1115,18 @@ const streamResponse = async (fileContent = null, options = {}) => {
       aiMsg.stats = { ...stats.value }
     }
 
-    // 保存 AI 消息到后端（含完整 subTurns）
+    // 保存 AI 消息到后端（含完整 subTurns + 本轮 token 计费）。
+    // 优先用 Hermes 上报的真实模型名（turnUsage.modelName），用于跨会话按
+    // 模型分组统计；没有就退到展示用的 currentModelName。
+    const persistedModelName = turnUsage.value.modelName || currentModelName
     const savedAiMsg = await saveMessage(
       currentConversationId.value,
       'assistant',
       currentContent.value,
       currentReasoning.value,
       aiMsg?.subTurns || streamSubTurns,
-      currentModelName
+      persistedModelName,
+      turnUsage.value,
     )
     if (savedAiMsg) {
       messages.value[aiMessageIndex].id = savedAiMsg.id

@@ -20,6 +20,11 @@ PRICING: Dict[str, Dict[str, Decimal]] = {
         "output": Decimal("2"),
         "cache": Decimal("0.02"),
     },
+    "deepseek-v4-pro": {
+        "input": Decimal("2"),
+        "output": Decimal("6"),
+        "cache": Decimal("0.25"),
+    },
 }
 
 DEFAULT_MODEL = "deepseek-v4-flash"
