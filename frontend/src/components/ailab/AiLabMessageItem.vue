@@ -563,15 +563,15 @@ const openImage = (dataUrl) => {
               style="border: 1px solid var(--ai-accent); color: var(--theme-700); font-size: 15px;"
             ></textarea>
             <div class="flex items-center gap-2">
+              <button @click="cancelEdit"
+                      class="text-xs transition-colors cursor-pointer" style="color: var(--theme-400);">
+                取消
+              </button>
               <button @click="submitEdit"
                       :disabled="!editContent.trim()"
                       class="px-3 py-1 text-xs rounded-md transition-colors disabled:opacity-50 cursor-pointer"
                       style="background: var(--theme-700); color: var(--theme-50);">
                 发送
-              </button>
-              <button @click="cancelEdit"
-                      class="text-xs transition-colors cursor-pointer" style="color: var(--theme-400);">
-                取消
               </button>
             </div>
           </div>
