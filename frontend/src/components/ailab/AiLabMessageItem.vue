@@ -217,7 +217,7 @@ const stepLabel = (step) => {
       if (step.status === 'parsing' || step.status === 'pending') return `Calling ${name}`
       return `Running ${name}`
     }
-    return name
+    return `Ran ${name}`
   }
   return ''
 }
@@ -585,13 +585,13 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
           <template v-if="hasTraceTimeline">
             <!-- 思维链折叠头：流式中显示当前活动 -->
             <button class="trace-header" @click="traceCollapsed = !traceCollapsed">
+              <span :class="['trace-header-text', { 'trace-shimmer-text': isLive && traceCollapsed }]">{{ headerLabel }}</span>
               <svg
                 :class="['trace-chevron', { 'is-open': !traceCollapsed }]"
                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
               >
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
               </svg>
-              <span :class="['trace-header-text', { 'trace-shimmer-text': isLive && traceCollapsed }]">{{ headerLabel }}</span>
             </button>
 
             <!-- 展开后 -->
@@ -643,13 +643,6 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
                       class="trace-item-row"
                       @click="toggleStep(step.id)"
                     >
-                      <svg
-                        :class="['trace-chevron', 'trace-chevron-sm', { 'is-open': isStepExpanded(step.id) }]"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
-                      </svg>
-
                       <span class="trace-step-icon">
                         <svg v-if="step.kind === 'tool' && step.status === 'success'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-check">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
@@ -663,6 +656,13 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 
                       <span :class="['trace-step-label', step.kind === 'tool' && 'trace-step-label-mono', { 'trace-shimmer-text': step.live }]">{{ stepLabel(step) }}</span>
                       <span v-if="stepMeta(step)" class="trace-step-meta">{{ stepMeta(step) }}</span>
+
+                      <svg
+                        :class="['trace-chevron', 'trace-chevron-sm', 'trace-chevron-end', { 'is-open': isStepExpanded(step.id) }]"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
+                      </svg>
                     </button>
 
                     <Transition name="collapse">
@@ -707,15 +707,15 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
           <!-- 兼容旧数据结构 -->
           <template v-else-if="shouldShowLegacyReasoning">
             <button class="trace-header" @click="emit('toggle-reasoning', index)">
+              <span class="trace-header-text">
+                {{ isStreaming && isReasoningPhase ? 'Thinking…' : `已思考 ${message.reasoning.length} 字` }}
+              </span>
               <svg
                 :class="['trace-chevron', { 'is-open': !reasoningCollapsed }]"
                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
               >
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
               </svg>
-              <span class="trace-header-text">
-                {{ isStreaming && isReasoningPhase ? 'Thinking…' : `已思考 ${message.reasoning.length} 字` }}
-              </span>
             </button>
             <Transition name="collapse">
               <div v-if="!reasoningCollapsed" class="trace-list">
@@ -832,9 +832,10 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  max-width: min(100%, 42rem);
-  padding: 0.2rem 0.5rem 0.2rem 0.25rem;
-  margin-left: -0.25rem;
+  /* 不截断短标签 — "Running terminal" / "Thinking…" 都要完整显示 */
+  max-width: 100%;
+  padding: 0.2rem 0.5rem;
+  margin-left: -0.5rem;
   cursor: pointer;
   user-select: none;
   border: 0;
@@ -843,7 +844,6 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   transition: background 0.16s ease, color 0.16s ease;
   color: var(--theme-500);
   position: relative;
-  overflow: hidden;
 }
 
 .trace-header:hover {
@@ -854,9 +854,9 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .trace-header-text {
   font-size: 0.78rem;
   font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* 让短标签自己撑开；过长（多步骤聚合的 header）时换行而不是省略 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .trace-chevron {
@@ -865,6 +865,7 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   color: var(--theme-400);
   flex-shrink: 0;
   transition: transform 0.18s ease, color 0.18s ease;
+  margin-left: auto;
 }
 
 .trace-chevron.is-open {
@@ -876,12 +877,28 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   height: 0.7rem;
 }
 
+.trace-chevron-end {
+  margin-left: auto;
+}
+
 /* === 步骤列表 === */
 .trace-list {
   width: min(100%, 42rem);
-  margin: 0.25rem 0 0.25rem 0;
-  padding: 0.25rem 0 0.25rem 0.6rem;
-  border-left: 1px solid var(--theme-200, #e4e4df);
+  margin: 0.25rem 0;
+  padding: 0.25rem 0;
+  position: relative;
+  /* 用 ::before 在 icon 中心位置画一条虚线，从上到下串起所有步骤 */
+}
+
+.trace-list::before {
+  content: '';
+  position: absolute;
+  /* icon 列：宽 0.85rem 居中于 0.425rem，加上左 padding 0.25rem -> 中心 ≈ 0.675rem */
+  left: 0.675rem;
+  top: 0.6rem;
+  bottom: 0.6rem;
+  border-left: 1px dashed var(--theme-200, #d8d8d2);
+  pointer-events: none;
 }
 
 .trace-item {
@@ -889,12 +906,11 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 }
 
 .trace-item-row {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  max-width: 100%;
+  gap: 0.45rem;
+  width: 100%;
   padding: 0.18rem 0.5rem 0.18rem 0.25rem;
-  margin-left: -0.25rem;
   border: 0;
   background: transparent;
   border-radius: 0.4rem;
@@ -903,7 +919,6 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
   color: var(--theme-500);
   transition: background 0.16s ease, color 0.16s ease;
   position: relative;
-  overflow: hidden;
 }
 
 .trace-item-row:hover {
