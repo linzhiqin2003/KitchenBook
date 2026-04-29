@@ -1307,12 +1307,14 @@ const openImage = (dataUrl) => {
 
 /* === Agent 发的图片（markdown image） === */
 .markdown-content :deep(.md-img-link) {
-  display: inline-block;
+  display: block;            /* inline-block 会留 baseline 间距 */
   margin: 0.5em 0;
   border-radius: 0.5rem;
   overflow: hidden;
   text-decoration: none;
-  background: rgba(0, 0, 0, 0.04);
+  width: fit-content;
+  max-width: 100%;
+  line-height: 0;            /* 杀掉文字行高造成的额外间隙 */
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .markdown-content :deep(.md-img-link:hover) {
@@ -1323,8 +1325,9 @@ const openImage = (dataUrl) => {
   display: block;
   max-width: 100%;
   max-height: 420px;
+  width: auto;
+  height: auto;
   border-radius: 0.5rem;
-  object-fit: contain;
   cursor: zoom-in;
 }
 

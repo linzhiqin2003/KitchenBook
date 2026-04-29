@@ -1867,9 +1867,14 @@ def ailab_internal_add_message(request, pk):
     except AiLabConversation.DoesNotExist:
         return Response({"error": "conversation not found for this user"}, status=status.HTTP_404_NOT_FOUND)
 
+    from .asset_publish import publish_local_assets_in_content
     serializer = AiLabMessageSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if serializer.validated_data.get('role') == 'assistant':
+        serializer.validated_data['content'] = publish_local_assets_in_content(
+            serializer.validated_data.get('content', '')
+        )
     serializer.save(conversation=conversation)
     conversation.save()
     return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -2001,9 +2006,16 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='messages')
     def add_message(self, request, pk=None):
         """向会话添加消息"""
+        from .asset_publish import publish_local_assets_in_content
         conversation = self.get_object()
         serializer = AiLabMessageSerializer(data=request.data)
         if serializer.is_valid():
+            # assistant 消息里的本地文件路径自动发布到 MEDIA 并改写成公网 URL，
+            # 让 web 端能渲染。base 类的 extract_local_files 只对 IM 平台生效。
+            if serializer.validated_data.get('role') == 'assistant':
+                serializer.validated_data['content'] = publish_local_assets_in_content(
+                    serializer.validated_data.get('content', '')
+                )
             serializer.save(conversation=conversation)
             # 更新会话时间
             conversation.save()  # 触发 auto_now
