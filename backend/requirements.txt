@@ -22,4 +22,4 @@ google-auth>=2.27,<3
 mutagen>=1.47,<2
 PyJWT[crypto]>=2.8,<3
 aliyun-python-sdk-core>=2.16
-alibabacloud-nls-python-sdk @ git+https://github.com/aliyun/alibabacloud-nls-python-sdk.git
+nls @ git+https://github.com/aliyun/alibabacloud-nls-python-sdk.git
