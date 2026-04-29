@@ -158,10 +158,10 @@ defineExpose({
       <button
         v-if="!isNearBottom"
         @click="scrollToBottom(true)"
-        class="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 z-10"
-        style="background: var(--theme-50, #f8f8f6); border: 1px solid var(--theme-200, #e4e4df); font-size: 13px; color: var(--theme-500, #6b6b63);"
+        class="scroll-bottom-btn absolute bottom-1 left-1/2 -translate-x-1/2 px-2 py-1 cursor-pointer flex items-center gap-1 z-10"
+        style="font-size: 12px; color: var(--theme-400, #8a8a82); background: transparent; border: none;"
       >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
         </svg>
         回到底部
@@ -194,5 +194,13 @@ defineExpose({
 .fade-up-leave-to {
   opacity: 0;
   transform: translate(-50%, 8px);
+}
+
+.scroll-bottom-btn {
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.scroll-bottom-btn:hover {
+  color: var(--theme-600, #5a5a52);
+  transform: translate(-50%, -1px);
 }
 </style>
