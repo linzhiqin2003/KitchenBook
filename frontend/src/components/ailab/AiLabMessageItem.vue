@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
+import AiLabReasoningTrace from './AiLabReasoningTrace.vue'
 
 const props = defineProps({
   message: {
@@ -518,6 +519,12 @@ const parseMarkdown = (markdown) => {
 }
 
 const parsedContent = computed(() => parseMarkdown(props.message.content))
+
+// 段列表：每段 = 一组 subTurns（思考/工具调用）+ 一段文本。
+// AiLabView.normalizeAssistantMessage 已保证 message.segments 一定存在。
+const segments = computed(() => Array.isArray(props.message.segments) ? props.message.segments : [])
+const isLastSegment = (idx) => idx === segments.value.length - 1
+const parseSegmentContent = (text) => parseMarkdown(text || '')
 </script>
 
 <template>
@@ -580,193 +587,65 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
       <div class="flex flex-col items-start flex-1 min-w-0">
         <div class="mb-1.5" style="font-size: 13px; font-weight: 600; color: var(--theme-400); letter-spacing: 0.01em;">{{ message.modelName || 'AI' }}</div>
 
-        <!-- 工具调用时间线 -->
-        <div v-if="hasTraceTimeline || shouldShowLegacyReasoning" class="w-full mb-3">
-          <template v-if="hasTraceTimeline">
-            <!-- 思维链折叠头：流式中显示当前活动 -->
-            <button class="trace-header" @click="traceCollapsed = !traceCollapsed">
-              <span :class="['trace-header-text', { 'trace-shimmer-text': isLive && traceCollapsed }]">{{ headerLabel }}</span>
-              <svg
-                :class="['trace-chevron', { 'is-open': !traceCollapsed }]"
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
-              </svg>
-            </button>
+        <!-- 按 segment 循环：每段 = 一组思考/工具调用 + 该段输出的文字 -->
+        <template v-for="(seg, segIdx) in segments" :key="seg.id || segIdx">
+          <!-- trace 区：这一段产生的思考/工具调用 -->
+          <div class="w-full mb-2">
+            <AiLabReasoningTrace
+              :segment="seg"
+              :is-streaming="isStreaming && isLastSegment(segIdx)"
+              :is-reasoning-phase="isReasoningPhase && isLastSegment(segIdx)"
+            />
+          </div>
 
-            <!-- 展开后 -->
-            <Transition name="collapse">
-              <div v-if="!traceCollapsed" class="trace-list">
-                <!-- 单步骤：直接展示详情，不嵌套子折叠 -->
-                <template v-if="singleStep">
-                  <!-- 思考详情 -->
-                  <div v-if="singleStep.kind === 'thinking'" class="trace-thinking-text">{{ singleStep.text }}</div>
-
-                  <!-- 工具调用详情 -->
-                  <template v-else-if="singleStep.kind === 'tool'">
-                    <pre v-if="hasToolArguments(singleStep.toolCall)" class="trace-code">{{ formatToolArguments(singleStep.toolCall) }}</pre>
-                    <div
-                      v-if="singleStep.live && singleStep.toolCall.progressUrls && singleStep.toolCall.progressUrls.length"
-                      class="trace-url-tags"
-                    >
-                      <span
-                        v-for="(u, ui) in singleStep.toolCall.progressUrls"
-                        :key="ui"
-                        :class="['url-tag', u.status === 'done' ? 'url-tag-done' : u.status === 'fail' ? 'url-tag-fail' : 'url-tag-pending']"
-                      >
-                        <img
-                          :src="`https://www.google.com/s2/favicons?domain=${u.domain}&sz=16`"
-                          class="url-tag-icon"
-                          loading="lazy"
-                          @error="$event.target.style.display='none'"
-                        />
-                        <span class="url-tag-text">{{ u.domain }}</span>
-                        <svg v-if="u.status === 'done'" class="url-tag-check" viewBox="0 0 16 16" fill="currentColor"><path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z"/></svg>
-                        <span v-else-if="u.status === 'pending'" class="url-tag-spinner"></span>
-                      </span>
-                    </div>
-                    <div
-                      v-if="formatToolResult(singleStep.toolCall)"
-                      :class="['trace-result-text', singleStep.toolCall.status === 'error' ? 'text-red-600' : '']"
-                    >{{ formatToolResult(singleStep.toolCall) }}</div>
-                  </template>
-                </template>
-
-                <!-- 多步骤：列表 + 子折叠 -->
-                <template v-else>
-                  <div
-                    v-for="step in steps"
-                    :key="step.id"
-                    class="trace-item"
-                  >
-                    <button
-                      class="trace-item-row"
-                      @click="toggleStep(step.id)"
-                    >
-                      <span class="trace-step-icon">
-                        <svg v-if="step.kind === 'tool' && step.status === 'success'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-check">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 6.5l2.4 2.4L9.5 3.5"/>
-                        </svg>
-                        <svg v-else-if="step.kind === 'tool' && step.status === 'error'" viewBox="0 0 12 12" fill="none" stroke="currentColor" class="trace-icon-cross">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l6 6M9 3l-6 6"/>
-                        </svg>
-                        <span v-else-if="step.live" class="trace-icon-live"></span>
-                        <span v-else class="trace-icon-dot"></span>
-                      </span>
-
-                      <span :class="['trace-step-label', step.kind === 'tool' && 'trace-step-label-mono', { 'trace-shimmer-text': step.live }]">{{ stepLabel(step) }}</span>
-                      <span v-if="stepMeta(step)" class="trace-step-meta">{{ stepMeta(step) }}</span>
-
-                      <svg
-                        :class="['trace-chevron', 'trace-chevron-sm', 'trace-chevron-end', { 'is-open': isStepExpanded(step.id) }]"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
-                      </svg>
-                    </button>
-
-                    <Transition name="collapse">
-                      <div v-if="isStepExpanded(step.id)" class="trace-item-detail">
-                        <div v-if="step.kind === 'thinking'" class="trace-thinking-text">{{ step.text }}</div>
-
-                        <template v-else-if="step.kind === 'tool'">
-                          <pre v-if="hasToolArguments(step.toolCall)" class="trace-code">{{ formatToolArguments(step.toolCall) }}</pre>
-                          <div
-                            v-if="step.live && step.toolCall.progressUrls && step.toolCall.progressUrls.length"
-                            class="trace-url-tags"
-                          >
-                            <span
-                              v-for="(u, ui) in step.toolCall.progressUrls"
-                              :key="ui"
-                              :class="['url-tag', u.status === 'done' ? 'url-tag-done' : u.status === 'fail' ? 'url-tag-fail' : 'url-tag-pending']"
-                            >
-                              <img
-                                :src="`https://www.google.com/s2/favicons?domain=${u.domain}&sz=16`"
-                                class="url-tag-icon"
-                                loading="lazy"
-                                @error="$event.target.style.display='none'"
-                              />
-                              <span class="url-tag-text">{{ u.domain }}</span>
-                              <svg v-if="u.status === 'done'" class="url-tag-check" viewBox="0 0 16 16" fill="currentColor"><path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z"/></svg>
-                              <span v-else-if="u.status === 'pending'" class="url-tag-spinner"></span>
-                            </span>
-                          </div>
-                          <div
-                            v-if="formatToolResult(step.toolCall)"
-                            :class="['trace-result-text', step.toolCall.status === 'error' ? 'text-red-600' : '']"
-                          >{{ formatToolResult(step.toolCall) }}</div>
-                        </template>
-                      </div>
-                    </Transition>
-                  </div>
-                </template>
-              </div>
-            </Transition>
-          </template>
-
-          <!-- 兼容旧数据结构 -->
-          <template v-else-if="shouldShowLegacyReasoning">
-            <button class="trace-header" @click="emit('toggle-reasoning', index)">
-              <span class="trace-header-text">
-                {{ isStreaming && isReasoningPhase ? 'Thinking…' : `已思考 ${message.reasoning.length} 字` }}
-              </span>
-              <svg
-                :class="['trace-chevron', { 'is-open': !reasoningCollapsed }]"
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/>
-              </svg>
-            </button>
-            <Transition name="collapse">
-              <div v-if="!reasoningCollapsed" class="trace-list">
-                <div class="trace-thinking-text">{{ message.reasoning }}</div>
-              </div>
-            </Transition>
-          </template>
-        </div>
-
-        <!-- 主要内容 -->
-        <div
-          v-if="message.content || (!isReasoningPhase && isStreaming && !currentReasoning && !currentToolCall && subTurns.length === 0 && !shouldShowLegacyReasoning)"
-          class="group relative w-full"
-        >
+          <!-- 内容区：这一段的文字输出 -->
           <div
-            v-if="message.content"
-            class="markdown-content prose prose-sm max-w-none leading-relaxed text-gray-900"
-            v-html="parsedContent"
-          ></div>
+            v-if="seg.content || (isLastSegment(segIdx) && isStreaming && !isReasoningPhase && !seg.currentReasoning && !seg.currentToolCall && (!seg.subTurns || seg.subTurns.length === 0))"
+            class="group relative w-full mb-3"
+          >
+            <div
+              v-if="seg.content"
+              class="markdown-content prose prose-sm max-w-none leading-relaxed text-gray-900"
+              v-html="parseSegmentContent(seg.content)"
+            ></div>
 
-          <!-- 加载中状态 -->
-          <div v-else-if="isStreaming && !message.reasoning" class="flex items-center gap-2 py-1" style="color: var(--theme-400);">
-            <div class="flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 0ms"></span>
-              <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 150ms"></span>
-              <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 300ms"></span>
+            <!-- 流式起始时尚无任何 trace 也无内容 → 显示三点加载 -->
+            <div
+              v-else-if="isLastSegment(segIdx) && isStreaming"
+              class="flex items-center gap-2 py-1" style="color: var(--theme-400);"
+            >
+              <div class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 0ms"></span>
+                <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 150ms"></span>
+                <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 300ms"></span>
+              </div>
+            </div>
+
+            <!-- 操作按钮：仅在最后一段且非流式状态时显示 -->
+            <div
+              v-if="isLastSegment(segIdx) && seg.content && !isStreaming"
+              class="flex items-center gap-1 mt-2 text-gray-400 animate-fade-in-soft"
+            >
+              <button @click="copyContent"
+                      class="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 hover:text-gray-600 transition-colors text-xs cursor-pointer">
+                <svg v-if="!copied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <span>{{ copied ? '已复制' : '复制' }}</span>
+              </button>
+              <button @click="emit('regenerate', message.id)"
+                      class="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 hover:text-gray-600 transition-colors text-xs cursor-pointer">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <span>再次生成</span>
+              </button>
             </div>
           </div>
-
-          <!-- AI 消息操作按钮 -->
-          <div v-if="message.content && !isStreaming"
-               class="flex items-center gap-1 mt-2 text-gray-400 animate-fade-in-soft">
-            <button @click="copyContent"
-                    class="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 hover:text-gray-600 transition-colors text-xs cursor-pointer">
-              <svg v-if="!copied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-              </svg>
-              <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-              </svg>
-              <span>{{ copied ? '已复制' : '复制' }}</span>
-            </button>
-            <button @click="emit('regenerate', message.id)"
-                    class="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 hover:text-gray-600 transition-colors text-xs cursor-pointer">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              <span>再次生成</span>
-            </button>
-          </div>
-        </div>
+        </template>
 
         <!-- 耗时信息（token 用量统一在底部状态栏展示） -->
         <div v-if="message.stats && message.stats.endTime" class="flex items-center gap-4 mt-2 text-xs text-gray-400 animate-fade-in-soft">

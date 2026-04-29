@@ -227,10 +227,21 @@ const normalizeAssistantMessage = (message) => {
   // segments 是新结构（可能从后端回传，也可能由历史数据合成出唯一一段）
   let segments = Array.isArray(message.segments) ? message.segments : null
   if (!segments || segments.length === 0) {
-    // 历史消息：合成单段 segment 兜底，保证 UI 始终走新版渲染路径
+    // 历史消息：合成单段 segment 兜底
+    const synthSubTurns = subTurns.slice()
+    // 极旧格式：只有 message.reasoning 没有 subTurns —— 包成一个 thinking subTurn
+    if (synthSubTurns.length === 0 && message.reasoning) {
+      synthSubTurns.push({
+        id: 'legacy-r',
+        reasoning: message.reasoning,
+        reasoningStartedAt: null,
+        reasoningFinishedAt: null,
+        toolCall: null,
+      })
+    }
     segments = [{
       id: 'legacy-0',
-      subTurns,
+      subTurns: synthSubTurns,
       content: message.content || '',
     }]
   }
