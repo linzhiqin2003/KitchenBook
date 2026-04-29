@@ -483,6 +483,7 @@ const streamResponse = async (fileContent = null) => {
   let activeReasoning = ''
   let activeToolIndex = null
   let hasDoneEvent = false
+  let activeReasoningStartedAt = null
   const streamSubTurns = []
   const streamToolCalls = new Map()
 
@@ -511,11 +512,16 @@ const streamResponse = async (fileContent = null) => {
       return
     }
 
+    const reasoningStartedAt = activeReasoningStartedAt
+    const reasoningFinishedAt = hasReasoning ? Date.now() : null
+
     const orderedToolCalls = Array.from(streamToolCalls.values()).sort((a, b) => a.index - b.index)
     if (orderedToolCalls.length === 0) {
       streamSubTurns.push({
         id: createTraceId(),
         reasoning: activeReasoning.trim(),
+        reasoningStartedAt,
+        reasoningFinishedAt,
         toolCall: null
       })
     } else {
@@ -523,12 +529,15 @@ const streamResponse = async (fileContent = null) => {
         streamSubTurns.push({
           id: createTraceId(),
           reasoning: index === 0 ? activeReasoning.trim() : '',
+          reasoningStartedAt: index === 0 ? reasoningStartedAt : null,
+          reasoningFinishedAt: index === 0 ? reasoningFinishedAt : null,
           toolCall: { ...toolCall }
         })
       })
     }
 
     activeReasoning = ''
+    activeReasoningStartedAt = null
     streamToolCalls.clear()
     activeToolIndex = null
     syncTraceState()
@@ -652,6 +661,9 @@ const streamResponse = async (fileContent = null) => {
   const appendReasoningChunk = (chunk) => {
     if (!chunk) return
     setPhase(STREAM_PHASE.REASONING)
+    if (activeReasoningStartedAt === null) {
+      activeReasoningStartedAt = Date.now()
+    }
     currentReasoning.value += chunk
     activeReasoning += chunk
     const aiMsg = getAiMessage()

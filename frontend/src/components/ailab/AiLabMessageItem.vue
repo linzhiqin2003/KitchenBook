@@ -122,6 +122,7 @@ const steps = computed(() => {
         id: `${baseKey}-r`,
         kind: 'thinking',
         text: turn.reasoning,
+        turn,
         status: 'done',
         live: false
       })
@@ -141,6 +142,7 @@ const steps = computed(() => {
       id: 'live-reasoning',
       kind: 'thinking',
       text: currentReasoning.value,
+      turn: null,
       status: 'running',
       live: true
     })
@@ -179,9 +181,16 @@ const headerLabel = computed(() => {
   }
   // 完成后：按工具类型聚合的概况
   const tools = subTurns.value.filter(t => t.toolCall).map(t => t.toolCall)
-  const totalThinking = subTurns.value.reduce((s, t) => s + (t.reasoning?.length || 0), 0)
+  const totalThinkingMs = subTurns.value.reduce((s, t) => {
+    if (t.reasoningStartedAt && t.reasoningFinishedAt) {
+      return s + (t.reasoningFinishedAt - t.reasoningStartedAt)
+    }
+    return s
+  }, 0)
   const parts = []
-  if (totalThinking) parts.push(`thought ${totalThinking} chars`)
+  if (totalThinkingMs > 0) {
+    parts.push(`thought for ${formatDuration(totalThinkingMs)}`)
+  }
   if (tools.length) {
     const counts = {}
     for (const t of tools) {
@@ -213,9 +222,33 @@ const stepLabel = (step) => {
   return ''
 }
 
+// 把毫秒数格式化为 1.2s / 2m 30s / 1h 5m，自动选择合理单位
+const formatDuration = (ms) => {
+  if (!Number.isFinite(ms) || ms <= 0) return ''
+  const totalSeconds = ms / 1000
+  if (totalSeconds < 60) {
+    return totalSeconds < 10
+      ? `${totalSeconds.toFixed(1)}s`
+      : `${Math.round(totalSeconds)}s`
+  }
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  if (totalMinutes < 60) {
+    const sec = Math.round(totalSeconds - totalMinutes * 60)
+    return sec ? `${totalMinutes}m ${sec}s` : `${totalMinutes}m`
+  }
+  const hours = Math.floor(totalMinutes / 60)
+  const remMin = totalMinutes - hours * 60
+  return remMin ? `${hours}h ${remMin}m` : `${hours}h`
+}
+
 const stepMeta = (step) => {
   if (step.kind === 'thinking') {
-    return step.text ? `${step.text.length} 字` : ''
+    // 优先用真实耗时；流式中没有 finishedAt 则不显示
+    const turn = step.turn
+    if (turn?.reasoningStartedAt && turn?.reasoningFinishedAt) {
+      return formatDuration(turn.reasoningFinishedAt - turn.reasoningStartedAt)
+    }
+    return ''
   }
   if (step.kind === 'tool') {
     return formatToolDuration(step.toolCall)
