@@ -854,9 +854,10 @@ const parsedContent = computed(() => parseMarkdown(props.message.content))
 .trace-header-text {
   font-size: 0.78rem;
   font-weight: 500;
-  /* 让短标签自己撑开；过长（多步骤聚合的 header）时换行而不是省略 */
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  /* 短标签（"Thinking…" / "Running terminal"）保持单行不截断；
+     长聚合标签溢出时按词换行，绝不在词中间断字 */
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .trace-chevron {
