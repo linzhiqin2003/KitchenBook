@@ -3,6 +3,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
 import AiLabPanel from '../components/ailab/AiLabPanel.vue'
+import AiLabNotificationBell from '../components/ailab/AiLabNotificationBell.vue'
 import { useAuthStore } from '../store/auth'
 
 const authStore = useAuthStore()
@@ -1455,8 +1456,10 @@ onMounted(async () => {
         </button>
 
         <div class="flex items-center gap-2 flex-1 min-w-0">
-          <span class="text-[14px] font-semibold tracking-tight" style="color: var(--theme-700);">AI Lab</span>
+          <span class="text-[14px] font-semibold tracking-tight" style="color: var(--theme-700);">MyAgent</span>
         </div>
+
+        <AiLabNotificationBell />
 
         <router-link
           to="/ai-lab/studio"

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Recipe, RecipeStep, Ingredient, RecipeIngredient, Order, OrderItem, BlogPost, Tag, Category, AiLabConversation, AiLabMessage
+from .models import Recipe, RecipeStep, Ingredient, RecipeIngredient, Order, OrderItem, BlogPost, Tag, Category, AiLabConversation, AiLabMessage, AiLabNotification
 
 class RecipeStepSerializer(serializers.ModelSerializer):
     class Meta:
@@ -235,3 +235,11 @@ class AiLabConversationDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = AiLabConversation
         fields = ['id', 'title', 'created_at', 'updated_at', 'messages', 'token_usage']
+
+
+class AiLabNotificationSerializer(serializers.ModelSerializer):
+    """MyAgent 通知收件箱序列化器"""
+    class Meta:
+        model = AiLabNotification
+        fields = ['id', 'title', 'content', 'source', 'metadata', 'is_read', 'created_at']
+        read_only_fields = ['id', 'created_at']

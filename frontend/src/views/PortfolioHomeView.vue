@@ -45,8 +45,8 @@ const navBlocks = [
   },
   {
     id: 'ai-lab',
-    title: 'AI 实验室',
-    subtitle: 'AI Lab',
+    title: 'MyAgent',
+    subtitle: 'MyAgent',
     description: 'AI 对话 · 同声传译 · OCR · 表情包',
     path: '/ai-lab',
     gradient: 'from-emerald-400 via-teal-500 to-cyan-500',

@@ -182,6 +182,41 @@ class AiLabMessage(models.Model):
         return f"{self.role}: {self.content[:50]}..."
 
 
+class AiLabNotification(models.Model):
+    """MyAgent 通知收件箱
+
+    跟 conversation 解耦的 agent 推送消息：cron 任务、后台 hook、手动 push
+    都落到这里。用户上线后从顶部铃铛拉取查看。
+    """
+    SOURCE_CHOICES = [
+        ('cron', 'Cron'),
+        ('hook', 'Hook'),
+        ('manual', 'Manual'),
+        ('agent', 'Agent'),
+    ]
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='ailab_notifications',
+    )
+    title = models.CharField(max_length=200, blank=True, default='')
+    content = models.TextField()
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='agent')
+    metadata = models.JSONField(blank=True, default=dict)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['user', 'is_read']),
+        ]
+
+    def __str__(self):
+        return f"[{self.source}] {self.title or self.content[:40]}"
+
+
 # ==================== 技术博客模块 ====================
 
 class BlogPost(models.Model):

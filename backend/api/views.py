@@ -1589,9 +1589,10 @@ class WhisperTranscribeView(APIView):
 
 # ==================== AI Lab 会话管理 ====================
 
-from .models import AiLabConversation, AiLabMessage
+from .models import AiLabConversation, AiLabMessage, AiLabNotification
 from .serializers import (
-    AiLabConversationListSerializer, AiLabConversationDetailSerializer, AiLabMessageSerializer
+    AiLabConversationListSerializer, AiLabConversationDetailSerializer, AiLabMessageSerializer,
+    AiLabNotificationSerializer,
 )
 
 
@@ -1719,6 +1720,97 @@ def ailab_internal_add_message(request, pk):
     serializer.save(conversation=conversation)
     conversation.save()
     return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+# ============================================================================
+# MyAgent 通知收件箱 —— 跟 conversation 解耦的 agent push 消息
+# ============================================================================
+
+class AiLabNotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """GET /api/ai/notifications/      — 当前用户的通知，倒序
+       GET /api/ai/notifications/?unread=1  — 仅未读
+       POST /api/ai/notifications/mark-read/   — body: {ids: [...]} 或 {all: true}
+    """
+    serializer_class = AiLabNotificationSerializer
+    from rest_framework_simplejwt.authentication import JWTAuthentication
+    from rest_framework.permissions import IsAuthenticated
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = AiLabNotification.objects.filter(user=self.request.user)
+        if self.request.query_params.get('unread') in ('1', 'true', 'yes'):
+            qs = qs.filter(is_read=False)
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        page = qs[: int(request.query_params.get('limit', 50) or 50)]
+        ser = self.get_serializer(page, many=True)
+        unread_count = AiLabNotification.objects.filter(user=request.user, is_read=False).count()
+        return Response({
+            'results': ser.data,
+            'unread_count': unread_count,
+        })
+
+    @action(detail=False, methods=['post'], url_path='mark-read')
+    def mark_read(self, request):
+        """标已读：body {ids: [int]} 或 {all: true}"""
+        all_flag = bool(request.data.get('all'))
+        ids = request.data.get('ids') or []
+        qs = AiLabNotification.objects.filter(user=request.user, is_read=False)
+        if not all_flag:
+            ids = [int(i) for i in ids if str(i).isdigit()]
+            if not ids:
+                return Response({"updated": 0})
+            qs = qs.filter(id__in=ids)
+        n = qs.update(is_read=True)
+        return Response({"updated": n})
+
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+def ailab_internal_push_notification(request):
+    """Hermes / cron / 任意服务端使用 INTERNAL_TOKEN 推一条通知给指定用户。
+
+    Headers:
+      Authorization: Bearer <HERMES_INTERNAL_TOKEN>
+      X-Hermes-User-Id: <django user id>
+
+    Body: {title?, content, source?, metadata?}
+    """
+    from django.conf import settings as _s
+    from django.contrib.auth import get_user_model
+
+    token = (request.META.get('HTTP_AUTHORIZATION') or '').strip()
+    expected = (getattr(_s, 'HERMES_INTERNAL_TOKEN', '') or '').strip()
+    if not expected or token != f"Bearer {expected}":
+        return Response({"error": "unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user_id = (request.META.get('HTTP_X_HERMES_USER_ID') or '').strip()
+    if not user_id.isdigit():
+        return Response({"error": "missing or invalid X-Hermes-User-Id"}, status=status.HTTP_400_BAD_REQUEST)
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(pk=int(user_id))
+    except User.DoesNotExist:
+        return Response({"error": "user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    content = (request.data.get('content') or '').strip()
+    if not content:
+        return Response({"error": "content required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    notif = AiLabNotification.objects.create(
+        user=user,
+        title=(request.data.get('title') or '')[:200],
+        content=content,
+        source=(request.data.get('source') or 'agent')[:20],
+        metadata=request.data.get('metadata') or {},
+    )
+    return Response(AiLabNotificationSerializer(notif).data, status=status.HTTP_201_CREATED)
 
 
 class AiLabConversationViewSet(viewsets.ModelViewSet):
