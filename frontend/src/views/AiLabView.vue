@@ -480,6 +480,10 @@ const sendMessage = async (content = null) => {
 
   // 开始流式响应（传入文件内容供 API 调用使用）
   await streamResponse(fileContent)
+
+  // AI 标题在后端是异步生成（DeepSeek 1-2s 出结果），流式响应结束后
+  // 再拉一次会话列表，把"新对话"换成生成出的真实标题
+  fetchConversations()
 }
 
 // 流式响应

@@ -1594,6 +1594,86 @@ from .serializers import (
 )
 
 
+def _kickoff_ai_title_generation(conversation, first_user_message: str) -> None:
+    """异步给一段对话生成简短标题。
+
+    直接打 DeepSeek v4-flash（thinking disabled，~1s 出结果），让模型从
+    用户首条消息里浓缩出 6-15 字的中文短标题。整个过程扔到后台线程跑，
+    主请求立即返回；标题写回 DB 后前端下次拉 conversation list 就更新。
+
+    任何失败都退回到原来的 substring 30 字逻辑，保证一定有标题。
+    """
+    import json as _json
+    import threading
+    import urllib.request
+
+    fallback = (first_user_message or '').strip()[:30]
+    if fallback and len(first_user_message or '') > 30:
+        fallback = fallback + '...'
+    fallback = fallback or '新对话'
+
+    def _set_title(title: str) -> None:
+        try:
+            fresh = AiLabConversation.objects.get(pk=conversation.pk)
+            if fresh.title == '新对话':
+                fresh.title = title
+                fresh.save(update_fields=['title'])
+        except AiLabConversation.DoesNotExist:
+            pass
+
+    def _run():
+        api_key = getattr(settings, 'DEEPSEEK_API_KEY', '')
+        base_url = getattr(settings, 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
+        if not api_key:
+            _set_title(fallback)
+            return
+
+        system_msg = (
+            "你是会话标题生成器。读用户的第一条消息，输出 6-15 个中文字符的简短标题。"
+            "只输出标题本身，不要引号、句号、解释、前后缀。"
+            "能用中文就用中文，避免连续超过 6 个英文字母。"
+        )
+        user_msg = (first_user_message or '').strip()[:500] or '新对话'
+        try:
+            payload = _json.dumps({
+                "model": "deepseek-v4-flash",
+                "messages": [
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                "max_tokens": 40,
+                "temperature": 0.3,
+                # v4-flash 默认会进入 thinking 状态 → max_tokens 太小直接返回空
+                "thinking": {"type": "disabled"},
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                f"{base_url}/chat/completions",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+            raw = (data.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).debug("DeepSeek title gen failed: %s", exc)
+            _set_title(fallback)
+            return
+
+        title = raw.strip().strip('"').strip("'").strip('「').strip('」').strip('《').strip('》')
+        # 模型可能输出多行/解释，取第一行；超长截断
+        title = title.split('\n')[0].strip()
+        if len(title) > 30:
+            title = title[:30]
+        _set_title(title or fallback)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 class AiLabConversationViewSet(viewsets.ModelViewSet):
     """AI Lab 会话管理 — 严格按登录用户隔离"""
     queryset = AiLabConversation.objects.all()
@@ -1623,13 +1703,10 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
             # 更新会话时间
             conversation.save()  # 触发 auto_now
 
-            # 如果是用户消息且会话标题是默认的，则自动更新标题
+            # 如果是用户消息且会话标题是默认的，则自动生成标题
             if serializer.validated_data.get('role') == 'user' and conversation.title == '新对话':
                 content = serializer.validated_data.get('content', '')
-                # 取前30个字符作为标题
-                new_title = content[:30] + ('...' if len(content) > 30 else '')
-                conversation.title = new_title
-                conversation.save()
+                _kickoff_ai_title_generation(conversation, content)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
