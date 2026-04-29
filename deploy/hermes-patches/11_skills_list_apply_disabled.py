@@ -24,6 +24,10 @@ from pathlib import Path
 
 P = Path("/home/admin/.hermes/hermes-agent/gateway/platforms/api_server.py")
 SENTINEL = "# [patch11] apply yaml-disabled list"
+# patch13 rewrote the whole _handle_list_skills body and folded patch11's
+# disabled-list overlay into its own NEW block, so its presence means we're
+# also covered.
+SENTINEL_SUPERSEDED = "# [patch13] use agent's filtered skill view"
 
 OLD = (
     "                            \"enabled\": not os.path.exists(os.path.join(cat_path, \".disabled\")),\n"
@@ -57,7 +61,7 @@ NEW = (
 
 def main() -> int:
     text = P.read_text()
-    if SENTINEL in text:
+    if SENTINEL in text or SENTINEL_SUPERSEDED in text:
         print("  [skip] already patched")
         return 0
     if OLD not in text:
