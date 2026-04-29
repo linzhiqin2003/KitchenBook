@@ -1141,18 +1141,18 @@ const openImage = (dataUrl) => {
 
 .markdown-content :deep(pre),
 .markdown-content :deep(.code-block) {
-  background: #1c1c1e;
+  background: var(--theme-50, #f8f8f6);
+  border: 1px solid var(--theme-200, #e4e4df);
   border-radius: 8px;
   padding: 0.875em 1em;
   margin: 0.75em 0;
   overflow-x: auto;
-  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .markdown-content :deep(pre code),
 .markdown-content :deep(.code-block code) {
   background: transparent;
-  color: #d4d4d8;
+  color: var(--theme-700, #2d2d28);
   padding: 0;
   font-size: 0.85em;
   line-height: 1.65;
