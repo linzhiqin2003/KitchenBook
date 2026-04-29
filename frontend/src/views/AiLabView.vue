@@ -258,6 +258,77 @@ const normalizeToolStatus = (status) => {
   return TOOL_STATUS.PARSING
 }
 
+const MARKDOWN_IMAGE_URL_RE = /!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
+const LOCAL_ASSET_PATH_RE = /(^|[^\w/:.-])(\/(?:[\w.-]+\/)+[\w.-]+\.(?:png|jpg|jpeg|gif|webp|pdf|mp4|mov|webm|mkv))\b/gi
+const PUBLISHED_ASSET_URL_RE = /(^|[^\w/:.-])(\/media\/ailab\/[\w.-]+\.(?:png|jpg|jpeg|gif|webp|pdf|mp4|mov|webm|mkv))\b/gi
+
+const extractMatches = (text, regex, groupIndex = 1) => {
+  if (!text) return []
+  const matches = []
+  for (const match of text.matchAll(regex)) {
+    if (match[groupIndex]) {
+      matches.push(match[groupIndex])
+    }
+  }
+  return matches
+}
+
+const buildPersistedAssetUrlMap = (streamedContent, persistedContent) => {
+  const rewrites = new Map()
+  const streamedImageUrls = extractMatches(streamedContent, MARKDOWN_IMAGE_URL_RE, 1)
+  const persistedImageUrls = extractMatches(persistedContent, MARKDOWN_IMAGE_URL_RE, 1)
+  const imageCount = Math.min(streamedImageUrls.length, persistedImageUrls.length)
+
+  for (let i = 0; i < imageCount; i += 1) {
+    if (streamedImageUrls[i] !== persistedImageUrls[i]) {
+      rewrites.set(streamedImageUrls[i], persistedImageUrls[i])
+    }
+  }
+
+  if (rewrites.size > 0) {
+    return rewrites
+  }
+
+  const streamedLocalPaths = extractMatches(streamedContent, LOCAL_ASSET_PATH_RE, 2)
+  const persistedMediaUrls = extractMatches(persistedContent, PUBLISHED_ASSET_URL_RE, 2)
+  if (streamedLocalPaths.length === 0 || streamedLocalPaths.length !== persistedMediaUrls.length) {
+    return rewrites
+  }
+
+  streamedLocalPaths.forEach((path, index) => {
+    if (path !== persistedMediaUrls[index]) {
+      rewrites.set(path, persistedMediaUrls[index])
+    }
+  })
+  return rewrites
+}
+
+const replaceAssetUrls = (text, rewrites) => {
+  if (!text || !rewrites || rewrites.size === 0) return text || ''
+  let nextText = text
+  for (const [from, to] of rewrites.entries()) {
+    nextText = nextText.replaceAll(from, to)
+  }
+  return nextText
+}
+
+const syncSegmentsWithPersistedContent = (segments, streamedContent, persistedContent) => {
+  if (!Array.isArray(segments) || segments.length === 0) return segments
+  if (segments.length === 1) {
+    return [{ ...segments[0], content: persistedContent }]
+  }
+
+  const rewrites = buildPersistedAssetUrlMap(streamedContent, persistedContent)
+  if (rewrites.size === 0) {
+    return segments
+  }
+
+  return segments.map(seg => ({
+    ...seg,
+    content: replaceAssetUrls(seg.content || '', rewrites)
+  }))
+}
+
 const normalizeAssistantMessage = (message) => {
   if (message?.role !== 'assistant') {
     return message
@@ -1129,13 +1200,22 @@ const streamResponse = async (fileContent = null, options = {}) => {
       turnUsage.value,
     )
     if (savedAiMsg) {
-      messages.value[aiMessageIndex].id = savedAiMsg.id
-      // 后端 asset_publish 会把 /tmp/foo.png 改写成 /media/ailab/...
-      // 流式期间前端拿的是 agent 原始路径，图片加载会失败 —— 用持久化后的
-      // content 替换前端这条，让图片立即可显示，不必切换会话再回来。
-      if (savedAiMsg.content && savedAiMsg.content !== currentContent.value) {
-        messages.value[aiMessageIndex].content = savedAiMsg.content
-        currentContent.value = savedAiMsg.content
+      const existingAiMsg = messages.value[aiMessageIndex]
+      if (existingAiMsg) {
+        const persistedContent = savedAiMsg.content || currentContent.value
+        const syncedSegments = syncSegmentsWithPersistedContent(
+          existingAiMsg.segments,
+          currentContent.value,
+          persistedContent,
+        )
+
+        messages.value[aiMessageIndex] = normalizeAssistantMessage({
+          ...existingAiMsg,
+          ...savedAiMsg,
+          content: persistedContent,
+          segments: syncedSegments,
+        })
+        currentContent.value = persistedContent
       }
     }
 
