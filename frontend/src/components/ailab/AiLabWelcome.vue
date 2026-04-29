@@ -10,6 +10,8 @@ const props = defineProps({
   recordingDuration: { type: Number, default: 0 },
   hasImage: { type: Boolean, default: false },
   fileAttachment: { type: Object, default: null },
+  selectedModel: { type: String, default: '' },
+  modelOptions: { type: Array, default: () => [] },
   sessionTokens: {
     type: Object,
     default: () => ({
@@ -24,7 +26,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'update:modelValue', 'ask', 'send', 'stop', 'image-click', 'voice-click', 'paste', 'remove-file', 'toggle-sidebar'
+  'update:modelValue', 'update:selectedModel', 'ask', 'send', 'stop', 'image-click', 'voice-click', 'paste', 'remove-file', 'toggle-sidebar'
 ])
 
 const examplePrompts = [
@@ -58,9 +60,12 @@ const examplePrompts = [
         :recording-duration="recordingDuration"
         :has-image="hasImage"
         :file-attachment="fileAttachment"
+        :selected-model="selectedModel"
+        :model-options="modelOptions"
         :session-tokens="sessionTokens"
         :context-limit="contextLimit"
         @update:model-value="emit('update:modelValue', $event)"
+        @update:selected-model="emit('update:selectedModel', $event)"
         @send="emit('send')"
         @stop="emit('stop')"
         @image-click="emit('image-click')"

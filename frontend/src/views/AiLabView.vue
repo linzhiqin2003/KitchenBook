@@ -10,6 +10,19 @@ const router = useRouter()
 import { useAuthStore } from '../store/auth'
 
 const authStore = useAuthStore()
+const DEFAULT_AGENT_MODEL = 'deepseek-v4-flash'
+const AGENT_MODEL_OPTIONS = [
+  { value: 'deepseek-v4-flash', label: 'Flash', title: 'DeepSeek V4 Flash' },
+  { value: 'deepseek-v4-pro', label: 'Pro', title: 'DeepSeek V4 Pro' },
+]
+
+const normalizeAgentModel = (value) => (
+  AGENT_MODEL_OPTIONS.some(option => option.value === value) ? value : DEFAULT_AGENT_MODEL
+)
+
+const getAgentModelLabel = (value) => (
+  AGENT_MODEL_OPTIONS.find(option => option.value === value)?.title || value || DEFAULT_AGENT_MODEL
+)
 
 // 给 Django /api/ai/... 请求带上 JWT —— 后端按 request.user 过滤会话
 const djangoHeaders = (extra = {}) => {
@@ -69,6 +82,7 @@ const inputMessage = ref('')
 const messages = ref([])
 const chatAreaRef = ref(null)
 const isChatNearBottom = ref(true)
+const selectedAgentModel = ref(DEFAULT_AGENT_MODEL)
 
 // ===== 文件/语音状态 =====
 const selectedFile = ref(null)       // File object
@@ -402,6 +416,7 @@ const fetchConversation = async (id) => {
     if (response.ok) {
       const data = await response.json()
       currentConversation.value = data
+      selectedAgentModel.value = normalizeAgentModel(data.agent_model)
       messages.value = normalizeMessagesForUI(data.messages || [])
       // 恢复持久化的 token 用量
       if (data.token_usage && typeof data.token_usage === 'object' && Object.keys(data.token_usage).length > 0) {
@@ -431,13 +446,14 @@ const createConversation = async () => {
     const response = await fetch(`${API_BASE_URL}/api/ai/conversations/`, {
       method: 'POST',
       headers: djangoHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ title: '新对话' })
+      body: JSON.stringify({ title: '新对话', agent_model: selectedAgentModel.value })
     })
     if (response.ok) {
       const data = await response.json()
       conversations.value.unshift(data)
       currentConversationId.value = data.id
       currentConversation.value = data
+      selectedAgentModel.value = normalizeAgentModel(data.agent_model)
     }
   } catch (error) {
     console.error('创建会话失败:', error)
@@ -460,6 +476,26 @@ const selectConversation = async (id) => {
   currentConversationId.value = id
   resetSessionTokens()
   await fetchConversation(id)
+}
+
+const updateConversationAgentModel = async (conversationId, model) => {
+  if (!conversationId) return
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ai/conversations/${conversationId}/`, {
+      method: 'PATCH',
+      headers: djangoHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ agent_model: model })
+    })
+    if (response.ok) {
+      const data = await response.json()
+      currentConversation.value = data
+      conversations.value = conversations.value.map(conv => (
+        conv.id === conversationId ? { ...conv, agent_model: data.agent_model } : conv
+      ))
+    }
+  } catch (error) {
+    console.error('更新会话模型失败:', error)
+  }
 }
 
 // 删除会话
@@ -617,7 +653,7 @@ const streamResponse = async (fileContent = null, options = {}) => {
   // 添加空的 AI 消息用于流式填充
   const aiMessageIndex = messages.value.length
   currentStreamingIndex.value = aiMessageIndex
-  const currentModelName = 'Hermes'
+  const currentModelName = getAgentModelLabel(selectedAgentModel.value)
   messages.value.push({
     role: 'assistant',
     content: '',
@@ -1062,7 +1098,7 @@ const streamResponse = async (fileContent = null, options = {}) => {
       method: 'POST',
       headers: chatHeaders,
       body: JSON.stringify({
-        model: 'hermes-agent',
+        model: selectedAgentModel.value,
         messages: apiMessages,
         stream: true,
         stream_options: { include_usage: true }
@@ -1190,7 +1226,7 @@ const streamResponse = async (fileContent = null, options = {}) => {
     // 保存 AI 消息到后端（含完整 subTurns + 本轮 token 计费）。
     // 优先用 Hermes 上报的真实模型名（turnUsage.modelName），用于跨会话按
     // 模型分组统计；没有就退到展示用的 currentModelName。
-    const persistedModelName = turnUsage.value.modelName || currentModelName
+    const persistedModelName = turnUsage.value.modelName || selectedAgentModel.value
     const savedAiMsg = await saveMessage(
       currentConversationId.value,
       'assistant',
@@ -1293,6 +1329,15 @@ const stopGeneration = async () => {
 
 const handleScrollBottom = () => {
   chatAreaRef.value?.scrollToBottom(true)
+}
+
+const handleAgentModelChange = async (nextModel) => {
+  const normalized = normalizeAgentModel(nextModel)
+  if (normalized === selectedAgentModel.value) return
+  selectedAgentModel.value = normalized
+  if (currentConversationId.value) {
+    await updateConversationAgentModel(currentConversationId.value, normalized)
+  }
 }
 
 // 编辑消息（删除原 user 消息及后续 → 重新发起）
@@ -1632,6 +1677,8 @@ onMounted(async () => {
       <AiLabWelcome
         v-if="!hasMessages"
         v-model="inputMessage"
+        :selected-model="selectedAgentModel"
+        :model-options="AGENT_MODEL_OPTIONS"
         :is-loading="isLoading"
         :is-recording="isRecording"
         :is-transcribing="isTranscribing"
@@ -1641,6 +1688,7 @@ onMounted(async () => {
         :file-attachment="selectedAttachment"
         :session-tokens="sessionTokens"
         :context-limit="TOKEN_CONTEXT_LIMIT"
+        @update:selected-model="handleAgentModelChange"
         @ask="handleQuickAsk"
         @send="handleSend"
         @stop="stopGeneration"
@@ -1688,6 +1736,8 @@ onMounted(async () => {
       <AiLabInput
         v-if="hasMessages"
         v-model="inputMessage"
+        :selected-model="selectedAgentModel"
+        :model-options="AGENT_MODEL_OPTIONS"
         :is-loading="isLoading"
         :is-recording="isRecording"
         :is-transcribing="isTranscribing"
@@ -1698,6 +1748,7 @@ onMounted(async () => {
         :session-tokens="sessionTokens"
         :context-limit="TOKEN_CONTEXT_LIMIT"
         :show-scroll-bottom="!isChatNearBottom"
+        @update:selected-model="handleAgentModelChange"
         @send="handleSend"
         @stop="stopGeneration"
         @scroll-bottom="handleScrollBottom"

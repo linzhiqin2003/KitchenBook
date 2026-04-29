@@ -217,7 +217,7 @@ class AiLabConversationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AiLabConversation
-        fields = ['id', 'title', 'created_at', 'updated_at', 'message_count', 'last_message']
+        fields = ['id', 'title', 'agent_model', 'created_at', 'updated_at', 'message_count', 'last_message']
 
     def get_message_count(self, obj):
         return obj.messages.count()
@@ -238,7 +238,7 @@ class AiLabConversationDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AiLabConversation
-        fields = ['id', 'title', 'created_at', 'updated_at', 'messages', 'token_usage']
+        fields = ['id', 'title', 'agent_model', 'created_at', 'updated_at', 'messages', 'token_usage']
 
 
 class AiLabNotificationSerializer(serializers.ModelSerializer):

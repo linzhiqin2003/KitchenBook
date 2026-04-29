@@ -12,6 +12,8 @@ const props = defineProps({
   hasImage: { type: Boolean, default: false },
   fileAttachment: { type: Object, default: null },
   floating: { type: Boolean, default: true },
+  selectedModel: { type: String, default: '' },
+  modelOptions: { type: Array, default: () => [] },
   sessionTokens: {
     type: Object,
     default: () => ({
@@ -27,7 +29,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'update:modelValue', 'send', 'stop', 'image-click', 'voice-click', 'paste', 'remove-file', 'scroll-bottom'
+  'update:modelValue', 'update:selectedModel', 'send', 'stop', 'image-click', 'voice-click', 'paste', 'remove-file', 'scroll-bottom'
 ])
 
 const localValue = ref(props.modelValue)
@@ -93,6 +95,8 @@ const formatDuration = (seconds) => {
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
+
+const shouldShowModelSwitcher = computed(() => props.modelOptions.length > 1)
 </script>
 
 <template>
@@ -234,19 +238,38 @@ const formatDuration = (seconds) => {
         </div>
       </div>
 
-      <!-- 底部状态栏：模型标识 + token 用量 -->
-      <div v-if="floating" class="flex items-center justify-center gap-3 mt-1.5" style="font-size: 13px; color: var(--theme-400);">
-        <span>Hermes Agent</span>
-        <span style="color: var(--theme-300);">·</span>
-        <AiLabTokenUsage
-          :prompt-tokens="sessionTokens.promptTokens"
-          :completion-tokens="sessionTokens.completionTokens"
-          :total-prompt-tokens="sessionTokens.totalPromptTokens"
-          :total-completion-tokens="sessionTokens.totalCompletionTokens"
-          :turn-count="sessionTokens.turnCount"
-          :context-limit="contextLimit"
-          :breakdown="sessionTokens.breakdown"
-        />
+      <!-- 底部状态栏：模型切换 + token 用量 -->
+      <div
+        v-if="shouldShowModelSwitcher || floating"
+        class="input-footer"
+        :class="{ 'input-footer--floating': floating, 'input-footer--compact': !floating }"
+      >
+        <div v-if="shouldShowModelSwitcher" class="model-switcher" role="tablist" aria-label="选择 Hermes 基座模型">
+          <button
+            v-for="option in modelOptions"
+            :key="option.value"
+            type="button"
+            class="model-switcher__button"
+            :class="{ 'is-active': selectedModel === option.value }"
+            :title="option.title || option.label"
+            @click="emit('update:selectedModel', option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+
+        <template v-if="floating">
+          <span v-if="shouldShowModelSwitcher" class="input-footer__separator">·</span>
+          <AiLabTokenUsage
+            :prompt-tokens="sessionTokens.promptTokens"
+            :completion-tokens="sessionTokens.completionTokens"
+            :total-prompt-tokens="sessionTokens.totalPromptTokens"
+            :total-completion-tokens="sessionTokens.totalCompletionTokens"
+            :turn-count="sessionTokens.turnCount"
+            :context-limit="contextLimit"
+            :breakdown="sessionTokens.breakdown"
+          />
+        </template>
       </div>
     </div>
   </div>
@@ -291,6 +314,54 @@ const formatDuration = (seconds) => {
 .fade-up-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+.input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+  color: var(--theme-400);
+}
+.input-footer--floating {
+  font-size: 13px;
+}
+.input-footer--compact {
+  font-size: 12px;
+}
+.input-footer__separator {
+  color: var(--theme-300);
+}
+.model-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.18rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+.model-switcher__button {
+  border: none;
+  background: transparent;
+  color: var(--theme-400, #8a8a82);
+  min-width: 68px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+.model-switcher__button:hover {
+  color: var(--theme-600, #5a5a52);
+}
+.model-switcher__button.is-active {
+  background: var(--theme-700, #2d2d28);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.14);
 }
 .input-shell {
   background: rgba(255, 255, 255, 0.94);

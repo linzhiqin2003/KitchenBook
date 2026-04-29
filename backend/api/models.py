@@ -136,6 +136,8 @@ class Category(models.Model):
 
 class AiLabConversation(models.Model):
     """AI Lab 会话 — 每个会话归属一个登录用户"""
+    DEFAULT_AGENT_MODEL = "deepseek-v4-flash"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -144,6 +146,12 @@ class AiLabConversation(models.Model):
         blank=True,
     )
     title = models.CharField(max_length=200, default="新对话")
+    agent_model = models.CharField(
+        max_length=100,
+        default=DEFAULT_AGENT_MODEL,
+        blank=True,
+        help_text="该会话选中的 Hermes 基座模型",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     # Token 用量持久化
