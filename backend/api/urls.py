@@ -32,7 +32,9 @@ urlpatterns = [
     # 内部端点：Hermes 在客户端断开后的回写通道（token 认证，绕过 JWT）
     path('ai/conversations/<int:pk>/messages/internal/', ailab_internal_add_message, name='ai-conversation-messages-internal'),
     # MyAgent 通知推送：Hermes / cron 用 token 推一条通知到用户收件箱
-    path('ai/notifications/internal/', ailab_internal_push_notification, name='ai-notification-internal'),
+    # 路径不能放在 router 注册的 ai/notifications/ 下面 —— router 会把 "internal"
+    # 当成 retrieve 的 pk，被 viewset 的 JWT 拦截。改成独立 ai/internal/ 前缀
+    path('ai/internal/notifications/', ailab_internal_push_notification, name='ai-notification-internal'),
     path('tarot/', include('cards.urls')),
     path('tarot/', include('readings.urls')),
     path('tarot/', include('oracle.urls')),
