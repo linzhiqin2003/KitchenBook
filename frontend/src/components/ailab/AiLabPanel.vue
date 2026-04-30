@@ -19,9 +19,6 @@ const skills = ref([])
 const memoryEntries = ref([])
 const memoryBreadcrumbs = ref([])
 const memoryCurrentPath = ref('memories')
-const memoryRootDisplay = ref('')
-const memoryEntryCount = ref(0)
-const memoryListLimit = ref(0)
 const memorySelectedPath = ref('')
 const workspaceRoots = ref([])
 const workspaceActiveRoot = ref('')
@@ -148,11 +145,8 @@ const fetchMemory = async ({ path = memoryCurrentPath.value || 'memories' } = {}
       params: { root: 'user', path }
     })
     memoryCurrentPath.value = data.current_path || path
-    memoryRootDisplay.value = data.current_display || data.root_display || ''
     memoryBreadcrumbs.value = Array.isArray(data.breadcrumbs) ? data.breadcrumbs : []
     memoryEntries.value = Array.isArray(data.entries) ? data.entries : []
-    memoryEntryCount.value = Number(data.entry_count) || memoryEntries.value.length
-    memoryListLimit.value = Number(data.list_limit) || 0
   } catch (e) {
     console.error('Failed to fetch memory directory:', e)
     memoryError.value = e?.response?.data?.error || e?.message || '无法读取 memories 目录'
@@ -440,8 +434,11 @@ const workspaceRootHint = computed(() => (
   workspaceCurrentDisplay.value || workspaceRootDisplay.value || '~/.hermes/users/<uid>'
 ))
 
-const memoryRootHint = computed(() => (
-  memoryRootDisplay.value || '~/.hermes/users/<uid>/memories'
+const memoryBreadcrumbItems = computed(() => (
+  memoryBreadcrumbs.value.map((crumb, index) => ({
+    ...crumb,
+    name: index === 0 ? 'Memory' : crumb.name,
+  }))
 ))
 
 const openMemoryBreadcrumb = async (path) => {
@@ -584,18 +581,6 @@ defineExpose({
               {{ memoryError }}
             </div>
 
-            <div class="rounded-xl border px-3 py-3 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
-              <div class="text-[12px] font-semibold mb-2" style="color: #6e6e76;">Memory Directory</div>
-              <div class="text-[11px] break-all" style="color: #9a9aa0; font-family: var(--ai-font-mono);">
-                {{ memoryRootHint }}
-              </div>
-              <div class="text-[11px] mt-2 flex flex-wrap gap-x-3 gap-y-1" style="color: #9a9aa0;">
-                <span>{{ visibleMemoryEntries.length }} 项</span>
-                <span v-if="memoryEntryCount !== visibleMemoryEntries.length">共 {{ memoryEntryCount }} 项</span>
-                <span v-if="memoryListLimit > 0">单目录上限 {{ memoryListLimit }}</span>
-              </div>
-            </div>
-
             <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <button
@@ -610,7 +595,7 @@ defineExpose({
                   </svg>
                 </button>
                 <button
-                  v-for="crumb in memoryBreadcrumbs"
+                  v-for="crumb in memoryBreadcrumbItems"
                   :key="`memory-${crumb.path || 'root'}`"
                   class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
                   style="color: #6e6e76;"

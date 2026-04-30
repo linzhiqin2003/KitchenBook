@@ -1872,6 +1872,34 @@ def _workspace_entry_payload(root_path: Path, entry: Path) -> dict | None:
     }
 
 
+def _workspace_preview_kind(path: Path, *, stat_result=None) -> str:
+    try:
+        target_stat = stat_result or path.stat()
+    except OSError:
+        return 'meta'
+
+    mime_type = mimetypes.guess_type(str(path))[0] or 'application/octet-stream'
+    extension = (path.suffix or '').lower()
+    size = int(target_stat.st_size or 0)
+    is_text = extension in _AILAB_WORKSPACE_TEXT_EXTS or mime_type.startswith('text/')
+    if is_text:
+        return 'text'
+    if mime_type.startswith('image/') and size <= _AILAB_WORKSPACE_BINARY_PREVIEW_LIMIT:
+        return 'image'
+    if mime_type == 'application/pdf' and size <= _AILAB_WORKSPACE_BINARY_PREVIEW_LIMIT:
+        return 'pdf'
+    return 'meta'
+
+
+def _workspace_entry_is_visible(entry: Path, payload: dict) -> bool:
+    entry_type = payload.get('type')
+    if entry_type == 'dir':
+        return True
+    if entry_type == 'file':
+        return _workspace_preview_kind(entry) != 'meta'
+    return True
+
+
 def _workspace_breadcrumbs(root_item: dict, root_path: Path, target_path: Path) -> list[dict]:
     crumbs = [{'name': root_item['label'], 'path': ''}]
     parts = target_path.relative_to(root_path).parts
@@ -1900,7 +1928,7 @@ def _workspace_directory_payload(user, root_key: str, relative_path: str = '') -
     entries = []
     for child in children[:_AILAB_WORKSPACE_LIST_LIMIT]:
         payload = _workspace_entry_payload(root_path, child)
-        if payload is not None:
+        if payload is not None and _workspace_entry_is_visible(child, payload):
             entries.append(payload)
 
     return {
@@ -1937,6 +1965,7 @@ def _workspace_file_preview_payload(user, root_key: str, relative_path: str = ''
     mime_type = mimetypes.guess_type(str(target_path))[0] or 'application/octet-stream'
     extension = (target_path.suffix or '').lower()
     size = int(stat_result.st_size or 0)
+    preview_type = _workspace_preview_kind(target_path, stat_result=stat_result)
     payload = {
         'root': root_item['key'],
         'root_label': root_item['label'],
@@ -1951,25 +1980,21 @@ def _workspace_file_preview_payload(user, root_key: str, relative_path: str = ''
             stat_result.st_mtime,
             tz=dt_timezone.utc,
         ).isoformat(),
-        'preview_type': 'meta',
+        'preview_type': preview_type,
         'truncated': False,
     }
 
-    is_text = extension in _AILAB_WORKSPACE_TEXT_EXTS or mime_type.startswith('text/')
-    if is_text:
+    if preview_type == 'text':
         raw = target_path.read_bytes()
         payload['truncated'] = len(raw) > _AILAB_WORKSPACE_TEXT_PREVIEW_LIMIT
-        payload['preview_type'] = 'text'
         payload['content'] = raw[:_AILAB_WORKSPACE_TEXT_PREVIEW_LIMIT].decode('utf-8', errors='replace')
         return payload
 
-    if mime_type.startswith('image/') and size <= _AILAB_WORKSPACE_BINARY_PREVIEW_LIMIT:
-        payload['preview_type'] = 'image'
+    if preview_type == 'image':
         payload['content_base64'] = base64.b64encode(target_path.read_bytes()).decode('ascii')
         return payload
 
-    if mime_type == 'application/pdf' and size <= _AILAB_WORKSPACE_BINARY_PREVIEW_LIMIT:
-        payload['preview_type'] = 'pdf'
+    if preview_type == 'pdf':
         payload['content_base64'] = base64.b64encode(target_path.read_bytes()).decode('ascii')
         return payload
 
