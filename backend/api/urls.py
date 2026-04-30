@@ -7,6 +7,7 @@ from .views import (
     RecipeIngredientViewSet, AiLabConversationViewSet, AiLabMessageViewSet,
     AiLabNotificationViewSet, ailab_internal_add_message, ailab_internal_push_notification,
     ailab_me, ailab_redeem_invite, ailab_invites, ailab_workspace, ailab_workspace_preview,
+    ailab_skills_browser, ailab_skills_preview,
 )
 
 router = DefaultRouter()
@@ -40,6 +41,8 @@ urlpatterns = [
     path('ai/me/', ailab_me, name='ai-me'),
     path('ai/workspace/', ailab_workspace, name='ai-workspace'),
     path('ai/workspace/preview/', ailab_workspace_preview, name='ai-workspace-preview'),
+    path('ai/skills/browser/', ailab_skills_browser, name='ai-skills-browser'),
+    path('ai/skills/preview/', ailab_skills_preview, name='ai-skills-preview'),
     path('ai/invites/', ailab_invites, name='ai-invites'),
     path('ai/invites/redeem/', ailab_redeem_invite, name='ai-invites-redeem'),
     path('tarot/', include('cards.urls')),

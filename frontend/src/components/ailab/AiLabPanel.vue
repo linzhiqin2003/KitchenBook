@@ -16,6 +16,12 @@ const activeTab = ref('tools')
 const tabs = ['tools', 'skills', 'memory', 'files', 'notifications']
 const tools = ref([])
 const skills = ref([])
+const selectedSkillName = ref('')
+const selectedSkillMeta = ref(null)
+const skillBrowserEntries = ref([])
+const skillBrowserBreadcrumbs = ref([])
+const skillBrowserCurrentPath = ref('')
+const skillBrowserSelectedPath = ref('')
 const memoryEntries = ref([])
 const memoryBreadcrumbs = ref([])
 const memoryCurrentPath = ref('memories')
@@ -36,10 +42,12 @@ const workspacePreview = ref(null)
 const workspacePreviewOpen = ref(false)
 const loadingTools = ref(false)
 const loadingSkills = ref(false)
+const loadingSkillBrowser = ref(false)
 const loadingMemory = ref(false)
 const loadingWorkspace = ref(false)
 const loadingWorkspacePreview = ref(false)
 const memoryError = ref('')
+const skillBrowserError = ref('')
 const workspaceError = ref('')
 const workspacePreviewError = ref('')
 const MIN_PANEL_WIDTH = 280
@@ -120,6 +128,17 @@ const fetchSkills = async () => {
     if (r.ok) {
       const data = await r.json()
       skills.value = data.skills || []
+      if (skills.value.length === 0) {
+        selectedSkillName.value = ''
+        selectedSkillMeta.value = null
+        skillBrowserEntries.value = []
+        skillBrowserBreadcrumbs.value = []
+        skillBrowserCurrentPath.value = ''
+        skillBrowserSelectedPath.value = ''
+      } else {
+        const nextSkill = skills.value.find(item => item.name === selectedSkillName.value) || skills.value[0]
+        await fetchSkillBrowser({ skillName: nextSkill.name, path: nextSkill.name === selectedSkillName.value ? skillBrowserCurrentPath.value : '' })
+      }
     }
   } catch (e) { console.error('Failed to fetch skills:', e) }
   finally { loadingSkills.value = false }
@@ -137,6 +156,33 @@ const toggleSkill = async (skill) => {
   } catch (e) { console.error('Failed to toggle skill:', e) }
 }
 
+const fetchSkillBrowser = async ({ skillName = selectedSkillName.value || '', path = '' } = {}) => {
+  if (!skillName) return
+  loadingSkillBrowser.value = true
+  skillBrowserError.value = ''
+  try {
+    const { data } = await api.get('/ai/skills/browser/', {
+      params: { skill: skillName, path }
+    })
+    selectedSkillName.value = data.skill || skillName
+    selectedSkillMeta.value = {
+      name: data.skill || skillName,
+      category: data.category || '',
+      description: data.description || '',
+      rootDisplay: data.root_display || '',
+    }
+    skillBrowserCurrentPath.value = data.current_path || path || ''
+    skillBrowserBreadcrumbs.value = Array.isArray(data.breadcrumbs) ? data.breadcrumbs : []
+    skillBrowserEntries.value = Array.isArray(data.entries) ? data.entries : []
+    skillBrowserSelectedPath.value = ''
+  } catch (e) {
+    console.error('Failed to fetch skill browser:', e)
+    skillBrowserError.value = e?.response?.data?.error || e?.message || '无法读取 skill 目录'
+  } finally {
+    loadingSkillBrowser.value = false
+  }
+}
+
 const fetchMemory = async ({ path = memoryCurrentPath.value || 'memories' } = {}) => {
   loadingMemory.value = true
   memoryError.value = ''
@@ -151,6 +197,28 @@ const fetchMemory = async ({ path = memoryCurrentPath.value || 'memories' } = {}
     console.error('Failed to fetch memory directory:', e)
     memoryError.value = e?.response?.data?.error || e?.message || '无法读取 memories 目录'
   } finally { loadingMemory.value = false }
+}
+
+const previewSkillEntry = async (entry) => {
+  workspacePreviewError.value = ''
+  loadingWorkspacePreview.value = true
+  try {
+    const { data } = await api.get('/ai/skills/preview/', {
+      params: {
+        skill: selectedSkillName.value,
+        path: entry.path,
+      }
+    })
+    if (data.preview_type === 'image' || data.preview_type === 'pdf') {
+      data.data_url = `data:${data.mime_type};base64,${data.content_base64}`
+    }
+    workspacePreview.value = data
+    workspacePreviewOpen.value = true
+  } catch (e) {
+    workspacePreviewError.value = e?.response?.data?.error || e?.message || '预览失败'
+  } finally {
+    loadingWorkspacePreview.value = false
+  }
 }
 
 const clearWorkspacePreview = () => {
@@ -264,6 +332,13 @@ const skillsByCategory = computed(() => {
 const visibleMemoryEntries = computed(() => (
   memoryEntries.value.filter(entry => !entry.name.endsWith('.lock'))
 ))
+
+const skillBrowserCanGoUp = computed(() => skillBrowserBreadcrumbs.value.length > 1)
+
+const skillBrowserParentPath = computed(() => {
+  if (skillBrowserBreadcrumbs.value.length <= 1) return ''
+  return skillBrowserBreadcrumbs.value[skillBrowserBreadcrumbs.value.length - 2]?.path || ''
+})
 
 const notifications = ref([])
 const notificationsLoading = ref(false)
@@ -441,6 +516,19 @@ const memoryBreadcrumbItems = computed(() => (
   }))
 ))
 
+const skillsByCategoryWithSelected = computed(() => {
+  const groups = {}
+  for (const skill of skills.value) {
+    const cat = skill.category || ''
+    if (!groups[cat]) groups[cat] = []
+    groups[cat].push({
+      ...skill,
+      isSelected: skill.name === selectedSkillName.value,
+    })
+  }
+  return groups
+})
+
 const openMemoryBreadcrumb = async (path) => {
   memoryCurrentPath.value = path || 'memories'
   memorySelectedPath.value = ''
@@ -459,6 +547,31 @@ const openMemoryEntry = async (entry) => {
     return
   }
   await previewWorkspaceEntry({ ...entry, root: 'user' })
+}
+
+const openSkillBrowserBreadcrumb = async (path) => {
+  skillBrowserCurrentPath.value = path || ''
+  skillBrowserSelectedPath.value = ''
+  await fetchSkillBrowser({ skillName: selectedSkillName.value, path: skillBrowserCurrentPath.value })
+}
+
+const selectSkill = async (skill) => {
+  if (!skill?.name) return
+  await fetchSkillBrowser({ skillName: skill.name, path: '' })
+}
+
+const selectSkillBrowserEntry = (entry) => {
+  skillBrowserSelectedPath.value = entry.path
+}
+
+const openSkillBrowserEntry = async (entry) => {
+  if (entry.type === 'dir') {
+    skillBrowserCurrentPath.value = entry.path
+    skillBrowserSelectedPath.value = ''
+    await fetchSkillBrowser({ skillName: selectedSkillName.value, path: entry.path })
+    return
+  }
+  await previewSkillEntry(entry)
 }
 
 defineExpose({
@@ -557,18 +670,109 @@ defineExpose({
           <div v-if="loadingSkills" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">加载中…</div>
           <div v-else-if="skills.length === 0" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">暂无已安装的技能</div>
           <template v-else>
-            <div v-for="(group, category) in skillsByCategory" :key="category" class="mb-3">
+            <div v-for="(group, category) in skillsByCategoryWithSelected" :key="category" class="mb-3">
               <div v-if="category" class="px-3 pb-1 pt-2" style="font-size: 11px; font-weight: 600; color: #9a9aa0; letter-spacing: 0.03em;">{{ category || 'Other' }}</div>
               <div class="space-y-0.5">
                 <div v-for="skill in group" :key="skill.name"
-                  class="flex items-center justify-between px-3 py-1.5 rounded-lg hover:bg-white/60 transition-colors">
-                  <span class="text-[14px] truncate" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</span>
-                  <button @click="toggleSkill(skill)"
+                  class="flex items-start justify-between gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                  :style="skill.isSelected
+                    ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
+                    : 'background: #fff; border: 1px solid #ececef;'"
+                  @click="selectSkill(skill)">
+                  <div class="min-w-0 flex-1">
+                    <div class="text-[14px] truncate" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</div>
+                    <div v-if="skill.description" class="text-[11px] mt-0.5 line-clamp-2" style="color: #9a9aa0;">{{ skill.description }}</div>
+                  </div>
+                  <button @click.stop="toggleSkill(skill)"
                     class="shrink-0 ml-2 cursor-pointer px-2 py-0.5 rounded text-[12px] transition-colors"
                     :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">
                     {{ skill.enabled ? 'on' : 'off' }}
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <div v-if="selectedSkillName" class="mt-4">
+              <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    class="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
+                    :disabled="!skillBrowserCanGoUp"
+                    :style="skillBrowserCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
+                    title="返回上一级"
+                    @click="openSkillBrowserBreadcrumb(skillBrowserParentPath)"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+                    </svg>
+                  </button>
+                  <button
+                    v-for="crumb in skillBrowserBreadcrumbs"
+                    :key="`skill-${selectedSkillName}-${crumb.path || 'root'}`"
+                    class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
+                    style="color: #6e6e76;"
+                    @click="openSkillBrowserBreadcrumb(crumb.path)"
+                  >
+                    {{ crumb.name }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="selectedSkillMeta?.description" class="px-1 pb-2 text-[11px]" style="color: #9a9aa0;">
+                {{ selectedSkillMeta.description }}
+              </div>
+
+              <div v-if="loadingSkillBrowser" class="text-center py-8 text-[12px]" style="color: #b0b0b6;">
+                加载中…
+              </div>
+              <div
+                v-else-if="skillBrowserError"
+                class="rounded-lg px-3 py-2 text-[13px]"
+                style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;"
+              >
+                {{ skillBrowserError }}
+              </div>
+              <div v-else-if="skillBrowserEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
+                当前目录是空的
+              </div>
+              <div v-else class="space-y-1">
+                <button
+                  v-for="entry in skillBrowserEntries"
+                  :key="`${selectedSkillName}-${entry.path}`"
+                  class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
+                  :style="skillBrowserSelectedPath === entry.path
+                    ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
+                    : 'background: #fff; border: 1px solid #ececef;'"
+                  @click="selectSkillBrowserEntry(entry)"
+                  @dblclick="openSkillBrowserEntry(entry)"
+                >
+                  <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
+                    <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
+                    </svg>
+                    <svg v-else-if="entry.type === 'symlink'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 016.364 6.364l-1.757 1.757a4.5 4.5 0 01-6.364 0m-1.414-9.9a4.5 4.5 0 00-6.364 0L2.44 8.666a4.5 4.5 0 006.364 6.364l1.757-1.757" />
+                    </svg>
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.625a1.125 1.125 0 00-1.125-1.125H8.25m11.25 9.75h-2.625a1.125 1.125 0 00-1.125 1.125V18m4.875-3.75l-3.375 3.375a2.25 2.25 0 01-1.59.659H6.375A1.125 1.125 0 015.25 17.16V5.625A1.125 1.125 0 016.375 4.5H8.25m0 0l2.25 2.25m-2.25-2.25V6.75m0-2.25h6.75" />
+                    </svg>
+                  </span>
+
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="text-[13px] truncate" style="color: #2c2c30;">{{ entry.name }}</span>
+                      <span v-if="entry.type === 'dir' && entry.has_children" class="text-[10px] shrink-0" style="color: #b0b0b6;">folder</span>
+                      <span v-else-if="entry.type !== 'dir'" class="text-[11px] shrink-0" style="color: #9a9aa0;">{{ formatWorkspaceSize(entry.size) }}</span>
+                    </div>
+                    <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
+                      <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
+                      <span v-if="entry.target"> · {{ entry.target }}</span>
+                    </div>
+                  </div>
+                </button>
+              </div>
+              <div class="mt-3 text-[11px] text-center" style="color: #b0b0b6;">
+                单击选择，双击打开
               </div>
             </div>
           </template>

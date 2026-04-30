@@ -1774,6 +1774,11 @@ def _ailab_agent_workspace_root() -> Path:
     ))
 
 
+def _ailab_skills_root() -> Path:
+    hermes_home = Path(os.path.expanduser(getattr(settings, 'HERMES_HOME', '~/.hermes')))
+    return hermes_home / 'skills'
+
+
 def _workspace_display_path(root: Path) -> str:
     home = Path.home()
     try:
@@ -1898,6 +1903,160 @@ def _workspace_entry_is_visible(entry: Path, payload: dict) -> bool:
     if entry_type == 'file':
         return _workspace_preview_kind(entry) != 'meta'
     return True
+
+
+def _extract_skill_frontmatter(skill_md: Path) -> dict:
+    try:
+        text = skill_md.read_text(encoding='utf-8', errors='replace')[:8192]
+    except OSError:
+        return {}
+    if not text.startswith('---'):
+        return {}
+    end = text.find('\n---', 3)
+    if end == -1:
+        return {}
+    frontmatter = text[3:end].strip()
+    metadata = {}
+    for line in frontmatter.splitlines():
+        if ':' not in line:
+            continue
+        key, value = line.split(':', 1)
+        key = key.strip().lower()
+        value = value.strip().strip('"\'')
+        if key and value:
+            metadata[key] = value
+    return metadata
+
+
+def _discover_skill_index() -> dict[str, dict]:
+    skills_root = _ailab_skills_root()
+    if not skills_root.exists():
+        return {}
+
+    skill_index: dict[str, dict] = {}
+    for skill_md in sorted(skills_root.rglob('SKILL.md')):
+        if any(part.startswith('.') for part in skill_md.relative_to(skills_root).parts):
+            continue
+        metadata = _extract_skill_frontmatter(skill_md)
+        name = metadata.get('name') or skill_md.parent.name
+        if name in skill_index:
+            continue
+        relative_parts = skill_md.relative_to(skills_root).parts
+        category = relative_parts[0] if len(relative_parts) > 2 else ''
+        skill_index[name] = {
+            'name': name,
+            'description': metadata.get('description', ''),
+            'category': category,
+            'path': skill_md.parent,
+        }
+    return skill_index
+
+
+def _resolve_skill_target(skill_name: str, relative_path: str = ''):
+    skill_name = (skill_name or '').strip()
+    if not skill_name:
+        raise FileNotFoundError('skill not found')
+    skill_index = _discover_skill_index()
+    skill_item = skill_index.get(skill_name)
+    if skill_item is None:
+        raise FileNotFoundError('skill not found')
+
+    root_path = skill_item['path'].expanduser().resolve()
+    relative_path = (relative_path or '').strip().strip('/')
+    target_path = (root_path / relative_path).resolve(strict=False) if relative_path else root_path
+    try:
+        target_path.relative_to(root_path)
+    except ValueError:
+        raise PermissionError('path escapes skill root')
+    return skill_item, root_path, target_path
+
+
+def _skill_breadcrumbs(skill_item: dict, root_path: Path, target_path: Path) -> list[dict]:
+    crumbs = [{'name': skill_item['name'], 'path': ''}]
+    parts = target_path.relative_to(root_path).parts
+    current = Path()
+    for part in parts:
+        current /= part
+        crumbs.append({'name': part, 'path': current.as_posix()})
+    return crumbs
+
+
+def _skill_directory_payload(skill_name: str, relative_path: str = '') -> dict:
+    skill_item, root_path, target_path = _resolve_skill_target(skill_name, relative_path)
+    if not target_path.exists():
+        raise FileNotFoundError('path not found')
+    if not target_path.is_dir():
+        raise NotADirectoryError('path is not a directory')
+
+    try:
+        children = list(target_path.iterdir())
+    except OSError as exc:
+        raise PermissionError(str(exc)) from exc
+
+    children.sort(key=lambda child: (not child.is_dir(), child.name.lower()))
+    truncated = len(children) > _AILAB_WORKSPACE_LIST_LIMIT
+    entries = []
+    for child in children[:_AILAB_WORKSPACE_LIST_LIMIT]:
+        payload = _workspace_entry_payload(root_path, child)
+        if payload is not None and _workspace_entry_is_visible(child, payload):
+            entries.append(payload)
+
+    return {
+        'skill': skill_item['name'],
+        'category': skill_item['category'],
+        'description': skill_item['description'],
+        'root_display': _workspace_display_path(root_path),
+        'current_path': '' if target_path == root_path else target_path.relative_to(root_path).as_posix(),
+        'current_display': _workspace_display_path(target_path),
+        'breadcrumbs': _skill_breadcrumbs(skill_item, root_path, target_path),
+        'entries': entries,
+        'entry_count': len(entries),
+        'truncated': truncated,
+        'list_limit': _AILAB_WORKSPACE_LIST_LIMIT,
+    }
+
+
+def _skill_file_preview_payload(skill_name: str, relative_path: str = '') -> dict:
+    skill_item, root_path, target_path = _resolve_skill_target(skill_name, relative_path)
+    if not target_path.exists():
+        raise FileNotFoundError('path not found')
+    if not target_path.is_file():
+        raise IsADirectoryError('path is a directory')
+
+    stat_result = target_path.stat()
+    mime_type = mimetypes.guess_type(str(target_path))[0] or 'application/octet-stream'
+    extension = (target_path.suffix or '').lower()
+    size = int(stat_result.st_size or 0)
+    preview_type = _workspace_preview_kind(target_path, stat_result=stat_result)
+    payload = {
+        'skill': skill_item['name'],
+        'category': skill_item['category'],
+        'root_display': _workspace_display_path(root_path),
+        'path': target_path.relative_to(root_path).as_posix(),
+        'display_path': _workspace_display_path(target_path),
+        'name': target_path.name,
+        'size': size,
+        'extension': extension,
+        'mime_type': mime_type,
+        'modified_at': datetime.fromtimestamp(
+            stat_result.st_mtime,
+            tz=dt_timezone.utc,
+        ).isoformat(),
+        'preview_type': preview_type,
+        'truncated': False,
+    }
+
+    if preview_type == 'text':
+        raw = target_path.read_bytes()
+        payload['truncated'] = len(raw) > _AILAB_WORKSPACE_TEXT_PREVIEW_LIMIT
+        payload['content'] = raw[:_AILAB_WORKSPACE_TEXT_PREVIEW_LIMIT].decode('utf-8', errors='replace')
+        return payload
+
+    if preview_type in {'image', 'pdf'}:
+        payload['content_base64'] = base64.b64encode(target_path.read_bytes()).decode('ascii')
+        return payload
+
+    return payload
 
 
 def _workspace_breadcrumbs(root_item: dict, root_path: Path, target_path: Path) -> list[dict]:
@@ -2037,6 +2196,44 @@ def ailab_workspace_preview(request):
         return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
     except FileNotFoundError:
         return Response({'error': 'path not found'}, status=status.HTTP_404_NOT_FOUND)
+    except IsADirectoryError:
+        return Response({'error': 'path is a directory'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@authentication_classes([_JWTAuth])
+@permission_classes([permissions.IsAuthenticated, AiLabAccessPermission])
+def ailab_skills_browser(request):
+    """Browse a single Hermes skill directory by skill name."""
+    try:
+        payload = _skill_directory_payload(
+            request.query_params.get('skill') or '',
+            request.query_params.get('path') or '',
+        )
+        return Response(payload)
+    except PermissionError as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+    except FileNotFoundError:
+        return Response({'error': 'skill not found'}, status=status.HTTP_404_NOT_FOUND)
+    except NotADirectoryError:
+        return Response({'error': 'path is not a directory'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@authentication_classes([_JWTAuth])
+@permission_classes([permissions.IsAuthenticated, AiLabAccessPermission])
+def ailab_skills_preview(request):
+    """Preview a file inside a Hermes skill directory."""
+    try:
+        payload = _skill_file_preview_payload(
+            request.query_params.get('skill') or '',
+            request.query_params.get('path') or '',
+        )
+        return Response(payload)
+    except PermissionError as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+    except FileNotFoundError:
+        return Response({'error': 'skill not found'}, status=status.HTTP_404_NOT_FOUND)
     except IsADirectoryError:
         return Response({'error': 'path is a directory'}, status=status.HTTP_400_BAD_REQUEST)
 
