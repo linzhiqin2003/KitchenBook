@@ -97,42 +97,78 @@ def _p16_file_to_data_url(p):
 
 
 def _p16_attach_images(api_messages, model_name, api_mode):
-    """Mutate api_messages in place: convert string content to multipart
-    [text, image_url, ...] when an absolute image path is mentioned."""
+    """Mutate api_messages in place: collect absolute image paths from
+    every message in the *current turn window* (tool results, agent
+    thoughts, the user's own message) and attach them as image_url
+    parts on the **last user message**.
+
+    Why last user message and not the message that contains the path:
+    OpenAI Vision spec only blesses ``image_url`` content parts on
+    user/assistant messages. Several backends (mimo included) serde-
+    reject multipart content on ``tool`` role. Aggregating onto the
+    last user message keeps the payload spec-compliant everywhere.
+    """
     if api_mode in {"anthropic_messages", "bedrock_converse"}:
         return  # those modes have their own multimodal conventions
     if not _p16_is_multimodal(model_name):
         return
-    if not isinstance(api_messages, list):
+    if not isinstance(api_messages, list) or not api_messages:
         return
+
+    # Find the index of the latest user message; that's where we attach.
+    last_user_idx = -1
+    for i, msg in enumerate(api_messages):
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            last_user_idx = i
+    if last_user_idx < 0:
+        return
+    last_user = api_messages[last_user_idx]
+    last_user_content = last_user.get("content")
+    if not isinstance(last_user_content, str):
+        return  # already multipart from a previous build pass — idempotent
+
+    # Find the previous user message so we only sweep paths produced
+    # *during this turn* (assistant/tool messages between prev-user and
+    # current-user) plus the current user message itself. Avoids
+    # re-attaching every image ever mentioned across a long history.
+    prev_user_idx = -1
+    for i in range(last_user_idx - 1, -1, -1):
+        if isinstance(api_messages[i], dict) and api_messages[i].get("role") == "user":
+            prev_user_idx = i
+            break
+
+    paths = []
     seen = set()
-    attached = 0
-    for msg in api_messages:
-        if attached >= _P16_MAX_ATTACH:
-            return
+    for i in range(prev_user_idx + 1, last_user_idx + 1):
+        msg = api_messages[i]
         if not isinstance(msg, dict):
             continue
         content = msg.get("content")
+        # Some assistant messages have content=None when there's a
+        # tool_call; skip those.
         if not isinstance(content, str) or not content:
             continue
-        # Skip if no candidate path
-        candidates = list(dict.fromkeys(_P16_PATH_RE.findall(content)))
-        if not candidates:
-            continue
-        new_parts = [{"type": "text", "text": content}]
-        for raw in candidates:
-            if attached >= _P16_MAX_ATTACH:
-                break
+        for raw in _P16_PATH_RE.findall(content):
             if raw in seen:
                 continue
-            data_url = _p16_file_to_data_url(raw)
-            if data_url is None:
-                continue
-            new_parts.append({"type": "image_url", "image_url": {"url": data_url}})
             seen.add(raw)
-            attached += 1
-        if len(new_parts) > 1:
-            msg["content"] = new_parts
+            paths.append(raw)
+
+    if not paths:
+        return
+
+    new_parts = [{"type": "text", "text": last_user_content}]
+    attached = 0
+    for raw in paths:
+        if attached >= _P16_MAX_ATTACH:
+            break
+        data_url = _p16_file_to_data_url(raw)
+        if data_url is None:
+            continue
+        new_parts.append({"type": "image_url", "image_url": {"url": data_url}})
+        attached += 1
+    if attached > 0:
+        last_user["content"] = new_parts
 '''
 
 
