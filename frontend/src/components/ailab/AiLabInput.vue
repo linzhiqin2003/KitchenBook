@@ -177,6 +177,13 @@ const getInlineSublabel = (option) => {
               class="attachment-card__img"
               alt=""
             />
+            <!-- 图片预览未就绪：FileReader 还在读，先占位（skeleton 闪烁），
+                 避免在加载窗口里短暂掉到下面的 PDF 分支造成"先 PDF 后图"的视觉跳变 -->
+            <div
+              v-else-if="fileAttachment.type === 'image'"
+              class="attachment-card__skeleton"
+              aria-label="图片加载中"
+            ></div>
             <!-- PDF：页面 + 角标 -->
             <template v-else>
               <div class="attachment-card__pdf-page">
@@ -574,7 +581,9 @@ const getInlineSublabel = (option) => {
   min-height: 24px;
   /* JS 端 autoResize 控制高度。max-height 兜底，避免撑爆容器 */
   max-height: 220px;
-  padding: 0;
+  /* 左侧留出 6px 让首字符与下方 + 图标视觉对齐（+ button 32x32，
+     里面的 SVG 居中后 icon 左缘大约离按钮左边 6px） */
+  padding: 0 0 0 6px;
   margin-bottom: 6px;
   overflow-y: hidden;
 }
@@ -747,6 +756,25 @@ const getInlineSublabel = (option) => {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* FileReader 读图期间的占位骨架 — 柔和的浅灰渐变 + 横向流动光斑，
+   避免短暂闪过 PDF 卡片那种诡异跳变 */
+.attachment-card__skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(229, 231, 235, 0.6) 30%,
+    rgba(243, 244, 246, 0.95) 50%,
+    rgba(229, 231, 235, 0.6) 70%
+  );
+  background-size: 200% 100%;
+  animation: attachment-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes attachment-skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 
 /* PDF 卡片：模拟一页文档 */
