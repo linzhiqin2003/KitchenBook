@@ -1782,38 +1782,43 @@ def _workspace_display_path(root: Path) -> str:
         return root.as_posix()
 
 
-def _ailab_workspace_roots(user) -> list[dict]:
-    roots = [
+def _all_ailab_workspace_roots(user) -> list[dict]:
+    user_root = {
+        'key': 'user',
+        'label': 'User Data',
+        'path': _ailab_user_workspace_root(user.id),
+    }
+    if not is_ai_lab_owner(user):
+        return [user_root]
+    return [
         {
-            'key': 'user',
-            'label': 'User Data',
-            'path': _ailab_user_workspace_root(user.id),
+            'key': 'workspace',
+            'label': 'Workspace',
+            'path': _ailab_agent_workspace_root(),
+        },
+        user_root,
+        {
+            'key': 'tmp',
+            'label': 'Temp',
+            'path': Path(tempfile.gettempdir()),
+        },
+        {
+            'key': 'home',
+            'label': 'Home',
+            'path': Path.home(),
         },
     ]
-    if is_ai_lab_owner(user):
-        roots = [
-            {
-                'key': 'workspace',
-                'label': 'Workspace',
-                'path': _ailab_agent_workspace_root(),
-            },
-            roots[0],
-            {
-                'key': 'tmp',
-                'label': 'Temp',
-                'path': Path(tempfile.gettempdir()),
-            },
-            {
-                'key': 'home',
-                'label': 'Home',
-                'path': Path.home(),
-            },
-        ]
-    return roots
+
+
+def _ailab_workspace_roots(user, *, include_user_for_owner: bool = True) -> list[dict]:
+    roots = _all_ailab_workspace_roots(user)
+    if include_user_for_owner or not is_ai_lab_owner(user):
+        return roots
+    return [item for item in roots if item['key'] != 'user']
 
 
 def _resolve_workspace_target(user, root_key: str, relative_path: str = ''):
-    roots = _ailab_workspace_roots(user)
+    roots = _all_ailab_workspace_roots(user)
     roots_by_key = {item['key']: item for item in roots}
     active_key = root_key if root_key in roots_by_key else roots[0]['key']
     root_item = roots_by_key[active_key]
@@ -1879,6 +1884,7 @@ def _workspace_breadcrumbs(root_item: dict, root_path: Path, target_path: Path) 
 
 def _workspace_directory_payload(user, root_key: str, relative_path: str = '') -> dict:
     roots, root_item, root_path, target_path = _resolve_workspace_target(user, root_key, relative_path)
+    visible_roots = _ailab_workspace_roots(user, include_user_for_owner=False)
     if not target_path.exists():
         raise FileNotFoundError('path not found')
     if not target_path.is_dir():
@@ -1905,7 +1911,7 @@ def _workspace_directory_payload(user, root_key: str, relative_path: str = '') -
                 'root_display': _workspace_display_path(item['path'].expanduser().resolve()),
                 'exists': item['path'].expanduser().exists(),
             }
-            for item in roots
+            for item in visible_roots
         ],
         'active_root': root_item['key'],
         'active_root_label': root_item['label'],
