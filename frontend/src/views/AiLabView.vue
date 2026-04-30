@@ -11,11 +11,13 @@ import { useAuthStore } from '../store/auth'
 
 const authStore = useAuthStore()
 const DEFAULT_AGENT_MODEL = 'deepseek-v4-flash'
+// label = 品牌名（粗体展示），title = 完整名称；副标题由 getInlineSublabel
+// 在 title 里剥掉 label 子串得到（DeepSeek V4 Flash → V4 Flash）
 const AGENT_MODEL_OPTIONS = [
-  { value: 'deepseek-v4-flash', label: 'Flash', title: 'DeepSeek V4 Flash' },
-  { value: 'deepseek-v4-pro', label: 'Pro', title: 'DeepSeek V4 Pro' },
-  { value: 'xiaomi/mimo-v2.5', label: 'MiMo', title: 'Xiaomi MiMo V2.5' },
-  { value: 'xiaomi/mimo-v2.5-pro', label: 'MiMo Pro', title: 'Xiaomi MiMo V2.5 Pro' },
+  { value: 'deepseek-v4-flash', label: 'DeepSeek', title: 'DeepSeek V4 Flash' },
+  { value: 'deepseek-v4-pro', label: 'DeepSeek', title: 'DeepSeek V4 Pro' },
+  { value: 'xiaomi/mimo-v2.5', label: 'Xiaomi', title: 'Xiaomi MiMo V2.5' },
+  { value: 'xiaomi/mimo-v2.5-pro', label: 'Xiaomi', title: 'Xiaomi MiMo V2.5 Pro' },
 ]
 
 const normalizeAgentModel = (value) => (

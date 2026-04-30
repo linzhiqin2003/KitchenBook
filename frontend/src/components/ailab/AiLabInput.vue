@@ -129,14 +129,14 @@ const selectModel = (value) => {
   isModelMenuOpen.value = false
 }
 
-// 截短 trigger 上的副标题：把 "Xiaomi MiMo V2.5" 这种全名压成简洁的副标，
-// 主要剥掉与 label 重复的部分，比如 label="MiMo" / title="Xiaomi MiMo V2.5" → "Xiaomi"
+// 把全名压成副标：剥掉与 label（品牌名）重复的部分，
+// 例：label="DeepSeek" / title="DeepSeek V4 Flash" → "V4 Flash"
+//     label="Xiaomi"   / title="Xiaomi MiMo V2.5"  → "MiMo V2.5"
 const getInlineSublabel = (option) => {
   if (!option) return ''
   const title = (option.title || '').trim()
   const label = (option.label || '').trim()
   if (!title || title === label) return ''
-  // 优先去掉 label 子串，留下品牌前缀（如 "Xiaomi"），更接近 Claude 那种 "Adaptive" 副标的味道
   const stripped = title.replace(label, '').replace(/[·•:：\-—]+/g, ' ').replace(/\s+/g, ' ').trim()
   return stripped || title
 }
@@ -305,7 +305,7 @@ const getInlineSublabel = (option) => {
                     <span class="model-select__option-body">
                       <span class="model-select__option-label">{{ option.label }}</span>
                       <span v-if="option.title && option.title !== option.label" class="model-select__option-meta">
-                        {{ option.title }}
+                        {{ getInlineSublabel(option) }}
                       </span>
                     </span>
                     <svg

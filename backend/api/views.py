@@ -2046,6 +2046,25 @@ def ailab_internal_add_message(request, pk):
         serializer.validated_data['content'] = publish_local_assets_in_content(
             serializer.validated_data.get('content', '')
         )
+
+    # 去重：前端流式结束后会调 add_message 写一行 assistant；如果 SSE socket
+    # 收尾时抛了 OSError，Hermes 这里又会兜底回写，造成同一轮出现两条 assistant
+    # 消息（刷新后两条都被拉出来）。判定逻辑：本会话最新一条 assistant 消息的
+    # created_at 已经晚于最新一条 user 消息 → 当前用户轮已有回复，跳过写入。
+    if serializer.validated_data.get('role') == 'assistant':
+        latest_user = conversation.messages.filter(role='user').order_by('-created_at').first()
+        latest_assistant = conversation.messages.filter(role='assistant').order_by('-created_at').first()
+        if latest_assistant and (not latest_user or latest_assistant.created_at >= latest_user.created_at):
+            import logging
+            logging.getLogger(__name__).info(
+                "[ailab-bg] dedup: conv=%s latest user turn already has assistant reply (msg=%s); skipping internal write",
+                conversation.pk, latest_assistant.pk,
+            )
+            return Response(
+                AiLabMessageSerializer(latest_assistant).data,
+                status=status.HTTP_200_OK,
+            )
+
     serializer.save(conversation=conversation)
     conversation.save()
     return Response(serializer.data, status=status.HTTP_201_CREATED)
