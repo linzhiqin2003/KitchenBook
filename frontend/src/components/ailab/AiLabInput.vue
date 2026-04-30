@@ -309,10 +309,19 @@ const selectModel = (value) => {
                 :title="option.title || option.label"
                 @click="selectModel(option.value)"
               >
-                <span class="model-select__option-label">{{ option.label }}</span>
-                <span v-if="option.title && option.title !== option.label" class="model-select__option-meta">
-                  {{ option.title }}
+                <span class="model-select__option-body">
+                  <span class="model-select__option-label">{{ option.label }}</span>
+                  <span v-if="option.title && option.title !== option.label" class="model-select__option-meta">
+                    {{ option.title }}
+                  </span>
                 </span>
+                <svg
+                  v-if="selectedModel === option.value"
+                  class="model-select__option-check"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
               </button>
             </div>
           </Transition>
@@ -435,54 +444,72 @@ const selectModel = (value) => {
 .model-select__menu {
   position: absolute;
   left: 0;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 6px);
   min-width: 220px;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.3rem;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   background: rgba(255, 255, 255, 0.98);
   box-shadow:
-    0 18px 42px rgba(15, 23, 42, 0.12),
-    0 3px 10px rgba(15, 23, 42, 0.08);
+    0 12px 32px rgba(15, 23, 42, 0.10),
+    0 2px 6px rgba(15, 23, 42, 0.06);
   backdrop-filter: blur(12px);
   z-index: 20;
+  overflow: hidden;
 }
 .model-select__option {
   width: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
-  padding: 0.6rem 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   background: transparent;
   text-align: left;
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.model-select__option + .model-select__option {
+  margin-top: 1px;
 }
 .model-select__option:hover {
-  background: rgba(15, 23, 42, 0.05);
+  background: rgba(15, 23, 42, 0.045);
 }
 .model-select__option.is-active {
-  background: var(--theme-700, #2d2d28);
-  color: #fff;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--theme-700, #2d2d28);
+}
+.model-select__option-body {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
 }
 .model-select__option-label {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   line-height: 1.2;
+  color: var(--theme-700, #2d2d28);
+  white-space: nowrap;
 }
 .model-select__option-meta {
   font-size: 11px;
-  line-height: 1.25;
-  color: var(--theme-400, #8a8a82);
+  line-height: 1.2;
+  color: var(--theme-400, #9a9a92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.model-select__option.is-active .model-select__option-meta {
-  color: rgba(255, 255, 255, 0.74);
+.model-select__option-check {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--ai-accent, #3d7cc9);
 }
 .input-shell {
   background: rgba(255, 255, 255, 0.94);
