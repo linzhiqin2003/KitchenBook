@@ -435,29 +435,28 @@ const getInlineSublabel = (option) => {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0 0.6rem;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 999px;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--theme-700, #2d2d28);
   font-family: inherit;
-  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+  transition: color 0.16s ease, background 0.16s ease;
   cursor: pointer;
 }
 .model-select__trigger:hover,
 .model-select__trigger.is-open {
-  border-color: rgba(15, 23, 42, 0.16);
-  background: rgba(15, 23, 42, 0.035);
+  background: rgba(15, 23, 42, 0.05);
 }
 .model-select__label {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   color: var(--theme-700, #2d2d28);
 }
 .model-select__sub-label {
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1;
   color: var(--theme-400, #9a9a92);
   white-space: nowrap;
@@ -617,7 +616,7 @@ const getInlineSublabel = (option) => {
   height: 30px;
   line-height: 30px;
   color: var(--theme-500, #7a7a72);
-  font-size: 12.5px;
+  font-size: 14px;
   user-select: none;
   cursor: default;
 }
@@ -626,7 +625,7 @@ const getInlineSublabel = (option) => {
   color: var(--theme-700, #2d2d28);
 }
 .model-select__locked-sub {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--theme-400, #9a9a92);
   font-weight: 500;
 }
