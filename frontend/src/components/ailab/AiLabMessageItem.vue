@@ -87,6 +87,33 @@ const copyContent = async () => {
   }
 }
 
+// ── 流式启动等待文案（新 session 网络冷启动） ─────────────────────────
+// 卡 5s+ 时切换到"正在思考"，10s+ 切到"马上来"——让用户感觉系统在动
+const initialWaitSec = ref(0)
+let initialWaitTimer = null
+const initialThinkingHint = computed(() => {
+  if (initialWaitSec.value < 5) return '连接模型中…'
+  if (initialWaitSec.value < 12) return '正在准备…'
+  return '马上来…'
+})
+watch(
+  () => props.isStreaming && (props.message.segments?.length ?? 0) === 0 && !props.message.content,
+  (waiting) => {
+    if (waiting) {
+      initialWaitSec.value = 0
+      if (initialWaitTimer) clearInterval(initialWaitTimer)
+      initialWaitTimer = setInterval(() => { initialWaitSec.value += 1 }, 1000)
+    } else {
+      if (initialWaitTimer) {
+        clearInterval(initialWaitTimer)
+        initialWaitTimer = null
+      }
+      initialWaitSec.value = 0
+    }
+  },
+  { immediate: true }
+)
+
 // ── 图片预览 lightbox ──────────────────────────────────────────────────
 const previewSrc = ref(null)
 const isDownloading = ref(false)
@@ -147,6 +174,10 @@ const downloadPreview = async () => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onPreviewKey)
   document.body.style.overflow = ''
+  if (initialWaitTimer) {
+    clearInterval(initialWaitTimer)
+    initialWaitTimer = null
+  }
 })
 
 // 整体思维链折叠（默认折叠）
@@ -759,6 +790,24 @@ const openImage = (dataUrl) => {
     <div class="flex gap-3 max-w-[calc(100%-48px)]">
       <div class="flex flex-col items-start flex-1 min-w-0">
         <div class="mb-1.5" style="font-size: 13px; font-weight: 600; color: var(--theme-400); letter-spacing: 0.01em;">{{ message.modelName || 'AI' }}</div>
+
+        <!-- 流式刚启动还没收到任何 chunk 时（新 session 第一回合的网络冷启动尤为明显）：
+             segments 仍为空，下面 v-for 跑 0 次什么都不渲染。给一个最顶层的"准备中"占位 —
+             保证用户立刻看到反馈，避免空白等待 -->
+        <div
+          v-if="isStreaming && segments.length === 0 && !message.content"
+          class="initial-thinking flex items-center gap-2 py-2 mb-1"
+          aria-label="正在准备回复"
+        >
+          <div class="flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 0ms"></span>
+            <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 150ms"></span>
+            <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 300ms"></span>
+          </div>
+          <Transition name="thinking-hint" mode="out-in">
+            <span :key="initialThinkingHint" class="text-[12.5px] initial-thinking__hint" style="color: var(--theme-400);">{{ initialThinkingHint }}</span>
+          </Transition>
+        </div>
 
         <!-- 按 segment 循环：每段 = 一组思考/工具调用 + 该段输出的文字 -->
         <template v-for="(seg, segIdx) in segments" :key="seg.id || segIdx">
@@ -1552,6 +1601,31 @@ const openImage = (dataUrl) => {
   color: var(--theme-700);
   font-size: 13px;
   max-width: 100%;
+}
+
+/* === 启动等待占位 === */
+.initial-thinking {
+  animation: initial-thinking-fade-in 0.18s ease-out;
+}
+@keyframes initial-thinking-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.initial-thinking__hint {
+  font-style: italic;
+}
+.thinking-hint-enter-active,
+.thinking-hint-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  display: inline-block;
+}
+.thinking-hint-enter-from {
+  opacity: 0;
+  transform: translateX(4px);
+}
+.thinking-hint-leave-to {
+  opacity: 0;
+  transform: translateX(-4px);
 }
 
 /* === 图片预览 lightbox === */
