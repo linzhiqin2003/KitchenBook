@@ -524,6 +524,16 @@ const parseMarkdown = (markdown, options = {}) => {
     return placeholder
   })
 
+  // Bare image URL 自动包成 markdown image — agent 经常忘记写 ![]() 语法，
+  // 直接吐出像 "/media/ailab/xxx.png" 或 "https://x.com/y.jpg" 这样的路径，
+  // 浏览器看就是字面字符串。这里把"独立成行"的图片 URL 改写成 ![](url)
+  // 让下游的 image 渲染规则接管。仅在该行除了 URL 外没有其他可见文本时触发，
+  // 避免误抓段落里嵌入的 URL。
+  html = html.replace(
+    /^([ \t]*)((?:https?:\/\/|\/)\S+\.(?:png|jpe?g|gif|webp|bmp))([ \t]*)$/gim,
+    (m, lead, url, trail) => `${lead}![](${url})${trail}`,
+  )
+
   // 规范化多余空行（3+ 连续换行 → 2 个，避免产生空白段落）
   html = html.replace(/\n{3,}/g, '\n\n')
 
