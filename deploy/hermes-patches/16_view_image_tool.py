@@ -47,8 +47,28 @@ from pathlib import Path
 
 VT = Path("/home/admin/.hermes/hermes-agent/tools/vision_tools.py")
 RA = Path("/home/admin/.hermes/hermes-agent/run_agent.py")
+TS = Path("/home/admin/.hermes/hermes-agent/toolsets.py")
 SENTINEL_VT = "# [patch16-view] view_image tool"
 SENTINEL_RA = "# [patch16-view] view_image inline-rewrite"
+
+# toolsets.py: extend the "vision" toolset's tools list to expose view_image
+# to model_tools.get_tool_definitions(); without this the registry has the
+# tool but get_tool_definitions(resolved_toolset='vision') only returns
+# ['vision_analyze'] and the agent never sees view_image in its tool list.
+TS_OLD = (
+    '    "vision": {\n'
+    '        "description": "Image analysis and vision tools",\n'
+    '        "tools": ["vision_analyze"],\n'
+    '        "includes": []\n'
+    '    },\n'
+)
+TS_NEW = (
+    '    "vision": {\n'
+    '        "description": "Image analysis and vision tools",\n'
+    '        "tools": ["vision_analyze", "view_image"],  # patch16-view\n'
+    '        "includes": []\n'
+    '    },\n'
+)
 
 
 # ── tools/vision_tools.py: register a new tool at the bottom ─────────
@@ -291,6 +311,13 @@ def main() -> int:
             (RA_HOOK_OLD, RA_HOOK_NEW, "run_agent.py: _build_api_kwargs hook"),
         ],
         SENTINEL_RA,
+    ) and ok
+
+    # 3) Extend the "vision" toolset definition so model_tools picks up view_image
+    ok = patch_file(
+        TS,
+        [(TS_OLD, TS_NEW, 'toolsets.py: vision toolset += view_image')],
+        '"tools": ["vision_analyze", "view_image"]',
     ) and ok
 
     return 0 if ok else 3
