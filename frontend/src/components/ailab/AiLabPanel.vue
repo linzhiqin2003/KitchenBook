@@ -16,8 +16,13 @@ const activeTab = ref('tools')
 const tabs = ['tools', 'skills', 'memory', 'files', 'notifications']
 const tools = ref([])
 const skills = ref([])
-const memory = ref('')
-const userProfile = ref('')
+const memoryEntries = ref([])
+const memoryBreadcrumbs = ref([])
+const memoryCurrentPath = ref('memories')
+const memoryRootDisplay = ref('')
+const memoryEntryCount = ref(0)
+const memoryListLimit = ref(0)
+const memorySelectedPath = ref('')
 const workspaceRoots = ref([])
 const workspaceActiveRoot = ref('')
 const workspaceRootLabel = ref('')
@@ -37,8 +42,6 @@ const loadingSkills = ref(false)
 const loadingMemory = ref(false)
 const loadingWorkspace = ref(false)
 const loadingWorkspacePreview = ref(false)
-const editingMemory = ref(false)
-const memoryDraft = ref('')
 const memoryError = ref('')
 const workspaceError = ref('')
 const workspacePreviewError = ref('')
@@ -137,23 +140,23 @@ const toggleSkill = async (skill) => {
   } catch (e) { console.error('Failed to toggle skill:', e) }
 }
 
-const fetchMemory = async () => {
+const fetchMemory = async ({ path = memoryCurrentPath.value || 'memories' } = {}) => {
   loadingMemory.value = true
   memoryError.value = ''
   try {
-    const r = await fetch(`${HERMES_API_URL}/api/memory`, { headers: headers.value })
-    const data = await r.json().catch(() => ({}))
-    if (!r.ok) {
-      throw new Error(responseErrorMessage(data, `Memory 接口请求失败 (${r.status})`))
-    }
-    memory.value = data.memory || ''
-    userProfile.value = data.user_profile || ''
-    return true
+    const { data } = await api.get('/ai/workspace/', {
+      params: { root: 'user', path }
+    })
+    memoryCurrentPath.value = data.current_path || path
+    memoryRootDisplay.value = data.current_display || data.root_display || ''
+    memoryBreadcrumbs.value = Array.isArray(data.breadcrumbs) ? data.breadcrumbs : []
+    memoryEntries.value = Array.isArray(data.entries) ? data.entries : []
+    memoryEntryCount.value = Number(data.entry_count) || memoryEntries.value.length
+    memoryListLimit.value = Number(data.list_limit) || 0
   } catch (e) {
-    console.error('Failed to fetch memory:', e)
-    memoryError.value = e.message || '无法读取 Memory，请检查 Hermes /api/memory 接口和服务状态。'
+    console.error('Failed to fetch memory directory:', e)
+    memoryError.value = e?.response?.data?.error || e?.message || '无法读取 memories 目录'
   } finally { loadingMemory.value = false }
-  return false
 }
 
 const clearWorkspacePreview = () => {
@@ -211,7 +214,7 @@ const previewWorkspaceEntry = async (entry) => {
   try {
     const { data } = await api.get('/ai/workspace/preview/', {
       params: {
-        root: workspaceActiveRoot.value,
+        root: entry.root || workspaceActiveRoot.value,
         path: entry.path,
       }
     })
@@ -246,30 +249,6 @@ const closeWorkspacePreview = () => {
   workspacePreviewOpen.value = false
 }
 
-const startEditMemory = () => {
-  memoryDraft.value = memory.value
-  editingMemory.value = true
-}
-
-const saveMemory = async () => {
-  memoryError.value = ''
-  try {
-    const r = await fetch(`${HERMES_API_URL}/api/memory`, {
-      method: 'POST', headers: headers.value,
-      body: JSON.stringify({ memory: memoryDraft.value })
-    })
-    const data = await r.json().catch(() => ({}))
-    if (!r.ok) {
-      throw new Error(responseErrorMessage(data, `Memory 保存失败 (${r.status})`))
-    }
-    memory.value = memoryDraft.value
-    editingMemory.value = false
-  } catch (e) {
-    console.error('Failed to save memory:', e)
-    memoryError.value = e.message || 'Memory 保存失败'
-  }
-}
-
 const isCurrentTabLoading = computed(() => {
   if (activeTab.value === 'tools') return loadingTools.value
   if (activeTab.value === 'skills') return loadingSkills.value
@@ -287,6 +266,10 @@ const skillsByCategory = computed(() => {
   }
   return groups
 })
+
+const visibleMemoryEntries = computed(() => (
+  memoryEntries.value.filter(entry => !entry.name.endsWith('.lock'))
+))
 
 const notifications = ref([])
 const notificationsLoading = ref(false)
@@ -433,10 +416,16 @@ const formatWorkspaceTime = (iso) => {
 }
 
 const workspaceCanGoUp = computed(() => workspaceBreadcrumbs.value.length > 1)
+const memoryCanGoUp = computed(() => memoryBreadcrumbs.value.length > 1)
 
 const workspaceParentPath = computed(() => {
   if (workspaceBreadcrumbs.value.length <= 1) return ''
   return workspaceBreadcrumbs.value[workspaceBreadcrumbs.value.length - 2]?.path || ''
+})
+
+const memoryParentPath = computed(() => {
+  if (memoryBreadcrumbs.value.length <= 1) return 'memories'
+  return memoryBreadcrumbs.value[memoryBreadcrumbs.value.length - 2]?.path || 'memories'
 })
 
 const workspacePreviewMeta = computed(() => {
@@ -450,6 +439,30 @@ const workspacePreviewMeta = computed(() => {
 const workspaceRootHint = computed(() => (
   workspaceCurrentDisplay.value || workspaceRootDisplay.value || '~/.hermes/users/<uid>'
 ))
+
+const memoryRootHint = computed(() => (
+  memoryRootDisplay.value || '~/.hermes/users/<uid>/memories'
+))
+
+const openMemoryBreadcrumb = async (path) => {
+  memoryCurrentPath.value = path || 'memories'
+  memorySelectedPath.value = ''
+  await fetchMemory({ path: memoryCurrentPath.value })
+}
+
+const selectMemoryEntry = (entry) => {
+  memorySelectedPath.value = entry.path
+}
+
+const openMemoryEntry = async (entry) => {
+  if (entry.type === 'dir') {
+    memoryCurrentPath.value = entry.path
+    memorySelectedPath.value = ''
+    await fetchMemory({ path: entry.path })
+    return
+  }
+  await previewWorkspaceEntry({ ...entry, root: 'user' })
+}
 
 defineExpose({
   refreshMemory: fetchMemory,
@@ -571,31 +584,84 @@ defineExpose({
               {{ memoryError }}
             </div>
 
-            <div class="mb-4">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[13px] font-semibold" style="color: #6e6e76;">MEMORY.md</span>
-                <button v-if="!editingMemory" @click="startEditMemory"
-                  class="text-[12px] px-2 py-0.5 rounded-md cursor-pointer transition-colors"
-                  style="color: var(--ai-accent); border: 1px solid var(--ai-accent-soft);">编辑</button>
-                <div v-else class="flex gap-1">
-                  <button @click="saveMemory" class="text-[12px] px-2 py-0.5 rounded-md cursor-pointer" style="background: var(--theme-700); color: #fff;">保存</button>
-                  <button @click="editingMemory = false" class="text-[12px] px-2 py-0.5 rounded-md cursor-pointer" style="color: #9a9aa0;">取消</button>
-                </div>
+            <div class="rounded-xl border px-3 py-3 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
+              <div class="text-[12px] font-semibold mb-2" style="color: #6e6e76;">Memory Directory</div>
+              <div class="text-[11px] break-all" style="color: #9a9aa0; font-family: var(--ai-font-mono);">
+                {{ memoryRootHint }}
               </div>
-              <textarea v-if="editingMemory" v-model="memoryDraft"
-                class="w-full rounded-lg p-3 outline-none resize-none"
-                style="background: #fff; border: 1px solid var(--ai-accent); color: #2c2c30; font-size: 12px; line-height: 1.6; min-height: 200px; font-family: var(--ai-font-mono);"></textarea>
-              <pre v-else class="rounded-lg p-3 whitespace-pre-wrap break-words"
-                style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; min-height: 60px; font-family: var(--ai-font-mono);">{{ memory || '(空)' }}</pre>
+              <div class="text-[11px] mt-2 flex flex-wrap gap-x-3 gap-y-1" style="color: #9a9aa0;">
+                <span>{{ visibleMemoryEntries.length }} 项</span>
+                <span v-if="memoryEntryCount !== visibleMemoryEntries.length">共 {{ memoryEntryCount }} 项</span>
+                <span v-if="memoryListLimit > 0">单目录上限 {{ memoryListLimit }}</span>
+              </div>
             </div>
 
-            <div>
-              <div class="flex items-center mb-2">
-                <span class="text-[13px] font-semibold" style="color: #6e6e76;">USER.md</span>
-                <span class="text-[11px] ml-2" style="color: #b0b0b6;">agent 自动维护</span>
+            <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button
+                  class="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
+                  :disabled="!memoryCanGoUp"
+                  :style="memoryCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
+                  title="返回上一级"
+                  @click="openMemoryBreadcrumb(memoryParentPath)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+                  </svg>
+                </button>
+                <button
+                  v-for="crumb in memoryBreadcrumbs"
+                  :key="`memory-${crumb.path || 'root'}`"
+                  class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
+                  style="color: #6e6e76;"
+                  @click="openMemoryBreadcrumb(crumb.path)"
+                >
+                  {{ crumb.name }}
+                </button>
               </div>
-              <pre class="rounded-lg p-3 whitespace-pre-wrap break-words"
-                style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; min-height: 60px; font-family: var(--ai-font-mono);">{{ userProfile || '(空)' }}</pre>
+            </div>
+
+            <div v-if="visibleMemoryEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
+              当前目录是空的
+            </div>
+            <div v-else class="space-y-1">
+              <button
+                v-for="entry in visibleMemoryEntries"
+                :key="entry.path"
+                class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
+                :style="memorySelectedPath === entry.path
+                  ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
+                  : 'background: #fff; border: 1px solid #ececef;'"
+                @click="selectMemoryEntry(entry)"
+                @dblclick="openMemoryEntry(entry)"
+              >
+                <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
+                  <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
+                  </svg>
+                  <svg v-else-if="entry.type === 'symlink'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 016.364 6.364l-1.757 1.757a4.5 4.5 0 01-6.364 0m-1.414-9.9a4.5 4.5 0 00-6.364 0L2.44 8.666a4.5 4.5 0 006.364 6.364l1.757-1.757" />
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.625a1.125 1.125 0 00-1.125-1.125H8.25m11.25 9.75h-2.625a1.125 1.125 0 00-1.125 1.125V18m4.875-3.75l-3.375 3.375a2.25 2.25 0 01-1.59.659H6.375A1.125 1.125 0 015.25 17.16V5.625A1.125 1.125 0 016.375 4.5H8.25m0 0l2.25 2.25m-2.25-2.25V6.75m0-2.25h6.75" />
+                  </svg>
+                </span>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-[13px] truncate" style="color: #2c2c30;">{{ entry.name }}</span>
+                    <span v-if="entry.type === 'dir' && entry.has_children" class="text-[10px] shrink-0" style="color: #b0b0b6;">folder</span>
+                    <span v-else-if="entry.type !== 'dir'" class="text-[11px] shrink-0" style="color: #9a9aa0;">{{ formatWorkspaceSize(entry.size) }}</span>
+                  </div>
+                  <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
+                    <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
+                    <span v-if="entry.target"> · {{ entry.target }}</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div class="mt-3 text-[11px] text-center" style="color: #b0b0b6;">
+              单击选择，双击打开
             </div>
           </template>
         </template>
