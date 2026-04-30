@@ -88,13 +88,13 @@ const copyContent = async () => {
 }
 
 // ── 流式启动等待文案（新 session 网络冷启动） ─────────────────────────
-// 卡 5s+ 时切换到"正在思考"，10s+ 切到"马上来"——让用户感觉系统在动
+// 跟 trace 上的 "Thinking…" 风格保持一致：英文 + 文字流光
 const initialWaitSec = ref(0)
 let initialWaitTimer = null
 const initialThinkingHint = computed(() => {
-  if (initialWaitSec.value < 5) return '连接模型中…'
-  if (initialWaitSec.value < 12) return '正在准备…'
-  return '马上来…'
+  if (initialWaitSec.value < 5) return 'Connecting…'
+  if (initialWaitSec.value < 12) return 'Warming up…'
+  return 'Almost there…'
 })
 watch(
   () => props.isStreaming && (props.message.segments?.length ?? 0) === 0 && !props.message.content,
@@ -815,7 +815,7 @@ const openImage = (dataUrl) => {
             <span class="w-1.5 h-1.5 rounded-full animate-bounce" style="background: var(--theme-300); animation-delay: 300ms"></span>
           </div>
           <Transition name="thinking-hint" mode="out-in">
-            <span :key="initialThinkingHint" class="text-[12.5px] initial-thinking__hint" style="color: var(--theme-400);">{{ initialThinkingHint }}</span>
+            <span :key="initialThinkingHint" class="initial-thinking__hint trace-shimmer-text">{{ initialThinkingHint }}</span>
           </Transition>
         </div>
 
@@ -1622,7 +1622,10 @@ const openImage = (dataUrl) => {
   to   { opacity: 1; transform: translateY(0); }
 }
 .initial-thinking__hint {
-  font-style: italic;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
 }
 .thinking-hint-enter-active,
 .thinking-hint-leave-active {
