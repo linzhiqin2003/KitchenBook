@@ -3,7 +3,6 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
 import { useAuthStore } from '../../store/auth'
 import api from '../../api/client'
-import AiLabWorkspaceTreeNode from './AiLabWorkspaceTreeNode.vue'
 
 const authStore = useAuthStore()
 
@@ -19,30 +18,34 @@ const tools = ref([])
 const skills = ref([])
 const memory = ref('')
 const userProfile = ref('')
+const workspaceRoots = ref([])
+const workspaceActiveRoot = ref('')
+const workspaceRootLabel = ref('')
+const workspaceRootDisplay = ref('')
+const workspaceCurrentPath = ref('')
+const workspaceCurrentDisplay = ref('')
 const workspaceEntries = ref([])
-const workspaceRoot = ref('')
-const workspaceExists = ref(false)
-const workspaceStats = ref({
-  files: 0,
-  directories: 0,
-  total_size: 0,
-  truncated: false,
-})
+const workspaceBreadcrumbs = ref([])
+const workspaceEntryCount = ref(0)
+const workspaceTruncated = ref(false)
+const workspaceListLimit = ref(0)
+const workspacePreview = ref(null)
 const loadingTools = ref(false)
 const loadingSkills = ref(false)
 const loadingMemory = ref(false)
 const loadingWorkspace = ref(false)
+const loadingWorkspacePreview = ref(false)
 const editingMemory = ref(false)
 const memoryDraft = ref('')
 const memoryError = ref('')
 const workspaceError = ref('')
+const workspacePreviewError = ref('')
 const MIN_PANEL_WIDTH = 280
 const MAX_PANEL_WIDTH = 560
-const DEFAULT_PANEL_WIDTH = 320
+const DEFAULT_PANEL_WIDTH = 360
 const panelWidth = ref(DEFAULT_PANEL_WIDTH)
 const isResizing = ref(false)
 
-// 把当前登录用户的 id 透传给 Hermes，让服务端 scope memory / config 路径
 const headers = computed(() => {
   const uid = authStore.user?.id
   const h = {
@@ -151,25 +154,81 @@ const fetchMemory = async () => {
   return false
 }
 
-const fetchWorkspace = async () => {
+const clearWorkspacePreview = () => {
+  workspacePreview.value = null
+  workspacePreviewError.value = ''
+  loadingWorkspacePreview.value = false
+}
+
+const fetchWorkspace = async ({ root = workspaceActiveRoot.value || '', path = workspaceCurrentPath.value || '' } = {}) => {
   loadingWorkspace.value = true
   workspaceError.value = ''
   try {
-    const { data } = await api.get('/ai/workspace/')
-    workspaceRoot.value = data.root_display || ''
-    workspaceExists.value = Boolean(data.exists)
+    const { data } = await api.get('/ai/workspace/', {
+      params: { root, path }
+    })
+    workspaceRoots.value = Array.isArray(data.roots) ? data.roots : []
+    workspaceActiveRoot.value = data.active_root || workspaceRoots.value[0]?.key || ''
+    workspaceRootLabel.value = data.active_root_label || workspaceRoots.value.find(item => item.key === workspaceActiveRoot.value)?.label || ''
+    workspaceRootDisplay.value = data.root_display || ''
+    workspaceCurrentPath.value = data.current_path || ''
+    workspaceCurrentDisplay.value = data.current_display || ''
+    workspaceBreadcrumbs.value = Array.isArray(data.breadcrumbs) ? data.breadcrumbs : []
     workspaceEntries.value = Array.isArray(data.entries) ? data.entries : []
-    workspaceStats.value = {
-      files: Number(data.stats?.files) || 0,
-      directories: Number(data.stats?.directories) || 0,
-      total_size: Number(data.stats?.total_size) || 0,
-      truncated: Boolean(data.stats?.truncated),
-    }
+    workspaceEntryCount.value = Number(data.entry_count) || workspaceEntries.value.length
+    workspaceTruncated.value = Boolean(data.truncated)
+    workspaceListLimit.value = Number(data.list_limit) || 0
   } catch (e) {
     workspaceError.value = e?.response?.data?.error || e?.message || '加载失败'
   } finally {
     loadingWorkspace.value = false
   }
+}
+
+const openWorkspaceRoot = async (rootKey) => {
+  if (!rootKey) return
+  if (rootKey === workspaceActiveRoot.value && !workspaceCurrentPath.value) return
+  workspaceActiveRoot.value = rootKey
+  workspaceCurrentPath.value = ''
+  clearWorkspacePreview()
+  await fetchWorkspace({ root: rootKey, path: '' })
+}
+
+const openWorkspaceBreadcrumb = async (path) => {
+  workspaceCurrentPath.value = path || ''
+  clearWorkspacePreview()
+  await fetchWorkspace({ root: workspaceActiveRoot.value, path: workspaceCurrentPath.value })
+}
+
+const previewWorkspaceEntry = async (entry) => {
+  workspacePreviewError.value = ''
+  loadingWorkspacePreview.value = true
+  try {
+    const { data } = await api.get('/ai/workspace/preview/', {
+      params: {
+        root: workspaceActiveRoot.value,
+        path: entry.path,
+      }
+    })
+    if (data.preview_type === 'image' || data.preview_type === 'pdf') {
+      data.data_url = `data:${data.mime_type};base64,${data.content_base64}`
+    }
+    workspacePreview.value = data
+  } catch (e) {
+    workspacePreviewError.value = e?.response?.data?.error || e?.message || '预览失败'
+  } finally {
+    loadingWorkspacePreview.value = false
+  }
+}
+
+const openWorkspaceEntry = async (entry) => {
+  if (entry.type === 'dir') {
+    workspaceCurrentPath.value = entry.path
+    clearWorkspacePreview()
+    await fetchWorkspace({ root: workspaceActiveRoot.value, path: entry.path })
+    return
+  }
+  await previewWorkspaceEntry(entry)
 }
 
 const startEditMemory = () => {
@@ -214,18 +273,10 @@ const skillsByCategory = computed(() => {
   return groups
 })
 
-// === 通知 (从 Django 拉，用 JWT) ===
 const notifications = ref([])
 const notificationsLoading = ref(false)
 const notificationsError = ref('')
 const notificationsUnread = ref(0)
-
-const djangoHeaders = () => {
-  const t = localStorage.getItem('access_token') || ''
-  const h = { 'Content-Type': 'application/json' }
-  if (t) h['Authorization'] = `Bearer ${t}`
-  return h
-}
 
 const fetchNotifications = async () => {
   notificationsLoading.value = true
@@ -241,7 +292,6 @@ const fetchNotifications = async () => {
   }
 }
 
-// 单独的轻量轮询：只拿未读数，用于铃铛 badge
 const pollNotificationsUnread = async () => {
   try {
     const { data } = await api.get('/ai/notifications/', { params: { unread: 1, limit: 1 } })
@@ -304,8 +354,6 @@ const sourceLabel = (s) => ({
 
 const loadTab = (tab) => {
   activeTab.value = tab
-  // 每次切换都重新拉，保证显示与后端真实状态一致（新装的 skill 立刻可见，
-  // 别处改了 disabled 列表也能反映过来）
   if (tab === 'tools') fetchTools()
   if (tab === 'skills') fetchSkills()
   if (tab === 'memory') fetchMemory()
@@ -320,7 +368,6 @@ watch(
   }
 )
 
-// 通知未读数轮询：30s 一次，独立于 panel 是否打开
 let notifPollHandle = null
 onMounted(() => {
   if (props.visible) loadTab(activeTab.value)
@@ -333,7 +380,6 @@ onUnmounted(() => {
   if (notifPollHandle) clearInterval(notifPollHandle)
 })
 
-// 暴露给父组件：让铃铛能切到通知 tab、读取未读数
 const openNotifications = () => {
   loadTab('notifications')
 }
@@ -344,6 +390,37 @@ const formatWorkspaceSize = (size) => {
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
   return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }
+
+const formatWorkspaceTime = (iso) => {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const workspaceCanGoUp = computed(() => workspaceBreadcrumbs.value.length > 1)
+
+const workspaceParentPath = computed(() => {
+  if (workspaceBreadcrumbs.value.length <= 1) return ''
+  return workspaceBreadcrumbs.value[workspaceBreadcrumbs.value.length - 2]?.path || ''
+})
+
+const workspacePreviewMeta = computed(() => {
+  if (!workspacePreview.value) return ''
+  return [
+    workspacePreview.value.mime_type,
+    formatWorkspaceSize(workspacePreview.value.size),
+  ].filter(Boolean).join(' · ')
+})
+
+const workspaceRootHint = computed(() => (
+  workspaceCurrentDisplay.value || workspaceRootDisplay.value || '~/.hermes/users/<uid>'
+))
 
 defineExpose({
   refreshMemory: fetchMemory,
@@ -372,7 +449,7 @@ defineExpose({
         title="拖动调整宽度"
         @pointerdown="startResize"
       ></div>
-      <!-- Header -->
+
       <div class="flex items-center justify-between px-4 pt-3 pb-2">
         <span class="text-[14px] font-semibold" style="color: #2c2c30;">Agent Panel</span>
         <button @click="emit('close')" class="p-1 rounded-md cursor-pointer hover:bg-black/[0.04]" style="color: #9a9aa0;">
@@ -382,7 +459,6 @@ defineExpose({
         </button>
       </div>
 
-      <!-- Tabs -->
       <div class="flex items-center px-3 pb-2 gap-1">
         <button v-for="tab in tabs" :key="tab"
           @click="loadTab(tab)"
@@ -395,7 +471,6 @@ defineExpose({
             style="background: #ef4444; color: #fff;"
           >{{ notificationsUnread > 99 ? '99+' : notificationsUnread }}</span>
         </button>
-        <!-- 刷新当前 tab —— 让用户手动触发同步，不必等切 tab -->
         <button
           v-if="activeTab !== 'notifications'"
           @click="loadTab(activeTab)"
@@ -410,10 +485,7 @@ defineExpose({
         </button>
       </div>
 
-      <!-- Content -->
       <div class="flex-1 overflow-y-auto px-3 pb-4">
-
-        <!-- Tools Tab -->
         <template v-if="activeTab === 'tools'">
           <div v-if="loadingTools" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">加载中…</div>
           <template v-else>
@@ -431,7 +503,6 @@ defineExpose({
                 </div>
               </template>
             </div>
-            <!-- MCP section -->
             <div v-if="tools.some(t => t.type === 'mcp')" class="mt-4">
               <div class="px-3 pb-1.5" style="font-size: 11px; font-weight: 600; color: #9a9aa0; letter-spacing: 0.03em;">MCP Servers</div>
               <div v-for="tool in tools.filter(t => t.type === 'mcp')" :key="'mcp-' + tool.name"
@@ -443,7 +514,6 @@ defineExpose({
           </template>
         </template>
 
-        <!-- Skills Tab -->
         <template v-if="activeTab === 'skills'">
           <div v-if="loadingSkills" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">加载中…</div>
           <div v-else-if="skills.length === 0" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">暂无已安装的技能</div>
@@ -465,7 +535,6 @@ defineExpose({
           </template>
         </template>
 
-        <!-- Memory Tab -->
         <template v-if="activeTab === 'memory'">
           <div v-if="loadingMemory" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
           <template v-else>
@@ -473,7 +542,6 @@ defineExpose({
               {{ memoryError }}
             </div>
 
-            <!-- MEMORY.md -->
             <div class="mb-4">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-[13px] font-semibold" style="color: #6e6e76;">MEMORY.md</span>
@@ -492,7 +560,6 @@ defineExpose({
                 style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; min-height: 60px; font-family: var(--ai-font-mono);">{{ memory || '(空)' }}</pre>
             </div>
 
-            <!-- USER.md -->
             <div>
               <div class="flex items-center mb-2">
                 <span class="text-[13px] font-semibold" style="color: #6e6e76;">USER.md</span>
@@ -504,23 +571,59 @@ defineExpose({
           </template>
         </template>
 
-        <!-- Files Tab -->
         <template v-if="activeTab === 'files'">
           <div class="rounded-xl border px-3 py-3 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
-            <div class="text-[12px] font-semibold mb-1" style="color: #6e6e76;">Workspace</div>
+            <div class="text-[12px] font-semibold mb-2" style="color: #6e6e76;">{{ workspaceRootLabel || 'Workspace' }}</div>
+            <div class="flex flex-wrap gap-1.5 mb-2">
+              <button
+                v-for="root in workspaceRoots"
+                :key="root.key"
+                @click="openWorkspaceRoot(root.key)"
+                class="px-2.5 py-1 rounded-md text-[12px] cursor-pointer transition-colors"
+                :style="workspaceActiveRoot === root.key
+                  ? 'background: var(--theme-700); color: #fff;'
+                  : 'background: #fff; color: #6e6e76; border: 1px solid #ececef;'"
+              >
+                {{ root.label }}
+              </button>
+            </div>
             <div class="text-[11px] break-all" style="color: #9a9aa0; font-family: var(--ai-font-mono);">
-              {{ workspaceRoot || '~/.hermes/users/<uid>' }}
+              {{ workspaceRootHint }}
             </div>
             <div class="text-[11px] mt-2 flex flex-wrap gap-x-3 gap-y-1" style="color: #9a9aa0;">
-              <span>{{ workspaceStats.directories }} 个目录</span>
-              <span>{{ workspaceStats.files }} 个文件</span>
-              <span>{{ formatWorkspaceSize(workspaceStats.total_size) }}</span>
+              <span>{{ workspaceEntryCount }} 项</span>
+              <span v-if="workspaceListLimit > 0">单目录上限 {{ workspaceListLimit }}</span>
             </div>
             <div
-              v-if="workspaceStats.truncated"
+              v-if="workspaceTruncated"
               class="text-[11px] mt-2"
               style="color: #b45309;"
-            >目录树过大，当前只展示前 2000 个节点</div>
+            >当前目录条目过多，只展示前 {{ workspaceListLimit }} 项</div>
+          </div>
+
+          <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button
+                class="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
+                :disabled="!workspaceCanGoUp"
+                :style="workspaceCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
+                title="返回上一级"
+                @click="openWorkspaceBreadcrumb(workspaceParentPath)"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+                </svg>
+              </button>
+              <button
+                v-for="crumb in workspaceBreadcrumbs"
+                :key="`${workspaceActiveRoot}-${crumb.path || 'root'}`"
+                class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
+                style="color: #6e6e76;"
+                @click="openWorkspaceBreadcrumb(crumb.path)"
+              >
+                {{ crumb.name }}
+              </button>
+            </div>
           </div>
 
           <div v-if="loadingWorkspace" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
@@ -531,22 +634,91 @@ defineExpose({
           >
             {{ workspaceError }}
           </div>
-          <div v-else-if="!workspaceExists" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
-            用户空间还没有初始化
-          </div>
           <div v-else-if="workspaceEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
-            当前用户空间是空的
+            当前目录是空的
           </div>
-          <div v-else class="space-y-0.5">
-            <AiLabWorkspaceTreeNode
+          <div v-else class="space-y-1">
+            <button
               v-for="entry in workspaceEntries"
               :key="entry.path"
-              :entry="entry"
-            />
+              class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
+              :style="workspacePreview?.path === entry.path
+                ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
+                : 'background: #fff; border: 1px solid #ececef;'"
+              @click="openWorkspaceEntry(entry)"
+            >
+              <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
+                <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
+                </svg>
+                <svg v-else-if="entry.type === 'symlink'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 016.364 6.364l-1.757 1.757a4.5 4.5 0 01-6.364 0m-1.414-9.9a4.5 4.5 0 00-6.364 0L2.44 8.666a4.5 4.5 0 006.364 6.364l1.757-1.757" />
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.625a1.125 1.125 0 00-1.125-1.125H8.25m11.25 9.75h-2.625a1.125 1.125 0 00-1.125 1.125V18m4.875-3.75l-3.375 3.375a2.25 2.25 0 01-1.59.659H6.375A1.125 1.125 0 015.25 17.16V5.625A1.125 1.125 0 016.375 4.5H8.25m0 0l2.25 2.25m-2.25-2.25V6.75m0-2.25h6.75" />
+                </svg>
+              </span>
+
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-[13px] truncate" style="color: #2c2c30;">{{ entry.name }}</span>
+                  <span v-if="entry.type === 'dir' && entry.has_children" class="text-[10px] shrink-0" style="color: #b0b0b6;">folder</span>
+                  <span v-else-if="entry.type !== 'dir'" class="text-[11px] shrink-0" style="color: #9a9aa0;">{{ formatWorkspaceSize(entry.size) }}</span>
+                </div>
+                <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
+                  <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
+                  <span v-if="entry.target"> · {{ entry.target }}</span>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <div class="mt-3 rounded-xl border p-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <span class="text-[12px] font-semibold truncate" style="color: #6e6e76;">
+                {{ workspacePreview?.name || 'Preview' }}
+              </span>
+              <span v-if="workspacePreviewMeta" class="text-[11px] shrink-0" style="color: #9a9aa0;">
+                {{ workspacePreviewMeta }}
+              </span>
+            </div>
+
+            <div v-if="loadingWorkspacePreview" class="text-center py-6 text-[12px]" style="color: #9a9aa0;">加载预览…</div>
+            <div v-else-if="workspacePreviewError" class="rounded-lg px-3 py-2 text-[12px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
+              {{ workspacePreviewError }}
+            </div>
+            <div v-else-if="!workspacePreview" class="text-[12px] py-6 text-center" style="color: #b0b0b6;">
+              点击文件查看内容
+            </div>
+            <template v-else>
+              <pre
+                v-if="workspacePreview.preview_type === 'text'"
+                class="rounded-lg p-3 whitespace-pre-wrap break-words max-h-[320px] overflow-auto"
+                style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; font-family: var(--ai-font-mono);"
+              >{{ workspacePreview.content }}</pre>
+              <img
+                v-else-if="workspacePreview.preview_type === 'image'"
+                :src="workspacePreview.data_url"
+                :alt="workspacePreview.name"
+                class="w-full rounded-lg border"
+                style="border-color: #ececef;"
+              />
+              <iframe
+                v-else-if="workspacePreview.preview_type === 'pdf'"
+                :src="workspacePreview.data_url"
+                class="w-full h-72 rounded-lg border bg-white"
+                style="border-color: #ececef;"
+              ></iframe>
+              <div v-else class="rounded-lg p-3 text-[12px]" style="background: #fff; color: #6e6e76; border: 1px solid #ececef;">
+                这个文件类型暂不支持内联预览。
+              </div>
+              <div v-if="workspacePreview.truncated" class="text-[11px] mt-2" style="color: #b45309;">
+                文件较大，当前只展示前 256 KB 文本内容
+              </div>
+            </template>
           </div>
         </template>
 
-        <!-- Notifications Tab -->
         <template v-if="activeTab === 'notifications'">
           <div class="flex items-center justify-between mb-2 px-1">
             <span class="text-[13px]" style="color: #6e6e76;">

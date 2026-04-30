@@ -18,6 +18,7 @@ import re
 import os
 import uuid
 import base64
+import mimetypes
 import tempfile
 from pathlib import Path
 from .models import Recipe, Ingredient, Order, BlogPost, Tag, Category, RecipeStep, RecipeIngredient
@@ -1751,13 +1752,26 @@ def ailab_invites(request):
     }, status=status.HTTP_201_CREATED)
 
 
-_AILAB_WORKSPACE_MAX_NODES = 2000
+_AILAB_WORKSPACE_LIST_LIMIT = 500
+_AILAB_WORKSPACE_TEXT_PREVIEW_LIMIT = 256_000
+_AILAB_WORKSPACE_BINARY_PREVIEW_LIMIT = 6 * 1024 * 1024
+_AILAB_WORKSPACE_TEXT_EXTS = {
+    '.md', '.txt', '.py', '.js', '.ts', '.tsx', '.jsx', '.json', '.yaml', '.yml',
+    '.toml', '.ini', '.cfg', '.conf', '.sh', '.bash', '.zsh', '.log', '.css',
+    '.html', '.htm', '.vue', '.sql', '.csv', '.tsv', '.env', '.xml',
+}
 
 
 def _ailab_user_workspace_root(user_id: int) -> Path:
     """Return the per-user Hermes workspace root mirrored by AI Lab."""
     hermes_home = Path(os.path.expanduser(getattr(settings, 'HERMES_HOME', '~/.hermes')))
     return hermes_home / 'users' / str(user_id)
+
+
+def _ailab_agent_workspace_root() -> Path:
+    return Path(os.path.expanduser(
+        getattr(settings, 'HERMES_AGENT_WORKSPACE', '~/.hermes/hermes-agent')
+    ))
 
 
 def _workspace_display_path(root: Path) -> str:
@@ -1768,105 +1782,232 @@ def _workspace_display_path(root: Path) -> str:
         return root.as_posix()
 
 
-def _build_workspace_tree(root: Path) -> dict:
-    stats = {
-        'files': 0,
-        'directories': 0,
-        'total_size': 0,
-        'nodes': 0,
+def _ailab_workspace_roots(user) -> list[dict]:
+    roots = [
+        {
+            'key': 'user',
+            'label': 'User Data',
+            'path': _ailab_user_workspace_root(user.id),
+        },
+    ]
+    if is_ai_lab_owner(user):
+        roots = [
+            {
+                'key': 'workspace',
+                'label': 'Workspace',
+                'path': _ailab_agent_workspace_root(),
+            },
+            roots[0],
+            {
+                'key': 'tmp',
+                'label': 'Temp',
+                'path': Path(tempfile.gettempdir()),
+            },
+            {
+                'key': 'home',
+                'label': 'Home',
+                'path': Path.home(),
+            },
+        ]
+    return roots
+
+
+def _resolve_workspace_target(user, root_key: str, relative_path: str = ''):
+    roots = _ailab_workspace_roots(user)
+    roots_by_key = {item['key']: item for item in roots}
+    active_key = root_key if root_key in roots_by_key else roots[0]['key']
+    root_item = roots_by_key[active_key]
+    root_path = root_item['path'].expanduser().resolve()
+    relative_path = (relative_path or '').strip().strip('/')
+    target_path = (root_path / relative_path).resolve(strict=False) if relative_path else root_path
+    try:
+        target_path.relative_to(root_path)
+    except ValueError:
+        raise PermissionError('path escapes workspace root')
+    return roots, root_item, root_path, target_path
+
+
+def _workspace_entry_payload(root_path: Path, entry: Path) -> dict | None:
+    try:
+        stat_result = entry.lstat()
+    except OSError:
+        return None
+
+    entry_type = 'file'
+    has_children = False
+    target = ''
+    if entry.is_symlink():
+        entry_type = 'symlink'
+        try:
+            target = os.readlink(entry)
+        except OSError:
+            target = ''
+    elif entry.is_dir():
+        entry_type = 'dir'
+        try:
+            next(entry.iterdir())
+            has_children = True
+        except StopIteration:
+            has_children = False
+        except OSError:
+            has_children = False
+
+    return {
+        'name': entry.name,
+        'path': entry.relative_to(root_path).as_posix(),
+        'type': entry_type,
+        'size': int(stat_result.st_size or 0),
+        'extension': (entry.suffix or '').lower(),
+        'modified_at': datetime.fromtimestamp(
+            stat_result.st_mtime,
+            tz=dt_timezone.utc,
+        ).isoformat(),
+        'has_children': has_children,
+        'target': target,
+    }
+
+
+def _workspace_breadcrumbs(root_item: dict, root_path: Path, target_path: Path) -> list[dict]:
+    crumbs = [{'name': root_item['label'], 'path': ''}]
+    parts = target_path.relative_to(root_path).parts
+    current = Path()
+    for part in parts:
+        current /= part
+        crumbs.append({'name': part, 'path': current.as_posix()})
+    return crumbs
+
+
+def _workspace_directory_payload(user, root_key: str, relative_path: str = '') -> dict:
+    roots, root_item, root_path, target_path = _resolve_workspace_target(user, root_key, relative_path)
+    if not target_path.exists():
+        raise FileNotFoundError('path not found')
+    if not target_path.is_dir():
+        raise NotADirectoryError('path is not a directory')
+
+    try:
+        children = list(target_path.iterdir())
+    except OSError as exc:
+        raise PermissionError(str(exc)) from exc
+
+    children.sort(key=lambda child: (not child.is_dir(), child.name.lower()))
+    truncated = len(children) > _AILAB_WORKSPACE_LIST_LIMIT
+    entries = []
+    for child in children[:_AILAB_WORKSPACE_LIST_LIMIT]:
+        payload = _workspace_entry_payload(root_path, child)
+        if payload is not None:
+            entries.append(payload)
+
+    return {
+        'roots': [
+            {
+                'key': item['key'],
+                'label': item['label'],
+                'root_display': _workspace_display_path(item['path'].expanduser().resolve()),
+                'exists': item['path'].expanduser().exists(),
+            }
+            for item in roots
+        ],
+        'active_root': root_item['key'],
+        'active_root_label': root_item['label'],
+        'root_display': _workspace_display_path(root_path),
+        'current_path': '' if target_path == root_path else target_path.relative_to(root_path).as_posix(),
+        'current_display': _workspace_display_path(target_path),
+        'breadcrumbs': _workspace_breadcrumbs(root_item, root_path, target_path),
+        'entries': entries,
+        'entry_count': len(entries),
+        'truncated': truncated,
+        'list_limit': _AILAB_WORKSPACE_LIST_LIMIT,
+    }
+
+
+def _workspace_file_preview_payload(user, root_key: str, relative_path: str = '') -> dict:
+    _roots, root_item, root_path, target_path = _resolve_workspace_target(user, root_key, relative_path)
+    if not target_path.exists():
+        raise FileNotFoundError('path not found')
+    if not target_path.is_file():
+        raise IsADirectoryError('path is not a file')
+
+    stat_result = target_path.stat()
+    mime_type = mimetypes.guess_type(str(target_path))[0] or 'application/octet-stream'
+    extension = (target_path.suffix or '').lower()
+    size = int(stat_result.st_size or 0)
+    payload = {
+        'root': root_item['key'],
+        'root_label': root_item['label'],
+        'root_display': _workspace_display_path(root_path),
+        'path': target_path.relative_to(root_path).as_posix(),
+        'display_path': _workspace_display_path(target_path),
+        'name': target_path.name,
+        'size': size,
+        'extension': extension,
+        'mime_type': mime_type,
+        'modified_at': datetime.fromtimestamp(
+            stat_result.st_mtime,
+            tz=dt_timezone.utc,
+        ).isoformat(),
+        'preview_type': 'meta',
         'truncated': False,
     }
 
-    def _visit(path: Path) -> dict | None:
-        if stats['nodes'] >= _AILAB_WORKSPACE_MAX_NODES:
-            stats['truncated'] = True
-            return None
-
-        try:
-            stat_result = path.lstat()
-        except OSError:
-            return None
-
-        stats['nodes'] += 1
-        relative_path = '.' if path == root else path.relative_to(root).as_posix()
-        payload = {
-            'name': path.name if path != root else root.name,
-            'path': relative_path,
-            'modified_at': datetime.fromtimestamp(
-                stat_result.st_mtime,
-                tz=dt_timezone.utc,
-            ).isoformat(),
-        }
-
-        if path.is_symlink():
-            payload['type'] = 'symlink'
-            try:
-                payload['target'] = os.readlink(path)
-            except OSError:
-                payload['target'] = ''
-            return payload
-
-        if path.is_dir():
-            stats['directories'] += 1
-            payload['type'] = 'dir'
-            children = []
-            try:
-                entries = sorted(
-                    path.iterdir(),
-                    key=lambda child: (not child.is_dir(), child.name.lower()),
-                )
-            except OSError as exc:
-                payload['children'] = []
-                payload['error'] = str(exc)
-                return payload
-
-            for child in entries:
-                child_payload = _visit(child)
-                if child_payload is not None:
-                    children.append(child_payload)
-            payload['children'] = children
-            return payload
-
-        payload['type'] = 'file'
-        payload['size'] = int(stat_result.st_size or 0)
-        payload['extension'] = (path.suffix or '').lower()
-        stats['files'] += 1
-        stats['total_size'] += payload['size']
+    is_text = extension in _AILAB_WORKSPACE_TEXT_EXTS or mime_type.startswith('text/')
+    if is_text:
+        raw = target_path.read_bytes()
+        payload['truncated'] = len(raw) > _AILAB_WORKSPACE_TEXT_PREVIEW_LIMIT
+        payload['preview_type'] = 'text'
+        payload['content'] = raw[:_AILAB_WORKSPACE_TEXT_PREVIEW_LIMIT].decode('utf-8', errors='replace')
         return payload
 
-    root_payload = _visit(root)
-    return {
-        'entries': root_payload.get('children', []) if root_payload else [],
-        'stats': {
-            'files': stats['files'],
-            'directories': max(stats['directories'] - 1, 0),
-            'total_size': stats['total_size'],
-            'truncated': stats['truncated'],
-        },
-    }
+    if mime_type.startswith('image/') and size <= _AILAB_WORKSPACE_BINARY_PREVIEW_LIMIT:
+        payload['preview_type'] = 'image'
+        payload['content_base64'] = base64.b64encode(target_path.read_bytes()).decode('ascii')
+        return payload
+
+    if mime_type == 'application/pdf' and size <= _AILAB_WORKSPACE_BINARY_PREVIEW_LIMIT:
+        payload['preview_type'] = 'pdf'
+        payload['content_base64'] = base64.b64encode(target_path.read_bytes()).decode('ascii')
+        return payload
+
+    return payload
 
 
 @api_view(['GET'])
 @authentication_classes([_JWTAuth])
 @permission_classes([permissions.IsAuthenticated, AiLabAccessPermission])
 def ailab_workspace(request):
-    """Return the authenticated user's Hermes workspace tree."""
-    root = _ailab_user_workspace_root(request.user.id)
-    exists = root.exists() and root.is_dir()
-    payload = {
-        'root_display': _workspace_display_path(root),
-        'exists': exists,
-        'entries': [],
-        'stats': {
-            'files': 0,
-            'directories': 0,
-            'total_size': 0,
-            'truncated': False,
-        },
-    }
-    if exists:
-        payload.update(_build_workspace_tree(root))
-    return Response(payload)
+    """Browse the authenticated user's visible Hermes filesystem roots."""
+    try:
+        payload = _workspace_directory_payload(
+            request.user,
+            request.query_params.get('root') or '',
+            request.query_params.get('path') or '',
+        )
+        return Response(payload)
+    except PermissionError as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+    except FileNotFoundError:
+        return Response({'error': 'path not found'}, status=status.HTTP_404_NOT_FOUND)
+    except NotADirectoryError:
+        return Response({'error': 'path is not a directory'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@authentication_classes([_JWTAuth])
+@permission_classes([permissions.IsAuthenticated, AiLabAccessPermission])
+def ailab_workspace_preview(request):
+    """Preview a single file from an allowed Hermes filesystem root."""
+    try:
+        payload = _workspace_file_preview_payload(
+            request.user,
+            request.query_params.get('root') or '',
+            request.query_params.get('path') or '',
+        )
+        return Response(payload)
+    except PermissionError as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+    except FileNotFoundError:
+        return Response({'error': 'path not found'}, status=status.HTTP_404_NOT_FOUND)
+    except IsADirectoryError:
+        return Response({'error': 'path is a directory'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def _derive_fallback_conversation_title(first_user_message: str) -> str:
