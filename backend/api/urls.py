@@ -6,7 +6,7 @@ from .views import (
     DeepSeekOCRView, WhisperTranscribeView, PDFExtractView, RecipeStepViewSet,
     RecipeIngredientViewSet, AiLabConversationViewSet, AiLabMessageViewSet,
     AiLabNotificationViewSet, ailab_internal_add_message, ailab_internal_push_notification,
-    ailab_me, ailab_redeem_invite, ailab_invites,
+    ailab_me, ailab_redeem_invite, ailab_invites, ailab_workspace,
 )
 
 router = DefaultRouter()
@@ -38,6 +38,7 @@ urlpatterns = [
     path('ai/internal/notifications/', ailab_internal_push_notification, name='ai-notification-internal'),
     # MyAgent 用户身份 / 邀请码闸门
     path('ai/me/', ailab_me, name='ai-me'),
+    path('ai/workspace/', ailab_workspace, name='ai-workspace'),
     path('ai/invites/', ailab_invites, name='ai-invites'),
     path('ai/invites/redeem/', ailab_redeem_invite, name='ai-invites-redeem'),
     path('tarot/', include('cards.urls')),

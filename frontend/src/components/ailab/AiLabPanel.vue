@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
 import { useAuthStore } from '../../store/auth'
 import api from '../../api/client'
+import AiLabWorkspaceTreeNode from './AiLabWorkspaceTreeNode.vue'
 
 const authStore = useAuthStore()
 
@@ -13,16 +14,28 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const activeTab = ref('tools')
+const tabs = ['tools', 'skills', 'memory', 'files', 'notifications']
 const tools = ref([])
 const skills = ref([])
 const memory = ref('')
 const userProfile = ref('')
+const workspaceEntries = ref([])
+const workspaceRoot = ref('')
+const workspaceExists = ref(false)
+const workspaceStats = ref({
+  files: 0,
+  directories: 0,
+  total_size: 0,
+  truncated: false,
+})
 const loadingTools = ref(false)
 const loadingSkills = ref(false)
 const loadingMemory = ref(false)
+const loadingWorkspace = ref(false)
 const editingMemory = ref(false)
 const memoryDraft = ref('')
 const memoryError = ref('')
+const workspaceError = ref('')
 const MIN_PANEL_WIDTH = 280
 const MAX_PANEL_WIDTH = 560
 const DEFAULT_PANEL_WIDTH = 320
@@ -138,6 +151,27 @@ const fetchMemory = async () => {
   return false
 }
 
+const fetchWorkspace = async () => {
+  loadingWorkspace.value = true
+  workspaceError.value = ''
+  try {
+    const { data } = await api.get('/ai/workspace/')
+    workspaceRoot.value = data.root_display || ''
+    workspaceExists.value = Boolean(data.exists)
+    workspaceEntries.value = Array.isArray(data.entries) ? data.entries : []
+    workspaceStats.value = {
+      files: Number(data.stats?.files) || 0,
+      directories: Number(data.stats?.directories) || 0,
+      total_size: Number(data.stats?.total_size) || 0,
+      truncated: Boolean(data.stats?.truncated),
+    }
+  } catch (e) {
+    workspaceError.value = e?.response?.data?.error || e?.message || '加载失败'
+  } finally {
+    loadingWorkspace.value = false
+  }
+}
+
 const startEditMemory = () => {
   memoryDraft.value = memory.value
   editingMemory.value = true
@@ -166,6 +200,7 @@ const isCurrentTabLoading = computed(() => {
   if (activeTab.value === 'tools') return loadingTools.value
   if (activeTab.value === 'skills') return loadingSkills.value
   if (activeTab.value === 'memory') return loadingMemory.value
+  if (activeTab.value === 'files') return loadingWorkspace.value
   return false
 })
 
@@ -274,6 +309,7 @@ const loadTab = (tab) => {
   if (tab === 'tools') fetchTools()
   if (tab === 'skills') fetchSkills()
   if (tab === 'memory') fetchMemory()
+  if (tab === 'files') fetchWorkspace()
   if (tab === 'notifications') fetchNotifications()
 }
 
@@ -302,10 +338,19 @@ const openNotifications = () => {
   loadTab('notifications')
 }
 
+const formatWorkspaceSize = (size) => {
+  const value = Number(size) || 0
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
+}
+
 defineExpose({
   refreshMemory: fetchMemory,
   openNotifications,
   notificationsUnread,
+  openTab: loadTab,
+  activeTab,
 })
 </script>
 
@@ -339,11 +384,11 @@ defineExpose({
 
       <!-- Tabs -->
       <div class="flex items-center px-3 pb-2 gap-1">
-        <button v-for="tab in ['tools', 'skills', 'memory', 'notifications']" :key="tab"
+        <button v-for="tab in tabs" :key="tab"
           @click="loadTab(tab)"
           class="px-3 py-1 rounded-md text-[13px] font-medium transition-colors cursor-pointer relative"
           :style="activeTab === tab ? 'background: #fff; color: #2c2c30; box-shadow: 0 1px 2px rgba(0,0,0,0.05);' : 'color: #9a9aa0;'">
-          {{ tab === 'tools' ? 'Tools' : tab === 'skills' ? 'Skills' : tab === 'memory' ? 'Memory' : 'Inbox' }}
+          {{ tab === 'tools' ? 'Tools' : tab === 'skills' ? 'Skills' : tab === 'memory' ? 'Memory' : tab === 'files' ? 'Files' : 'Inbox' }}
           <span
             v-if="tab === 'notifications' && notificationsUnread > 0"
             class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full text-[9px] font-semibold flex items-center justify-center px-1"
@@ -457,6 +502,48 @@ defineExpose({
                 style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; min-height: 60px; font-family: var(--ai-font-mono);">{{ userProfile || '(空)' }}</pre>
             </div>
           </template>
+        </template>
+
+        <!-- Files Tab -->
+        <template v-if="activeTab === 'files'">
+          <div class="rounded-xl border px-3 py-3 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
+            <div class="text-[12px] font-semibold mb-1" style="color: #6e6e76;">Workspace</div>
+            <div class="text-[11px] break-all" style="color: #9a9aa0; font-family: var(--ai-font-mono);">
+              {{ workspaceRoot || '~/.hermes/users/<uid>' }}
+            </div>
+            <div class="text-[11px] mt-2 flex flex-wrap gap-x-3 gap-y-1" style="color: #9a9aa0;">
+              <span>{{ workspaceStats.directories }} 个目录</span>
+              <span>{{ workspaceStats.files }} 个文件</span>
+              <span>{{ formatWorkspaceSize(workspaceStats.total_size) }}</span>
+            </div>
+            <div
+              v-if="workspaceStats.truncated"
+              class="text-[11px] mt-2"
+              style="color: #b45309;"
+            >目录树过大，当前只展示前 2000 个节点</div>
+          </div>
+
+          <div v-if="loadingWorkspace" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
+          <div
+            v-else-if="workspaceError"
+            class="rounded-lg px-3 py-2 text-[13px]"
+            style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;"
+          >
+            {{ workspaceError }}
+          </div>
+          <div v-else-if="!workspaceExists" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
+            用户空间还没有初始化
+          </div>
+          <div v-else-if="workspaceEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
+            当前用户空间是空的
+          </div>
+          <div v-else class="space-y-0.5">
+            <AiLabWorkspaceTreeNode
+              v-for="entry in workspaceEntries"
+              :key="entry.path"
+              :entry="entry"
+            />
+          </div>
         </template>
 
         <!-- Notifications Tab -->

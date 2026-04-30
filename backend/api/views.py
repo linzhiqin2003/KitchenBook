@@ -10,6 +10,7 @@ from django.db.models import Sum
 from django.http import StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.storage import default_storage
+from datetime import datetime, timezone as dt_timezone
 import hashlib
 import time
 import json
@@ -18,6 +19,7 @@ import os
 import uuid
 import base64
 import tempfile
+from pathlib import Path
 from .models import Recipe, Ingredient, Order, BlogPost, Tag, Category, RecipeStep, RecipeIngredient
 from .serializers import (
     RecipeSerializer, PublicRecipeSerializer, IngredientSerializer, OrderSerializer,
@@ -1747,6 +1749,124 @@ def ailab_invites(request):
         'created_at': invite.created_at,
         'expires_at': invite.expires_at,
     }, status=status.HTTP_201_CREATED)
+
+
+_AILAB_WORKSPACE_MAX_NODES = 2000
+
+
+def _ailab_user_workspace_root(user_id: int) -> Path:
+    """Return the per-user Hermes workspace root mirrored by AI Lab."""
+    hermes_home = Path(os.path.expanduser(getattr(settings, 'HERMES_HOME', '~/.hermes')))
+    return hermes_home / 'users' / str(user_id)
+
+
+def _workspace_display_path(root: Path) -> str:
+    home = Path.home()
+    try:
+        return f"~/{root.relative_to(home).as_posix()}"
+    except ValueError:
+        return root.as_posix()
+
+
+def _build_workspace_tree(root: Path) -> dict:
+    stats = {
+        'files': 0,
+        'directories': 0,
+        'total_size': 0,
+        'nodes': 0,
+        'truncated': False,
+    }
+
+    def _visit(path: Path) -> dict | None:
+        if stats['nodes'] >= _AILAB_WORKSPACE_MAX_NODES:
+            stats['truncated'] = True
+            return None
+
+        try:
+            stat_result = path.lstat()
+        except OSError:
+            return None
+
+        stats['nodes'] += 1
+        relative_path = '.' if path == root else path.relative_to(root).as_posix()
+        payload = {
+            'name': path.name if path != root else root.name,
+            'path': relative_path,
+            'modified_at': datetime.fromtimestamp(
+                stat_result.st_mtime,
+                tz=dt_timezone.utc,
+            ).isoformat(),
+        }
+
+        if path.is_symlink():
+            payload['type'] = 'symlink'
+            try:
+                payload['target'] = os.readlink(path)
+            except OSError:
+                payload['target'] = ''
+            return payload
+
+        if path.is_dir():
+            stats['directories'] += 1
+            payload['type'] = 'dir'
+            children = []
+            try:
+                entries = sorted(
+                    path.iterdir(),
+                    key=lambda child: (not child.is_dir(), child.name.lower()),
+                )
+            except OSError as exc:
+                payload['children'] = []
+                payload['error'] = str(exc)
+                return payload
+
+            for child in entries:
+                child_payload = _visit(child)
+                if child_payload is not None:
+                    children.append(child_payload)
+            payload['children'] = children
+            return payload
+
+        payload['type'] = 'file'
+        payload['size'] = int(stat_result.st_size or 0)
+        payload['extension'] = (path.suffix or '').lower()
+        stats['files'] += 1
+        stats['total_size'] += payload['size']
+        return payload
+
+    root_payload = _visit(root)
+    return {
+        'entries': root_payload.get('children', []) if root_payload else [],
+        'stats': {
+            'files': stats['files'],
+            'directories': max(stats['directories'] - 1, 0),
+            'total_size': stats['total_size'],
+            'truncated': stats['truncated'],
+        },
+    }
+
+
+@api_view(['GET'])
+@authentication_classes([_JWTAuth])
+@permission_classes([permissions.IsAuthenticated, AiLabAccessPermission])
+def ailab_workspace(request):
+    """Return the authenticated user's Hermes workspace tree."""
+    root = _ailab_user_workspace_root(request.user.id)
+    exists = root.exists() and root.is_dir()
+    payload = {
+        'root_display': _workspace_display_path(root),
+        'exists': exists,
+        'entries': [],
+        'stats': {
+            'files': 0,
+            'directories': 0,
+            'total_size': 0,
+            'truncated': False,
+        },
+    }
+    if exists:
+        payload.update(_build_workspace_tree(root))
+    return Response(payload)
 
 
 def _derive_fallback_conversation_title(first_user_message: str) -> str:
