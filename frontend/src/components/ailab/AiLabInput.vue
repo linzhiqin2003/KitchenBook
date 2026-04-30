@@ -26,6 +26,8 @@ const props = defineProps({
   },
   contextLimit: { type: Number, default: 1_000_000 },
   showScrollBottom: { type: Boolean, default: false },
+  // 对话已经开始（有消息）时锁定模型 —— Toolbar 上只显示模型名，不再可点选
+  modelLocked: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -205,9 +207,25 @@ const getInlineSublabel = (option) => {
           </div>
         </div>
 
-        <div class="input-main-row">
-          <!-- 左侧工具按钮 -->
-          <div class="flex items-center gap-1 shrink-0">
+        <!-- 文字区：独占一行，按 Shift+Enter 自动撑高（最多 220px 后内部滚动） -->
+        <textarea
+          ref="textareaRef"
+          v-model="localValue"
+          @keydown="handleKeydown"
+          @input="autoResize"
+          @compositionstart="onCompositionStart"
+          @compositionend="onCompositionEnd"
+          @paste="handlePaste"
+          :disabled="isLoading || isRecording || isOcrProcessing"
+          :placeholder="isOcrProcessing ? '正在处理文件…' : isRecording ? '录音中…' : '继续对话…'"
+          class="input-textarea"
+          rows="1"
+        ></textarea>
+
+        <!-- 操作行：所有按钮统一放到下面一行（Claude.ai 风格） -->
+        <div class="input-toolbar">
+          <!-- 左侧：上传 -->
+          <div class="input-toolbar__left">
             <button
               @click="emit('image-click')"
               :disabled="isLoading || isOcrProcessing || isRecording"
@@ -222,26 +240,23 @@ const getInlineSublabel = (option) => {
             <span v-if="hasAttachment" class="attachment-count">1</span>
           </div>
 
-          <!-- 输入框 -->
-          <textarea
-            ref="textareaRef"
-            v-model="localValue"
-            @keydown="handleKeydown"
-            @input="autoResize"
-            @compositionstart="onCompositionStart"
-            @compositionend="onCompositionEnd"
-            @paste="handlePaste"
-            :disabled="isLoading || isRecording || isOcrProcessing"
-            :placeholder="isOcrProcessing ? '正在处理文件…' : isRecording ? '录音中…' : '继续对话…'"
-            class="input-textarea"
-            rows="1"
-          ></textarea>
-
-          <!-- 右侧操作 -->
-          <div class="input-actions">
-            <!-- 模型切换：贴在 mic / send 之前；与 Claude.ai 风格一致 -->
+          <!-- 右侧：模型切换 + 语音 + 发送 -->
+          <div class="input-toolbar__right">
+            <!-- 锁定模式：对话已开始，只展示当前模型名作为静态文字 -->
             <div
-              v-if="shouldShowModelSwitcher"
+              v-if="shouldShowModelSwitcher && modelLocked"
+              class="model-select__locked"
+              :title="selectedModelOption?.title || selectedModelOption?.label || ''"
+            >
+              <span class="model-select__locked-label">{{ selectedModelOption?.label || '' }}</span>
+              <span
+                v-if="selectedModelOption?.title && selectedModelOption.title !== selectedModelOption.label"
+                class="model-select__locked-sub"
+              >{{ getInlineSublabel(selectedModelOption) }}</span>
+            </div>
+            <!-- 可切换模式：欢迎屏幕 / 第一条消息发出之前 -->
+            <div
+              v-else-if="shouldShowModelSwitcher"
               ref="modelMenuRef"
               class="model-select model-select--inline"
             >
@@ -532,8 +547,8 @@ const getInlineSublabel = (option) => {
 .input-shell {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(15, 23, 42, 0.11);
-  border-radius: 28px;
-  padding: 6px;
+  border-radius: 22px;
+  padding: 12px 16px 8px;
   box-shadow:
     0 18px 42px rgba(15, 23, 42, 0.08),
     0 2px 7px rgba(15, 23, 42, 0.08),
@@ -547,29 +562,21 @@ const getInlineSublabel = (option) => {
     0 0 0 3px rgba(45, 45, 40, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
-.input-main-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 4px 0 8px;
-}
 .input-textarea {
-  flex: 1;
-  min-width: 0;
-  align-self: center;
+  width: 100%;
+  display: block;
   resize: none;
   border: 0;
   outline: none;
   background: transparent;
   color: #111827;
-  font-size: 16px;
-  line-height: 24px;
-  min-height: 26px;
-  /* JS 端 autoResize 会精确控制高度（最高约 220px ≈ 9 行）。
-     这里 max-height 兜底，避免极端情况撑爆容器 */
+  font-size: 15px;
+  line-height: 22px;
+  min-height: 24px;
+  /* JS 端 autoResize 控制高度。max-height 兜底，避免撑爆容器 */
   max-height: 220px;
-  padding: 1px 0;
+  padding: 0;
+  margin-bottom: 6px;
   overflow-y: hidden;
 }
 .input-textarea::-webkit-scrollbar {
@@ -586,6 +593,44 @@ const getInlineSublabel = (option) => {
   opacity: 0.62;
   cursor: not-allowed;
 }
+.input-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  margin-top: 2px;
+}
+.input-toolbar__left,
+.input-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+/* 锁定模式：对话开始后，只展示当前模型名 */
+.model-select__locked {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 8px;
+  height: 30px;
+  line-height: 30px;
+  color: var(--theme-500, #7a7a72);
+  font-size: 12.5px;
+  user-select: none;
+  cursor: default;
+}
+.model-select__locked-label {
+  font-weight: 600;
+  color: var(--theme-700, #2d2d28);
+}
+.model-select__locked-sub {
+  font-size: 11.5px;
+  color: var(--theme-400, #9a9a92);
+  font-weight: 500;
+}
+/* 旧的 .input-actions 还在被某些地方引用，保留为向后兼容 */
 .input-actions {
   display: flex;
   align-items: center;

@@ -1740,6 +1740,7 @@ onMounted(async () => {
         v-model="inputMessage"
         :selected-model="selectedAgentModel"
         :model-options="AGENT_MODEL_OPTIONS"
+        :model-locked="hasMessages"
         :is-loading="isLoading"
         :is-recording="isRecording"
         :is-transcribing="isTranscribing"
