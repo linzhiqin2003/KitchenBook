@@ -25,6 +25,16 @@ PRICING: Dict[str, Dict[str, Decimal]] = {
         "output": Decimal("6"),
         "cache": Decimal("0.25"),
     },
+    "xiaomi/mimo-v2.5": {
+        "input": Decimal("0.4"),
+        "output": Decimal("2"),
+        "cache": Decimal("0.08"),
+    },
+    "xiaomi/mimo-v2.5-pro": {
+        "input": Decimal("1"),
+        "output": Decimal("3"),
+        "cache": Decimal("0.2"),
+    },
 }
 
 DEFAULT_MODEL = "deepseek-v4-flash"

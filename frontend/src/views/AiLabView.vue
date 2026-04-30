@@ -14,6 +14,8 @@ const DEFAULT_AGENT_MODEL = 'deepseek-v4-flash'
 const AGENT_MODEL_OPTIONS = [
   { value: 'deepseek-v4-flash', label: 'Flash', title: 'DeepSeek V4 Flash' },
   { value: 'deepseek-v4-pro', label: 'Pro', title: 'DeepSeek V4 Pro' },
+  { value: 'xiaomi/mimo-v2.5', label: 'MiMo', title: 'Xiaomi MiMo V2.5' },
+  { value: 'xiaomi/mimo-v2.5-pro', label: 'MiMo Pro', title: 'Xiaomi MiMo V2.5 Pro' },
 ]
 
 const normalizeAgentModel = (value) => (
