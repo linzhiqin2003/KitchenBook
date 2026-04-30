@@ -29,7 +29,9 @@ const workspaceBreadcrumbs = ref([])
 const workspaceEntryCount = ref(0)
 const workspaceTruncated = ref(false)
 const workspaceListLimit = ref(0)
+const workspaceSelectedPath = ref('')
 const workspacePreview = ref(null)
+const workspacePreviewOpen = ref(false)
 const loadingTools = ref(false)
 const loadingSkills = ref(false)
 const loadingMemory = ref(false)
@@ -156,6 +158,7 @@ const fetchMemory = async () => {
 
 const clearWorkspacePreview = () => {
   workspacePreview.value = null
+  workspacePreviewOpen.value = false
   workspacePreviewError.value = ''
   loadingWorkspacePreview.value = false
 }
@@ -190,12 +193,14 @@ const openWorkspaceRoot = async (rootKey) => {
   if (rootKey === workspaceActiveRoot.value && !workspaceCurrentPath.value) return
   workspaceActiveRoot.value = rootKey
   workspaceCurrentPath.value = ''
+  workspaceSelectedPath.value = ''
   clearWorkspacePreview()
   await fetchWorkspace({ root: rootKey, path: '' })
 }
 
 const openWorkspaceBreadcrumb = async (path) => {
   workspaceCurrentPath.value = path || ''
+  workspaceSelectedPath.value = ''
   clearWorkspacePreview()
   await fetchWorkspace({ root: workspaceActiveRoot.value, path: workspaceCurrentPath.value })
 }
@@ -214,6 +219,7 @@ const previewWorkspaceEntry = async (entry) => {
       data.data_url = `data:${data.mime_type};base64,${data.content_base64}`
     }
     workspacePreview.value = data
+    workspacePreviewOpen.value = true
   } catch (e) {
     workspacePreviewError.value = e?.response?.data?.error || e?.message || '预览失败'
   } finally {
@@ -221,14 +227,23 @@ const previewWorkspaceEntry = async (entry) => {
   }
 }
 
+const selectWorkspaceEntry = (entry) => {
+  workspaceSelectedPath.value = entry.path
+}
+
 const openWorkspaceEntry = async (entry) => {
   if (entry.type === 'dir') {
     workspaceCurrentPath.value = entry.path
+    workspaceSelectedPath.value = ''
     clearWorkspacePreview()
     await fetchWorkspace({ root: workspaceActiveRoot.value, path: entry.path })
     return
   }
   await previewWorkspaceEntry(entry)
+}
+
+const closeWorkspacePreview = () => {
+  workspacePreviewOpen.value = false
 }
 
 const startEditMemory = () => {
@@ -378,6 +393,20 @@ onMounted(() => {
 onUnmounted(() => {
   stopResize()
   if (notifPollHandle) clearInterval(notifPollHandle)
+})
+
+const handleKeydown = (event) => {
+  if (event.key === 'Escape' && workspacePreviewOpen.value) {
+    closeWorkspacePreview()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 const openNotifications = () => {
@@ -642,10 +671,11 @@ defineExpose({
               v-for="entry in workspaceEntries"
               :key="entry.path"
               class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
-              :style="workspacePreview?.path === entry.path
+              :style="workspaceSelectedPath === entry.path
                 ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
                 : 'background: #fff; border: 1px solid #ececef;'"
-              @click="openWorkspaceEntry(entry)"
+              @click="selectWorkspaceEntry(entry)"
+              @dblclick="openWorkspaceEntry(entry)"
             >
               <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
                 <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
@@ -672,50 +702,8 @@ defineExpose({
               </div>
             </button>
           </div>
-
-          <div class="mt-3 rounded-xl border p-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
-            <div class="flex items-center justify-between gap-2 mb-2">
-              <span class="text-[12px] font-semibold truncate" style="color: #6e6e76;">
-                {{ workspacePreview?.name || 'Preview' }}
-              </span>
-              <span v-if="workspacePreviewMeta" class="text-[11px] shrink-0" style="color: #9a9aa0;">
-                {{ workspacePreviewMeta }}
-              </span>
-            </div>
-
-            <div v-if="loadingWorkspacePreview" class="text-center py-6 text-[12px]" style="color: #9a9aa0;">加载预览…</div>
-            <div v-else-if="workspacePreviewError" class="rounded-lg px-3 py-2 text-[12px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
-              {{ workspacePreviewError }}
-            </div>
-            <div v-else-if="!workspacePreview" class="text-[12px] py-6 text-center" style="color: #b0b0b6;">
-              点击文件查看内容
-            </div>
-            <template v-else>
-              <pre
-                v-if="workspacePreview.preview_type === 'text'"
-                class="rounded-lg p-3 whitespace-pre-wrap break-words max-h-[320px] overflow-auto"
-                style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; font-family: var(--ai-font-mono);"
-              >{{ workspacePreview.content }}</pre>
-              <img
-                v-else-if="workspacePreview.preview_type === 'image'"
-                :src="workspacePreview.data_url"
-                :alt="workspacePreview.name"
-                class="w-full rounded-lg border"
-                style="border-color: #ececef;"
-              />
-              <iframe
-                v-else-if="workspacePreview.preview_type === 'pdf'"
-                :src="workspacePreview.data_url"
-                class="w-full h-72 rounded-lg border bg-white"
-                style="border-color: #ececef;"
-              ></iframe>
-              <div v-else class="rounded-lg p-3 text-[12px]" style="background: #fff; color: #6e6e76; border: 1px solid #ececef;">
-                这个文件类型暂不支持内联预览。
-              </div>
-              <div v-if="workspacePreview.truncated" class="text-[11px] mt-2" style="color: #b45309;">
-                文件较大，当前只展示前 256 KB 文本内容
-              </div>
-            </template>
+          <div class="mt-3 text-[11px] text-center" style="color: #b0b0b6;">
+            单击选择，双击打开
           </div>
         </template>
 
@@ -783,6 +771,79 @@ defineExpose({
       </div>
     </div>
   </Transition>
+
+  <Transition name="workspace-preview">
+    <div
+      v-if="workspacePreviewOpen"
+      class="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 px-6 py-8"
+      @click="closeWorkspacePreview"
+    >
+      <div
+        class="w-full max-w-4xl max-h-full rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
+        style="background: #f7f7f8; border-color: rgba(255,255,255,0.24);"
+        @click.stop
+      >
+        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b" style="border-color: #e8e8ec;">
+          <div class="min-w-0">
+            <div class="text-[14px] font-semibold truncate" style="color: #2c2c30;">
+              {{ workspacePreview?.name || 'Preview' }}
+            </div>
+            <div class="text-[11px] truncate mt-0.5" style="color: #9a9aa0;">
+              {{ workspacePreview?.display_path }}
+            </div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <span v-if="workspacePreviewMeta" class="text-[11px]" style="color: #9a9aa0;">
+              {{ workspacePreviewMeta }}
+            </span>
+            <button
+              class="w-8 h-8 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.05]"
+              style="color: #9a9aa0;"
+              title="关闭"
+              @click="closeWorkspacePreview"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-auto p-4">
+          <div v-if="loadingWorkspacePreview" class="text-center py-10 text-[13px]" style="color: #9a9aa0;">加载预览…</div>
+          <div v-else-if="workspacePreviewError" class="rounded-lg px-3 py-2 text-[13px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
+            {{ workspacePreviewError }}
+          </div>
+          <template v-else-if="workspacePreview">
+            <pre
+              v-if="workspacePreview.preview_type === 'text'"
+              class="rounded-xl p-4 whitespace-pre-wrap break-words min-h-[240px]"
+              style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; font-family: var(--ai-font-mono);"
+            >{{ workspacePreview.content }}</pre>
+            <img
+              v-else-if="workspacePreview.preview_type === 'image'"
+              :src="workspacePreview.data_url"
+              :alt="workspacePreview.name"
+              class="max-w-full max-h-[75vh] mx-auto rounded-xl border bg-white"
+              style="border-color: #ececef;"
+            />
+            <iframe
+              v-else-if="workspacePreview.preview_type === 'pdf'"
+              :src="workspacePreview.data_url"
+              class="w-full h-[75vh] rounded-xl border bg-white"
+              style="border-color: #ececef;"
+            ></iframe>
+            <div v-else class="rounded-xl p-4 text-[13px]" style="background: #fff; color: #6e6e76; border: 1px solid #ececef;">
+              这个文件类型暂不支持内联预览。
+            </div>
+            <div v-if="workspacePreview.truncated" class="text-[11px] mt-3" style="color: #b45309;">
+              文件较大，当前只展示前 256 KB 文本内容
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -829,6 +890,12 @@ defineExpose({
 }
 .slide-enter-from, .slide-leave-to {
   transform: translateX(100%);
+  opacity: 0;
+}
+.workspace-preview-enter-active, .workspace-preview-leave-active {
+  transition: opacity 0.18s ease;
+}
+.workspace-preview-enter-from, .workspace-preview-leave-to {
   opacity: 0;
 }
 </style>
