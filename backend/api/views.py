@@ -1749,6 +1749,54 @@ def ailab_invites(request):
     }, status=status.HTTP_201_CREATED)
 
 
+def _derive_fallback_conversation_title(first_user_message: str) -> str:
+    """从首条用户消息提取一个稳定的兜底标题。
+
+    目标不是机械截断原文，而是尽量概括用户首句意图；这样即便标题模型失手，
+    也不会把助手自我介绍之类的内容误写成会话名。
+    """
+    text = re.sub(r'\s+', ' ', (first_user_message or '').strip())
+    if not text:
+        return '新对话'
+
+    first_line = text.splitlines()[0].strip()
+    first_sentence = re.split(r'[。！？!?；;]', first_line, maxsplit=1)[0].strip()
+    base = (first_sentence or first_line or text).strip(' "\'「」《》【】()[]')
+
+    normalized = re.sub(r'\s+', '', base)
+    lower = normalized.lower()
+    heuristics = [
+        (r'^(你是谁|你是(谁|什么))[\?？]*$', '身份确认'),
+        (r'^(介绍一下(你自己|你)|自我介绍一下)[\?？]*$', '自我介绍'),
+        (r'^(你好|嗨|hello|hi)[!！。,\?？]*$', '打招呼'),
+        (r'^(在吗|有人吗)[\?？]*$', '确认在线'),
+    ]
+    for pattern, title in heuristics:
+        if re.fullmatch(pattern, lower):
+            return title
+
+    if len(base) <= 16:
+        return base
+    return base[:16].rstrip('，,、：:；; ')
+
+
+def _is_valid_generated_conversation_title(title: str, first_user_message: str) -> bool:
+    """过滤明显跑偏的标题，尤其是把助手自我介绍写成会话名。"""
+    cleaned = (title or '').strip()
+    if not cleaned or cleaned == '新对话':
+        return False
+
+    lowered_title = cleaned.lower()
+    lowered_user = (first_user_message or '').lower()
+
+    banned_when_missing = ('hermes', '助手', '小智', 'ai助手', '智能助手')
+    if any(token in lowered_title for token in banned_when_missing):
+        if not any(token in lowered_user for token in banned_when_missing):
+            return False
+
+    return True
+
+
 def _kickoff_ai_title_generation(conversation, first_user_message: str) -> None:
     """异步给一段对话生成简短标题。
 
@@ -1762,10 +1810,7 @@ def _kickoff_ai_title_generation(conversation, first_user_message: str) -> None:
     import threading
     import urllib.request
 
-    fallback = (first_user_message or '').strip()[:30]
-    if fallback and len(first_user_message or '') > 30:
-        fallback = fallback + '...'
-    fallback = fallback or '新对话'
+    fallback = _derive_fallback_conversation_title(first_user_message)
 
     def _set_title(title: str) -> None:
         try:
@@ -1784,9 +1829,13 @@ def _kickoff_ai_title_generation(conversation, first_user_message: str) -> None:
             return
 
         system_msg = (
-            "你是会话标题生成器。读用户的第一条消息，输出 6-15 个中文字符的简短标题。"
+            "你是会话标题生成器。你的任务是只根据用户第一条消息，总结用户意图，生成会话标题。"
+            "不要复述助手身份，不要引用助手回复，不要臆造新的人名、品牌名、设定。"
+            "输出 4-12 个中文字符，尽量概括含义而不是照抄问句。"
             "只输出标题本身，不要引号、句号、解释、前后缀。"
-            "能用中文就用中文，避免连续超过 6 个英文字母。"
+            "示例：'你是谁？' -> '身份确认'；"
+            "'帮我润色这封求职邮件' -> '求职邮件润色'；"
+            "'解释一下协方差矩阵' -> '协方差矩阵解释'。"
         )
         user_msg = (first_user_message or '').strip()[:500] or '新对话'
         try:
@@ -1824,6 +1873,8 @@ def _kickoff_ai_title_generation(conversation, first_user_message: str) -> None:
         title = title.split('\n')[0].strip()
         if len(title) > 30:
             title = title[:30]
+        if not _is_valid_generated_conversation_title(title, first_user_message):
+            title = fallback
         _set_title(title or fallback)
 
     threading.Thread(target=_run, daemon=True).start()
@@ -2002,6 +2053,23 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def _repair_persisted_media_tags(self, conversation) -> None:
+        """把历史 assistant 消息里遗留的 MEDIA: 标记补发成 /media URL。"""
+        from .asset_publish import publish_local_assets_in_content
+
+        stale_messages = conversation.messages.filter(role='assistant', content__contains='MEDIA:')
+        for message in stale_messages:
+            repaired = publish_local_assets_in_content(message.content or '')
+            if repaired != (message.content or ''):
+                message.content = repaired
+                message.save(update_fields=['content'])
+
+    def retrieve(self, request, *args, **kwargs):
+        conversation = self.get_object()
+        self._repair_persisted_media_tags(conversation)
+        serializer = self.get_serializer(conversation)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='messages')
     def add_message(self, request, pk=None):

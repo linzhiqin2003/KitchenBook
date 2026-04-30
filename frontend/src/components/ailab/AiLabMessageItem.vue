@@ -411,11 +411,22 @@ const escapeHtml = (text) => {
 }
 
 const LOCAL_FS_IMAGE_RE = /^\/(?:private|tmp|var|Users|home|root|mnt|Volumes)\//i
+const MEDIA_LOCAL_IMAGE_RE = /^MEDIA:\s*\/(?:private|tmp|var|Users|home|root|mnt|Volumes)\//i
 const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|bmp|svg)(?:\?[^)\s]*)?$/i
 
 const isUnpublishedLocalImage = (url) => {
   if (!url || typeof url !== 'string') return false
-  return LOCAL_FS_IMAGE_RE.test(url) && IMAGE_EXT_RE.test(url)
+  return (LOCAL_FS_IMAGE_RE.test(url) || MEDIA_LOCAL_IMAGE_RE.test(url)) && IMAGE_EXT_RE.test(url)
+}
+
+const normalizeRenderableImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return url
+  if (!url.startsWith('MEDIA:')) return url
+  const target = url.slice('MEDIA:'.length).trim()
+  if (target.startsWith('http://') || target.startsWith('https://') || target.startsWith('/media/')) {
+    return target
+  }
+  return url
 }
 
 const buildStreamingImagePlaceholder = (alt = '', detail = '图片生成中，完成后自动显示') => {
@@ -506,7 +517,10 @@ const parseMarkdown = (markdown, options = {}) => {
       if (isStreaming && isUnpublishedLocalImage(url)) {
         return buildStreamingImagePlaceholder(alt)
       }
-      const safeUrl = escapeHtml(url)
+      if (!isStreaming && isUnpublishedLocalImage(url)) {
+        return buildStreamingImagePlaceholder(alt, '图片路径尚未发布，稍后刷新会自动恢复')
+      }
+      const safeUrl = escapeHtml(normalizeRenderableImageUrl(url))
       const safeAlt = escapeHtml(alt || '')
       const titleAttr = title ? ` title="${escapeHtml(title)}"` : (alt ? ` title="${safeAlt}"` : '')
       // 不再包 <a> — 由 markdown-content 上的点击委托打开预览（避免新窗口下载）

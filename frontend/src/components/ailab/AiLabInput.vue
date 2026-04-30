@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import AiLabTokenUsage from './AiLabTokenUsage.vue'
 
 const props = defineProps({
@@ -34,6 +34,8 @@ const emit = defineEmits([
 
 const localValue = ref(props.modelValue)
 const textareaRef = ref(null)
+const modelMenuRef = ref(null)
+const isModelMenuOpen = ref(false)
 
 // 输入框最大高度 — 单行 24px 行高 × ~9 行 ≈ 220px。超出后内部滚动。
 const TEXTAREA_MAX_HEIGHT = 220
@@ -59,6 +61,20 @@ watch(localValue, (val) => {
 })
 
 onMounted(() => { autoResize() })
+
+const handleModelMenuOutsideClick = (event) => {
+  if (!modelMenuRef.value?.contains(event.target)) {
+    isModelMenuOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleModelMenuOutsideClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleModelMenuOutsideClick)
+})
 
 const composing = ref(false)
 const onCompositionStart = () => { composing.value = true }
@@ -97,6 +113,19 @@ const formatDuration = (seconds) => {
 }
 
 const shouldShowModelSwitcher = computed(() => props.modelOptions.length > 1)
+const selectedModelOption = computed(() => (
+  props.modelOptions.find(option => option.value === props.selectedModel) || props.modelOptions[0] || null
+))
+
+const toggleModelMenu = () => {
+  if (!shouldShowModelSwitcher.value) return
+  isModelMenuOpen.value = !isModelMenuOpen.value
+}
+
+const selectModel = (value) => {
+  emit('update:selectedModel', value)
+  isModelMenuOpen.value = false
+}
 </script>
 
 <template>
@@ -244,18 +273,49 @@ const shouldShowModelSwitcher = computed(() => props.modelOptions.length > 1)
         class="input-footer"
         :class="{ 'input-footer--floating': floating, 'input-footer--compact': !floating }"
       >
-        <div v-if="shouldShowModelSwitcher" class="model-switcher" role="tablist" aria-label="选择 Hermes 基座模型">
+        <div
+          v-if="shouldShowModelSwitcher"
+          ref="modelMenuRef"
+          class="model-select"
+        >
           <button
-            v-for="option in modelOptions"
-            :key="option.value"
             type="button"
-            class="model-switcher__button"
-            :class="{ 'is-active': selectedModel === option.value }"
-            :title="option.title || option.label"
-            @click="emit('update:selectedModel', option.value)"
+            class="model-select__trigger"
+            :class="{ 'is-open': isModelMenuOpen }"
+            :aria-expanded="isModelMenuOpen ? 'true' : 'false'"
+            aria-haspopup="listbox"
+            :title="selectedModelOption?.title || selectedModelOption?.label || '选择 Hermes 基座模型'"
+            @click.stop="toggleModelMenu"
           >
-            {{ option.label }}
+            <span class="model-select__label">{{ selectedModelOption?.label || '选择模型' }}</span>
+            <svg class="model-select__chevron" :class="{ 'is-open': isModelMenuOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
           </button>
+
+          <Transition name="fade-up">
+            <div
+              v-if="isModelMenuOpen"
+              class="model-select__menu"
+              role="listbox"
+              aria-label="选择 Hermes 基座模型"
+            >
+              <button
+                v-for="option in modelOptions"
+                :key="option.value"
+                type="button"
+                class="model-select__option"
+                :class="{ 'is-active': selectedModel === option.value }"
+                :title="option.title || option.label"
+                @click="selectModel(option.value)"
+              >
+                <span class="model-select__option-label">{{ option.label }}</span>
+                <span v-if="option.title && option.title !== option.label" class="model-select__option-meta">
+                  {{ option.title }}
+                </span>
+              </button>
+            </div>
+          </Transition>
         </div>
 
         <template v-if="floating">
@@ -332,36 +392,97 @@ const shouldShowModelSwitcher = computed(() => props.modelOptions.length > 1)
 .input-footer__separator {
   color: var(--theme-300);
 }
-.model-switcher {
+.model-select {
+  position: relative;
+}
+.model-select__trigger {
+  min-width: 108px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.18rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.76);
+  justify-content: space-between;
+  gap: 0.45rem;
+  padding: 0 0.75rem;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
-}
-.model-switcher__button {
-  border: none;
-  background: transparent;
-  color: var(--theme-400, #8a8a82);
-  min-width: 68px;
-  padding: 0.35rem 0.7rem;
   border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--theme-500, #6b7280);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+  cursor: pointer;
+}
+.model-select__trigger:hover,
+.model-select__trigger.is-open {
+  border-color: rgba(15, 23, 42, 0.14);
+  color: var(--theme-700, #2d2d28);
+  background: rgba(255, 255, 255, 0.95);
+}
+.model-select__label {
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
+  white-space: nowrap;
+}
+.model-select__chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  transition: transform 0.16s ease;
+}
+.model-select__chevron.is-open {
+  transform: rotate(180deg);
+}
+.model-select__menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.3rem;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.12),
+    0 3px 10px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(12px);
+  z-index: 20;
+}
+.model-select__option {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
-.model-switcher__button:hover {
-  color: var(--theme-600, #5a5a52);
+.model-select__option:hover {
+  background: rgba(15, 23, 42, 0.05);
 }
-.model-switcher__button.is-active {
+.model-select__option.is-active {
   background: var(--theme-700, #2d2d28);
   color: #fff;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.14);
+}
+.model-select__option-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.model-select__option-meta {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--theme-400, #8a8a82);
+}
+.model-select__option.is-active .model-select__option-meta {
+  color: rgba(255, 255, 255, 0.74);
 }
 .input-shell {
   background: rgba(255, 255, 255, 0.94);

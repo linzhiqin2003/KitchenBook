@@ -42,6 +42,10 @@ _PATH_RE = re.compile(
     r"(?<![/\w:.\-])(/(?:[\w.\-]+/)+[\w.\-]+\.(?:" + "|".join(_PUBLISHED_EXTS) + r"))\b",
     re.IGNORECASE,
 )
+_MEDIA_TAG_RE = re.compile(
+    r"MEDIA:\s*([^\s)]+)",
+    re.IGNORECASE,
+)
 
 
 def _publish_dir() -> Path:
@@ -75,18 +79,17 @@ def publish_local_assets_in_content(content: str) -> str:
     base_url = _base_url()
     cache: dict[str, str] = {}
 
-    def _replace(match: "re.Match[str]") -> str:
-        path_str = match.group(1)
+    def _publish_path(path_str: str, original: str) -> str:
         if path_str in cache:
             return cache[path_str]
         try:
             src = Path(path_str)
             if not src.is_absolute():
-                return match.group(0)
+                return original
             if not src.is_file():
-                return match.group(0)
+                return original
             if _is_under_media(src):
-                return match.group(0)
+                return original
             suffix = src.suffix.lower() or ".bin"
             fname = f"{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_urlsafe(6)}{suffix}"
             dst = pub_dir / fname
@@ -100,6 +103,19 @@ def publish_local_assets_in_content(content: str) -> str:
             return public_url
         except Exception as e:
             logger.warning("ailab publish failed for %s: %s", path_str, e)
-            return match.group(0)
+            return original
 
-    return _PATH_RE.sub(_replace, content)
+    def _replace_media_tag(match: "re.Match[str]") -> str:
+        target = (match.group(1) or "").strip()
+        if not target:
+            return match.group(0)
+        if target.startswith(("http://", "https://", "/media/")):
+            return target
+        return _publish_path(target, match.group(0))
+
+    def _replace_path(match: "re.Match[str]") -> str:
+        path_str = match.group(1)
+        return _publish_path(path_str, match.group(0))
+
+    content = _MEDIA_TAG_RE.sub(_replace_media_tag, content)
+    return _PATH_RE.sub(_replace_path, content)
