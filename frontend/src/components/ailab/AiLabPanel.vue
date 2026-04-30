@@ -40,6 +40,7 @@ const workspaceListLimit = ref(0)
 const workspaceSelectedPath = ref('')
 const workspacePreview = ref(null)
 const workspacePreviewOpen = ref(false)
+const skillBrowserOpen = ref(false)
 const loadingTools = ref(false)
 const loadingSkills = ref(false)
 const loadingSkillBrowser = ref(false)
@@ -448,8 +449,14 @@ onUnmounted(() => {
 })
 
 const handleKeydown = (event) => {
-  if (event.key === 'Escape' && workspacePreviewOpen.value) {
+  if (event.key !== 'Escape') return
+  // 文件预览叠在 skill 浏览器之上，先关上层
+  if (workspacePreviewOpen.value) {
     closeWorkspacePreview()
+    return
+  }
+  if (skillBrowserOpen.value) {
+    closeSkillBrowser()
   }
 }
 
@@ -540,12 +547,8 @@ const selectMemoryEntry = (entry) => {
 }
 
 const openMemoryEntry = async (entry) => {
-  if (entry.type === 'dir') {
-    memoryCurrentPath.value = entry.path
-    memorySelectedPath.value = ''
-    await fetchMemory({ path: entry.path })
-    return
-  }
+  // Memory tab 锁在 memories/ 根目录：dir 不进入，仅文件能预览
+  if (entry.type === 'dir') return
   await previewWorkspaceEntry({ ...entry, root: 'user' })
 }
 
@@ -555,9 +558,26 @@ const openSkillBrowserBreadcrumb = async (path) => {
   await fetchSkillBrowser({ skillName: selectedSkillName.value, path: skillBrowserCurrentPath.value })
 }
 
-const selectSkill = async (skill) => {
+// 单击只高亮（不发请求、不展开任何浏览器）。
+const selectSkill = (skill) => {
   if (!skill?.name) return
-  await fetchSkillBrowser({ skillName: skill.name, path: '' })
+  selectedSkillName.value = skill.name
+}
+
+// 双击：弹浮窗，展示该 skill 的文件浏览器；切换 skill 时重置路径。
+const openSkillBrowser = async (skill) => {
+  if (!skill?.name) return
+  if (selectedSkillName.value !== skill.name) {
+    skillBrowserCurrentPath.value = ''
+    skillBrowserSelectedPath.value = ''
+  }
+  selectedSkillName.value = skill.name
+  skillBrowserOpen.value = true
+  await fetchSkillBrowser({ skillName: skill.name, path: skillBrowserCurrentPath.value || '' })
+}
+
+const closeSkillBrowser = () => {
+  skillBrowserOpen.value = false
 }
 
 const selectSkillBrowserEntry = (entry) => {
@@ -678,7 +698,8 @@ defineExpose({
                   :style="skill.isSelected
                     ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
                     : 'background: #fff; border: 1px solid #ececef;'"
-                  @click="selectSkill(skill)">
+                  @click="selectSkill(skill)"
+                  @dblclick="openSkillBrowser(skill)">
                   <div class="min-w-0 flex-1">
                     <div class="text-[14px] truncate" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</div>
                     <div v-if="skill.description" class="text-[11px] mt-0.5 line-clamp-2" style="color: #9a9aa0;">{{ skill.description }}</div>
@@ -692,89 +713,6 @@ defineExpose({
               </div>
             </div>
 
-            <div v-if="selectedSkillName" class="mt-4">
-              <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    class="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
-                    :disabled="!skillBrowserCanGoUp"
-                    :style="skillBrowserCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
-                    title="返回上一级"
-                    @click="openSkillBrowserBreadcrumb(skillBrowserParentPath)"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
-                    </svg>
-                  </button>
-                  <button
-                    v-for="crumb in skillBrowserBreadcrumbs"
-                    :key="`skill-${selectedSkillName}-${crumb.path || 'root'}`"
-                    class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
-                    style="color: #6e6e76;"
-                    @click="openSkillBrowserBreadcrumb(crumb.path)"
-                  >
-                    {{ crumb.name }}
-                  </button>
-                </div>
-              </div>
-
-              <div v-if="selectedSkillMeta?.description" class="px-1 pb-2 text-[11px]" style="color: #9a9aa0;">
-                {{ selectedSkillMeta.description }}
-              </div>
-
-              <div v-if="loadingSkillBrowser" class="text-center py-8 text-[12px]" style="color: #b0b0b6;">
-                加载中…
-              </div>
-              <div
-                v-else-if="skillBrowserError"
-                class="rounded-lg px-3 py-2 text-[13px]"
-                style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;"
-              >
-                {{ skillBrowserError }}
-              </div>
-              <div v-else-if="skillBrowserEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
-                当前目录是空的
-              </div>
-              <div v-else class="space-y-1">
-                <button
-                  v-for="entry in skillBrowserEntries"
-                  :key="`${selectedSkillName}-${entry.path}`"
-                  class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
-                  :style="skillBrowserSelectedPath === entry.path
-                    ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
-                    : 'background: #fff; border: 1px solid #ececef;'"
-                  @click="selectSkillBrowserEntry(entry)"
-                  @dblclick="openSkillBrowserEntry(entry)"
-                >
-                  <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
-                    <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
-                    </svg>
-                    <svg v-else-if="entry.type === 'symlink'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 016.364 6.364l-1.757 1.757a4.5 4.5 0 01-6.364 0m-1.414-9.9a4.5 4.5 0 00-6.364 0L2.44 8.666a4.5 4.5 0 006.364 6.364l1.757-1.757" />
-                    </svg>
-                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.625a1.125 1.125 0 00-1.125-1.125H8.25m11.25 9.75h-2.625a1.125 1.125 0 00-1.125 1.125V18m4.875-3.75l-3.375 3.375a2.25 2.25 0 01-1.59.659H6.375A1.125 1.125 0 015.25 17.16V5.625A1.125 1.125 0 016.375 4.5H8.25m0 0l2.25 2.25m-2.25-2.25V6.75m0-2.25h6.75" />
-                    </svg>
-                  </span>
-
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <span class="text-[13px] truncate" style="color: #2c2c30;">{{ entry.name }}</span>
-                      <span v-if="entry.type === 'dir' && entry.has_children" class="text-[10px] shrink-0" style="color: #b0b0b6;">folder</span>
-                      <span v-else-if="entry.type !== 'dir'" class="text-[11px] shrink-0" style="color: #9a9aa0;">{{ formatWorkspaceSize(entry.size) }}</span>
-                    </div>
-                    <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
-                      <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
-                      <span v-if="entry.target"> · {{ entry.target }}</span>
-                    </div>
-                  </div>
-                </button>
-              </div>
-              <div class="mt-3 text-[11px] text-center" style="color: #b0b0b6;">
-                单击选择，双击打开
-              </div>
-            </div>
           </template>
         </template>
 
@@ -783,31 +721,6 @@ defineExpose({
           <template v-else>
             <div v-if="memoryError" class="mb-3 rounded-lg px-3 py-2 text-[13px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
               {{ memoryError }}
-            </div>
-
-            <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <button
-                  class="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
-                  :disabled="!memoryCanGoUp"
-                  :style="memoryCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
-                  title="返回上一级"
-                  @click="openMemoryBreadcrumb(memoryParentPath)"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
-                  </svg>
-                </button>
-                <button
-                  v-for="crumb in memoryBreadcrumbItems"
-                  :key="`memory-${crumb.path || 'root'}`"
-                  class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
-                  style="color: #6e6e76;"
-                  @click="openMemoryBreadcrumb(crumb.path)"
-                >
-                  {{ crumb.name }}
-                </button>
-              </div>
             </div>
 
             <div v-if="visibleMemoryEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
@@ -848,9 +761,6 @@ defineExpose({
                   </div>
                 </div>
               </button>
-            </div>
-            <div class="mt-3 text-[11px] text-center" style="color: #b0b0b6;">
-              单击选择，双击打开
             </div>
           </template>
         </template>
@@ -1023,6 +933,118 @@ defineExpose({
             </div>
           </div>
         </template>
+      </div>
+    </div>
+  </Transition>
+
+  <Transition name="workspace-preview">
+    <div
+      v-if="skillBrowserOpen"
+      class="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 px-6 py-8"
+      @click="closeSkillBrowser"
+    >
+      <div
+        class="w-full max-w-2xl max-h-full rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
+        style="background: #f7f7f8; border-color: rgba(255,255,255,0.24);"
+        @click.stop
+      >
+        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b" style="border-color: #e8e8ec;">
+          <div class="min-w-0">
+            <div class="text-[14px] font-semibold truncate" style="color: #2c2c30;">
+              {{ selectedSkillName || 'Skill' }}
+            </div>
+            <div v-if="selectedSkillMeta?.description" class="text-[11px] truncate mt-0.5" style="color: #9a9aa0;">
+              {{ selectedSkillMeta.description }}
+            </div>
+          </div>
+          <button
+            class="w-8 h-8 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.05] shrink-0"
+            style="color: #9a9aa0;"
+            title="关闭"
+            @click="closeSkillBrowser"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-auto p-4">
+          <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button
+                class="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
+                :disabled="!skillBrowserCanGoUp"
+                :style="skillBrowserCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
+                title="返回上一级"
+                @click="openSkillBrowserBreadcrumb(skillBrowserParentPath)"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+                </svg>
+              </button>
+              <button
+                v-for="crumb in skillBrowserBreadcrumbs"
+                :key="`skill-${selectedSkillName}-${crumb.path || 'root'}`"
+                class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
+                style="color: #6e6e76;"
+                @click="openSkillBrowserBreadcrumb(crumb.path)"
+              >
+                {{ crumb.name }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="loadingSkillBrowser" class="text-center py-8 text-[12px]" style="color: #b0b0b6;">
+            加载中…
+          </div>
+          <div
+            v-else-if="skillBrowserError"
+            class="rounded-lg px-3 py-2 text-[13px]"
+            style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;"
+          >
+            {{ skillBrowserError }}
+          </div>
+          <div v-else-if="skillBrowserEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
+            当前目录是空的
+          </div>
+          <div v-else class="space-y-1">
+            <button
+              v-for="entry in skillBrowserEntries"
+              :key="`${selectedSkillName}-${entry.path}`"
+              class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
+              :style="skillBrowserSelectedPath === entry.path
+                ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
+                : 'background: #fff; border: 1px solid #ececef;'"
+              @click="selectSkillBrowserEntry(entry)"
+              @dblclick="openSkillBrowserEntry(entry)"
+            >
+              <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
+                <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
+                </svg>
+                <svg v-else-if="entry.type === 'symlink'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 016.364 6.364l-1.757 1.757a4.5 4.5 0 01-6.364 0m-1.414-9.9a4.5 4.5 0 00-6.364 0L2.44 8.666a4.5 4.5 0 006.364 6.364l1.757-1.757" />
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.625a1.125 1.125 0 00-1.125-1.125H8.25m11.25 9.75h-2.625a1.125 1.125 0 00-1.125 1.125V18m4.875-3.75l-3.375 3.375a2.25 2.25 0 01-1.59.659H6.375A1.125 1.125 0 015.25 17.16V5.625A1.125 1.125 0 016.375 4.5H8.25m0 0l2.25 2.25m-2.25-2.25V6.75m0-2.25h6.75" />
+                </svg>
+              </span>
+
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-[13px] truncate" style="color: #2c2c30;">{{ entry.name }}</span>
+                  <span v-if="entry.type === 'dir' && entry.has_children" class="text-[10px] shrink-0" style="color: #b0b0b6;">folder</span>
+                  <span v-else-if="entry.type !== 'dir'" class="text-[11px] shrink-0" style="color: #9a9aa0;">{{ formatWorkspaceSize(entry.size) }}</span>
+                </div>
+                <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
+                  <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
+                  <span v-if="entry.target"> · {{ entry.target }}</span>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </Transition>

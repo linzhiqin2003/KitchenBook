@@ -1,8 +1,9 @@
 """模型计费表、模型归一化与开销估算。
 
-价格按"每百万 token 多少 RMB"配置。cache_tokens 按 cache 价计，
-prompt_tokens 中扣掉 cache_tokens 后的部分按 input 价计。
-不区分 cache 读写（按用户约定，read+write 合并到 cache_tokens 一并按 cache 价）。
+价格按"每百万 token 多少美元"配置（统一用 USD 出账，前端按需展示
+$ 符号）。cache_tokens 按 cache 价计，prompt_tokens 中扣掉
+cache_tokens 后的部分按 input 价计。不区分 cache 读写（read+write
+合并到 cache_tokens 一并按 cache 价）。
 
 新增模型：直接在 PRICING 字典加一条；未列出的模型回退到 DEFAULT_MODEL。
 """
@@ -13,17 +14,19 @@ from decimal import Decimal
 from typing import Any, Dict, Optional
 
 
-# RMB per 1 million tokens
+# USD per 1 million tokens. DeepSeek V4 系列以 OpenRouter 现价为准；
+# mimo 系直接照 OpenRouter dashboard。cache 价没明示的取 input 的 10%
+# （DeepSeek 官方 cache 大约 1/10 input 的经验比例）。
 PRICING: Dict[str, Dict[str, Decimal]] = {
     "deepseek-v4-flash": {
-        "input": Decimal("1"),
-        "output": Decimal("2"),
-        "cache": Decimal("0.02"),
+        "input": Decimal("0.14"),
+        "output": Decimal("0.28"),
+        "cache": Decimal("0.014"),
     },
     "deepseek-v4-pro": {
-        "input": Decimal("2"),
-        "output": Decimal("6"),
-        "cache": Decimal("0.25"),
+        "input": Decimal("0.435"),
+        "output": Decimal("0.87"),
+        "cache": Decimal("0.0435"),
     },
     "xiaomi/mimo-v2.5": {
         "input": Decimal("0.4"),
@@ -38,7 +41,7 @@ PRICING: Dict[str, Dict[str, Decimal]] = {
 }
 
 DEFAULT_MODEL = "deepseek-v4-flash"
-CURRENCY = "CNY"
+CURRENCY = "USD"
 MODEL_ALIASES: Dict[str, str] = {
     "Hermes": DEFAULT_MODEL,
     "hermes-agent": DEFAULT_MODEL,
@@ -60,6 +63,16 @@ def get_pricing(model: Optional[str]) -> Dict[str, Decimal]:
     return PRICING[DEFAULT_MODEL]
 
 
+def supports_cache(model: Optional[str]) -> bool:
+    """这个模型是否启用 prompt cache（用于决定是否对 cache_tokens=0
+    的轮做"同 session 历史 100% 命中"估算）。
+
+    当前 PRICING 里出现的全部当作支持——DeepSeek V4 / 小米 MiMo 系
+    都有 cache 能力，差别只在上游有没有把字段传回来。
+    """
+    return normalize_model_name(model) in PRICING
+
+
 def estimate_cost(
     *,
     prompt_tokens: int,
@@ -76,7 +89,7 @@ def estimate_cost(
     返回：
       {
         "model": "deepseek-v4-flash",
-        "currency": "CNY",
+        "currency": "USD",
         "input_cost": "1.234567",   # 字符串以保留精度
         "cache_cost": "0.001234",
         "output_cost": "2.345678",

@@ -91,6 +91,9 @@ const headerLabel = computed(() => {
     if (currentReasoning.value) return 'Thinking…'
   }
   // 完成态：聚合摘要
+  // 摘要力求一句话 ≤ 两段：思考耗时 + 工具一句。工具种类 ≤ 2 时列出名字
+  // （ran skill_view, ran terminal）；超过 2 种就合并成 "ran N tools"，
+  // 避免横向拉到很长。展开后每步独立一行，仍能看到详情。
   const tools = subTurns.value.filter(t => t.toolCall).map(t => t.toolCall)
   const totalThinkingMs = subTurns.value.reduce((s, t) => {
     if (t.reasoningStartedAt && t.reasoningFinishedAt) return s + (t.reasoningFinishedAt - t.reasoningStartedAt)
@@ -100,12 +103,19 @@ const headerLabel = computed(() => {
   if (totalThinkingMs > 0) parts.push(`thought for ${formatDuration(totalThinkingMs)}`)
   if (tools.length) {
     const counts = {}
+    const order = []
     for (const t of tools) {
       const name = t.name || 'tool'
+      if (counts[name] === undefined) order.push(name)
       counts[name] = (counts[name] || 0) + 1
     }
-    for (const [name, count] of Object.entries(counts)) {
-      parts.push(count > 1 ? `ran ${name} ${count}x` : `ran ${name}`)
+    if (order.length > 2) {
+      parts.push(`ran ${tools.length} tools`)
+    } else {
+      for (const name of order) {
+        const count = counts[name]
+        parts.push(count > 1 ? `ran ${name} ${count}x` : `ran ${name}`)
+      }
     }
   }
   if (!parts.length) return 'Thought'

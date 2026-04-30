@@ -107,23 +107,24 @@ const promptCacheRatio = computed(() => {
 })
 
 const cost = computed(() => stats.value?.cost || null)
+// 后端 currency=USD；前端就直接 $ 标。换汇率由用户自己心算。
 const totalCostLabel = computed(() => {
   const c = cost.value
   if (!c) return '—'
   const total = Number(c.total)
   if (!isFinite(total)) return '—'
-  if (total < 0.0001) return '< ¥0.0001'
-  if (total < 0.01) return `¥${total.toFixed(4)}`
-  if (total < 1) return `¥${total.toFixed(3)}`
-  return `¥${total.toFixed(2)}`
+  if (total < 0.0001) return '< $0.0001'
+  if (total < 0.01) return `$${total.toFixed(4)}`
+  if (total < 1) return `$${total.toFixed(3)}`
+  return `$${total.toFixed(2)}`
 })
 const formatCost = (v) => {
   const n = Number(v)
-  if (!isFinite(n) || n === 0) return '¥0'
-  if (n < 0.0001) return '< ¥0.0001'
-  if (n < 0.01) return `¥${n.toFixed(4)}`
-  if (n < 1) return `¥${n.toFixed(3)}`
-  return `¥${n.toFixed(2)}`
+  if (!isFinite(n) || n === 0) return '$0'
+  if (n < 0.0001) return '< $0.0001'
+  if (n < 0.01) return `$${n.toFixed(4)}`
+  if (n < 1) return `$${n.toFixed(3)}`
+  return `$${n.toFixed(2)}`
 }
 
 const getModelBucketLabel = (bucket) => {

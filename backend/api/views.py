@@ -2369,6 +2369,42 @@ def _kickoff_ai_title_generation(conversation, first_user_message: str) -> None:
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _estimate_session_cache_tokens(conversation, validated_data):
+    """同 session 历史 100% 命中估算。
+
+    上游（OpenRouter / Hermes）对部分 provider 拿不到真实 cache_tokens，
+    导致 mimo 等模型 cache_tokens 永远是 0。约定：同一 conversation 内，
+    上一条 assistant 看到的 prompt 在本轮里都被命中——所以这一轮的
+    cache_tokens 估算上限就是上一条 assistant 的 prompt_tokens。
+    `min(prev_prompt, current_prompt)` 防止估出比当前 prompt 还大的值。
+
+    仅在 cache_tokens=0、role=assistant、模型在 PRICING 表里时启用，
+    避免覆盖上游真实数据。validated_data 原地修改。
+    """
+    from common.pricing import supports_cache
+
+    if validated_data.get('role') != 'assistant':
+        return
+    if int(validated_data.get('cache_tokens') or 0) > 0:
+        return
+    prompt_tokens = int(validated_data.get('prompt_tokens') or 0)
+    if prompt_tokens <= 0:
+        return
+    if not supports_cache(validated_data.get('model_name')):
+        return
+    prev_assistant = (
+        conversation.messages
+        .filter(role='assistant')
+        .order_by('-created_at')
+        .first()
+    )
+    if not prev_assistant:
+        return  # 首轮没有历史可 cache
+    estimated = min(int(prev_assistant.prompt_tokens or 0), prompt_tokens)
+    if estimated > 0:
+        validated_data['cache_tokens'] = estimated
+
+
 @csrf_exempt
 @api_view(['POST'])
 @authentication_classes([])
@@ -2434,6 +2470,7 @@ def ailab_internal_add_message(request, pk):
                 status=status.HTTP_200_OK,
             )
 
+    _estimate_session_cache_tokens(conversation, serializer.validated_data)
     serializer.save(conversation=conversation)
     conversation.save()
     return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -2592,6 +2629,7 @@ class AiLabConversationViewSet(viewsets.ModelViewSet):
                 serializer.validated_data['content'] = publish_local_assets_in_content(
                     serializer.validated_data.get('content', '')
                 )
+            _estimate_session_cache_tokens(conversation, serializer.validated_data)
             serializer.save(conversation=conversation)
             # 更新会话时间
             conversation.save()  # 触发 auto_now
