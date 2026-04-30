@@ -387,16 +387,40 @@ const selectModel = (value) => {
 .input-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.55rem;
   margin-top: 0.5rem;
   color: var(--theme-400);
 }
 .input-footer--floating {
+  /* 浮动条同时挂着 token 用量等信息，居中显得平衡 */
+  justify-content: center;
   font-size: 13px;
 }
 .input-footer--compact {
+  /* Welcome 视图只剩孤零零一个模型 pill；居中会让它看起来很突兀。
+     右对齐 + 更克制的留白，让它收敛到输入框的尾端做附属说明 */
+  justify-content: flex-end;
   font-size: 12px;
+  margin-top: 0.4rem;
+  padding-right: 0.25rem;
+}
+.input-footer--compact .model-select__trigger {
+  min-width: 0;
+  height: 26px;
+  padding: 0 0.55rem;
+  font-size: 11.5px;
+  background: transparent;
+  border-color: rgba(15, 23, 42, 0.06);
+  box-shadow: none;
+}
+.input-footer--compact .model-select__trigger:hover,
+.input-footer--compact .model-select__trigger.is-open {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+.input-footer--compact .model-select__chevron {
+  width: 11px;
+  height: 11px;
 }
 .input-footer__separator {
   color: var(--theme-300);
