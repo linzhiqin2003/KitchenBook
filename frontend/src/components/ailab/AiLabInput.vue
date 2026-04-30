@@ -126,6 +126,18 @@ const selectModel = (value) => {
   emit('update:selectedModel', value)
   isModelMenuOpen.value = false
 }
+
+// 截短 trigger 上的副标题：把 "Xiaomi MiMo V2.5" 这种全名压成简洁的副标，
+// 主要剥掉与 label 重复的部分，比如 label="MiMo" / title="Xiaomi MiMo V2.5" → "Xiaomi"
+const getInlineSublabel = (option) => {
+  if (!option) return ''
+  const title = (option.title || '').trim()
+  const label = (option.label || '').trim()
+  if (!title || title === label) return ''
+  // 优先去掉 label 子串，留下品牌前缀（如 "Xiaomi"），更接近 Claude 那种 "Adaptive" 副标的味道
+  const stripped = title.replace(label, '').replace(/[·•:：\-—]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return stripped || title
+}
 </script>
 
 <template>
@@ -227,6 +239,65 @@ const selectModel = (value) => {
 
           <!-- 右侧操作 -->
           <div class="input-actions">
+            <!-- 模型切换：贴在 mic / send 之前；与 Claude.ai 风格一致 -->
+            <div
+              v-if="shouldShowModelSwitcher"
+              ref="modelMenuRef"
+              class="model-select model-select--inline"
+            >
+              <button
+                type="button"
+                class="model-select__trigger"
+                :class="{ 'is-open': isModelMenuOpen }"
+                :aria-expanded="isModelMenuOpen ? 'true' : 'false'"
+                aria-haspopup="listbox"
+                :title="selectedModelOption?.title || selectedModelOption?.label || '选择 Hermes 基座模型'"
+                @click.stop="toggleModelMenu"
+              >
+                <span class="model-select__label">{{ selectedModelOption?.label || '选择模型' }}</span>
+                <span
+                  v-if="selectedModelOption?.title && selectedModelOption.title !== selectedModelOption.label"
+                  class="model-select__sub-label"
+                >{{ getInlineSublabel(selectedModelOption) }}</span>
+                <svg class="model-select__chevron" :class="{ 'is-open': isModelMenuOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+
+              <Transition name="fade-up">
+                <div
+                  v-if="isModelMenuOpen"
+                  class="model-select__menu"
+                  role="listbox"
+                  aria-label="选择 Hermes 基座模型"
+                >
+                  <button
+                    v-for="option in modelOptions"
+                    :key="option.value"
+                    type="button"
+                    class="model-select__option"
+                    :class="{ 'is-active': selectedModel === option.value }"
+                    :title="option.title || option.label"
+                    @click="selectModel(option.value)"
+                  >
+                    <span class="model-select__option-body">
+                      <span class="model-select__option-label">{{ option.label }}</span>
+                      <span v-if="option.title && option.title !== option.label" class="model-select__option-meta">
+                        {{ option.title }}
+                      </span>
+                    </span>
+                    <svg
+                      v-if="selectedModel === option.value"
+                      class="model-select__option-check"
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  </button>
+                </div>
+              </Transition>
+            </div>
+
             <button
               @click="emit('voice-click')"
               :disabled="isLoading || isOcrProcessing || isTranscribing"
@@ -267,78 +338,20 @@ const selectModel = (value) => {
         </div>
       </div>
 
-      <!-- 底部状态栏：模型切换 + token 用量 -->
+      <!-- 底部状态栏：仅 floating 模式承载 token 用量；模型切换已挪进输入框右侧 -->
       <div
-        v-if="shouldShowModelSwitcher || floating"
-        class="input-footer"
-        :class="{ 'input-footer--floating': floating, 'input-footer--compact': !floating }"
+        v-if="floating"
+        class="input-footer input-footer--floating"
       >
-        <div
-          v-if="shouldShowModelSwitcher"
-          ref="modelMenuRef"
-          class="model-select"
-        >
-          <button
-            type="button"
-            class="model-select__trigger"
-            :class="{ 'is-open': isModelMenuOpen }"
-            :aria-expanded="isModelMenuOpen ? 'true' : 'false'"
-            aria-haspopup="listbox"
-            :title="selectedModelOption?.title || selectedModelOption?.label || '选择 Hermes 基座模型'"
-            @click.stop="toggleModelMenu"
-          >
-            <span class="model-select__label">{{ selectedModelOption?.label || '选择模型' }}</span>
-            <svg class="model-select__chevron" :class="{ 'is-open': isModelMenuOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-          </button>
-
-          <Transition name="fade-up">
-            <div
-              v-if="isModelMenuOpen"
-              class="model-select__menu"
-              role="listbox"
-              aria-label="选择 Hermes 基座模型"
-            >
-              <button
-                v-for="option in modelOptions"
-                :key="option.value"
-                type="button"
-                class="model-select__option"
-                :class="{ 'is-active': selectedModel === option.value }"
-                :title="option.title || option.label"
-                @click="selectModel(option.value)"
-              >
-                <span class="model-select__option-body">
-                  <span class="model-select__option-label">{{ option.label }}</span>
-                  <span v-if="option.title && option.title !== option.label" class="model-select__option-meta">
-                    {{ option.title }}
-                  </span>
-                </span>
-                <svg
-                  v-if="selectedModel === option.value"
-                  class="model-select__option-check"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-              </button>
-            </div>
-          </Transition>
-        </div>
-
-        <template v-if="floating">
-          <span v-if="shouldShowModelSwitcher" class="input-footer__separator">·</span>
-          <AiLabTokenUsage
-            :prompt-tokens="sessionTokens.promptTokens"
-            :completion-tokens="sessionTokens.completionTokens"
-            :total-prompt-tokens="sessionTokens.totalPromptTokens"
-            :total-completion-tokens="sessionTokens.totalCompletionTokens"
-            :turn-count="sessionTokens.turnCount"
-            :context-limit="contextLimit"
-            :breakdown="sessionTokens.breakdown"
-          />
-        </template>
+        <AiLabTokenUsage
+          :prompt-tokens="sessionTokens.promptTokens"
+          :completion-tokens="sessionTokens.completionTokens"
+          :total-prompt-tokens="sessionTokens.totalPromptTokens"
+          :total-completion-tokens="sessionTokens.totalCompletionTokens"
+          :turn-count="sessionTokens.turnCount"
+          :context-limit="contextLimit"
+          :breakdown="sessionTokens.breakdown"
+        />
       </div>
     </div>
   </div>
@@ -387,40 +400,14 @@ const selectModel = (value) => {
 .input-footer {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.55rem;
   margin-top: 0.5rem;
+  font-size: 13px;
   color: var(--theme-400);
 }
 .input-footer--floating {
-  /* 浮动条同时挂着 token 用量等信息，居中显得平衡 */
-  justify-content: center;
   font-size: 13px;
-}
-.input-footer--compact {
-  /* Welcome 视图只剩孤零零一个模型 pill；居中会让它看起来很突兀。
-     右对齐 + 更克制的留白，让它收敛到输入框的尾端做附属说明 */
-  justify-content: flex-end;
-  font-size: 12px;
-  margin-top: 0.4rem;
-  padding-right: 0.25rem;
-}
-.input-footer--compact .model-select__trigger {
-  min-width: 0;
-  height: 26px;
-  padding: 0 0.55rem;
-  font-size: 11.5px;
-  background: transparent;
-  border-color: rgba(15, 23, 42, 0.06);
-  box-shadow: none;
-}
-.input-footer--compact .model-select__trigger:hover,
-.input-footer--compact .model-select__trigger.is-open {
-  background: rgba(255, 255, 255, 0.6);
-  border-color: rgba(15, 23, 42, 0.12);
-}
-.input-footer--compact .model-select__chevron {
-  width: 11px;
-  height: 11px;
 }
 .input-footer__separator {
   color: var(--theme-300);
@@ -429,37 +416,44 @@ const selectModel = (value) => {
   position: relative;
 }
 .model-select__trigger {
-  min-width: 108px;
-  height: 32px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.45rem;
-  padding: 0 0.75rem;
+  gap: 0.4rem;
+  padding: 0 0.6rem;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--theme-500, #6b7280);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  background: transparent;
+  color: var(--theme-700, #2d2d28);
+  font-family: inherit;
   transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
   cursor: pointer;
 }
 .model-select__trigger:hover,
 .model-select__trigger.is-open {
-  border-color: rgba(15, 23, 42, 0.14);
-  color: var(--theme-700, #2d2d28);
-  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(15, 23, 42, 0.16);
+  background: rgba(15, 23, 42, 0.035);
 }
 .model-select__label {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
+  color: var(--theme-700, #2d2d28);
+}
+.model-select__sub-label {
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--theme-400, #9a9a92);
+  white-space: nowrap;
+  font-weight: 500;
 }
 .model-select__chevron {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   flex-shrink: 0;
+  margin-left: 1px;
+  color: var(--theme-400, #9a9a92);
   transition: transform 0.16s ease;
 }
 .model-select__chevron.is-open {
@@ -467,9 +461,9 @@ const selectModel = (value) => {
 }
 .model-select__menu {
   position: absolute;
-  left: 0;
-  bottom: calc(100% + 6px);
-  min-width: 220px;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 240px;
   display: flex;
   flex-direction: column;
   padding: 4px;
