@@ -406,6 +406,17 @@ const normalizeMessagesForUI = (list) => {
   return (list || []).map(m => {
     const normalized = normalizeAssistantMessage(m)
     if (!normalized.type) normalized.type = 'text'
+    // 从后端 file_attachment 恢复前端 fileAttachment（用于图片/PDF 显示）
+    if (normalized.role === 'user' && normalized.file_attachment && !normalized.fileAttachment) {
+      const att = normalized.file_attachment
+      if (att.type === 'image' && att.url) {
+        // dataUrl 用于前端 <img> 显示（Vite 开发代理 /media，生产 Nginx 代理）
+        // serverUrl 用于 apiMessages 拼接完整 URL 给 Hermes
+        normalized.fileAttachment = { type: 'image', dataUrl: att.url, serverUrl: att.url, filename: att.filename, size: att.size }
+      } else if (att.type === 'pdf') {
+        normalized.fileAttachment = att
+      }
+    }
     return normalized
   })
 }
@@ -541,7 +552,7 @@ const deleteConversation = async (id) => {
 }
 
 // 保存消息到后端
-const saveMessage = async (conversationId, role, content, reasoning = null, subTurns = null, modelName = null, usage = null) => {
+const saveMessage = async (conversationId, role, content, reasoning = null, subTurns = null, modelName = null, usage = null, fileAttachment = null) => {
   try {
     const body = { role, content, reasoning }
     if (subTurns && subTurns.length > 0) {
@@ -549,6 +560,9 @@ const saveMessage = async (conversationId, role, content, reasoning = null, subT
     }
     if (modelName) {
       body.model_name = modelName
+    }
+    if (fileAttachment) {
+      body.file_attachment = fileAttachment
     }
     if (usage && (usage.promptTokens || usage.completionTokens || usage.cacheTokens)) {
       body.prompt_tokens = usage.promptTokens || 0
@@ -594,19 +608,48 @@ const sendMessage = async (content = null, options = {}) => {
 
   // 处理文件附件
   let fileContent = null
+  let persistAttachment = null  // 持久化到后端的附件元信息
   if (selectedFile.value) {
     if (fileType.value === 'image') {
-      // 图片：读取 base64，作为多模态内容发给 Hermes
-      fileContent = await new Promise((resolve) => {
-        const reader = new FileReader()
-        reader.onload = (e) => resolve({
-          type: 'image',
-          dataUrl: e.target.result,
-          filename: selectedFile.value.name,
-          size: selectedFile.value.size,
-        })
-        reader.readAsDataURL(selectedFile.value)
-      })
+      // 图片：同时读取 base64（供 API 多模态调用）和上传到服务器（供持久化）
+      const [base64Result, uploadResult] = await Promise.all([
+        new Promise((resolve) => {
+          const reader = new FileReader()
+          reader.onload = (e) => resolve({
+            type: 'image',
+            dataUrl: e.target.result,
+            filename: selectedFile.value.name,
+            size: selectedFile.value.size,
+          })
+          reader.readAsDataURL(selectedFile.value)
+        }),
+        (async () => {
+          try {
+            isFileProcessing.value = true
+            const formData = new FormData()
+            formData.append('file', selectedFile.value)
+            const resp = await fetch(`${API_BASE_URL}/api/ai/image-upload/`, {
+              method: 'POST',
+              headers: djangoHeaders(),
+              body: formData,
+            })
+            const data = await resp.json()
+            if (!resp.ok) throw new Error(data.error || '图片上传失败')
+            isFileProcessing.value = false
+            return data  // { url, filename, size }
+          } catch (e) {
+            isFileProcessing.value = false
+            console.error('图片上传失败:', e)
+            return null
+          }
+        })(),
+      ])
+      fileContent = base64Result
+      if (uploadResult) {
+        persistAttachment = { type: 'image', url: uploadResult.url, filename: uploadResult.filename, size: uploadResult.size }
+        // 也把 URL 存到 fileContent 里，方便 apiMessages 构建
+        fileContent.serverUrl = uploadResult.url
+      }
     } else if (fileType.value === 'pdf') {
       // PDF：后端提取文本
       isFileProcessing.value = true
@@ -617,6 +660,7 @@ const sendMessage = async (content = null, options = {}) => {
         const data = await resp.json()
         if (!resp.ok) throw new Error(data.error || 'PDF 解析失败')
         fileContent = { type: 'pdf', text: data.text, filename: data.filename, pages: data.pages }
+        persistAttachment = { type: 'pdf', filename: data.filename, pages: data.pages }
       } catch (e) {
         alert(`文件处理失败: ${e.message}`)
         isFileProcessing.value = false
@@ -639,8 +683,8 @@ const sendMessage = async (content = null, options = {}) => {
   inputMessage.value = ''
   removeFile()
 
-  // 保存用户消息到后端
-  const savedUserMsg = await saveMessage(currentConversationId.value, 'user', displayText)
+  // 保存用户消息到后端（含附件元信息）
+  const savedUserMsg = await saveMessage(currentConversationId.value, 'user', displayText, null, null, null, null, persistAttachment)
   if (savedUserMsg) {
     userMessage.id = savedUserMsg.id
   }
@@ -1079,15 +1123,25 @@ const streamResponse = async (fileContent = null, options = {}) => {
     .filter(m => (m.role === 'user' || m.role === 'assistant') && !m.isStreaming)
     .map(m => {
       const text = m.content?.replace(/\n\n\*\[已停止生成\]\*$/, '') || ''
-      // 最后一条用户消息可能有文件附件
+      // 用户消息可能有文件附件
       if (m.role === 'user' && m.fileAttachment) {
         const att = m.fileAttachment
         if (att.type === 'image') {
           // 多模态：图片 + 文字
-          const parts = []
-          if (text && text !== '(图片)') parts.push({ type: 'text', text })
-          parts.push({ type: 'image_url', image_url: { url: att.dataUrl } })
-          return { role: 'user', content: parts }
+          // 当前会话：base64 dataUrl（data:image/...）
+          // 历史消息：相对路径 /media/...，需拼 API_BASE_URL 变成完整 URL 给 Hermes
+          let imageUrl = att.dataUrl
+          if (imageUrl && !imageUrl.startsWith('data:') && !imageUrl.startsWith('http')) {
+            imageUrl = `${API_BASE_URL}${imageUrl}`
+          } else if (!imageUrl && att.serverUrl) {
+            imageUrl = att.serverUrl.startsWith('http') ? att.serverUrl : `${API_BASE_URL}${att.serverUrl}`
+          }
+          if (imageUrl) {
+            const parts = []
+            if (text && text !== '(图片)') parts.push({ type: 'text', text })
+            parts.push({ type: 'image_url', image_url: { url: imageUrl } })
+            return { role: 'user', content: parts }
+          }
         }
         if (att.type === 'pdf') {
           // PDF：将提取的文本附加到消息

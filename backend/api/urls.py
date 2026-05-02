@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     RecipeViewSet, IngredientViewSet, OrderViewSet, ChefAuthView,
     BlogPostViewSet, TagViewSet, CategoryViewSet, AiAgentView, DeepSeekSpecialeView,
-    DeepSeekOCRView, WhisperTranscribeView, PDFExtractView, RecipeStepViewSet,
+    DeepSeekOCRView, WhisperTranscribeView, PDFExtractView, AiLabImageUploadView, RecipeStepViewSet,
     RecipeIngredientViewSet, AiLabConversationViewSet, AiLabMessageViewSet,
     AiLabNotificationViewSet, ailab_internal_add_message, ailab_internal_push_notification,
     ailab_me, ailab_redeem_invite, ailab_invites, ailab_workspace, ailab_workspace_preview,
@@ -30,6 +30,7 @@ urlpatterns = [
     path('ai/speciale/', DeepSeekSpecialeView.as_view(), name='ai-speciale'),
     path('ai/ocr/', DeepSeekOCRView.as_view(), name='ai-ocr'),
     path('ai/pdf-extract/', PDFExtractView.as_view(), name='ai-pdf-extract'),
+    path('ai/image-upload/', AiLabImageUploadView.as_view(), name='ai-image-upload'),
     path('ai/transcribe/', WhisperTranscribeView.as_view(), name='ai-transcribe'),
     # 内部端点：Hermes 在客户端断开后的回写通道（token 认证，绕过 JWT）
     path('ai/conversations/<int:pk>/messages/internal/', ailab_internal_add_message, name='ai-conversation-messages-internal'),

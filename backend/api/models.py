@@ -186,6 +186,7 @@ class AiLabMessage(models.Model):
     prompt_tokens = models.PositiveIntegerField(default=0, help_text="该轮计费 prompt tokens（包含 cache hit）")
     completion_tokens = models.PositiveIntegerField(default=0, help_text="该轮 completion tokens")
     cache_tokens = models.PositiveIntegerField(default=0, help_text="该轮命中 / 写入 cache 的 tokens")
+    file_attachment = models.JSONField(blank=True, null=True, help_text="文件附件元信息 {type, url, filename, size}")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

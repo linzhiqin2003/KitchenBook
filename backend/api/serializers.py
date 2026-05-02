@@ -202,7 +202,7 @@ class AiLabMessageSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'conversation', 'role', 'content', 'reasoning', 'sub_turns',
             'model_name', 'prompt_tokens', 'completion_tokens', 'cache_tokens',
-            'created_at',
+            'file_attachment', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
         extra_kwargs = {
