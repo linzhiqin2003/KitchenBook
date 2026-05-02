@@ -576,10 +576,25 @@ class QuestionViewSet(viewsets.ModelViewSet):
 
 
 class CoursewareView(viewsets.ViewSet):
-    """Read-only access to the raw courseware (the source markdown the AI was
-    fed). Lets the user browse the original chapter content directly.
+    """Read-only access to the raw courseware and review data.
     """
     authentication_classes = [CsrfExemptSessionAuthentication]
+
+    @action(detail=False, methods=['get'], url_path='review')
+    def review(self, request):
+        """GET /api/questiongen/courseware/review/?course_id=X
+
+        Returns the structured review/recall questions for a course.
+        """
+        import json as _json
+        course_id = request.query_params.get('course_id') or get_default_course()
+        review_file = get_course_dir(course_id) / "review" / "concepts.json"
+        if not review_file.exists():
+            return Response({"error": "No review data for this course"},
+                            status=status.HTTP_404_NOT_FOUND)
+        with open(review_file, 'r', encoding='utf-8') as f:
+            data = _json.load(f)
+        return Response(data)
 
     @action(detail=False, methods=['get'], url_path='chapter')
     def chapter(self, request):

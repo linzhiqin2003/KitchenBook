@@ -83,6 +83,9 @@ export const questionApi = {
     getCoursewareTopics(courseId) {
         return api.get('/courseware/topics/', { params: { course_id: courseId } });
     },
+    getReviewData(courseId) {
+        return api.get('/courseware/review/', { params: { course_id: courseId } });
+    },
 
     // Get available topics for a course
     getTopics(courseId = null) {

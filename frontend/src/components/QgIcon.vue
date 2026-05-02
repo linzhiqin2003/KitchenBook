@@ -78,6 +78,11 @@ const ICONS = {
   code: () => [
     h('path', { d: 'M9 18l-6-6 6-6M15 6l6 6-6 6' }),
   ],
+  // study mode: recall / review
+  recall: () => [
+    h('path', { d: 'M3 12a9 9 0 1 0 9-9' }),
+    h('path', { d: 'M3 3v9h9' }),
+  ],
   // misc
   check: () => [h('path', { d: 'M5 12l4 4L19 7' })],
   minus: () => [h('path', { d: 'M6 12h12' })],

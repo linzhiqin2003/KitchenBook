@@ -172,6 +172,11 @@
         />
       </div>
 
+      <!-- Review mode: concept recall flashcards -->
+      <div v-else-if="studyMode === 'review'" class="qg-stage__inner">
+        <ReviewView :course-id="currentCourseId" />
+      </div>
+
       <div v-else-if="loading" class="qg-stage__inner">
         <QuestionSkeleton />
         <p class="qg-stage__loading">{{ loadingMessage }}</p>
@@ -357,6 +362,7 @@ import QgChatSidebar from '../components/QgChatSidebar.vue';
 import QgThemeToggle from '../components/QgThemeToggle.vue';
 import NotesView from '../components/NotesView.vue';
 import CoursewareView from '../components/CoursewareView.vue';
+import ReviewView from '../components/ReviewView.vue';
 import QgIcon from '../components/QgIcon.vue';
 import { questionApi } from '../api';
 
@@ -379,6 +385,7 @@ const STUDY_MODES = [
   { value: 'answer', label: '答题', icon: 'target' },
   { value: 'notes',  label: '知识点', icon: 'note' },
   { value: 'raw',    label: '原文', icon: 'doc' },
+  { value: 'review', label: '回顾', icon: 'recall' },
 ];
 
 // State
