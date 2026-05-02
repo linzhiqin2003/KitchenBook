@@ -1054,11 +1054,16 @@ function onDocMouseDown(e) {
   }
 }
 
+function onWindowScroll() {
+  if (showQuoteBtn.value) showQuoteBtn.value = false;
+}
+
 // Initial load
 onMounted(async () => {
   loadHistoryFromStorage();
   window.addEventListener('keydown', onHistoryKey);
   document.addEventListener('mousedown', onDocMouseDown);
+  window.addEventListener('scroll', onWindowScroll, true);
 
   // Load courses first
   await loadCourses();
@@ -1089,6 +1094,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onHistoryKey);
   document.removeEventListener('mousedown', onDocMouseDown);
+  window.removeEventListener('scroll', onWindowScroll, true);
 });
 </script>
 
