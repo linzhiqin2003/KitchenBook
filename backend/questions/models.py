@@ -116,10 +116,19 @@ class Question(models.Model):
 
 
 class ChatNote(models.Model):
-    """Archived chat session saved as a browsable note."""
+    """Archived chat session or AI-generated knowledge card."""
+    NOTE_TYPE_CHOICES = [
+        ("archive", "Chat Archive"),
+        ("card", "Knowledge Card"),
+    ]
+
     course_id = models.CharField(max_length=100, db_index=True)
     topic = models.CharField(max_length=200, blank=True, default="")
     title = models.CharField(max_length=200)
+    note_type = models.CharField(max_length=10, choices=NOTE_TYPE_CHOICES, default="archive")
+    summary = models.TextField(blank=True, default="")
+    key_points = models.JSONField(default=list)
+    tags = models.JSONField(default=list)
     messages = models.JSONField(default=list)
     study_mode = models.CharField(max_length=20, default="study")
     created_at = models.DateTimeField(auto_now_add=True)

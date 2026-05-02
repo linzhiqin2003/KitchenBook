@@ -411,70 +411,196 @@ The student is browsing study materials about "{topic}".
 - If the student quoted a specific passage, focus on that
 - Answer in the same language as the student's question (Chinese if they ask in Chinese)
 - Be concise but thorough
+
+## Note-taking:
+You have a save_note tool. When the user asks you to record, save, or note down
+something (e.g. "记一下", "保存笔记", "帮我整理一下"), use it. Produce a
+well-structured knowledge card with a clear title, one-sentence summary,
+and organized key points. Always match the language the user is using.
 """
+
+
+# ─── Tool definitions ─────────────────────────────────────────────────
+CHAT_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "save_note",
+            "description": (
+                "Save a structured knowledge card for the user. "
+                "Call when the user asks to record, save, summarize, or note "
+                "information from the conversation."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Short descriptive title (under 60 chars)",
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "One-sentence summary of the note",
+                    },
+                    "key_points": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of key points, each a concise bullet",
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "1-4 short topic tags for categorization",
+                    },
+                },
+                "required": ["title", "summary", "key_points"],
+            },
+        },
+    }
+]
+
+
+def execute_save_note(args, course_id, topic, study_mode):
+    """Execute the save_note tool — create a ChatNote knowledge card."""
+    from ..models import ChatNote
+
+    note = ChatNote.objects.create(
+        course_id=course_id or "",
+        topic=topic or "",
+        title=(args.get("title") or "Untitled")[:200],
+        note_type="card",
+        summary=args.get("summary", ""),
+        key_points=args.get("key_points", []),
+        tags=args.get("tags", []),
+        messages=[],
+        study_mode=study_mode or "study",
+    )
+    return {"success": True, "note_id": note.id, "title": note.title}
 
 
 def chat_stream(mode, messages, current_question, course_id=None):
     """
     Streaming chat for Q&A, Review, and Study modes.
-    Yields chunks of text as they are generated.
-
-    Args:
-        mode: 'qa', 'review', or 'study'
-        messages: List of chat messages
-        current_question: The question object (or context dict for study mode)
-        course_id: Course identifier
+    Supports tool calling (save_note) in all modes.
 
     Yields:
-        dict with 'chunk' or 'done' or 'error'
+        dict with 'chunk', 'tool_call', 'tool_result', 'done', or 'error'
     """
     client = get_client()
     if not client:
         yield {"error": "DEEPSEEK_API_KEY not configured"}
         return
 
-    # Build system prompt based on mode
     if mode == 'qa':
         system_prompt = build_qa_system_prompt(current_question, course_id)
         temperature = 0.7
     elif mode == 'study':
         system_prompt = build_study_system_prompt(current_question or {}, course_id)
         temperature = 0.7
-    else:  # review
+    else:
         system_prompt = build_review_system_prompt(current_question, course_id)
         temperature = 0.3
-    
-    full_messages = [
-        {"role": "system", "content": system_prompt}
-    ] + messages
-    
+
+    full_messages = [{"role": "system", "content": system_prompt}] + messages
+
     try:
-        stream = client.chat.completions.create(
+        create_kwargs = dict(
             model=CHAT_MODEL,
             messages=full_messages,
             temperature=temperature,
             max_tokens=1500,
             stream=True,
+            tools=CHAT_TOOLS,
             **non_thinking_kwargs(),
         )
-        
+        stream = client.chat.completions.create(**create_kwargs)
+
         full_response = ""
-        
+        tool_calls_acc = {}
+
         for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
-                full_response += content
-                yield {"chunk": content}
-        
-        # Check for delete recommendation in review mode
-        recommend_delete = "[RECOMMENDATION: DELETE]" in full_response if mode == 'review' else False
-        
-        yield {
-            "done": True,
-            "full_response": full_response,
-            "recommend_delete": recommend_delete
-        }
-        
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+
+            if delta.content:
+                full_response += delta.content
+                yield {"chunk": delta.content}
+
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in tool_calls_acc:
+                        tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
+                    if tc.id:
+                        tool_calls_acc[idx]["id"] = tc.id
+                    if tc.function:
+                        if tc.function.name:
+                            tool_calls_acc[idx]["name"] = tc.function.name
+                        if tc.function.arguments:
+                            tool_calls_acc[idx]["arguments"] += tc.function.arguments
+
+        # Execute accumulated tool calls
+        if tool_calls_acc:
+            topic = ""
+            if current_question and isinstance(current_question, dict):
+                topic = current_question.get("topic", "")
+
+            assistant_tool_calls = []
+            tool_result_messages = []
+
+            for _idx, tc in sorted(tool_calls_acc.items()):
+                yield {"tool_call": {"name": tc["name"]}}
+
+                if tc["name"] == "save_note":
+                    try:
+                        args = json.loads(tc["arguments"])
+                    except json.JSONDecodeError:
+                        args = {}
+                    result = execute_save_note(args, course_id, topic, mode)
+                    yield {"tool_result": result}
+                else:
+                    result = {"error": f"Unknown tool: {tc['name']}"}
+
+                assistant_tool_calls.append({
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                })
+                tool_result_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": json.dumps(result),
+                })
+
+            # Follow-up call so AI can confirm the action to the user
+            followup_messages = full_messages + [
+                {
+                    "role": "assistant",
+                    "content": full_response or None,
+                    "tool_calls": assistant_tool_calls,
+                },
+            ] + tool_result_messages
+
+            followup = client.chat.completions.create(
+                model=CHAT_MODEL,
+                messages=followup_messages,
+                temperature=temperature,
+                max_tokens=500,
+                stream=True,
+                **non_thinking_kwargs(),
+            )
+            for chunk in followup:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    c = chunk.choices[0].delta.content
+                    full_response += c
+                    yield {"chunk": c}
+
+        recommend_delete = (
+            "[RECOMMENDATION: DELETE]" in full_response if mode == "review" else False
+        )
+        yield {"done": True, "full_response": full_response, "recommend_delete": recommend_delete}
+
     except Exception as e:
         yield {"error": str(e)}
 

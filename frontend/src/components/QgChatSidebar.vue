@@ -84,7 +84,13 @@
             </div>
           </div>
 
-          <div v-if="loading && !streamingContent" class="qg-sidebar__msg" data-role="assistant">
+          <!-- Tool execution indicator -->
+          <div v-if="toolStatus" class="qg-sidebar__toolCard">
+            <span class="qg-sidebar__toolDot"></span>
+            <span data-mono>{{ toolStatus }}</span>
+          </div>
+
+          <div v-if="loading && !streamingContent && !toolStatus" class="qg-sidebar__msg" data-role="assistant">
             <div class="qg-sidebar__bubble">
               <span class="qg-sidebar__dots"><span></span><span></span><span></span></span>
             </div>
@@ -161,7 +167,20 @@
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
           </div>
-          <div class="qg-sidebar__messages qg-sidebar__noteBody">
+          <!-- Knowledge card detail -->
+          <div v-if="selectedNote.note_type === 'card'" class="qg-sidebar__cardDetail">
+            <div class="qg-kcard">
+              <p class="qg-kcard__summary">{{ selectedNote.summary }}</p>
+              <ul v-if="selectedNote.key_points?.length" class="qg-kcard__points">
+                <li v-for="(pt, i) in selectedNote.key_points" :key="i" v-html="formatMessage(pt)"></li>
+              </ul>
+              <div v-if="selectedNote.tags?.length" class="qg-kcard__tags">
+                <span v-for="tag in selectedNote.tags" :key="tag" class="qg-kcard__tag" data-mono>{{ tag }}</span>
+              </div>
+            </div>
+          </div>
+          <!-- Chat archive detail -->
+          <div v-else class="qg-sidebar__messages qg-sidebar__noteBody">
             <div v-for="(msg, i) in selectedNote.messages" :key="i" class="qg-sidebar__msg" :data-role="msg.role">
               <div class="qg-sidebar__bubble" v-html="formatMessage(msg.content)"></div>
             </div>
@@ -175,20 +194,23 @@
               v-for="note in archiveNotes"
               :key="note.id"
               class="qg-sidebar__noteItem"
+              :data-type="note.note_type"
               @click="selectedNote = note"
             >
               <div class="qg-sidebar__noteItemHead">
+                <span v-if="note.note_type === 'card'" class="qg-sidebar__noteItemIcon">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+                </span>
                 <span class="qg-sidebar__noteItemTitle">{{ note.title }}</span>
                 <button class="qg-sidebar__noteItemDel" @click.stop="deleteNote(note.id)" title="删除">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
                 </button>
               </div>
               <div class="qg-sidebar__noteItemMeta" data-mono>
-                <span>{{ note.topic || 'general' }}</span>
+                <span v-for="tag in (note.tags || []).slice(0, 3)" :key="tag" class="qg-sidebar__noteMetaTag">{{ tag }}</span>
                 <span>{{ formatDate(note.created_at) }}</span>
-                <span>{{ note.messages?.length || 0 }} msgs</span>
               </div>
-              <p class="qg-sidebar__noteItemPreview">{{ notePreview(note) }}</p>
+              <p class="qg-sidebar__noteItemPreview">{{ note.note_type === 'card' ? (note.summary || '') : notePreview(note) }}</p>
             </div>
           </div>
           <div v-else class="qg-sidebar__empty">
@@ -196,7 +218,7 @@
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
             </svg>
             <p class="qg-sidebar__emptyTitle">No saved notes</p>
-            <p class="qg-sidebar__emptyBody">Archive a chat session to save it here for later review.</p>
+            <p class="qg-sidebar__emptyBody">Tell the AI to save notes during conversation — e.g. "记一下" or "帮我整理".</p>
           </div>
         </template>
       </template>
@@ -255,6 +277,7 @@ const archiveNotes = ref([]);
 const selectedNote = ref(null);
 const archiveSaving = ref(false);
 const archiveToast = ref(false);
+const toolStatus = ref('');
 
 // ─── Computed ────────────────────────────────────────────────────────
 const effectiveMode = computed(() => {
@@ -437,6 +460,7 @@ async function sendMessage() {
   nextTick(autoResize);
   loading.value = true;
   streamingContent.value = '';
+  toolStatus.value = '';
   userScrolledUp.value = false;
 
   try {
@@ -483,15 +507,24 @@ async function sendMessage() {
             fullResponse += data.chunk;
             streamingContent.value = fullResponse;
           }
+          if (data.tool_call) {
+            toolStatus.value = `Saving note...`;
+          }
+          if (data.tool_result) {
+            toolStatus.value = '';
+            if (data.tool_result.success) loadArchive();
+          }
           if (data.done) recommendDelete = data.recommend_delete || false;
         } catch { /* partial chunk */ }
       }
     }
 
     streamingContent.value = '';
+    toolStatus.value = '';
     messages.value.push({ role: 'assistant', content: fullResponse, recommendDelete });
   } catch (err) {
     streamingContent.value = '';
+    toolStatus.value = '';
     messages.value.push({ role: 'assistant', content: 'Error: ' + err.message });
   } finally {
     loading.value = false;
@@ -970,6 +1003,113 @@ defineExpose({ focusInput: () => nextTick(() => inputRef.value?.focus()) });
 }
 .qg-sidebar__send:hover:not(:disabled) { background: var(--qg-accent-hover); transform: scale(1.04); }
 .qg-sidebar__send:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ─── Tool execution indicator ────────────────────────────────────────── */
+.qg-sidebar__toolCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--qg-accent-soft);
+  border: 1px solid color-mix(in oklch, var(--qg-accent) 25%, transparent);
+  border-radius: var(--qg-radius-md);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--qg-accent);
+}
+.qg-sidebar__toolDot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--qg-accent);
+  animation: qg-dotPulse 1.4s ease-in-out infinite;
+}
+
+/* ─── Knowledge card (detail view) ────────────────────────────────────── */
+.qg-sidebar__cardDetail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px;
+}
+.qg-kcard {
+  padding: 20px;
+  background: var(--qg-surface-raised);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-lg);
+}
+.qg-kcard__summary {
+  font-size: var(--qg-text-base);
+  line-height: 1.6;
+  color: var(--qg-text-primary);
+  font-weight: 500;
+  margin: 0 0 16px;
+  letter-spacing: -0.005em;
+}
+.qg-kcard__points {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qg-kcard__points li {
+  position: relative;
+  padding-left: 16px;
+  font-size: var(--qg-text-sm);
+  line-height: 1.6;
+  color: var(--qg-text-secondary);
+}
+.qg-kcard__points li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 9px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--qg-accent);
+  opacity: 0.6;
+}
+.qg-kcard__points li :deep(p) { margin: 0; display: inline; }
+.qg-kcard__points li :deep(code) {
+  font-family: var(--qg-font-mono);
+  font-size: 0.875em;
+  background: var(--qg-surface-sunken);
+  border: 1px solid var(--qg-border-default);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.qg-kcard__points li :deep(strong) { color: var(--qg-text-primary); font-weight: 600; }
+.qg-kcard__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--qg-border-default);
+}
+.qg-kcard__tag {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: var(--qg-radius-pill);
+  background: var(--qg-surface-sunken);
+  color: var(--qg-text-tertiary);
+  border: 1px solid var(--qg-border-default);
+}
+
+/* ─── Note list: card-type item icon ──────────────────────────────────── */
+.qg-sidebar__noteItemIcon {
+  flex-shrink: 0;
+  color: var(--qg-accent);
+  display: inline-flex;
+}
+.qg-sidebar__noteMetaTag {
+  padding: 1px 6px;
+  border-radius: var(--qg-radius-pill);
+  background: var(--qg-accent-soft);
+  color: var(--qg-accent);
+  font-size: 9px;
+}
 
 /* ─── Archive: note detail header ─────────────────────────────────────── */
 .qg-sidebar__noteHead {
