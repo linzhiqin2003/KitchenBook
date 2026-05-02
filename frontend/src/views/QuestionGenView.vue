@@ -174,7 +174,10 @@
 
       <!-- Review mode: concept recall flashcards -->
       <div v-else-if="studyMode === 'review'" class="qg-stage__inner">
-        <ReviewView :course-id="currentCourseId" />
+        <ReviewView
+          :course-id="currentCourseId"
+          :topic="selectedTopic === 'all' ? null : selectedTopic"
+        />
       </div>
 
       <div v-else-if="loading" class="qg-stage__inner">

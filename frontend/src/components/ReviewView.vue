@@ -1,15 +1,9 @@
 <template>
   <article data-qg-surface class="rv">
-    <!-- Chapter picker -->
     <header class="rv__head">
       <div class="rv__headLeft">
-        <button
-          v-for="ch in chapters"
-          :key="ch.id"
-          class="rv__chBtn"
-          :data-active="activeChapter === ch.id"
-          @click="setChapter(ch.id)"
-        >{{ shortTitle(ch.title) }}</button>
+        <span class="qg-pill" data-tint="mcq">{{ activeChapterTitle }}</span>
+        <span class="rv__count" data-mono>{{ currentQuestions.length }} QUESTIONS</span>
       </div>
       <div class="rv__headRight" data-mono>
         <span class="rv__progress">{{ reviewedCount }}/{{ currentQuestions.length }}</span>
@@ -93,6 +87,7 @@ import { questionApi } from '../api';
 
 const props = defineProps({
   courseId: { type: String, required: true },
+  topic: { type: String, default: null },
 });
 
 const chapters = ref([]);
@@ -111,6 +106,10 @@ const currentQuestions = computed(() => {
 });
 
 const currentQ = computed(() => currentQuestions.value[cardIndex.value] || { id: 0, question: '', marks: 0, answer: [] });
+const activeChapterTitle = computed(() => {
+  const ch = chapters.value.find(c => c.id === activeChapter.value);
+  return ch ? ch.title : '—';
+});
 const reviewedCount = computed(() => {
   let count = 0;
   for (const q of currentQuestions.value) {
@@ -153,14 +152,27 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); });
 
 watch(() => props.courseId, load);
 
+watch(() => props.topic, (t) => {
+  if (!t || !chapters.value.length) return;
+  const match = chapters.value.find(c => c.id === t || c.id.includes(t) || t.includes(c.id));
+  if (match && match.id !== activeChapter.value) {
+    setChapter(match.id);
+  }
+}, { immediate: true });
+
 async function load() {
   loading.value = true;
   error.value = '';
   try {
     const r = await questionApi.getReviewData(props.courseId);
     chapters.value = r.data?.chapters || [];
-    if (chapters.value.length && !activeChapter.value) {
-      activeChapter.value = chapters.value[0].id;
+    if (chapters.value.length) {
+      if (props.topic) {
+        const match = chapters.value.find(c => c.id === props.topic || c.id.includes(props.topic) || props.topic.includes(c.id));
+        activeChapter.value = match ? match.id : chapters.value[0].id;
+      } else if (!activeChapter.value) {
+        activeChapter.value = chapters.value[0].id;
+      }
     }
   } catch (e) {
     error.value = e?.response?.data?.error || e?.message || 'Failed to load';
@@ -207,6 +219,11 @@ async function load() {
   background: var(--qg-accent-soft);
   color: var(--qg-accent);
   border-color: transparent;
+}
+.rv__count {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--qg-text-tertiary);
 }
 .rv__progress {
   font-size: 11px;
