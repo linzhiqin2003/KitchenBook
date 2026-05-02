@@ -1,5 +1,5 @@
 <template>
-  <div data-qg-surface class="qg-shell" :class="{ 'qg-shell--sidebar': showSidebar }">
+  <div data-qg-surface class="qg-shell" :class="{ 'qg-shell--sidebar': showSidebar }" :style="showSidebar ? { marginRight: sidebarWidth + 'px' } : {}">
     <!-- ─── Top bar: minimal hairline. Course + theme toggle live here. ─── -->
     <header class="qg-topbar">
       <div class="qg-topbar__inner">
@@ -329,6 +329,7 @@
       @close="showSidebar = false"
       @clear-quote="quotedText = ''"
       @question-deleted="handleQuestionDeleted"
+      @width-change="sidebarWidth = $event"
     />
 
     <!-- ─── Floating quote button ─── -->
@@ -405,6 +406,7 @@ const userAnswer = ref(null);  // { selected: 'A. xxx', correct: true/false }
 
 // Sidebar + text selection quoting
 const showSidebar = ref(false);
+const sidebarWidth = ref(380);
 const quotedText = ref('');
 const showQuoteBtn = ref(false);
 const quoteBtnPos = ref({ x: 0, y: 0 });
@@ -1099,11 +1101,8 @@ onBeforeUnmount(() => {
   padding-bottom: env(safe-area-inset-bottom);
   transition: margin-right var(--qg-dur-slow) var(--qg-ease);
 }
-.qg-shell--sidebar {
-  margin-right: 380px;
-}
 @media (max-width: 768px) {
-  .qg-shell--sidebar { margin-right: 0; }
+  .qg-shell--sidebar { margin-right: 0 !important; }
 }
 
 /* ─── Topbar ────────────────────────────────────────────────────────── */

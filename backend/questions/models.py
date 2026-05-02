@@ -113,3 +113,22 @@ class Question(models.Model):
 
     def __str__(self):
         return f"[{self.course_id}] [{self.question_type}/{self.difficulty}] {self.topic}: {self.question_text[:50]}..."
+
+
+class ChatNote(models.Model):
+    """Archived chat session saved as a browsable note."""
+    course_id = models.CharField(max_length=100, db_index=True)
+    topic = models.CharField(max_length=200, blank=True, default="")
+    title = models.CharField(max_length=200)
+    messages = models.JSONField(default=list)
+    study_mode = models.CharField(max_length=20, default="study")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["course_id", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.course_id}] {self.title}"

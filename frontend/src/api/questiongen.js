@@ -134,6 +134,18 @@ export const questionApi = {
         };
     },
 
+    // ─── Chat notes (archived sessions) ────────────────────────────────
+    getChatNotes(courseId = null) {
+        const params = courseId ? { course_id: courseId } : {};
+        return api.get('/chat-notes/', { params });
+    },
+    saveChatNote(data) {
+        return api.post('/chat-notes/', data);
+    },
+    deleteChatNote(id) {
+        return api.delete(`/chat-notes/${id}/`);
+    },
+
     // Request to delete a question (with reasoner confirmation)
     requestDelete(questionId, conversationHistory) {
         return api.post(`/questions/${questionId}/request-delete/`, {

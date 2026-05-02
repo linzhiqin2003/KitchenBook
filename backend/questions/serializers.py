@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Question, KnowledgePoint
+from .models import Question, KnowledgePoint, ChatNote
 
 class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -20,6 +20,12 @@ class QuestionSerializer(serializers.ModelSerializer):
             'generation_context',
             'created_at',
         ]
+
+
+class ChatNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChatNote
+        fields = '__all__'
 
 
 class KnowledgePointSerializer(serializers.ModelSerializer):

@@ -5,8 +5,8 @@ from rest_framework.authentication import SessionAuthentication
 from django.db.models import Count
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import Question, KnowledgePoint
-from .serializers import QuestionSerializer, KnowledgePointSerializer
+from .models import Question, KnowledgePoint, ChatNote
+from .serializers import QuestionSerializer, KnowledgePointSerializer, ChatNoteSerializer
 from .services.generator import (
     generate_question,
     generate_question_for_topic,
@@ -747,3 +747,17 @@ class KnowledgePointViewSet(viewsets.ReadOnlyModelViewSet):
                 )
             summary.append({"topic": topic, "generated": len(points)})
         return Response({"course_id": course_id, "summary": summary})
+
+
+class ChatNoteViewSet(viewsets.ModelViewSet):
+    """CRUD for archived chat sessions (saved as browsable notes)."""
+    queryset = ChatNote.objects.all()
+    serializer_class = ChatNoteSerializer
+    authentication_classes = [CsrfExemptSessionAuthentication]
+
+    def get_queryset(self):
+        qs = ChatNote.objects.all()
+        course_id = self.request.query_params.get('course_id')
+        if course_id:
+            qs = qs.filter(course_id=course_id)
+        return qs
