@@ -3,10 +3,14 @@
     <header class="rv__head">
       <div class="rv__headLeft">
         <span class="qg-pill" data-tint="mcq">{{ activeChapterTitle }}</span>
-        <span class="rv__count" data-mono>{{ currentQuestions.length }} QUESTIONS</span>
+        <span class="rv__count" data-mono>{{ displayQuestions.length }} QUESTIONS</span>
       </div>
-      <div class="rv__headRight" data-mono>
-        <span class="rv__progress">{{ reviewedCount }}/{{ currentQuestions.length }}</span>
+      <div class="rv__headRight">
+        <button class="rv__filterBtn" :data-active="starredOnly" @click="starredOnly = !starredOnly" title="只看标星">
+          <svg viewBox="0 0 24 24" width="14" height="14" :fill="starredOnly ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span v-if="starredCount" data-mono>{{ starredCount }}</span>
+        </button>
+        <span class="rv__progress" data-mono>{{ reviewedCount }}/{{ displayQuestions.length }}</span>
       </div>
     </header>
 
@@ -33,8 +37,14 @@
             class="rv__card"
             :key="cardIndex"
             :data-flipped="flipped"
+            :data-starred="isStarred(currentQ)"
             @click="flipped = !flipped"
           >
+            <!-- Star button -->
+            <button class="rv__star" :data-on="isStarred(currentQ)" @click.stop="toggleStar(currentQ)" title="标记重要">
+              <svg viewBox="0 0 24 24" width="18" height="18" :fill="isStarred(currentQ) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+
             <!-- Front: question -->
             <div class="rv__cardFront">
               <div class="rv__cardMeta">
@@ -67,13 +77,13 @@
         </button>
 
         <div class="rv__navCenter">
-          <span class="rv__navPos" data-mono>{{ String(cardIndex + 1).padStart(2,'0') }} / {{ String(currentQuestions.length).padStart(2,'0') }}</span>
+          <span class="rv__navPos" data-mono>{{ String(cardIndex + 1).padStart(2,'0') }} / {{ String(displayQuestions.length).padStart(2,'0') }}</span>
           <div class="rv__navBar">
-            <div class="rv__navFill" :style="{ width: `${((cardIndex + 1) / currentQuestions.length) * 100}%` }"></div>
+            <div class="rv__navFill" :style="{ width: `${((cardIndex + 1) / (displayQuestions.length || 1)) * 100}%` }"></div>
           </div>
         </div>
 
-        <button class="rv__navBtn" :disabled="cardIndex >= currentQuestions.length - 1" @click="go(1)">
+        <button class="rv__navBtn" :disabled="cardIndex >= displayQuestions.length - 1" @click="go(1)">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         </button>
       </nav>
@@ -98,6 +108,20 @@ const slideDir = ref('next');
 const loading = ref(false);
 const error = ref('');
 const reviewed = ref(new Set());
+const starredOnly = ref(false);
+
+const STARRED_KEY = 'rv_starred';
+const starred = ref(new Set(JSON.parse(localStorage.getItem(STARRED_KEY) || '[]')));
+
+function starKey(q) { return `${activeChapter.value}-${q.id}`; }
+function isStarred(q) { return starred.value.has(starKey(q)); }
+function toggleStar(q) {
+  const k = starKey(q);
+  const next = new Set(starred.value);
+  if (next.has(k)) next.delete(k); else next.add(k);
+  starred.value = next;
+  localStorage.setItem(STARRED_KEY, JSON.stringify([...next]));
+}
 
 const currentQuestions = computed(() => {
   if (!activeChapter.value) return [];
@@ -105,14 +129,22 @@ const currentQuestions = computed(() => {
   return ch ? ch.questions : [];
 });
 
-const currentQ = computed(() => currentQuestions.value[cardIndex.value] || { id: 0, question: '', marks: 0, answer: [] });
+const displayQuestions = computed(() => {
+  if (!starredOnly.value) return currentQuestions.value;
+  return currentQuestions.value.filter(q => starred.value.has(`${activeChapter.value}-${q.id}`));
+});
+
+const currentQ = computed(() => displayQuestions.value[cardIndex.value] || { id: 0, question: '', marks: 0, answer: [] });
 const activeChapterTitle = computed(() => {
   const ch = chapters.value.find(c => c.id === activeChapter.value);
   return ch ? ch.title : '—';
 });
+const starredCount = computed(() => {
+  return currentQuestions.value.filter(q => starred.value.has(`${activeChapter.value}-${q.id}`)).length;
+});
 const reviewedCount = computed(() => {
   let count = 0;
-  for (const q of currentQuestions.value) {
+  for (const q of displayQuestions.value) {
     if (reviewed.value.has(`${activeChapter.value}-${q.id}`)) count++;
   }
   return count;
@@ -134,10 +166,13 @@ function go(delta) {
   }
   slideDir.value = delta > 0 ? 'next' : 'prev';
   const next = cardIndex.value + delta;
-  if (next < 0 || next >= currentQuestions.value.length) return;
+  if (next < 0 || next >= displayQuestions.value.length) return;
   cardIndex.value = next;
   flipped.value = false;
 }
+
+// Reset card index when filter changes
+watch(starredOnly, () => { cardIndex.value = 0; flipped.value = false; });
 
 function onKey(e) {
   const tag = (e.target?.tagName || '').toLowerCase();
@@ -225,6 +260,30 @@ async function load() {
   letter-spacing: 0.12em;
   color: var(--qg-text-tertiary);
 }
+.rv__headRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rv__filterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-pill);
+  cursor: pointer;
+  color: var(--qg-text-muted);
+  font-size: 11px;
+  transition: all var(--qg-dur-fast) var(--qg-ease);
+}
+.rv__filterBtn:hover { color: var(--qg-type-fill); border-color: var(--qg-type-fill); }
+.rv__filterBtn[data-active="true"] {
+  color: var(--qg-type-fill);
+  background: var(--qg-type-fill-soft);
+  border-color: transparent;
+}
 .rv__progress {
   font-size: 11px;
   letter-spacing: 0.1em;
@@ -281,16 +340,51 @@ async function load() {
 }
 
 .rv__card {
+  position: relative;
   width: 100%;
   cursor: pointer;
   border: 1px solid var(--qg-border-default);
   border-radius: var(--qg-radius-lg);
   background: var(--qg-surface-raised);
   box-shadow: var(--qg-shadow-1);
-  transition: border-color var(--qg-dur-fast) var(--qg-ease);
+  transition: border-color var(--qg-dur-fast) var(--qg-ease), box-shadow var(--qg-dur-fast) var(--qg-ease);
   overflow: hidden;
 }
 .rv__card:hover { border-color: var(--qg-border-strong); }
+
+/* Starred card highlight */
+.rv__card[data-starred="true"] {
+  border-color: var(--qg-type-fill);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--qg-type-fill) 25%, transparent), var(--qg-shadow-1);
+}
+.rv__card[data-starred="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in oklch, var(--qg-type-fill) 6%, transparent);
+  pointer-events: none;
+}
+
+/* Star button */
+.rv__star {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 32px; height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--qg-text-muted);
+  transition: color var(--qg-dur-fast) var(--qg-ease), transform var(--qg-dur-fast) var(--qg-ease);
+}
+.rv__star:hover { color: var(--qg-type-fill); transform: scale(1.15); }
+.rv__star[data-on="true"] { color: var(--qg-type-fill); }
 
 /* Front/Back toggle */
 .rv__cardFront,

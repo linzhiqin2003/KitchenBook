@@ -818,8 +818,513 @@
           ]
         }
       ]
+    },
+    {
+      "id": "l7-hci-evaluation-part-one",
+      "title": "HCI Evaluation Part One",
+      "questions": [
+        {
+          "id": 1,
+          "question": "What is the Think Aloud evaluation technique?",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Users are asked to verbalise what they are thinking and doing as they perform a task using the software.",
+            "Provides insights into user experience; can identify navigation problems or content for improvement; used iteratively or on a finished product."
+          ]
+        },
+        {
+          "id": 2,
+          "question": "List the benefits and drawbacks of Think Aloud.",
+          "marks": 3,
+          "mock": null,
+          "answer": [
+            "Benefits: cheap, relatively easy, provides insight into user experience, low participant numbers, fits most SDLCs.",
+            "Drawbacks: relies on verbalisation (subjective, not objective), social desirability bias — participants may say what they think is the 'right answer'."
+          ]
+        },
+        {
+          "id": 3,
+          "question": "Describe how to plan and carry out a Think Aloud evaluation.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "Planning: decide research questions, write tasks, decide participant count and session length (15-60 min).",
+            "Carrying out: facilitator runs the session, 1-2 observers take notes. Explain there is no right answer. Ask participant to complete tasks uninterrupted. If user goes silent, prompt: 'what are you thinking?'",
+            "Analysis: combine observer notes, organise into meaningful categories (features that helped, features with problems, additional features wanted), count frequency to identify biggest issues."
+          ]
+        },
+        {
+          "id": 4,
+          "question": "What is a heuristic? What is heuristic evaluation?",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Heuristic: a generalisation or rule of thumb; experienced-based strategies for quick decisions (may not be optimal).",
+            "Heuristic evaluation: an inspection method conducted WITHOUT users — experts inspect a design to find usability problems against a set of usability principles. Analytical evaluation (based on principles) vs empirical evaluation (observing users)."
+          ]
+        },
+        {
+          "id": 5,
+          "question": "List Nielsen's 10 principles of heuristic evaluation.",
+          "marks": 5,
+          "mock": null,
+          "answer": [
+            "1. Visibility of system status (feedback)",
+            "2. Match between system and real world (conventions)",
+            "3. User control and freedom (emergency exits, undo/redo)",
+            "4. Consistency and standards",
+            "5. Error prevention",
+            "6. Recognition rather than recall",
+            "7. Flexibility and efficiency of use (accelerators, shortcuts)",
+            "8. Aesthetic and minimalist design",
+            "9. Help users recognise, diagnose and recover from errors",
+            "10. Help and documentation"
+          ]
+        },
+        {
+          "id": 6,
+          "question": "Explain 'Visibility of system status' with an example.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "The design must clearly communicate its state. Feedback should be presented quickly after user actions.",
+            "Do not show blank screens or static loading messages. Example: password strength indicator shown as password is entered."
+          ]
+        },
+        {
+          "id": 7,
+          "question": "Explain 'Match between system and real world' with an example.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "System should use familiar terminology. Controls should follow real-world conventions. Information in natural, logical order.",
+            "Example: iTunes organised as a Library (music, movies, TV) with a Store underneath — mirrors real-world library concept."
+          ]
+        },
+        {
+          "id": 8,
+          "question": "Explain 'User control and freedom'.",
+          "marks": 1,
+          "mock": null,
+          "answer": [
+            "Users need 'emergency exits' to leave unwanted states. Support undo/redo and clear navigation. Provide breadcrumbs showing current location."
+          ]
+        },
+        {
+          "id": 9,
+          "question": "Explain 'Recognition rather than recall'.",
+          "marks": 1,
+          "mock": null,
+          "answer": [
+            "Minimise user's memory load. Make objects, actions, options visible. User should not have to remember info from one part of dialogue to another. Instructions should be visible or easily retrievable."
+          ]
+        },
+        {
+          "id": 10,
+          "question": "Explain 'Aesthetic and minimalist design'. What four visual design principles apply?",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Dialogues should not contain irrelevant or rarely needed info. Every extra unit of info diminishes relative visibility of relevant info.",
+            "Four principles: Contrast, Repetition, Alignment, Proximity (CRAP)."
+          ]
+        },
+        {
+          "id": 11,
+          "question": "How do you run a heuristic evaluation? How many evaluators are needed?",
+          "marks": 3,
+          "mock": null,
+          "answer": [
+            "3-5 evaluators each do independent evaluation. Sometimes a facilitator records comments.",
+            "Facilitator can answer evaluators' questions (unlike user testing). Can be done on paper prototypes. Typically lasts 1-2 hours.",
+            "Expert goes through interface several times: first for overall feel, second for specific elements. Evaluators produce list of usability problems: which principle was violated and how."
+          ]
+        },
+        {
+          "id": 12,
+          "question": "List benefits and drawbacks of heuristic evaluation.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Benefits: cheap, relatively easy, instant gratification (lists available immediately), low participants, fits most SDLCs, very cost effective (benefit-cost ratio 48:1).",
+            "Drawbacks: important issues may get missed, might identify false issues, many trivial issues often identified (seems overly critical), experts have biases."
+          ]
+        },
+        {
+          "id": 13,
+          "question": "What are the key differences between Think Aloud (empirical) and Heuristic Evaluation (inspection)?",
+          "marks": 3,
+          "mock": null,
+          "answer": [
+            "Facilitator role: empirical — observe users and let them struggle; inspection — facilitator answers expert questions.",
+            "Participants: empirical needs more users; inspection needs only 3-5 experts.",
+            "Data analysis: empirical requires analysing observations after; inspection provides 'instant gratification' with a clear list of issues and heuristics broken."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l8-hci-evaluation-part-two",
+      "title": "HCI Evaluation Part Two",
+      "questions": [
+        {
+          "id": 1,
+          "question": "What are questionnaires used for in HCI? List tips for good questionnaires.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Used to collect demographic data and user opinions. Can evaluate designs and understand user requirements. Can be used at scale with low resources.",
+            "Tips: use validated questionnaires (measure what they claim). Avoid leading questions. Keep number feasible (question fatigue)."
+          ]
+        },
+        {
+          "id": 2,
+          "question": "Describe the NASA TLX: purpose, 6 subscales, and scoring.",
+          "marks": 5,
+          "mock": null,
+          "answer": [
+            "Purpose: estimates a user's perceived workload when using a system. Gold standard for measuring subjective workload. Developed by Sandra Hart (NASA).",
+            "6 subscales: Mental Demand, Physical Demand, Temporal Demand, Performance, Effort, Frustration. Five scales go Low→High; Performance goes Perfect→Failure.",
+            "Scoring: each dimension rated on a line with 21 tick marks (0-100 in steps of 5). Score = (tick number - 1) × 5.",
+            "With weights: 15 paired comparisons determine dimension weights (0-5 each, sum=15). Weighted score = sum(rating × weight) / 15. Range 0-100.",
+            "Without weights ('raw TLX'): sum of 6 ratings / 6. Simpler to administer, mixed evidence on sensitivity difference."
+          ]
+        },
+        {
+          "id": 3,
+          "question": "Describe the SUS questionnaire: purpose, structure, scoring, and threshold.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "System Usability Scale: 'quick and dirty' reliable usability measure. Created by John Brooke (1986). 10 items, 5-point Likert scale (Strongly Disagree to Strongly Agree).",
+            "Items alternate: odd items are positive (1,3,5,7,9), even items are negative (2,4,6,8,10).",
+            "Scoring: odd items = scale position - 1; even items = 5 - scale position. Each item contributes 0-4. Sum × 2.5 = total (range 0-100).",
+            "SUS score > 68 = above average usability. < 68 = below average. Individual item scores are not meaningful alone."
+          ]
+        },
+        {
+          "id": 4,
+          "question": "Explain 'within-subjects' vs 'between-subjects' study design.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "Within-subjects (repeated measures): every participant evaluates BOTH conditions (e.g., both site 1 and site 2).",
+            "Between-subjects: one group evaluates condition A, a different group evaluates condition B.",
+            "Within-subjects advantages: fewer participants needed; reduces impact of individual differences (participants are their own control).",
+            "Within-subjects disadvantage: learning effect (skills gained from one evaluation carry over to next).",
+            "Between-subjects advantages: less time per participant; no learning effects.",
+            "Between-subjects disadvantage: need more participants (each gives only one data point); participants must be comparable."
+          ]
+        },
+        {
+          "id": 5,
+          "question": "Which statistical test is used for within-subjects data? Which for between-subjects?",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Within-subjects: Wilcoxon Signed Rank Test. Ideal for Likert/scale data (SUS, NASA TLX). Minimum 5 users.",
+            "Between-subjects: Mann-Whitney U Test.",
+            "Both: use significance level α = 0.05 (95% certainty that difference is real). Test statistic must be ≤ critical value for significance."
+          ]
+        },
+        {
+          "id": 6,
+          "question": "[MOCK Q4] NHS chatbot (text vs speech interface):\n4.1a) Describe two evaluation designs and justify. [6]\n4.1b) Instrument for measuring usability. [4]\n4.1c) Statistical test and significance level. [3]\n4.2a) One empirical method with details. [4]\n4.2b) One inspection method with details. [4]\n4.2c) Two key differences between empirical and inspection. [4]",
+          "marks": 25,
+          "mock": "Q4",
+          "answer": [
+            "4.1a) Within-subjects: every user tests both text and speech (controls individual differences). Between-subjects: separate groups for each. Within-subjects preferred — participants vary in speech experience, each acts as own control. Counter learning effects by randomising order.",
+            "4.1b) SUS: 10 items, 5 of each type (positive/negative), measured on Likert scales. Score = (sum of contributions) × 2.5. Usability indicated by score > 68.",
+            "4.1c) Within-subjects → Wilcoxon Signed Rank Test. Between-subjects → Mann-Whitney U Test. Significance level α = 0.05.",
+            "4.2a) Think Aloud: facilitator explains tasks, participants verbalise thoughts, 2 observers record. Data grouped into categories (challenges, likes, suggestions).",
+            "4.2b) Heuristic evaluation: facilitator explains tasks, expert evaluates against Nielsen's heuristics, records issues and which heuristic was broken. Data available immediately.",
+            "4.2c) Differences: (1) facilitator role — empirical: observe and let struggle; inspection: answer expert questions. (2) participants — empirical needs more users; inspection needs 3-5 experts. (3) data — empirical requires post-analysis; inspection gives instant list."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l9-software-quality-and-testing",
+      "title": "Software Quality and Testing",
+      "questions": [
+        {
+          "id": 1,
+          "question": "List six reasons why software quality is relevant.",
+          "marks": 3,
+          "mock": null,
+          "answer": [
+            "Reputation (poor quality damages business). Cost (poor quality = expensive to develop/maintain, leads to technical debt).",
+            "Software certification (e.g., DO-178B/C for aircraft). Organisational certification (e.g., CMM, ISO 9001).",
+            "Legality (ALARP — As Low As Reasonably Practicable). Moral/ethical codes of practice (ACM ethical guidelines)."
+          ]
+        },
+        {
+          "id": 2,
+          "question": "Describe the three perspectives of software quality.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Subjective / 'fitness for use' (Juran): quality perceived by individual user (GUI aesthetics, missing functionality). Focus on vital few objectives.",
+            "Objective / 'conformance to requirements' (Crosby): measurable product properties (documentation, bug count, compliance). Achieved by disciplined specification.",
+            "Practical: what quality means to your specific team and clients."
+          ]
+        },
+        {
+          "id": 3,
+          "question": "List the four steps towards software quality.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Use a standard development process. Use a coding standard (industry compliance, consistent quality, security, reduce costs).",
+            "Define and monitor metrics (defect + complexity metrics — high complexity → more defects).",
+            "Identify and remove defects: conduct manual reviews, use testing."
+          ]
+        },
+        {
+          "id": 4,
+          "question": "What are the key elements of the testing process?",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "System Under Test (SUT): the system/unit being tested. Can be white-box (access to source code and runtime state) or black-box (only interface/API). May be reactive or deterministic. Must be isolated from live system.",
+            "Specification: idealised behaviour (UML, formal spec, or user stories/test cases in agile). A concrete spec enables systematic test generation; without it, testing is ad-hoc.",
+            "Test Cases: executions of SUT. Input (or sequence of inputs). Should cumulatively cover every distinctive facet of behaviour. An ideal test set exposes any deviation from spec.",
+            "Test Oracle: decides whether output is correct (assertion in code, or human user). Oracle problem: no comprehensive spec, many test cases, complex outputs make manual validation prohibitive."
+          ]
+        },
+        {
+          "id": 5,
+          "question": "Compare White-Box and Black-Box testing.",
+          "marks": 3,
+          "mock": null,
+          "answer": [
+            "White-box: access to internals (source code, runtime state, execution tracking). Uses code to measure coverage and drive test generation.",
+            "Black-box: no access to internals (may have access but don't use it). Only knows interface — parameters, functions/methods, specification document.",
+            "White-box measures coverage objectively; black-box tests from user/interface perspective."
+          ]
+        },
+        {
+          "id": 6,
+          "question": "List five white-box coverage metrics and explain Statement and Branch coverage.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "Statement, Branch, Def-Use/Dataflow, MC/DC, Mutation coverage.",
+            "Statement coverage = (statements executed / total statements). If a faulty statement is always buggy when executed, it will be detected.",
+            "Branch coverage = (branches executed / total branches). Subsumes statement coverage — every branch (true/false) must be executed.",
+            "DO-178B/C: non-critical → statement coverage; safety-critical → MC/DC coverage."
+          ]
+        },
+        {
+          "id": 7,
+          "question": "Describe the Equivalence Partitioning (EP) method for black-box testing.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "1. Decompose program into functional units (smaller = more rigorous tests, easier debugging).",
+            "2. Identify inputs and outputs for each unit.",
+            "3a. Identify categories: classify inputs into valid and invalid.",
+            "3b. Define partitions: value ranges/characteristics per category (e.g., 0≤exam≤75 valid, >75 invalid, alphabetic invalid).",
+            "3c. Identify constraints between categories (not all can combine).",
+            "3d. Write test specifications: pair each equivalence class with test inputs and expected outputs."
+          ]
+        },
+        {
+          "id": 8,
+          "question": "Explain Boundary Value testing.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Errors most frequently occur at edge cases.",
+            "Test: just below boundary, at the boundary, just above the boundary."
+          ]
+        },
+        {
+          "id": 9,
+          "question": "What is JUnit? List four types of assertions.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "JUnit: Java testing framework using assertions to verify code. Reports failures when assertions don't hold.",
+            "assertEquals(expected, actual), assertTrue(condition), assertFalse(condition), assertThat(value, matchingFunction)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l10-sustainability",
+      "title": "Software Engineering for Sustainability",
+      "questions": [
+        {
+          "id": 1,
+          "question": "Explain four negative effects of ICT on sustainability: induction, obsolescence, rebound effects, risks.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "Induction: ICT creates new demand for resources (e.g., cloud computing → more storage use).",
+            "Obsolescence: designing products for new sales, not supporting existing products (e.g., new iPhone models make older ones undesirable/unsupported).",
+            "Rebound effects: efficiency improvements lead to increased overall consumption instead of net savings (e.g., route planning apps make car travel more attractive → increase traffic).",
+            "Risks: unexpected sustainability challenges (e.g., 5G → increased demand for rare earth elements; AI → 'baked in' biases and unemployment)."
+          ]
+        },
+        {
+          "id": 2,
+          "question": "What three things can software do for sustainability?",
+          "marks": 3,
+          "mock": null,
+          "answer": [
+            "Optimisation: reduce waste via sensors and smart planning (e.g., plant watering based on humidity, satnav route optimisation).",
+            "Substitution: replace physical with digital (e.g., in-person → video conferencing, CD → music streaming).",
+            "Behaviour change: transition to sustainable production and consumption patterns (e.g., use renewables during peak generation, feedback on environmental impact when shopping, take-back functions)."
+          ]
+        },
+        {
+          "id": 3,
+          "question": "What is SusAF (Sustainability Awareness Framework)?",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "A question-based framework for building awareness of potential sustainability effects of a software solution.",
+            "Aims to enable discussion to make sustainability-conducive requirements decisions."
+          ]
+        },
+        {
+          "id": 4,
+          "question": "List the five dimensions of sustainability and give two topics per dimension.",
+          "marks": 5,
+          "mock": null,
+          "answer": [
+            "Social: Sense of Community, Trust, Inclusiveness and Diversity, Equality, Participation and Communication.",
+            "Individual: Health, Lifelong Learning, Privacy, Safety, Agency.",
+            "Environmental: Material and Resources, Energy, Biodiversity and Land Use, Soil/Atmospheric/Water Pollution, Logistics and Transportation.",
+            "Economic: Value, Customer Relationship Management, Supply Chain, Governance and Processes, Innovation and R&D.",
+            "Technical: Maintainability, Usability, Extensibility and Adaptability, Security, Scalability."
+          ]
+        },
+        {
+          "id": 5,
+          "question": "How does sustainability awareness impact Agile practices? Give four examples.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "Lack of stakeholder demand → SusAF shows win-win options (increase sustainability + reduce costs).",
+            "Sustainability not in product backlog → SusAF formulates sustainability-focused requirements to integrate.",
+            "Sustainability criteria missing in testing/CI → once in backlog, testing/acceptance criteria follow.",
+            "Lack of retrospective focus → formal sustainability requirement ensures discussion in retrospectives."
+          ]
+        },
+        {
+          "id": 6,
+          "question": "Describe the sustainability cloud process (AWS shared responsibility model).",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "AWS responsible for sustainability OF the cloud (infrastructure, data centers, electricity, cooling).",
+            "Customer responsible for sustainability IN the cloud (data design, software design, code efficiency, platform deployment, scaling).",
+            "Process: identify targets → evaluate options → prioritise and plan → test and validate → deploy → measure results and replicate."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l11-privacy-by-design",
+      "title": "Privacy by Design",
+      "questions": [
+        {
+          "id": 1,
+          "question": "List the 8 principles of Data Protection (GDPR).",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "1. Fairly and lawfully processed (consent, contractual/legal obligations, public interest).",
+            "2. Processed for limited purposes.",
+            "3. Adequate, relevant, and not excessive.",
+            "4. Accurate and kept up to date.",
+            "5. Not kept longer than necessary.",
+            "6. Processed in accordance with the data subject's rights.",
+            "7. Secure.",
+            "8. Not transferred to countries without adequate protection."
+          ]
+        },
+        {
+          "id": 2,
+          "question": "List the 7 principles of Privacy by Design.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "1. Preventive not remedial: anticipate and prevent privacy risks before they happen.",
+            "2. Privacy as the default setting: personal data automatically protected.",
+            "3. Privacy embedded into design: engineered from the start, not added later.",
+            "4. Full functionality: no trade-off between privacy and other interests (e.g., innovation).",
+            "5. End-to-end protection: data protected at every stage (collection, use, storage, deletion).",
+            "6. Visibility and transparency: operations remain open and accountable.",
+            "7. Respect for user privacy: user interests as core focus, strong defaults, clear notices, user-friendly options."
+          ]
+        },
+        {
+          "id": 3,
+          "question": "Why should we practice Privacy by Design? List three reasons.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "1. Reduce risk of data breaches.",
+            "2. Build trust with users.",
+            "3. Align with GDPR/similar regulation compliance."
+          ]
+        },
+        {
+          "id": 4,
+          "question": "Describe Privacy by Design Technique 1: Use of Personas.",
+          "marks": 3,
+          "mock": null,
+          "answer": [
+            "Users can browse using pre-defined representative personas to explore outcomes without providing real personal data.",
+            "Data is only collected when the user actively decides to proceed for a specific purpose.",
+            "Operationalises the GDPR rule: 'do not collect any data unless there is a clearly defined goal/purpose for it.'",
+            "Reduces conflicts around data sharing — users see data collected for specific purposes and accept it."
+          ]
+        },
+        {
+          "id": 5,
+          "question": "Describe Privacy by Design Technique 2: Inform and Give Choice.",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "Before data collection, clearly present: what data is needed, why, and the benefit to the user.",
+            "User chooses whether to share. Only relevant data for their chosen option is collected.",
+            "Enforces GDPR: 'process data only for limited purposes', collected data is 'adequate, relevant, and not excessive'."
+          ]
+        },
+        {
+          "id": 6,
+          "question": "List and explain Hoepman's 8 Privacy Design Strategies.",
+          "marks": 4,
+          "mock": null,
+          "answer": [
+            "Minimise: collect only data needed for processing.",
+            "Hide: collected/processed data should not be in plain sight.",
+            "Separate: distribute or isolate data during storage/processing.",
+            "Aggregate: store/process personal data at the highest possible aggregation level.",
+            "Inform: notify data subjects whenever personal data is processed.",
+            "Control: data subjects should control collection, storage, and processing.",
+            "Enforce: implement and enforce privacy policies compatible with legal requirements.",
+            "Demonstrate: data controller should be ready to demonstrate compliance."
+          ]
+        },
+        {
+          "id": 7,
+          "question": "What is GDPR and what motivates Privacy-focused Software Development?",
+          "marks": 2,
+          "mock": null,
+          "answer": [
+            "GDPR: General Data Protection Regulation — regulates how organisations collect, store, and process personal data.",
+            "Motivation: privacy concerns in software adoption, data-hungry business models not accounting for human needs. The false 'privacy-utility trade-off' claim (less data = less utility) is challenged."
+          ]
+        }
+      ]
     }
   ],
-  "total_questions": 75,
-  "total_marks": 268
+  "total_questions": 116,
+  "total_marks": 409
 }
