@@ -1469,42 +1469,6 @@ class PDFExtractView(APIView):
             return Response({'error': f'PDF 解析失败: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class AiLabImageUploadView(APIView):
-    """AI Lab 图片上传 — 保存到 MEDIA/ailab/uploads/ 并返回公开 URL"""
-    authentication_classes = [_JWTAuth]
-    permission_classes = [permissions.IsAuthenticated, AiLabAccessPermission]
-
-    def post(self, request):
-        image_file = request.FILES.get('file')
-        if not image_file:
-            return Response({'error': '请上传图片文件'}, status=status.HTTP_400_BAD_REQUEST)
-
-        allowed_types = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
-        if image_file.content_type not in allowed_types:
-            return Response({'error': '仅支持 JPG/PNG/GIF/WebP 格式'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if image_file.size > 10 * 1024 * 1024:
-            return Response({'error': '图片不能超过 10MB'}, status=status.HTTP_400_BAD_REQUEST)
-
-        upload_dir = Path(settings.MEDIA_ROOT) / 'ailab' / 'uploads'
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
-        ext = Path(image_file.name).suffix or '.jpg'
-        unique_name = f"{timezone.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}{ext}"
-        save_path = upload_dir / unique_name
-
-        with open(save_path, 'wb') as f:
-            for chunk in image_file.chunks():
-                f.write(chunk)
-
-        url = f"{settings.MEDIA_URL}ailab/uploads/{unique_name}"
-        return Response({
-            'url': url,
-            'filename': image_file.name,
-            'size': image_file.size,
-        })
-
-
 # ==================== 语音转录 (Groq Whisper via OpenAI SDK) ====================
 
 class WhisperTranscribeView(APIView):
@@ -1670,6 +1634,42 @@ class AiLabAccessPermission(permissions.BasePermission):
         if not getattr(u, 'is_authenticated', False):
             return False
         return has_ai_lab_access(u)
+
+
+class AiLabImageUploadView(APIView):
+    """AI Lab 图片上传 — 保存到 MEDIA/ailab/uploads/ 并返回公开 URL"""
+    authentication_classes = [_JWTAuth]
+    permission_classes = [permissions.IsAuthenticated, AiLabAccessPermission]
+
+    def post(self, request):
+        image_file = request.FILES.get('file')
+        if not image_file:
+            return Response({'error': '请上传图片文件'}, status=status.HTTP_400_BAD_REQUEST)
+
+        allowed_types = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
+        if image_file.content_type not in allowed_types:
+            return Response({'error': '仅支持 JPG/PNG/GIF/WebP 格式'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if image_file.size > 10 * 1024 * 1024:
+            return Response({'error': '图片不能超过 10MB'}, status=status.HTTP_400_BAD_REQUEST)
+
+        upload_dir = Path(settings.MEDIA_ROOT) / 'ailab' / 'uploads'
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        ext = Path(image_file.name).suffix or '.jpg'
+        unique_name = f"{timezone.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}{ext}"
+        save_path = upload_dir / unique_name
+
+        with open(save_path, 'wb') as f:
+            for chunk in image_file.chunks():
+                f.write(chunk)
+
+        url = f"{settings.MEDIA_URL}ailab/uploads/{unique_name}"
+        return Response({
+            'url': url,
+            'filename': image_file.name,
+            'size': image_file.size,
+        })
 
 
 @api_view(['GET'])
