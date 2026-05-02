@@ -377,17 +377,54 @@ Answer in the same language as the user's question.
 """
 
 
+def build_study_system_prompt(context, course_id=None):
+    """Build system prompt for study mode (notes/courseware browsing)."""
+    course_config = get_course(course_id) if course_id else None
+    course_name = course_config.get("name", "Course") if course_config else "Course"
+
+    topic = context.get("topic", "general")
+    quoted_text = context.get("quoted_text", "")
+
+    courseware = parse_courseware(course_id)
+    chapter_content = courseware.get(topic, "")[:4000]
+
+    quote_section = ""
+    if quoted_text:
+        quote_section = f"""
+## Highlighted Passage:
+The student has selected the following text and wants to discuss it:
+> {quoted_text}
+
+Focus your response on explaining this specific passage.
+"""
+
+    return f"""You are a study assistant for the "{course_name}" course.
+The student is browsing study materials about "{topic}".
+{quote_section}
+## Course Material (for reference):
+{chapter_content if chapter_content else 'No additional context available.'}
+
+## Your Role:
+- Help the student understand concepts from the material
+- Explain difficult passages in simple terms
+- Provide examples and analogies when helpful
+- If the student quoted a specific passage, focus on that
+- Answer in the same language as the student's question (Chinese if they ask in Chinese)
+- Be concise but thorough
+"""
+
+
 def chat_stream(mode, messages, current_question, course_id=None):
     """
-    Streaming chat for both Q&A and Review modes.
+    Streaming chat for Q&A, Review, and Study modes.
     Yields chunks of text as they are generated.
-    
+
     Args:
-        mode: 'qa' or 'review'
+        mode: 'qa', 'review', or 'study'
         messages: List of chat messages
-        current_question: The question object
+        current_question: The question object (or context dict for study mode)
         course_id: Course identifier
-    
+
     Yields:
         dict with 'chunk' or 'done' or 'error'
     """
@@ -395,10 +432,13 @@ def chat_stream(mode, messages, current_question, course_id=None):
     if not client:
         yield {"error": "DEEPSEEK_API_KEY not configured"}
         return
-    
+
     # Build system prompt based on mode
     if mode == 'qa':
         system_prompt = build_qa_system_prompt(current_question, course_id)
+        temperature = 0.7
+    elif mode == 'study':
+        system_prompt = build_study_system_prompt(current_question or {}, course_id)
         temperature = 0.7
     else:  # review
         system_prompt = build_review_system_prompt(current_question, course_id)

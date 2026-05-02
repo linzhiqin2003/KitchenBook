@@ -505,9 +505,14 @@ class QuestionViewSet(viewsets.ModelViewSet):
         current_question = request.data.get('current_question', {})
         course_id = request.data.get('course_id')
         
-        if not messages or not current_question:
+        if not messages:
             def error_stream():
-                yield f"data: {json.dumps({'error': 'Missing required data'})}\n\n"
+                yield f"data: {json.dumps({'error': 'Missing messages'})}\n\n"
+            return StreamingHttpResponse(error_stream(), content_type='text/event-stream')
+
+        if not current_question and mode not in ('study',):
+            def error_stream():
+                yield f"data: {json.dumps({'error': 'Missing question context'})}\n\n"
             return StreamingHttpResponse(error_stream(), content_type='text/event-stream')
         
         def event_stream():

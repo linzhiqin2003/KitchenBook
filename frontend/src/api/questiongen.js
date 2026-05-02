@@ -120,6 +120,20 @@ export const questionApi = {
         };
     },
 
+    // Study mode streaming config — for notes/courseware browsing
+    getStudyChatStreamConfig(messages, context, courseId = null) {
+        const baseURL = api.defaults.baseURL || '';
+        return {
+            url: `${baseURL}/questions/chat-stream/`,
+            data: {
+                mode: 'study',
+                messages,
+                current_question: context,
+                course_id: courseId
+            }
+        };
+    },
+
     // Request to delete a question (with reasoner confirmation)
     requestDelete(questionId, conversationHistory) {
         return api.post(`/questions/${questionId}/request-delete/`, {

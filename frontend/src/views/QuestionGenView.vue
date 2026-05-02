@@ -1,5 +1,5 @@
 <template>
-  <div data-qg-surface class="qg-shell">
+  <div data-qg-surface class="qg-shell" :class="{ 'qg-shell--sidebar': showSidebar }">
     <!-- ─── Top bar: minimal hairline. Course + theme toggle live here. ─── -->
     <header class="qg-topbar">
       <div class="qg-topbar__inner">
@@ -19,6 +19,9 @@
             <span class="qg-session__label">Session</span>
             <span class="qg-num qg-session__count">{{ correctCount }}<span class="qg-session__sep">/</span>{{ historyQuestions.length }}</span>
           </div>
+          <button class="qg-iconbtn" @click="showSidebar = !showSidebar" :data-active="showSidebar" title="AI 助手">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </button>
           <button class="qg-iconbtn" @click="showHistory = !showHistory" title="答题历史">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/><path d="M3 8l9 7 9-7"/></svg>
           </button>
@@ -152,7 +155,7 @@
     ></div>
 
     <!-- ─── Stage ─── -->
-    <main class="qg-stage">
+    <main class="qg-stage" @mouseup="onStageMouseUp">
       <!-- Notes mode: structured knowledge points -->
       <div v-if="studyMode === 'notes'" class="qg-stage__inner">
         <NotesView
@@ -313,13 +316,35 @@
       </div>
     </transition>
 
-    <AIChatWindow
-      :current-question="currentQuestion"
+    <!-- ─── AI Sidebar ─── -->
+    <QgChatSidebar
+      :open="showSidebar"
+      :study-mode="studyMode"
       :course-id="currentCourseId"
+      :topic="selectedTopic === 'all' ? null : selectedTopic"
+      :current-question="currentQuestion"
       :question-answered="questionAnswered"
       :user-answer="userAnswer"
+      :quoted-text="quotedText"
+      @close="showSidebar = false"
+      @clear-quote="quotedText = ''"
       @question-deleted="handleQuestionDeleted"
     />
+
+    <!-- ─── Floating quote button ─── -->
+    <teleport to="body">
+      <transition name="qg-fade">
+        <button
+          v-if="showQuoteBtn"
+          class="qg-quote-fab"
+          :style="quoteBtnStyle"
+          @mousedown.prevent.stop="quoteSelection"
+        >
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Quote
+        </button>
+      </transition>
+    </teleport>
   </div>
 </template>
 
@@ -327,7 +352,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import QuestionCard from '../components/QuestionCard.vue';
 import QuestionSkeleton from '../components/QuestionSkeleton.vue';
-import AIChatWindow from '../components/AIChatWindow.vue';
+import QgChatSidebar from '../components/QgChatSidebar.vue';
 import QgThemeToggle from '../components/QgThemeToggle.vue';
 import NotesView from '../components/NotesView.vue';
 import CoursewareView from '../components/CoursewareView.vue';
@@ -377,6 +402,21 @@ const error = ref(null);
 const questionSource = ref('');
 const questionAnswered = ref(false);
 const userAnswer = ref(null);  // { selected: 'A. xxx', correct: true/false }
+
+// Sidebar + text selection quoting
+const showSidebar = ref(false);
+const quotedText = ref('');
+const showQuoteBtn = ref(false);
+const quoteBtnPos = ref({ x: 0, y: 0 });
+const pendingQuoteText = ref('');
+
+const quoteBtnStyle = computed(() => ({
+  position: 'fixed',
+  top: `${quoteBtnPos.value.y}px`,
+  left: `${quoteBtnPos.value.x}px`,
+  transform: 'translate(-50%, -100%)',
+  zIndex: 9999,
+}));
 
 // Course selection state
 const currentCourseId = ref(null);
@@ -979,10 +1019,44 @@ async function handleQuestionDeleted(questionId) {
   await loadNotesStats();
 }
 
+// ─── Text selection → quote ─────────────────────────────────────────
+function onStageMouseUp(e) {
+  if (e.target.closest('.qg-quote-fab')) return;
+  const sel = window.getSelection();
+  const text = sel?.toString().trim();
+  if (text && text.length > 3) {
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    quoteBtnPos.value = {
+      x: rect.left + rect.width / 2,
+      y: rect.top - 6,
+    };
+    pendingQuoteText.value = text;
+    showQuoteBtn.value = true;
+  } else {
+    showQuoteBtn.value = false;
+  }
+}
+
+function quoteSelection() {
+  quotedText.value = pendingQuoteText.value;
+  pendingQuoteText.value = '';
+  showQuoteBtn.value = false;
+  showSidebar.value = true;
+  window.getSelection()?.removeAllRanges();
+}
+
+function onDocMouseDown(e) {
+  if (!e.target.closest('.qg-quote-fab')) {
+    showQuoteBtn.value = false;
+  }
+}
+
 // Initial load
 onMounted(async () => {
   loadHistoryFromStorage();
   window.addEventListener('keydown', onHistoryKey);
+  document.addEventListener('mousedown', onDocMouseDown);
 
   // Load courses first
   await loadCourses();
@@ -1012,6 +1086,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onHistoryKey);
+  document.removeEventListener('mousedown', onDocMouseDown);
 });
 </script>
 
@@ -1022,6 +1097,13 @@ onBeforeUnmount(() => {
   background: var(--qg-surface-base);
   color: var(--qg-text-primary);
   padding-bottom: env(safe-area-inset-bottom);
+  transition: margin-right var(--qg-dur-slow) var(--qg-ease);
+}
+.qg-shell--sidebar {
+  margin-right: 380px;
+}
+@media (max-width: 768px) {
+  .qg-shell--sidebar { margin-right: 0; }
 }
 
 /* ─── Topbar ────────────────────────────────────────────────────────── */
@@ -1119,6 +1201,11 @@ onBeforeUnmount(() => {
   color: var(--qg-text-primary);
   border-color: var(--qg-border-strong);
   background: var(--qg-surface-sunken);
+}
+.qg-iconbtn[data-active="true"] {
+  color: var(--qg-accent);
+  border-color: var(--qg-accent);
+  background: var(--qg-accent-soft);
 }
 
 /* ─── Hero ──────────────────────────────────────────────────────────── */
@@ -1789,5 +1876,31 @@ onBeforeUnmount(() => {
   .qg-console__inner { flex-direction: column; align-items: stretch; gap: 14px; }
   .qg-console__group--right { margin-left: 0; align-items: flex-start; }
   .qg-source { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+
+/* ─── Floating quote button ────────────────────────────────────────────── */
+.qg-quote-fab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: var(--qg-accent, oklch(0.46 0.13 252));
+  color: var(--qg-accent-on, #fff);
+  border: none;
+  border-radius: 999px;
+  font-family: var(--qg-font-mono, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  pointer-events: auto;
+}
+.qg-quote-fab:hover {
+  transform: translate(-50%, -100%) scale(1.06);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
 }
 </style>
