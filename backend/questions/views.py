@@ -19,7 +19,7 @@ from .services.generator import (
     batch_generate_typed,
 )
 from .services.parser import parse_simulation_questions, parse_courseware, get_all_topics
-from .services.courses import get_all_courses, get_course, get_default_course
+from .services.courses import get_all_courses, get_course, get_default_course, get_course_dir
 import random
 import re
 
