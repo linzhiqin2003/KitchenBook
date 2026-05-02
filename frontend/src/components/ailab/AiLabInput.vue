@@ -729,6 +729,51 @@ const getInlineSublabel = (option) => {
   color: #374151;
   box-shadow: none;
 }
+
+/* 移动端适配 */
+@media (max-width: 640px) {
+  .input-shell {
+    border-radius: 16px;
+    padding: 10px 12px 6px;
+  }
+  .input-textarea {
+    font-size: 16px; /* 防止 iOS 自动缩放 */
+    padding-left: 4px;
+  }
+  .input-toolbar {
+    gap: 4px;
+  }
+  .input-toolbar__right {
+    gap: 4px;
+  }
+  .model-select__menu {
+    min-width: 200px;
+    right: -8px;
+    max-width: calc(100vw - 32px);
+  }
+  .model-select__trigger {
+    padding: 0 0.35rem;
+    gap: 0.25rem;
+  }
+  .model-select__label {
+    font-size: 13px;
+  }
+  .model-select__sub-label {
+    display: none;
+  }
+  .model-select__locked {
+    padding: 0 4px;
+    font-size: 13px;
+    gap: 4px;
+  }
+  .model-select__locked-sub {
+    display: none;
+  }
+  .recording-time {
+    font-size: 11px;
+    min-width: 30px;
+  }
+}
 .attachment-row {
   display: flex;
   flex-wrap: wrap;

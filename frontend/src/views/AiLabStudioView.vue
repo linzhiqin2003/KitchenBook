@@ -1018,7 +1018,7 @@ onUnmounted(() => {
     <!-- Header -->
     <header class="relative z-50 flex-none h-12 flex items-center" style="border-bottom: 1px solid var(--theme-200, #e4e4df);">
       <div class="max-w-[1240px] mx-auto px-4 w-full flex items-center justify-between">
-        <div class="flex items-center gap-3 w-[200px]">
+        <div class="flex items-center gap-3">
           <router-link
             to="/ai-lab"
             class="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
@@ -1029,10 +1029,10 @@ onUnmounted(() => {
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
             </svg>
           </router-link>
-          <span class="text-[13px] font-semibold tracking-tight" style="color: var(--theme-700);">Studio</span>
+          <span class="text-[13px] font-semibold tracking-tight hidden sm:inline" style="color: var(--theme-700);">Studio</span>
         </div>
 
-        <div class="flex-1 flex justify-center">
+        <div class="flex-1 flex justify-center px-2">
           <div class="p-0.5 rounded-lg flex relative" style="background: var(--theme-200);">
             <div
               class="absolute top-0.5 bottom-0.5 rounded-md shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
@@ -1052,8 +1052,8 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="flex items-center justify-end gap-2 w-[200px]">
-          <span class="px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider" style="border: 1px solid var(--theme-200); color: var(--theme-400);">
+        <div class="flex items-center justify-end gap-2">
+          <span class="hidden md:inline px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider" style="border: 1px solid var(--theme-200); color: var(--theme-400);">
             {{ currentView === 'interpretation'
               ? (asrProvider === 'tingwu' ? 'Tingwu ASR+Trans' : (asrModel || 'Qwen3-ASR') + ' + Cerebras')
               : 'Emoji-v1' }}
@@ -1070,18 +1070,18 @@ onUnmounted(() => {
         <div v-show="currentView === 'interpretation'" class="h-full flex flex-col gap-5">
 
           <!-- Top bar: Language + Actions -->
-          <div class="flex-none flex items-end gap-4">
-            <div class="flex items-center gap-3 flex-1">
-              <div class="w-40">
+          <div class="flex-none flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+            <div class="flex items-center gap-2 sm:gap-3 flex-1 overflow-x-auto pb-1 sm:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0">
+              <div class="w-32 sm:w-40 shrink-0">
                 <LanguageSelector v-model="sourceLang" label="From" :disabled="isRecording || inflight > 0" />
               </div>
-              <div class="pt-5" style="color: var(--theme-300);">
+              <div class="pt-5 shrink-0" style="color: var(--theme-300);">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
               </div>
-              <div class="w-40">
+              <div class="w-32 sm:w-40 shrink-0">
                 <LanguageSelector v-model="targetLang" label="To" :disabled="isRecording || inflight > 0" :is-target="true" />
               </div>
-              <div class="pt-5 ml-2">
+              <div class="pt-5 sm:ml-2 shrink-0">
                 <div class="p-0.5 rounded-lg flex text-[11px]" style="background: var(--theme-200);">
                   <button
                     @click="asrProvider = 'standard'"
@@ -1102,7 +1102,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 shrink-0">
               <button
                 v-if="canGenerateMinutes"
                 @click="generateMeetingMinutes"
@@ -1193,7 +1193,7 @@ onUnmounted(() => {
           <div ref="historyContainer" class="flex-1 overflow-y-auto custom-scrollbar min-h-0 space-y-3">
 
             <div v-if="!transcriptionHistory.length && inflight === 0 && !showMinutes" class="h-full flex items-center justify-center">
-              <div class="text-center space-y-1.5">
+              <div class="text-center space-y-1.5 px-4">
                 <p class="text-[13px]" style="color: var(--theme-400);">录音或上传音频文件，自动转录并翻译</p>
                 <p class="text-[11px]" style="color: var(--theme-300);">
                   {{ asrProvider === 'tingwu'
@@ -1204,12 +1204,19 @@ onUnmounted(() => {
             </div>
 
             <div v-if="transcriptionHistory.length" class="rounded-xl overflow-hidden" style="border: 1px solid var(--theme-200);">
-              <div class="grid grid-cols-2 gap-4 px-5 pt-3 pb-2 sticky top-0 z-10" style="border-bottom: 1px solid var(--theme-200); background: var(--theme-100);">
+              <!-- Desktop header: two columns -->
+              <div class="hidden sm:grid grid-cols-2 gap-4 px-5 pt-3 pb-2 sticky top-0 z-10" style="border-bottom: 1px solid var(--theme-200); background: var(--theme-100);">
                 <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--theme-400);">Original</span>
                 <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--ai-accent);">Translation</span>
               </div>
+              <!-- Mobile header: stacked labels -->
+              <div class="sm:hidden flex gap-3 px-4 pt-3 pb-2 sticky top-0 z-10" style="border-bottom: 1px solid var(--theme-200); background: var(--theme-100);">
+                <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--theme-400);">原文</span>
+                <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--ai-accent);">译文</span>
+              </div>
 
-              <div class="grid grid-cols-2 gap-4 px-5 py-3" style="background: #fff;">
+              <!-- Desktop: two columns -->
+              <div class="hidden sm:grid grid-cols-2 gap-4 px-5 py-3" style="background: #fff;">
                 <p class="text-[14px] leading-relaxed">
                   <template v-for="group in paragraphs" :key="'o-' + group.paragraphId">
                     <span
@@ -1241,7 +1248,25 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <div class="px-5 py-2 text-center" style="border-top: 1px solid var(--theme-200);">
+              <!-- Mobile: stacked paragraphs -->
+              <div class="sm:hidden px-4 py-3 space-y-4" style="background: #fff;">
+                <template v-for="group in paragraphs" :key="'m-' + group.paragraphId">
+                  <div class="space-y-1.5">
+                    <p class="text-[13px] leading-relaxed" :style="group.isFinal ? 'color: var(--theme-700);' : 'color: var(--theme-300);'">
+                      {{ group.original }}
+                    </p>
+                    <p class="text-[13px] leading-relaxed" :style="group.isFinal ? 'color: var(--ai-accent);' : 'color: var(--theme-300);'">
+                      {{ group.translated }}
+                    </p>
+                  </div>
+                </template>
+                <div v-if="paragraphs.length && paragraphs[paragraphs.length - 1].pending" class="flex items-center gap-2 py-1">
+                  <span class="w-2.5 h-2.5 border-[1.5px] rounded-full animate-spin" style="border-color: var(--ai-accent); border-top-color: transparent;"></span>
+                  <span class="text-[12px]" style="color: var(--theme-400);">处理中...</span>
+                </div>
+              </div>
+
+              <div class="px-4 sm:px-5 py-2 text-center" style="border-top: 1px solid var(--theme-200);">
                 <span class="text-[11px]" style="color: var(--theme-400);">{{ totalEntries }} 段记录</span>
               </div>
             </div>

@@ -705,8 +705,8 @@ const openImage = (dataUrl) => {
 
 <template>
   <!-- 用户消息 -->
-  <div v-if="message.role === 'user'" class="w-full py-3 px-6 animate-fade-in flex justify-end" style="font-family: var(--ai-font-body);">
-    <div class="flex gap-3 flex-row-reverse max-w-3xl">
+  <div v-if="message.role === 'user'" class="w-full py-3 px-3 sm:px-6 animate-fade-in flex justify-end" style="font-family: var(--ai-font-body);">
+    <div class="flex gap-3 flex-row-reverse max-w-3xl w-full">
       <div class="flex flex-col items-end">
         <div class="relative group/bubble">
           <div v-if="!isEditing"
@@ -732,14 +732,14 @@ const openImage = (dataUrl) => {
             </button>
           </div>
 
-          <div v-if="isEditing" class="flex flex-col items-end gap-2">
+          <div v-if="isEditing" class="flex flex-col items-end gap-2 w-full">
             <textarea
               ref="editTextarea"
               v-model="editContent"
               @keydown.ctrl.enter="submitEdit"
               @keydown.esc="cancelEdit"
               @input="autoResizeTextarea"
-              :style="{ width: editBoxWidth + 'px' }"
+              :style="{ width: '100%', maxWidth: Math.min(editBoxWidth, window.innerWidth - 48) + 'px' }"
               class="rounded-xl px-4 py-3 bg-white leading-relaxed resize-none focus:outline-none overflow-hidden"
               style="border: 1px solid var(--ai-accent); color: var(--theme-700); font-size: 15px;"
             ></textarea>
@@ -796,9 +796,9 @@ const openImage = (dataUrl) => {
   </div>
 
   <!-- AI 消息 -->
-  <div v-else-if="message.role === 'assistant'" class="w-full py-3 px-6 animate-fade-in flex justify-start" style="font-family: var(--ai-font-body);">
-    <div class="flex gap-3 max-w-[calc(100%-48px)]">
-      <div class="flex flex-col items-start flex-1 min-w-0">
+  <div v-else-if="message.role === 'assistant'" class="w-full py-3 px-3 sm:px-6 animate-fade-in flex justify-start" style="font-family: var(--ai-font-body);">
+    <div class="flex gap-3 max-w-full sm:max-w-[calc(100%-48px)] w-full">
+      <div class="flex flex-col items-start flex-1 min-w-0 w-full">
         <div class="mb-1.5" style="font-size: 13px; font-weight: 600; color: var(--theme-400); letter-spacing: 0.01em;">{{ message.modelName || 'AI' }}</div>
 
         <!-- 流式刚启动还没收到任何 chunk 时（新 session 第一回合的网络冷启动尤为明显）：

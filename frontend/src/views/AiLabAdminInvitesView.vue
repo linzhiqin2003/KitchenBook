@@ -121,16 +121,18 @@ onMounted(async () => {
         <div v-if="loading" class="px-5 py-12 text-center text-[13px]" style="color: var(--theme-400);">加载中…</div>
         <div v-else-if="invites.length === 0" class="px-5 py-12 text-center text-[13px]" style="color: var(--theme-400);">暂无邀请码</div>
         <div v-else>
-          <div class="grid grid-cols-12 gap-3 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide" style="color: var(--theme-500); background: var(--theme-100); border-bottom: 1px solid var(--theme-200);">
+          <!-- Desktop header -->
+          <div class="hidden md:grid grid-cols-12 gap-3 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide" style="color: var(--theme-500); background: var(--theme-100); border-bottom: 1px solid var(--theme-200);">
             <div class="col-span-4">Code</div>
             <div class="col-span-3">备注</div>
             <div class="col-span-2">状态</div>
             <div class="col-span-3">使用者 / 时间</div>
           </div>
+          <!-- Desktop rows -->
           <div
             v-for="it in invites"
             :key="it.id"
-            class="grid grid-cols-12 gap-3 px-5 py-3 items-center text-[13px] transition-colors hover:bg-[var(--theme-50)]"
+            class="hidden md:grid grid-cols-12 gap-3 px-5 py-3 items-center text-[13px] transition-colors hover:bg-[var(--theme-50)]"
             style="border-bottom: 1px solid var(--theme-100);"
           >
             <div class="col-span-4 flex items-center gap-1.5">
@@ -146,6 +148,29 @@ onMounted(async () => {
             <div class="col-span-3 text-[12px]" style="color: var(--theme-500);">
               <span v-if="it.used_by">{{ it.used_by }}<br/></span>
               <span class="text-[11px]" style="color: var(--theme-400);">{{ fmtTime(it.used_at || it.created_at) }}</span>
+            </div>
+          </div>
+          <!-- Mobile cards -->
+          <div class="md:hidden divide-y" style="border-color: var(--theme-100);">
+            <div
+              v-for="it in invites"
+              :key="it.id"
+              class="px-4 py-3 text-[13px]"
+            >
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <code class="text-[12px] truncate" style="color: var(--theme-700); font-family: var(--ai-font-mono, ui-monospace, monospace);">{{ it.code }}</code>
+                  <button @click="copyCode(it.code)" class="text-[11px] cursor-pointer hover:underline shrink-0" style="color: var(--theme-400);" title="复制">📋</button>
+                </div>
+                <span v-if="it.is_used" class="text-[11px] font-medium px-2 py-0.5 rounded shrink-0" style="background: var(--theme-100); color: var(--theme-500);">已用</span>
+                <span v-else-if="it.is_expired" class="text-[11px] font-medium px-2 py-0.5 rounded shrink-0" style="background: #fef2f2; color: #b91c1c;">过期</span>
+                <span v-else class="text-[11px] font-medium px-2 py-0.5 rounded shrink-0" style="background: #ecfdf5; color: #047857;">未用</span>
+              </div>
+              <div v-if="it.note" class="text-[12px] mb-1 truncate" style="color: var(--theme-600);">{{ it.note }}</div>
+              <div class="flex items-center justify-between text-[11px]" style="color: var(--theme-400);">
+                <span v-if="it.used_by" style="color: var(--theme-500);">{{ it.used_by }}</span>
+                <span class="ml-auto">{{ fmtTime(it.used_at || it.created_at) }}</span>
+              </div>
             </div>
           </div>
         </div>

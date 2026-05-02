@@ -56,6 +56,10 @@ const MAX_PANEL_WIDTH = 560
 const DEFAULT_PANEL_WIDTH = 360
 const panelWidth = ref(DEFAULT_PANEL_WIDTH)
 const isResizing = ref(false)
+const isMobile = ref(window.innerWidth < 1024)
+
+const checkMobile = () => { isMobile.value = window.innerWidth < 1024 }
+let mobileResizeHandler = null
 
 const headers = computed(() => {
   const uid = authStore.user?.id
@@ -441,11 +445,14 @@ onMounted(() => {
   if (props.visible) loadTab(activeTab.value)
   pollNotificationsUnread()
   notifPollHandle = setInterval(pollNotificationsUnread, 30000)
+  mobileResizeHandler = () => checkMobile()
+  window.addEventListener('resize', mobileResizeHandler)
 })
 
 onUnmounted(() => {
   stopResize()
   if (notifPollHandle) clearInterval(notifPollHandle)
+  if (mobileResizeHandler) window.removeEventListener('resize', mobileResizeHandler)
 })
 
 const handleKeydown = (event) => {
@@ -608,8 +615,8 @@ defineExpose({
     <div
       v-if="visible"
       class="panel-shell flex flex-col"
-      :class="{ resizing: isResizing }"
-      :style="{ width: `${panelWidth}px`, minWidth: `${panelWidth}px` }"
+      :class="{ resizing: isResizing, 'panel-mobile': isMobile }"
+      :style="isMobile ? {} : { width: `${panelWidth}px`, minWidth: `${panelWidth}px` }"
     >
       <div
         class="resize-handle"
@@ -1121,6 +1128,15 @@ defineExpose({
       </div>
     </div>
   </Transition>
+
+  <!-- Mobile backdrop for panel -->
+  <Transition name="fade">
+    <div
+      v-if="visible && isMobile"
+      class="fixed inset-0 bg-black/40 z-[35] lg:hidden"
+      @click="emit('close')"
+    ></div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -1130,6 +1146,18 @@ defineExpose({
   background: #f7f7f8;
   border-left: 1px solid #ebebed;
   font-family: var(--ai-font-body);
+}
+@media (max-width: 1023px) {
+  .panel-shell.panel-mobile {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 85vw !important;
+    min-width: 280px !important;
+    max-width: 400px;
+    z-index: 40;
+    box-shadow: -8px 0 32px rgba(0,0,0,0.12);
+  }
 }
 .is-refreshing svg {
   animation: refresh-spin 0.8s linear infinite;
@@ -1173,6 +1201,12 @@ defineExpose({
   transition: opacity 0.18s ease;
 }
 .workspace-preview-enter-from, .workspace-preview-leave-to {
+  opacity: 0;
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
 </style>

@@ -435,28 +435,28 @@ onMounted(() => {
         <!-- Template Selector -->
         <!-- Template Selector -->
         <div class="ios-glass p-6 rounded-[32px] flex-1 min-h-[400px] flex flex-col shadow-xl ring-1 ring-white/10">
-          <div class="flex items-center justify-between mb-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
             <h2 class="text-[15px] font-semibold text-white/90 flex items-center gap-2">
               <span class="p-1.5 rounded-lg bg-pink-500/20 text-pink-400">🎭</span>
               Choose Expression
             </h2>
-            
+
             <!-- Category Tabs -->
-            <div class="flex bg-black/20 p-1 rounded-xl">
-              <button 
-                v-for="cat in categoryList" 
+            <div class="flex bg-black/20 p-1 rounded-xl overflow-x-auto">
+              <button
+                v-for="cat in categoryList"
                 :key="cat"
                 @click="activeCategory = cat"
-                class="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200"
+                class="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 shrink-0"
                 :class="activeCategory === cat ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/60'"
               >
                 {{ cat }}
               </button>
             </div>
           </div>
-          
+
           <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            <div class="grid grid-cols-4 gap-2.5">
+            <div class="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
               <button
                 v-for="template in currentCategoryTemplates"
                 :key="template.id"
