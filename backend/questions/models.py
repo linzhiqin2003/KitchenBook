@@ -28,6 +28,7 @@ class KnowledgePoint(models.Model):
     )
     source_excerpt = models.TextField(blank=True, default="")  # short quoted text from courseware
     source_chapter = models.CharField(max_length=200, blank=True, default="")  # human-readable chapter label
+    translations = models.JSONField(default=dict, blank=True)  # {"title_cn","definition_cn","details_cn"}
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

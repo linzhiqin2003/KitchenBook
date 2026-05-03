@@ -7,6 +7,16 @@
         <span v-if="currentCount" class="notes__count" data-mono>{{ currentCount }} POINTS</span>
         <span v-else-if="!loading" class="notes__count notes__count--muted" data-mono>EMPTY</span>
       </div>
+      <div v-if="points.length" class="notes__headActions">
+        <button
+          class="notes__langBtn"
+          :data-active="showCn"
+          @click="showCn = !showCn"
+          title="中英切换"
+        >
+          <span data-mono>中</span>
+        </button>
+      </div>
       <div v-if="points.length" class="notes__viewToggle" role="tablist" aria-label="视图模式">
         <button
           role="tab"
@@ -60,16 +70,20 @@
         >
           <header class="notes__itemHead">
             <span class="notes__index" data-mono>{{ String(idx + 1).padStart(2, '0') }}</span>
-            <h3 class="notes__title">{{ p.title }}</h3>
+            <h3 class="notes__title">{{ showCn && cnOf(p,'title_cn') ? cnOf(p,'title_cn') : p.title }}</h3>
             <span class="qg-pill notes__importance" :data-tint="p.importance === 'core' ? 'fill' : null">
               {{ p.importance === 'core' ? '核心' : '辅助' }}
             </span>
           </header>
 
-          <p class="notes__definition">{{ p.definition }}</p>
+          <p class="notes__definition">{{ showCn && cnOf(p,'definition_cn') ? cnOf(p,'definition_cn') : p.definition }}</p>
+          <p v-if="showCn && cnOf(p,'definition_cn')" class="notes__definitionOrig">{{ p.definition }}</p>
 
           <ul v-if="p.details && p.details.length" class="notes__details">
-            <li v-for="(d, di) in p.details" :key="di" class="notes__detail" v-html="renderInline(d)"></li>
+            <li v-for="(d, di) in p.details" :key="di" class="notes__detail">
+              <span v-html="renderInline(showCn && cnDetailOf(p,di) ? cnDetailOf(p,di) : d)"></span>
+              <span v-if="showCn && cnDetailOf(p,di)" class="notes__detailOrig" v-html="renderInline(d)"></span>
+            </li>
           </ul>
 
           <footer v-if="p.source_excerpt || p.source_chapter" class="notes__source">
@@ -96,16 +110,20 @@
           >
             <header class="notes__itemHead">
               <span class="notes__index" data-mono>{{ String(cardIndex + 1).padStart(2, '0') }}</span>
-              <h3 class="notes__title">{{ currentPoint.title }}</h3>
+              <h3 class="notes__title">{{ showCn && cnOf(currentPoint,'title_cn') ? cnOf(currentPoint,'title_cn') : currentPoint.title }}</h3>
               <span class="qg-pill notes__importance" :data-tint="currentPoint.importance === 'core' ? 'fill' : null">
                 {{ currentPoint.importance === 'core' ? '核心' : '辅助' }}
               </span>
             </header>
 
-            <p class="notes__definition">{{ currentPoint.definition }}</p>
+            <p class="notes__definition">{{ showCn && cnOf(currentPoint,'definition_cn') ? cnOf(currentPoint,'definition_cn') : currentPoint.definition }}</p>
+            <p v-if="showCn && cnOf(currentPoint,'definition_cn')" class="notes__definitionOrig">{{ currentPoint.definition }}</p>
 
             <ul v-if="currentPoint.details && currentPoint.details.length" class="notes__details">
-              <li v-for="(d, di) in currentPoint.details" :key="di" class="notes__detail" v-html="renderInline(d)"></li>
+              <li v-for="(d, di) in currentPoint.details" :key="di" class="notes__detail">
+                <span v-html="renderInline(showCn && cnDetailOf(currentPoint,di) ? cnDetailOf(currentPoint,di) : d)"></span>
+                <span v-if="showCn && cnDetailOf(currentPoint,di)" class="notes__detailOrig" v-html="renderInline(d)"></span>
+              </li>
             </ul>
 
             <footer v-if="currentPoint.source_excerpt || currentPoint.source_chapter" class="notes__source">
@@ -162,6 +180,7 @@ const props = defineProps({
 });
 
 const VIEW_MODE_KEY = 'notesview_view_mode';
+const LANG_KEY = 'notesview_show_cn';
 
 const points = ref([]);
 const loading = ref(false);
@@ -170,6 +189,17 @@ const currentTopic = ref(props.topic || null);
 const allCoursewareTopics = ref([]);
 
 const viewMode = ref(localStorage.getItem(VIEW_MODE_KEY) === 'card' ? 'card' : 'list');
+const showCn = ref(localStorage.getItem(LANG_KEY) === 'true');
+
+function cnOf(p, key) {
+  return p.translations?.[key] || '';
+}
+function cnDetailOf(p, idx) {
+  const arr = p.translations?.details_cn;
+  return arr && arr[idx] ? arr[idx] : '';
+}
+
+watch(showCn, (v) => localStorage.setItem(LANG_KEY, v ? 'true' : 'false'));
 const cardIndex = ref(0);
 const slideDir = ref('next'); // 'next' | 'prev' — drives transition direction
 const cardRef = ref(null);
@@ -340,6 +370,46 @@ defineExpose({ reload, regenerate: onRegenerate });
   color: var(--qg-text-tertiary);
 }
 .notes__count--muted { color: var(--qg-text-muted); }
+
+.notes__headActions {
+  display: inline-flex;
+  align-items: center;
+}
+.notes__langBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  background: transparent;
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  cursor: pointer;
+  color: var(--qg-text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all var(--qg-dur-fast) var(--qg-ease);
+}
+.notes__langBtn:hover { color: var(--qg-text-primary); border-color: var(--qg-border-strong); }
+.notes__langBtn[data-active="true"] {
+  color: var(--qg-accent);
+  background: var(--qg-accent-soft);
+  border-color: transparent;
+}
+
+.notes__definitionOrig {
+  font-size: var(--qg-text-sm);
+  line-height: 1.5;
+  color: var(--qg-text-tertiary);
+  margin: 0 0 12px;
+  font-style: italic;
+}
+.notes__detailOrig {
+  display: block;
+  margin-top: 2px;
+  font-size: calc(var(--qg-text-xs) - 1px);
+  color: var(--qg-text-muted);
+  font-style: italic;
+}
 
 .notes__regen {
   display: inline-flex;

@@ -42,5 +42,6 @@ class KnowledgePointSerializer(serializers.ModelSerializer):
             'importance',
             'source_excerpt',
             'source_chapter',
+            'translations',
             'created_at',
         ]
