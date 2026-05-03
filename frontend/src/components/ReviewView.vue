@@ -63,7 +63,10 @@
                 <span class="rv__cardLabel" data-mono>ANSWER</span>
               </div>
               <ul class="rv__cardAnswer">
-                <li v-for="(a, i) in currentQ.answer" :key="i">{{ a }}</li>
+                <li v-for="(a, i) in currentQ.answer" :key="i">
+                  <span>{{ a }}</span>
+                  <span v-if="currentQ.answer_cn && currentQ.answer_cn[i]" class="rv__cn">{{ currentQ.answer_cn[i] }}</span>
+                </li>
               </ul>
             </div>
           </div>
@@ -471,6 +474,14 @@ async function load() {
   border-radius: 50%;
   background: var(--qg-accent);
   opacity: 0.6;
+}
+.rv__cn {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--qg-text-xs);
+  line-height: 1.5;
+  color: var(--qg-text-tertiary);
+  font-style: italic;
 }
 
 /* ─── Navigation ──────────────────────────────────────────────────── */

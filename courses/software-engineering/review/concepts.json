@@ -13,6 +13,11 @@
             "Software is getting larger and larger.",
             "Software is getting more complex (complex domains, systems dependency).",
             "Time to market is shorter than ever."
+          ],
+          "answer_cn": [
+            "软件规模越来越大。",
+            "软件越来越复杂（复杂领域如人类行为、系统依赖如能源和汽车）。",
+            "产品上市时间比以往更短。"
           ]
         },
         {
@@ -27,6 +32,14 @@
             "End-user training gaps.",
             "Operational management failures.",
             "Note: 'bad developers' is NOT the main problem."
+          ],
+          "answer_cn": [
+            "需求质量差/过于雄心/不必要的需求。",
+            "超出预算。",
+            "合同管理问题。",
+            "终端用户培训不足。",
+            "运营管理失败。",
+            "注意：'差劲的开发者'并不是主要问题。"
           ]
         },
         {
@@ -37,6 +50,10 @@
           "answer": [
             "Engineering: cost-effective solutions to practical problems by applying scientific knowledge to building things for people.",
             "SE: design, development, testing, and maintenance of software applications, applying engineering principles and programming knowledge to build solutions for end users."
+          ],
+          "answer_cn": [
+            "工程学：通过应用科学知识为人们建造事物，从而为实际问题提供经济高效的解决方案。",
+            "软件工程：软件应用的设计、开发、测试和维护，运用工程原理和编程知识为终端用户构建解决方案。"
           ]
         },
         {
@@ -50,6 +67,13 @@
             "Kanban (task allocation and progress monitoring).",
             "Test-driven development (stop others breaking your code).",
             "Other techniques: experiment and explore."
+          ],
+          "answer_cn": [
+            "建模和绘图（达成设计共识）。",
+            "GitHub（共享文档促进协作）。",
+            "看板（任务分配和进度监控）。",
+            "测试驱动开发（防止他人破坏你的代码）。",
+            "其他技术：尝试和探索。"
           ]
         },
         {
@@ -65,6 +89,15 @@
             "Testing",
             "Deployment",
             "Operation and Maintenance"
+          ],
+          "answer_cn": [
+            "需求分析",
+            "规划",
+            "设计（高层级和详细）",
+            "开发",
+            "测试",
+            "部署",
+            "运营和维护"
           ]
         },
         {
@@ -74,6 +107,9 @@
           "mock": null,
           "answer": [
             "Waterfall, Agile, V-Model, Spiral."
+          ],
+          "answer_cn": [
+            "瀑布、敏捷、V型、螺旋。"
           ]
         },
         {
@@ -87,6 +123,13 @@
             "Implementation and Unit Testing: parallel coding, versioning, automated testing, docs.",
             "Integration and System Testing: combining modules, verifying whole system.",
             "Operation and Maintenance: deploying, ongoing support, bug fixes."
+          ],
+          "answer_cn": [
+            "需求定义：收集功能性和非功能性需求。",
+            "系统和软件设计：决定各部分如何交互，分配工作。",
+            "实现和单元测试：并行编码、版本控制、自动化测试、文档。",
+            "集成和系统测试：组合模块，验证整体系统。",
+            "运营和维护：部署、持续支持、漏洞修复。"
           ]
         },
         {
@@ -97,6 +140,10 @@
           "answer": [
             "Functional: what the system should do — services, reactions to inputs, behaviours, what NOT to do.",
             "Non-functional: quality properties — security, ease of use, response time. Constraints on services, apply to whole system."
+          ],
+          "answer_cn": [
+            "功能性需求：系统应该做什么——服务、对输入的反应、行为、不应该做的事。",
+            "非功能性需求：质量属性——安全性、易用性、响应时间。对服务的约束，适用于整个系统。"
           ]
         },
         {
@@ -108,6 +155,11 @@
             "Verification: 'Are you building it right?' — checks compliance with specifications.",
             "Validation: 'Are you building the right thing?' — checks it meets actual user needs.",
             "Example: system built per spec (passes V) but spec didn't capture a real user need like mobile access (fails V)."
+          ],
+          "answer_cn": [
+            "验证：'我们构建的对吗？'——检查软件是否符合规格说明。",
+            "确认：'我们构建的是正确的东西吗？'——检查软件是否满足用户实际需求。",
+            "例：系统按规格构建（通过验证）但规格未捕获真实用户需求如移动访问（未通过确认）。"
           ]
         },
         {
@@ -118,6 +170,10 @@
           "answer": [
             "Advantages: Simple to use; every phase has defined result and review; perfect for clear agreed requirements.",
             "Disadvantages: Software ready only after last stage; high risks and uncertainty; not suited for changing requirements; late integration."
+          ],
+          "answer_cn": [
+            "优点：简单易用；每个阶段有明确成果和评审；适合需求清晰且已达成一致的项目。",
+            "缺点：软件仅在最后阶段完成；风险和不确定性高；不适合需求变化的长期项目；集成在最后进行。"
           ]
         },
         {
@@ -127,6 +183,9 @@
           "mock": null,
           "answer": [
             "A structured and iterative methodology used by development teams to build, deliver and maintain high-quality and cost-effective software systems."
+          ],
+          "answer_cn": [
+            "由开发团队使用的结构化和迭代的方法论，用于构建、交付和维护高质量且经济高效的软件系统。"
           ]
         }
       ]
@@ -142,6 +201,9 @@
           "mock": null,
           "answer": [
             "Agile is a way of thinking about software development."
+          ],
+          "answer_cn": [
+            "敏捷是一种关于软件开发的思维方式。"
           ]
         },
         {
@@ -154,6 +216,12 @@
             "Working software over comprehensive documentation.",
             "Customer collaboration over contract negotiation.",
             "Responding to change over following a plan."
+          ],
+          "answer_cn": [
+            "个体和交互优于流程和工具。",
+            "可运行的软件优于详尽的文档。",
+            "客户协作优于合同谈判。",
+            "响应变化优于遵循计划。"
           ]
         },
         {
@@ -164,6 +232,10 @@
           "answer": [
             "Like: writing quality code; ticking off to-do list; impressing clients with working software; (any above).",
             "Dislike: writing extensive documentation; committing to a final design in advance; being micromanaged; working to big immovable deadlines."
+          ],
+          "answer_cn": [
+            "喜欢：编写高质量代码；完成待办清单任务；用可运行软件打动客户。",
+            "不喜欢：撰写大量文档；提前确定最终设计；被过度管理；面对巨大且不可移动的截止日期。"
           ]
         },
         {
@@ -174,6 +246,10 @@
           "answer": [
             "Client: (1) highest priority = satisfying client with early/continuous delivery (2) embrace change even late (3) collaborate daily with client (4) face-to-face communication (5) deliver working software frequently (6) minimise unnecessary work.",
             "Coder: (1) steady sustainable pace (2) self-organising teams (3) teams reflect regularly (4) progress = working code (5) continuous attention to technical excellence (6) build teams around motivated individuals."
+          ],
+          "answer_cn": [
+            "客户侧：(1)最高优先级=通过早期持续交付满足客户 (2)接受变化即使在后期 (3)每天与客户协作 (4)面对面沟通 (5)频繁交付可运行软件 (6)减少不必要的工作。",
+            "开发者侧：(1)稳定可持续的工作节奏 (2)自组织团队 (3)定期反思表现 (4)以可运行代码衡量进度 (5)持续关注技术卓越 (6)围绕积极个体组建团队。"
           ]
         },
         {
@@ -184,6 +260,10 @@
           "answer": [
             "Ethos: Simple design; Sustainable pace; Coding standards; Collective ownership; Whole team approach.",
             "Practices: Pair programming; Test driven; Small releases; Continuous integration; Refactoring."
+          ],
+          "answer_cn": [
+            "精神：简单设计（最简方式实现功能）；可持续节奏（努力恒定可控）；编码标准（团队遵循统一风格）；集体所有权（每个人拥有所有代码）；全员参与。",
+            "实践：结对编程；测试驱动；小版本发布；持续集成；重构。"
           ]
         },
         {
@@ -196,6 +276,12 @@
             "Tactician: thinks about implications and potential problems, recommends refactoring.",
             "Code not 'owned' by pair — anyone can change it. Pairings evolve at any time.",
             "All code is reviewed as written. Facilitates project communication."
+          ],
+          "answer_cn": [
+            "掌舵者：使用键盘鼠标，负责编码。",
+            "战术家：思考影响和潜在问题，建议重构。",
+            "代码不属于这对搭档——任何人都可以修改。搭档组合可以且应该随时变化。",
+            "所有代码在编写时就被审查。结对编程促进项目沟通。"
           ]
         },
         {
@@ -206,6 +292,10 @@
           "answer": [
             "Rules: tests written before code; no test = no feature; tests informed by requirements.",
             "Benefits: code coverage (all code has ≥1 test); simplified debugging (failure = last change); system documentation (tests describe what code does)."
+          ],
+          "answer_cn": [
+            "规则：测试在任何代码之前编写；没有测试=不实现功能；测试由需求驱动。",
+            "好处：代码覆盖率——所有代码都有至少一个测试。调试简化——失败的测试必定由最后的修改导致。系统文档——测试描述代码应该做什么。"
           ]
         },
         {
@@ -219,6 +309,13 @@
             "Sprint: short rapid development iteration.",
             "Product Backlog: to-do list of jobs.",
             "Product Owner: the client or their representative."
+          ],
+          "answer_cn": [
+            "Scrum：整个团队的每日站会。",
+            "Scrum Master：团队负责人。",
+            "Sprint：短期快速开发迭代。",
+            "产品待办列表：需要完成的任务清单。",
+            "产品负责人：客户（或其代表）。"
           ]
         },
         {
@@ -230,6 +327,11 @@
             "A flexible 'to do' list tool (originally post-it notes on whiteboard, now digital e.g. Jira).",
             "Issues progress through states from 'To do' to 'Done'.",
             "Columns: Backlog, Being Verified, Awaiting Integration, Done. Must have a 'Done' column."
+          ],
+          "answer_cn": [
+            "灵活的'待办事项'工具（最初是白板上的便签，现在是Jira等数字工具）。",
+            "问题从'待办'推进到'完成'各个状态。",
+            "列可包括：待办、验证中、等待集成、完成。必须有'完成'列。"
           ]
         },
         {
@@ -242,6 +344,12 @@
             "Good for greenfield but not effective for brownfield/legacy systems.",
             "Works for small co-located teams, challenging for large distributed development.",
             "Relies on developer knowledge — what if they're unavailable (holidays, illness, turnover)?"
+          ],
+          "answer_cn": [
+            "难以制定具有法律约束力的合同——从不提前编写完整规范。",
+            "适合全新开发但不适合棕地/遗留系统。",
+            "适合小型集中团队，不适合大型分布式开发。",
+            "依赖开发者知识——如果他们不在（休假、疾病、人员流动）怎么办？"
           ]
         }
       ]
@@ -259,6 +367,11 @@
             "Requirements specify a system in terms of user observation, not implementation.",
             "Functional: what the system does — services, reactions, behaviours, what NOT to do.",
             "Non-functional: quality properties — constraints on services, apply to whole system (security, usability, performance)."
+          ],
+          "answer_cn": [
+            "需求根据用户观察而非实现来规定系统。",
+            "功能性：系统做什么——服务、反应、行为、不应该做的事。",
+            "非功能性：质量属性——对服务的约束，适用于整个系统（安全、可用性、性能等）。"
           ]
         },
         {
@@ -272,6 +385,13 @@
             "People frequently don't know what they want.",
             "Requirements change frequently.",
             "Relevant people/information may not be accessible."
+          ],
+          "answer_cn": [
+            "术语不一致：人们用自己的话表达需求。",
+            "同一系统的需求相互冲突。",
+            "人们经常不知道自己想要什么。",
+            "需求频繁变化。",
+            "相关人员/信息可能无法获取。"
           ]
         },
         {
@@ -281,6 +401,9 @@
           "mock": null,
           "answer": [
             "Communication mechanism, instructions, and acceptance criteria."
+          ],
+          "answer_cn": [
+            "沟通机制、指令和验收标准。"
           ]
         },
         {
@@ -292,6 +415,11 @@
             "Unambiguous / Precise.",
             "Sufficiently accessible / Measurable.",
             "Understandable / Clear."
+          ],
+          "answer_cn": [
+            "明确/精确。",
+            "足够可及/可衡量。",
+            "可理解/清晰。"
           ]
         },
         {
@@ -302,6 +430,10 @@
           "answer": [
             "Template for identifying stakeholders, organized in concentric layers from product outward.",
             "Roles: Normal Operator, Functional Beneficiary, Champion, Sponsor, Purchaser, Developer, Maintenance Operator, Operational Support, Interfacing System Owner, Negative Stakeholder, Regulator, Politician, The Public."
+          ],
+          "answer_cn": [
+            "用于识别利益相关者的模板，以同心圆层从产品向外组织。",
+            "角色：普通操作员、功能受益者、倡导者、赞助者、购买者、开发者、维护操作员、运营支持、接口系统所有者、负面利益相关者、监管者、政治家、公众。"
           ]
         },
         {
@@ -311,6 +443,9 @@
           "mock": null,
           "answer": [
             "Clients; Documentation (org charts); Templates (onion model); Similar projects; Context analysis; Surrogate stakeholders; Negative stakeholders."
+          ],
+          "answer_cn": [
+            "客户；文档（组织结构图）；模板（洋葱模型）；类似项目；分析项目背景；替代利益相关者；负面利益相关者。"
           ]
         },
         {
@@ -320,6 +455,9 @@
           "mock": null,
           "answer": [
             "High-level requirement (no detail), focused on business/user value, large/complex at scope, needs breakdown into smaller pieces grouped under it."
+          ],
+          "answer_cn": [
+            "高层需求（无细节），关注业务/用户价值，规模大或复杂，需要拆分为更小的部分实施。"
           ]
         },
         {
@@ -330,6 +468,10 @@
           "answer": [
             "As a <type of user>, I want to <some goal> so that <some reason>.",
             "Example: As a user with low vision, I want to resize text so that I can read comfortably."
+          ],
+          "answer_cn": [
+            "模板：作为<用户类型>，我想要<某个目标>以便<某个原因>。",
+            "例：作为低视力用户，我想要调整文字大小以便舒适阅读。"
           ]
         },
         {
@@ -341,6 +483,11 @@
             "INVEST evaluates quality of user stories (how well written).",
             "I=Independent (work separately), N=Negotiable (flexible), V=Valuable (clear user value), E=Estimable (estimate effort), S=Small (fits in sprint), T=Testable (clear done criteria).",
             "Fails: Small (it's an epic, many disability types), Estimable (unclear effort), Testable (unclear acceptance tests)."
+          ],
+          "answer_cn": [
+            "INVEST用于评估用户故事的质量。",
+            "I=独立（可单独开发）、N=可协商（灵活可讨论）、V=有价值（对用户有明确价值）、E=可估算（可估算工作量）、S=小（适合一个迭代完成）、T=可测试（有明确完成标准）。",
+            "不满足：小（这是史诗级别需要多个迭代）、可估算（工作量不清晰）、可测试（验收标准不清晰）。"
           ]
         },
         {
@@ -351,6 +498,10 @@
           "answer": [
             "Template: Given <context>, When <action>, Then <expected outcome>.",
             "Qualities: Clear, Testable, Measurable, Atomic."
+          ],
+          "answer_cn": [
+            "模板：给定<前置条件>，当<动作>，那么<预期结果>。",
+            "质量：清晰、可测试、可衡量、原子性。"
           ]
         },
         {
@@ -362,6 +513,11 @@
             "Initiative: strategic objective, important business outcome, spans multiple epics and teams.",
             "Epic: large strategic goal, spans multiple sprints, needs breakdown.",
             "User Story: specific feature, completed within a single sprint."
+          ],
+          "answer_cn": [
+            "倡议：战略目标，重要的业务成果，跨多个史诗和团队。",
+            "史诗：大型战略目标，跨多个迭代，需要拆分。",
+            "用户故事：具体功能，在单个迭代内完成。"
           ]
         },
         {
@@ -371,6 +527,9 @@
           "mock": null,
           "answer": [
             "Must-Have (essential), Should-Have (important), Could-Have (nice to have), Won't-Have (out of scope at present)."
+          ],
+          "answer_cn": [
+            "必须有（必要）、应该有（重要）、可以有（锦上添花）、暂不考虑（当前范围外）。"
           ]
         },
         {
@@ -381,6 +540,10 @@
           "answer": [
             "High value + Low effort → do first. High value + High effort → do next.",
             "Low value + Low effort → do if time. Low value + High effort → avoid."
+          ],
+          "answer_cn": [
+            "高价值+低工作量→优先做。高价值+高工作量→其次做。",
+            "低价值+低工作量→有时间再做。低价值+高工作量→避免。"
           ]
         },
         {
@@ -390,6 +553,9 @@
           "mock": null,
           "answer": [
             "Interviews, Observations, Surveys, Current documentation, Similar products, Co-design, Prototyping."
+          ],
+          "answer_cn": [
+            "访谈、观察、问卷调查、现有文档、类似产品和解决方案、共同设计、原型制作。"
           ]
         },
         {
@@ -401,6 +567,11 @@
             "Product requirements: efficiency, dependability, security, usability.",
             "Organizational requirements: environmental, operational, development.",
             "External requirements: regulatory, ethical, legislative (accounting, safety/security)."
+          ],
+          "answer_cn": [
+            "产品需求：效率、可靠性、安全、可用性。",
+            "组织需求：环境、运营、开发。",
+            "外部需求：法规、伦理、立法（会计、安全）。"
           ]
         },
         {
@@ -411,6 +582,10 @@
           "answer": [
             "Describes functional requirements in terms of use cases, links stakeholder needs to software requirements, serves as planning tool.",
             "Two parts: use-case diagrams (visual) and use-case specifications (text)."
+          ],
+          "answer_cn": [
+            "以用例形式描述功能需求，将利益相关者需求与软件需求联系起来，作为规划工具。",
+            "两部分：用例图（可视化）和用例规范（文本描述）。"
           ]
         },
         {
@@ -420,6 +595,9 @@
           "mock": null,
           "answer": [
             "Communication, Identification, Testing."
+          ],
+          "answer_cn": [
+            "沟通、识别、测试。"
           ]
         },
         {
@@ -431,6 +609,11 @@
             "Anything that interacts with the system.",
             "Can be human, machine, or another system. Can actively interchange information. Can give or passively receive information.",
             "Actors are NOT part of the system — they are EXTERNAL."
+          ],
+          "answer_cn": [
+            "与系统交互的任何事物。",
+            "可以是人、机器或其他系统。可以主动交换信息。可以提供或被动接收信息。",
+            "参与者不是系统的一部分——它们是外部的。"
           ]
         },
         {
@@ -441,6 +624,10 @@
           "answer": [
             "A set of use-case instances, each a sequence of actions the system performs that yields an observable result of value to a particular actor.",
             "Models a dialogue between actors and the system."
+          ],
+          "answer_cn": [
+            "一组用例实例，每个实例是系统为特定参与者产生可观察价值结果的一系列动作。",
+            "模拟参与者和系统之间的对话。"
           ]
         },
         {
@@ -450,6 +637,10 @@
           "mock": null,
           "answer": [
             "Description of flow of events (actor-system interaction), preconditions, postconditions, special requirements, key scenarios, subflows."
+          ],
+          "answer_cn": [
+            "包含用例文本的需求文档。",
+            "内容：事件流描述（参与者-系统交互）、前置条件、后置条件、特殊需求、关键场景、子流程。"
           ]
         },
         {
@@ -460,6 +651,10 @@
           "answer": [
             "Basic flow: one successful scenario from start to finish.",
             "Alternative flows: regular variants, odd cases, exceptional/error flows. Many per use case."
+          ],
+          "answer_cn": [
+            "基本流：从头到尾的成功场景。每个用例一个。",
+            "替代流：常规变体、特殊情况、异常/错误流。每个用例多个。"
           ]
         },
         {
@@ -471,6 +666,11 @@
             "Each use case is independent of the others.",
             "No use cases have very similar behaviours or flows.",
             "No part of the flow has already been modelled as another use case."
+          ],
+          "answer_cn": [
+            "每个用例彼此独立。",
+            "没有用例具有非常相似的行为或流程。",
+            "流程中没有任何部分已被建模为另一个用例。"
           ]
         },
         {
@@ -483,6 +683,12 @@
             "Epic 2 — Inventory: (1) manager sets min stock alerts (2) stylist checks availability (3) owner generates stock reports.",
             "Acceptance criteria: Given/When/Then for each story.",
             "Roles: Product Owner (vision, backlog), Scrum Master (processes, obstacles), Developers (code, test, deploy)."
+          ],
+          "answer_cn": [
+            "Epic 1——产品目录：(1)经理添加产品 (2)造型师按名称/品牌搜索 (3)老板更新价格/库存。",
+            "Epic 2——库存管理：(1)经理设置最低库存预警 (2)造型师检查可用性 (3)老板生成库存报告。",
+            "验收标准：每个故事的 Given/When/Then。",
+            "角色：产品负责人（愿景、待办）、Scrum Master（流程、障碍）、开发人员（编码、测试、部署）。"
           ]
         }
       ]
@@ -499,6 +705,10 @@
           "answer": [
             "OO: structure software around objects and their interactions. Objects contain state and behaviour.",
             "Class = blueprint for types of objects (e.g. Car). Object = individual instance (e.g. Ford Fusion reg AB25CDF)."
+          ],
+          "answer_cn": [
+            "面向对象：围绕对象及其交互来构建软件。对象包含状态和行为。",
+            "类=对象类型的蓝图（如Car）。对象=具体实例（如福特Fusion注册号AB25CDF）。"
           ]
         },
         {
@@ -508,6 +718,9 @@
           "mock": null,
           "answer": [
             "Organise ideas; plan work; build understanding of structure/behaviour; communicate with dev team; help future maintenance."
+          ],
+          "answer_cn": [
+            "组织想法；规划工作；理解系统结构/行为；与开发团队沟通；帮助未来维护。"
           ]
         },
         {
@@ -519,6 +732,11 @@
             "Encloses data and behaviour within the object.",
             "Prevents unauthorised access. Controlled access: changed only by permitted methods. Protects data integrity.",
             "Example: private String name; public getName() — name accessed only via getter."
+          ],
+          "answer_cn": [
+            "将数据和行为封装在对象内部。",
+            "防止未授权访问。受控访问：对象只能通过允许的方法更改。保护数据完整性。",
+            "例：private String name; public getName()——name只能通过getter访问。"
           ]
         },
         {
@@ -529,6 +747,10 @@
           "answer": [
             "Focus on core concerns, expose only essential info, hide complexity.",
             "Benefit: loose coupling — objects interact via abstract interfaces, not concrete implementations."
+          ],
+          "answer_cn": [
+            "关注核心问题，只暴露本质信息，隐藏复杂性。",
+            "好处：松耦合——对象通过抽象接口交互，而非具体实现。"
           ]
         },
         {
@@ -539,6 +761,10 @@
           "answer": [
             "Inherit properties and behaviour from another class ('is-a' relationship).",
             "Benefits: reuse code (reduce re-writing), reduce errors and inconsistency."
+          ],
+          "answer_cn": [
+            "从另一个类继承属性和行为（'is-a'关系）。",
+            "好处：复用代码（减少重写）、减少错误和不一致。"
           ]
         },
         {
@@ -549,6 +775,10 @@
           "answer": [
             "Subclass substitution for superclass. Behaviour belongs to subclass (dynamic method dispatch). Enables extensibility.",
             "Example: Animal a = new Dog(); a.makeSound(); → 'Woof!' — subclass method called."
+          ],
+          "answer_cn": [
+            "子类可替代父类。行为属于子类（动态方法分派）。支持可扩展性。",
+            "例：Animal a = new Dog(); a.makeSound(); → 'Woof!'——调用的是子类方法。"
           ]
         },
         {
@@ -559,6 +789,10 @@
           "answer": [
             "Composition: build from other objects, strong ownership, coincident lifetimes — parts can't survive the whole. Non-shared aggregation.",
             "Aggregation: whole-part ('part-of') where parts CAN exist independently. Can be shared."
+          ],
+          "answer_cn": [
+            "组合：从其他对象构建对象。强所有权和共同生命周期——部分不能脱离整体存在。非共享聚合。",
+            "聚合：整体-部分（'part-of'）关系，部分可以独立存在。可以共享。"
           ]
         },
         {
@@ -569,6 +803,10 @@
           "answer": [
             "Static view of a system.",
             "Class box: Name, Attributes (visibility, name, type), Methods (visibility, name, params, return type)."
+          ],
+          "answer_cn": [
+            "系统的静态视图。",
+            "类框包含：名称、属性（可见性、名称、类型）、方法（可见性、名称、参数、返回类型）。"
           ]
         },
         {
@@ -578,6 +816,9 @@
           "mock": null,
           "answer": [
             "+ public (all), - private (class only), # protected (subclasses + package), ~ package (package only)."
+          ],
+          "answer_cn": [
+            "+ public（所有人可访问）、- private（仅类内部）、# protected（子类+包内）、~ package（仅包内）。"
           ]
         },
         {
@@ -588,6 +829,10 @@
           "answer": [
             "Attributes: [visibility] name [: type] [multiplicity] [= value] [{property}]. Static = underlined.",
             "Operations: [visibility] name ([params]) [: return] [{property}]. Static = underlined."
+          ],
+          "answer_cn": [
+            "属性：[可见性] 名称 [: 类型] [多重性] [= 值] [{属性}]。静态属性有下划线。",
+            "操作：[可见性] 名称([参数列表]) [: 返回类型] [{属性}]。静态操作有下划线。"
           ]
         },
         {
@@ -598,6 +843,10 @@
           "answer": [
             "Identify nouns from existing text (requirements, descriptions).",
             "Narrow down: remove duplicates/synonyms, irrelevant, out-of-scope."
+          ],
+          "answer_cn": [
+            "从现有文本（需求、描述）中识别名词。",
+            "缩小范围：移除重复/同义词、无关项、范围外项。"
           ]
         },
         {
@@ -608,6 +857,10 @@
           "answer": [
             "Association: semantic/structural relationship specifying connections among instances of classifiers.",
             "Multiplicity: number of instances one class relates to ONE instance of another. Two decisions per association (one at each end)."
+          ],
+          "answer_cn": [
+            "关联：分类器之间的语义/结构关系，指定实例之间的连接。",
+            "多重性：一个类与另一个类的一个实例相关的实例数量。每个关联有两个多重性决定（两端各一个）。"
           ]
         },
         {
@@ -618,6 +871,10 @@
           "answer": [
             "1 = exactly one. 0..* or * = zero or more. 1..* = one or more.",
             "0..1 = zero or one (optional). 2..4 = specified range. 2,4..6 = multiple disjoint ranges."
+          ],
+          "answer_cn": [
+            "1=恰好一个。0..* 或 *=零个或多个。1..*=一个或多个。",
+            "0..1=零个或一个（可选）。2..4=指定范围。2,4..6=多个不相邻范围。"
           ]
         },
         {
@@ -628,6 +885,10 @@
           "answer": [
             "Generalization: 'is a kind of' — subclass inherits from superclass.",
             "Aggregation: 'part of' — whole-part relationship, one object contains others."
+          ],
+          "answer_cn": [
+            "泛化：'是一种'——子类从父类继承，共享属性/行为。",
+            "聚合：'部分'——整体-部分关系，一个对象包含其他对象。"
           ]
         },
         {
@@ -638,6 +899,10 @@
           "answer": [
             "Abstract: cannot be instantiated (no direct objects). Serve as blueprints.",
             "Concrete: can be instantiated — all actual instances are of concrete classes."
+          ],
+          "answer_cn": [
+            "抽象类不能有直接对象（实例）。作为蓝图。",
+            "具体类可以有对象——所有实际实例都是具体类的。"
           ]
         },
         {
@@ -647,6 +912,9 @@
           "mock": null,
           "answer": [
             "Indicates it is possible to navigate from an associating class to the target class using the association."
+          ],
+          "answer_cn": [
+            "表示可以通过关联从一个关联类导航到目标类。"
           ]
         },
         {
@@ -657,6 +925,10 @@
           "answer": [
             "Models how objects collaborate and interact over time through messages. Good for real-time specs and complex scenarios.",
             "Elements: Participants (actors/objects), Lifeline (vertical dashed line), Time axis (top→bottom), Messages (horizontal arrows), Return messages (dashed arrows). Sync vs async arrowheads."
+          ],
+          "answer_cn": [
+            "模拟对象如何随时间通过消息协作和交互。适用于实时规范和复杂场景。",
+            "元素：参与者（角色/对象）、生命线（垂直虚线）、时间轴（从上到下）、消息（水平箭头）、返回消息（虚线箭头）。同步/异步箭头。"
           ]
         },
         {
@@ -667,6 +939,10 @@
           "answer": [
             "Frames: alt (branching/conditional), loop (iteration).",
             "SDs model: sequential flow, branching, iteration, recursion, concurrency. Primary/variant/exception scenarios."
+          ],
+          "answer_cn": [
+            "交互帧：alt（分支/条件）、loop（迭代）。",
+            "SD可建模：顺序流、分支、迭代、递归、并发。主要/变体/异常场景。"
           ]
         },
         {
@@ -680,6 +956,13 @@
             "6.3 Attrs: private (-) for encapsulation/security. Methods: public (+) for accessibility, with validation.",
             "6.4 Customer→Account (1 to 1,2); Account→Transactions (1 to *).",
             "6.5 Encapsulation: private balance + public deposit()/withdraw(). Abstraction: Account could be abstract. Inheritance: Current/Savings inherit Account. Polymorphism: withdraw() differs per subclass. Aggregation: Bank contains ATM+Account+Customer."
+          ],
+          "answer_cn": [
+            "6.1 类：ATM、Customer、Bank、Account、ATM Transactions、Current/Savings Account。显示属性、方法、关系、多重性。",
+            "6.2 属性：number（账号）、balance（余额）。方法：deposit()（存款）、withdraw()（取款）。",
+            "6.3 属性private(-)确保封装/安全。方法public(+)确保可访问性，修改前进行验证。",
+            "6.4 Customer→Account (1对1,2)；Account→Transactions (1对*)。",
+            "6.5 封装：private balance+public deposit()/withdraw()。抽象：Account可为抽象类。继承：Current/Savings继承Account。多态：withdraw()在子类中行为不同。聚合：Bank包含ATM+Account+Customer。"
           ]
         }
       ]
@@ -698,6 +981,12 @@
             "Product Owner: Epics, User Stories, Backlog Grooming.",
             "Dev Team: CI/CD, Pair Programming, TDD.",
             "Scrum Master: daily stand-ups, sprint planning, reviews, retrospectives. Kanban: limiting WiP, transparency."
+          ],
+          "answer_cn": [
+            "通过sprint周期（2-4周）进行迭代增量交付。",
+            "产品负责人：史诗、用户故事、待办列表梳理。",
+            "开发团队：CI/CD、结对编程、TDD。",
+            "Scrum Master：每日站会、迭代规划、评审、回顾。看板：限制在制品、进度透明。"
           ]
         },
         {
@@ -708,6 +997,10 @@
           "answer": [
             "Planning time/effort (team + customer), identifying testing focus, evaluating productivity.",
             "Measurement: attributing values to objects → basis for comparison → better decisions."
+          ],
+          "answer_cn": [
+            "规划时间/工作量（团队+客户），识别测试重点，评估生产力。",
+            "测量：赋予对象数值→作为比较基础→做出更好决策。"
           ]
         },
         {
@@ -717,6 +1010,9 @@
           "mock": null,
           "answer": [
             "Most entities are difficult to measure reliably. Difficult to 'pin down' a single value."
+          ],
+          "answer_cn": [
+            "大多数实体难以可靠测量。难以确定单一数值。"
           ]
         },
         {
@@ -727,6 +1023,10 @@
           "answer": [
             "Functional Suitability, Performance Efficiency, Compatibility, Usability,",
             "Security, Maintainability, Reliability, Portability."
+          ],
+          "answer_cn": [
+            "功能适用性、性能效率、兼容性、可用性、",
+            "安全性、可维护性、可靠性、可移植性。"
           ]
         },
         {
@@ -737,6 +1037,12 @@
           "answer": [
             "LoC: easy to compute, widely used, approximate size. But: ignores logical complexity, language-specific, not all lines equal.",
             "Cyclomatic Complexity: V(G) = E−N+2P. Measures independent paths through code. Better for logical complexity."
+          ],
+          "answer_cn": [
+            "代码行数：易于计算、广泛使用、大小的近似衡量。",
+            "代码行数局限：忽略逻辑/架构复杂性、高度依赖语言、不是所有行都相同。",
+            "环形复杂度：V(G)=E−N+2P。衡量代码中独立路径数。",
+            "独立路径引入至少一个新语句/条件。比代码行数更好地衡量逻辑复杂度。"
           ]
         },
         {
@@ -747,6 +1053,10 @@
           "answer": [
             "Story Points: informal size unit (1-10), derived collectively, 'Wisdom of Crowds'.",
             "Planning Poker: Fibonacci cards (1,3,5,8,13,20...), reveal simultaneously, discuss divergence, max 3 rounds."
+          ],
+          "answer_cn": [
+            "故事点：非正式的规模度量单位(1-10)，团队集体推导，'群众智慧'。",
+            "规划扑克：斐波那契数列卡片(1,3,5,8,13,20...)，同时亮牌，讨论分歧，最多3轮。"
           ]
         },
         {
@@ -757,6 +1067,10 @@
           "answer": [
             "Story points completed per sprint, derived from previous sprints (average).",
             "Estimates: time to complete project; target stories per sprint."
+          ],
+          "answer_cn": [
+            "每个迭代完成的故事点数，从以往迭代推导（平均值）。",
+            "估算：完成项目的时间；每个迭代可完成的目标故事数。"
           ]
         },
         {
@@ -767,6 +1081,10 @@
           "answer": [
             "Plot remaining work (story points) vs time, showing estimated vs actual lines.",
             "After each sprint compare estimate vs actual → discuss in retrospective → continuous improvement."
+          ],
+          "answer_cn": [
+            "绘制剩余工作量（故事点）与时间的关系，显示估计值和实际值两条线。",
+            "每个迭代后对比估计与实际进度→在回顾会中讨论→持续改进。"
           ]
         },
         {
@@ -780,6 +1098,13 @@
             "Outcome: actionable items for improving team processes.",
             "When: end of sprint, after or separate from sprint review.",
             "Discussed: what went well, what didn't, blockers, how to improve collaboration/productivity."
+          ],
+          "answer_cn": [
+            "目的：检查流程，反思团队表现，识别改进。",
+            "参会者：开发团队+Scrum Master（产品负责人可选）。",
+            "成果：旨在改进未来迭代中团队流程的可执行事项。",
+            "时间：迭代结束时，在评审之后或单独进行。",
+            "讨论：什么做得好、什么做得不好、障碍、如何改进协作/生产力。"
           ]
         },
         {
@@ -793,6 +1118,13 @@
             "Attendees: dev team, PO, SM, stakeholders, customers, users.",
             "Output: feedback on product, potential backlog changes.",
             "Key Q: 'Does the product meet stakeholder expectations?'"
+          ],
+          "answer_cn": [
+            "目的：检查产品增量，收集利益相关者反馈。",
+            "焦点：产品和迭代期间完成的交付物。",
+            "参会者：开发团队、产品负责人、Scrum Master、利益相关者、客户、用户。",
+            "成果：产品反馈，可能的待办列表变更。",
+            "关键问题：'产品是否满足利益相关者期望？'"
           ]
         },
         {
@@ -805,6 +1137,12 @@
             "Ceremonies: Sprint Planning, Daily Scrum, Sprint Review, Sprint Retrospective.",
             "Artifacts: Product Backlog, Sprint Backlog, Working Software.",
             "Agreements: Working Agreement, Definition of Ready, Definition of Done."
+          ],
+          "answer_cn": [
+            "角色：产品负责人、Scrum Master、团队。",
+            "仪式：迭代规划、每日站会、迭代评审、迭代回顾。",
+            "工件：产品待办列表、迭代待办列表、可运行的软件。",
+            "协议：工作协议、就绪定义、完成定义。"
           ]
         },
         {
@@ -815,6 +1153,10 @@
           "answer": [
             "Review: inspects PRODUCT; all stakeholders attend; output = backlog changes; 'does it meet expectations?'",
             "Retro: inspects PROCESS; dev team + SM only; output = improvement actions; 'how can we work better?'"
+          ],
+          "answer_cn": [
+            "评审：检查产品；所有利益相关者参与；产出=待办变更；'是否满足期望？'",
+            "回顾：检查流程；仅开发团队+SM；产出=改进行动；'如何更好地工作？'"
           ]
         }
       ]
@@ -831,6 +1173,10 @@
           "answer": [
             "Users are asked to verbalise what they are thinking and doing as they perform a task using the software.",
             "Provides insights into user experience; can identify navigation problems or content for improvement; used iteratively or on a finished product."
+          ],
+          "answer_cn": [
+            "用户在使用软件执行任务时被要求说出他们的想法和操作。",
+            "提供用户体验洞察；可识别导航问题或可改进的内容；可迭代使用或用于成品。"
           ]
         },
         {
@@ -841,6 +1187,10 @@
           "answer": [
             "Benefits: cheap, relatively easy, provides insight into user experience, low participant numbers, fits most SDLCs.",
             "Drawbacks: relies on verbalisation (subjective, not objective), social desirability bias — participants may say what they think is the 'right answer'."
+          ],
+          "answer_cn": [
+            "优点：成本低、相对简单、提供用户体验洞察、参与者少即可、适合大多数开发流程。",
+            "缺点：依赖口头表达（主观非客观）、社会期望偏差——参与者可能说出他们认为'正确'的答案。"
           ]
         },
         {
@@ -852,6 +1202,11 @@
             "Planning: decide research questions, write tasks, decide participant count and session length (15-60 min).",
             "Carrying out: facilitator runs the session, 1-2 observers take notes. Explain there is no right answer. Ask participant to complete tasks uninterrupted. If user goes silent, prompt: 'what are you thinking?'",
             "Analysis: combine observer notes, organise into meaningful categories (features that helped, features with problems, additional features wanted), count frequency to identify biggest issues."
+          ],
+          "answer_cn": [
+            "规划：确定研究问题、编写任务、决定参与人数和时长（15-60分钟）。",
+            "执行：引导员主持，1-2名观察员记录。说明没有正确答案。让参与者不间断完成任务。沉默时提示：'你在想什么？'",
+            "分析：合并观察笔记，按有意义的类别整理（帮助功能、问题功能、期望功能），统计频率找出最大问题。"
           ]
         },
         {
@@ -862,6 +1217,10 @@
           "answer": [
             "Heuristic: a generalisation or rule of thumb; experienced-based strategies for quick decisions (may not be optimal).",
             "Heuristic evaluation: an inspection method conducted WITHOUT users — experts inspect a design to find usability problems against a set of usability principles. Analytical evaluation (based on principles) vs empirical evaluation (observing users)."
+          ],
+          "answer_cn": [
+            "启发式：经验法则；基于经验的快速决策策略（可能不是最优的）。",
+            "启发式评估：无需用户参与的检查方法——专家根据可用性原则检查设计。分析式评估 vs 实证评估。"
           ]
         },
         {
@@ -880,6 +1239,18 @@
             "8. Aesthetic and minimalist design",
             "9. Help users recognise, diagnose and recover from errors",
             "10. Help and documentation"
+          ],
+          "answer_cn": [
+            "1.系统状态可见性（反馈）",
+            "2.系统与现实世界的匹配（约定）",
+            "3.用户控制与自由（紧急出口、撤销/重做）",
+            "4.一致性与标准",
+            "5.错误预防",
+            "6.识别而非回忆",
+            "7.使用灵活性和效率（快捷键）",
+            "8.美学与极简设计",
+            "9.帮助用户识别、诊断并从错误中恢复",
+            "10.帮助与文档"
           ]
         },
         {
@@ -890,6 +1261,10 @@
           "answer": [
             "The design must clearly communicate its state. Feedback should be presented quickly after user actions.",
             "Do not show blank screens or static loading messages. Example: password strength indicator shown as password is entered."
+          ],
+          "answer_cn": [
+            "设计必须清晰传达状态。用户操作后反馈应迅速呈现。",
+            "不显示空白屏幕或静态加载信息。例：输入密码时显示密码强度指示器。"
           ]
         },
         {
@@ -900,6 +1275,10 @@
           "answer": [
             "System should use familiar terminology. Controls should follow real-world conventions. Information in natural, logical order.",
             "Example: iTunes organised as a Library (music, movies, TV) with a Store underneath — mirrors real-world library concept."
+          ],
+          "answer_cn": [
+            "系统应使用用户熟悉的术语。控件应遵循现实世界惯例。信息以自然逻辑顺序呈现。",
+            "例：iTunes以图书馆形式组织——模拟现实世界概念。"
           ]
         },
         {
@@ -909,6 +1288,9 @@
           "mock": null,
           "answer": [
             "Users need 'emergency exits' to leave unwanted states. Support undo/redo and clear navigation. Provide breadcrumbs showing current location."
+          ],
+          "answer_cn": [
+            "用户需要'紧急出口'离开不需要的状态。支持撤销/重做和清晰导航。提供面包屑显示当前位置。"
           ]
         },
         {
@@ -918,6 +1300,9 @@
           "mock": null,
           "answer": [
             "Minimise user's memory load. Make objects, actions, options visible. User should not have to remember info from one part of dialogue to another. Instructions should be visible or easily retrievable."
+          ],
+          "answer_cn": [
+            "减少用户记忆负担。使对象、操作、选项可见。用户不应需要记住对话各部分的信息。使用说明应在适当时可见或易于检索。"
           ]
         },
         {
@@ -928,6 +1313,10 @@
           "answer": [
             "Dialogues should not contain irrelevant or rarely needed info. Every extra unit of info diminishes relative visibility of relevant info.",
             "Four principles: Contrast, Repetition, Alignment, Proximity (CRAP)."
+          ],
+          "answer_cn": [
+            "对话中不应包含不相关或很少需要的信息。每多一条信息都会降低相关信息的可见性。",
+            "四个原则：对比、重复、对齐、邻近（CRAP）。"
           ]
         },
         {
@@ -939,6 +1328,11 @@
             "3-5 evaluators each do independent evaluation. Sometimes a facilitator records comments.",
             "Facilitator can answer evaluators' questions (unlike user testing). Can be done on paper prototypes. Typically lasts 1-2 hours.",
             "Expert goes through interface several times: first for overall feel, second for specific elements. Evaluators produce list of usability problems: which principle was violated and how."
+          ],
+          "answer_cn": [
+            "3-5名评估者各自独立评估。有时引导员记录评论。",
+            "引导员可以回答评估者的问题（与用户测试不同）。可在纸质原型上进行。通常持续1-2小时。",
+            "专家多次浏览界面：第一次了解整体感觉，第二次关注具体元素。产出可用性问题清单。"
           ]
         },
         {
@@ -949,6 +1343,10 @@
           "answer": [
             "Benefits: cheap, relatively easy, instant gratification (lists available immediately), low participants, fits most SDLCs, very cost effective (benefit-cost ratio 48:1).",
             "Drawbacks: important issues may get missed, might identify false issues, many trivial issues often identified (seems overly critical), experts have biases."
+          ],
+          "answer_cn": [
+            "优点：成本低、简单、即时反馈（检查后立即获得问题清单）、参与者少、适合大多数流程、成本效益极高（48:1）。",
+            "缺点：可能遗漏重要问题、可能识别出错误问题、常识别出许多琐碎问题（显得过于挑剔）、专家有偏见。"
           ]
         },
         {
@@ -960,6 +1358,11 @@
             "Facilitator role: empirical — observe users and let them struggle; inspection — facilitator answers expert questions.",
             "Participants: empirical needs more users; inspection needs only 3-5 experts.",
             "Data analysis: empirical requires analysing observations after; inspection provides 'instant gratification' with a clear list of issues and heuristics broken."
+          ],
+          "answer_cn": [
+            "引导员角色：实证法——观察用户让其自行摸索；检查法——引导员回答专家问题。",
+            "参与者：实证法需要更多用户；检查法只需3-5名专家。",
+            "数据分析：实证法需要事后分析观察结果；检查法提供即时的问题和违反原则清单。"
           ]
         }
       ]
@@ -976,6 +1379,10 @@
           "answer": [
             "Used to collect demographic data and user opinions. Can evaluate designs and understand user requirements. Can be used at scale with low resources.",
             "Tips: use validated questionnaires (measure what they claim). Avoid leading questions. Keep number feasible (question fatigue)."
+          ],
+          "answer_cn": [
+            "用于收集人口统计数据和用户意见。可评估设计和了解用户需求。资源需求低。",
+            "提示：使用经过验证的问卷。避免引导性问题。保持合理数量（防止问卷疲劳）。"
           ]
         },
         {
@@ -989,6 +1396,13 @@
             "Scoring: each dimension rated on a line with 21 tick marks (0-100 in steps of 5). Score = (tick number - 1) × 5.",
             "With weights: 15 paired comparisons determine dimension weights (0-5 each, sum=15). Weighted score = sum(rating × weight) / 15. Range 0-100.",
             "Without weights ('raw TLX'): sum of 6 ratings / 6. Simpler to administer, mixed evidence on sensitivity difference."
+          ],
+          "answer_cn": [
+            "目的：估算用户使用系统时的感知工作量。主观工作量测量的黄金标准。",
+            "6个子量表：脑力需求、体力需求、时间需求、绩效、努力程度、挫败感。五个从低到高；绩效从完美到失败。",
+            "评分：每个维度用21个刻度线评分（0-100，步长5）。得分=（刻度编号-1）×5。",
+            "加权：15次两两比较确定维度权重（0-5，总和=15）。加权分=Σ(评分×权重)/15。",
+            "无权重（原始TLX）：6个评分之和/6。更易管理，敏感性差异证据不一。"
           ]
         },
         {
@@ -1001,6 +1415,12 @@
             "Items alternate: odd items are positive (1,3,5,7,9), even items are negative (2,4,6,8,10).",
             "Scoring: odd items = scale position - 1; even items = 5 - scale position. Each item contributes 0-4. Sum × 2.5 = total (range 0-100).",
             "SUS score > 68 = above average usability. < 68 = below average. Individual item scores are not meaningful alone."
+          ],
+          "answer_cn": [
+            "系统可用性量表：'快速粗略'的可靠可用性测量。Brooke(1986)。10题，5级李克特量表。",
+            "题目交替：奇数题正面表述，偶数题负面表述。",
+            "计分：奇数题=量表位置-1；偶数题=5-量表位置。每题贡献0-4分。总分×2.5=最终分数（0-100）。",
+            "SUS>68为高于平均可用性，<68为低于平均。单题分数无独立意义。"
           ]
         },
         {
@@ -1015,6 +1435,14 @@
             "Within-subjects disadvantage: learning effect (skills gained from one evaluation carry over to next).",
             "Between-subjects advantages: less time per participant; no learning effects.",
             "Between-subjects disadvantage: need more participants (each gives only one data point); participants must be comparable."
+          ],
+          "answer_cn": [
+            "受试者内（重复测量）：每个参与者评估两个条件。",
+            "受试者间：一组评估条件A，另一组评估条件B。",
+            "受试者内优点：需要更少参与者；减少个体差异影响（参与者作为自己的对照）。",
+            "受试者内缺点：学习效应。",
+            "受试者间优点：每个参与者花费更少时间；无学习效应。",
+            "受试者间缺点：需要更多参与者；参与者必须具有可比性。"
           ]
         },
         {
@@ -1026,6 +1454,11 @@
             "Within-subjects: Wilcoxon Signed Rank Test. Ideal for Likert/scale data (SUS, NASA TLX). Minimum 5 users.",
             "Between-subjects: Mann-Whitney U Test.",
             "Both: use significance level α = 0.05 (95% certainty that difference is real). Test statistic must be ≤ critical value for significance."
+          ],
+          "answer_cn": [
+            "受试者内：Wilcoxon符号秩检验。适用于李克特/量表数据。最少5名用户。",
+            "受试者间：Mann-Whitney U检验。",
+            "两者使用显著性水平α=0.05（95%确信差异真实）。检验统计量须≤临界值才有显著差异。"
           ]
         },
         {
@@ -1040,6 +1473,14 @@
             "4.2a) Think Aloud: facilitator explains tasks, participants verbalise thoughts, 2 observers record. Data grouped into categories (challenges, likes, suggestions).",
             "4.2b) Heuristic evaluation: facilitator explains tasks, expert evaluates against Nielsen's heuristics, records issues and which heuristic was broken. Data available immediately.",
             "4.2c) Differences: (1) facilitator role — empirical: observe and let struggle; inspection: answer expert questions. (2) participants — empirical needs more users; inspection needs 3-5 experts. (3) data — empirical requires post-analysis; inspection gives instant list."
+          ],
+          "answer_cn": [
+            "4.1a) 受试者内vs受试者间设计。优先受试者内——控制个体差异。随机化顺序抵消学习效应。",
+            "4.1b) SUS：10题正/负各5题，李克特量表。(贡献之和)×2.5。可用性>68分。",
+            "4.1c) 受试者内→Wilcoxon。受试者间→Mann-Whitney U。α=0.05。",
+            "4.2a) 出声思考：引导员解释任务，参与者说出想法，观察员记录。按类别分组数据。",
+            "4.2b) 启发式评估：专家对照Nielsen原则评估，记录问题和违反的原则。数据立即可用。",
+            "4.2c) 差异：引导员角色不同；参与者数量不同；数据分析方式不同。"
           ]
         }
       ]
@@ -1057,6 +1498,11 @@
             "Reputation (poor quality damages business). Cost (poor quality = expensive to develop/maintain, leads to technical debt).",
             "Software certification (e.g., DO-178B/C for aircraft). Organisational certification (e.g., CMM, ISO 9001).",
             "Legality (ALARP — As Low As Reasonably Practicable). Moral/ethical codes of practice (ACM ethical guidelines)."
+          ],
+          "answer_cn": [
+            "声誉（低质量损害业务）。成本（低质量=昂贵开发/维护，导致技术债务）。",
+            "软件认证（如DO-178B/C用于航空）。组织认证（如CMM、ISO 9001）。",
+            "合法性（ALARP——合理可行的最低风险）。道德/伦理规范（ACM伦理准则）。"
           ]
         },
         {
@@ -1068,6 +1514,11 @@
             "Subjective / 'fitness for use' (Juran): quality perceived by individual user (GUI aesthetics, missing functionality). Focus on vital few objectives.",
             "Objective / 'conformance to requirements' (Crosby): measurable product properties (documentation, bug count, compliance). Achieved by disciplined specification.",
             "Practical: what quality means to your specific team and clients."
+          ],
+          "answer_cn": [
+            "主观/'适用性'（Juran）：用户感知的质量（GUI美学、功能缺失）。关注关键少数目标。",
+            "客观/'符合要求'（Crosby）：可衡量的产品属性（文档、缺陷数、合规性）。",
+            "实用：质量对你的团队和客户的具体含义。"
           ]
         },
         {
@@ -1079,6 +1530,11 @@
             "Use a standard development process. Use a coding standard (industry compliance, consistent quality, security, reduce costs).",
             "Define and monitor metrics (defect + complexity metrics — high complexity → more defects).",
             "Identify and remove defects: conduct manual reviews, use testing."
+          ],
+          "answer_cn": [
+            "使用标准开发流程。使用编码标准（行业合规、一致质量、安全、降低成本）。",
+            "定义和监控指标（缺陷+复杂度指标——高复杂度→更多缺陷）。",
+            "识别和消除缺陷：进行人工审查，使用测试。"
           ]
         },
         {
@@ -1091,6 +1547,12 @@
             "Specification: idealised behaviour (UML, formal spec, or user stories/test cases in agile). A concrete spec enables systematic test generation; without it, testing is ad-hoc.",
             "Test Cases: executions of SUT. Input (or sequence of inputs). Should cumulatively cover every distinctive facet of behaviour. An ideal test set exposes any deviation from spec.",
             "Test Oracle: decides whether output is correct (assertion in code, or human user). Oracle problem: no comprehensive spec, many test cases, complex outputs make manual validation prohibitive."
+          ],
+          "answer_cn": [
+            "被测系统（SUT）：白盒（可访问源代码和运行时状态）或黑盒（仅接口/API）。可以是反应式或确定性的。必须与生产系统隔离。",
+            "规格说明：理想化行为。具体规范支持系统化测试生成；否则为临时性的。",
+            "测试用例：SUT的执行。应累积覆盖行为的每个特征。",
+            "测试预言机：判断输出正确性。预言机问题：无完整规范、大量用例、复杂输出。"
           ]
         },
         {
@@ -1102,6 +1564,11 @@
             "White-box: access to internals (source code, runtime state, execution tracking). Uses code to measure coverage and drive test generation.",
             "Black-box: no access to internals (may have access but don't use it). Only knows interface — parameters, functions/methods, specification document.",
             "White-box measures coverage objectively; black-box tests from user/interface perspective."
+          ],
+          "answer_cn": [
+            "白盒：可访问内部。使用代码测量覆盖率并驱动测试生成。",
+            "黑盒：不访问内部。仅了解接口。",
+            "白盒客观测量覆盖率；黑盒从用户/接口角度测试。"
           ]
         },
         {
@@ -1114,6 +1581,12 @@
             "Statement coverage = (statements executed / total statements). If a faulty statement is always buggy when executed, it will be detected.",
             "Branch coverage = (branches executed / total branches). Subsumes statement coverage — every branch (true/false) must be executed.",
             "DO-178B/C: non-critical → statement coverage; safety-critical → MC/DC coverage."
+          ],
+          "answer_cn": [
+            "语句、分支、定义-使用/数据流、MC/DC、变异覆盖。",
+            "语句覆盖=已执行语句/总语句。有缺陷的语句被执行则会被检测。",
+            "分支覆盖=已执行分支/总分支。包含语句覆盖。",
+            "DO-178B/C：非关键→语句覆盖；安全关键→MC/DC。"
           ]
         },
         {
@@ -1128,6 +1601,14 @@
             "3b. Define partitions: value ranges/characteristics per category (e.g., 0≤exam≤75 valid, >75 invalid, alphabetic invalid).",
             "3c. Identify constraints between categories (not all can combine).",
             "3d. Write test specifications: pair each equivalence class with test inputs and expected outputs."
+          ],
+          "answer_cn": [
+            "1.将程序分解为功能单元（更小=更严格测试、更易调试）。",
+            "2.识别每个单元的输入和输出。",
+            "3a.识别类别：分为有效和无效。",
+            "3b.定义分区：每个类别的值范围/特征。",
+            "3c.识别约束（并非所有类别都能组合）。",
+            "3d.编写测试规格：将等价类与测试输入和预期输出配对。"
           ]
         },
         {
@@ -1138,6 +1619,10 @@
           "answer": [
             "Errors most frequently occur at edge cases.",
             "Test: just below boundary, at the boundary, just above the boundary."
+          ],
+          "answer_cn": [
+            "错误最常发生在边界情况。",
+            "测试：略低于边界值、恰好在边界值、略高于边界值。"
           ]
         },
         {
@@ -1148,6 +1633,10 @@
           "answer": [
             "JUnit: Java testing framework using assertions to verify code. Reports failures when assertions don't hold.",
             "assertEquals(expected, actual), assertTrue(condition), assertFalse(condition), assertThat(value, matchingFunction)."
+          ],
+          "answer_cn": [
+            "JUnit：Java测试框架，使用断言验证代码。断言不成立时报告失败。",
+            "assertEquals(期望值,实际值)、assertTrue(条件)、assertFalse(条件)、assertThat(值,匹配函数)。"
           ]
         }
       ]
@@ -1166,6 +1655,12 @@
             "Obsolescence: designing products for new sales, not supporting existing products (e.g., new iPhone models make older ones undesirable/unsupported).",
             "Rebound effects: efficiency improvements lead to increased overall consumption instead of net savings (e.g., route planning apps make car travel more attractive → increase traffic).",
             "Risks: unexpected sustainability challenges (e.g., 5G → increased demand for rare earth elements; AI → 'baked in' biases and unemployment)."
+          ],
+          "answer_cn": [
+            "诱导效应：ICT创造新的资源需求（如云计算→更多存储）。",
+            "过时性：为新销售设计产品，不支持现有产品（如新iPhone使旧款不受支持）。",
+            "反弹效应：效率提升导致总体消费增加而非节约（如导航APP使驾车更有吸引力→增加交通量）。",
+            "风险：意外的可持续性挑战（如5G→增加稀土需求；AI→内置偏见和失业）。"
           ]
         },
         {
@@ -1177,6 +1672,11 @@
             "Optimisation: reduce waste via sensors and smart planning (e.g., plant watering based on humidity, satnav route optimisation).",
             "Substitution: replace physical with digital (e.g., in-person → video conferencing, CD → music streaming).",
             "Behaviour change: transition to sustainable production and consumption patterns (e.g., use renewables during peak generation, feedback on environmental impact when shopping, take-back functions)."
+          ],
+          "answer_cn": [
+            "优化：通过传感器和智能规划减少浪费（如基于湿度浇水、导航路线优化）。",
+            "替代：用数字替代物理（如视频会议替代面对面、流媒体替代CD）。",
+            "行为改变：向可持续的生产和消费模式转变（如在可再生能源高峰时使用能源、购物时反馈环境影响）。"
           ]
         },
         {
@@ -1187,6 +1687,10 @@
           "answer": [
             "A question-based framework for building awareness of potential sustainability effects of a software solution.",
             "Aims to enable discussion to make sustainability-conducive requirements decisions."
+          ],
+          "answer_cn": [
+            "基于问题的框架，用于建立对软件解决方案潜在可持续性影响的认知。",
+            "旨在促进讨论，做出有利于可持续发展的需求决策。"
           ]
         },
         {
@@ -1200,6 +1704,13 @@
             "Environmental: Material and Resources, Energy, Biodiversity and Land Use, Soil/Atmospheric/Water Pollution, Logistics and Transportation.",
             "Economic: Value, Customer Relationship Management, Supply Chain, Governance and Processes, Innovation and R&D.",
             "Technical: Maintainability, Usability, Extensibility and Adaptability, Security, Scalability."
+          ],
+          "answer_cn": [
+            "社会：社区意识、信任、包容性与多样性、平等、参与和沟通。",
+            "个人：健康、终身学习、隐私、安全、自主权。",
+            "环境：材料和资源、能源、生物多样性和土地使用、污染、物流和运输。",
+            "经济：价值、客户关系管理、供应链、治理和流程、创新和研发。",
+            "技术：可维护性、可用性、可扩展性和适应性、安全性、可伸缩性。"
           ]
         },
         {
@@ -1212,6 +1723,12 @@
             "Sustainability not in product backlog → SusAF formulates sustainability-focused requirements to integrate.",
             "Sustainability criteria missing in testing/CI → once in backlog, testing/acceptance criteria follow.",
             "Lack of retrospective focus → formal sustainability requirement ensures discussion in retrospectives."
+          ],
+          "answer_cn": [
+            "缺乏利益相关者需求→SusAF展示双赢选项。",
+            "可持续性不在产品待办中→SusAF制定需求纳入。",
+            "测试/CI中缺少标准→一旦纳入待办，测试标准随之。",
+            "回顾中缺乏关注→正式需求确保在回顾会讨论。"
           ]
         },
         {
@@ -1223,6 +1740,11 @@
             "AWS responsible for sustainability OF the cloud (infrastructure, data centers, electricity, cooling).",
             "Customer responsible for sustainability IN the cloud (data design, software design, code efficiency, platform deployment, scaling).",
             "Process: identify targets → evaluate options → prioritise and plan → test and validate → deploy → measure results and replicate."
+          ],
+          "answer_cn": [
+            "AWS负责云的可持续性（基础设施、数据中心、电力、冷却）。",
+            "客户负责云中的可持续性（数据设计、软件设计、代码效率、平台部署、扩展）。",
+            "流程：确定目标→评估选项→优先排序→测试验证→部署→衡量结果并复制成功。"
           ]
         }
       ]
@@ -1245,6 +1767,16 @@
             "6. Processed in accordance with the data subject's rights.",
             "7. Secure.",
             "8. Not transferred to countries without adequate protection."
+          ],
+          "answer_cn": [
+            "1.公平合法处理（同意、合同/法律义务、公共利益）。",
+            "2.仅为有限目的处理。",
+            "3.充分、相关且不过度。",
+            "4.准确并在必要时保持更新。",
+            "5.不超过必要时间保留。",
+            "6.按照数据主体的权利处理。",
+            "7.安全。",
+            "8.不转移到没有充分保护的国家。"
           ]
         },
         {
@@ -1260,6 +1792,15 @@
             "5. End-to-end protection: data protected at every stage (collection, use, storage, deletion).",
             "6. Visibility and transparency: operations remain open and accountable.",
             "7. Respect for user privacy: user interests as core focus, strong defaults, clear notices, user-friendly options."
+          ],
+          "answer_cn": [
+            "1.预防而非补救：在隐私风险发生前预见和预防。",
+            "2.隐私作为默认设置：个人数据自动受保护。",
+            "3.隐私嵌入设计：从一开始就工程化，而非后期添加。",
+            "4.完整功能：隐私与其他利益之间无需权衡。",
+            "5.端到端保护：数据在每个阶段都受保护。",
+            "6.可见性和透明度：运营保持开放和负责。",
+            "7.尊重用户隐私：用户利益为核心。"
           ]
         },
         {
@@ -1271,6 +1812,11 @@
             "1. Reduce risk of data breaches.",
             "2. Build trust with users.",
             "3. Align with GDPR/similar regulation compliance."
+          ],
+          "answer_cn": [
+            "1.降低数据泄露风险。",
+            "2.建立用户信任。",
+            "3.符合GDPR/类似法规合规。"
           ]
         },
         {
@@ -1283,6 +1829,12 @@
             "Data is only collected when the user actively decides to proceed for a specific purpose.",
             "Operationalises the GDPR rule: 'do not collect any data unless there is a clearly defined goal/purpose for it.'",
             "Reduces conflicts around data sharing — users see data collected for specific purposes and accept it."
+          ],
+          "answer_cn": [
+            "用户可以使用预定义角色浏览，无需提供真实个人数据。",
+            "仅当用户主动为特定目的继续时才收集数据。",
+            "落实GDPR规则：'除非有明确目的，否则不收集数据。'",
+            "减少数据共享冲突——用户理解并接受数据收集目的。"
           ]
         },
         {
@@ -1294,6 +1846,11 @@
             "Before data collection, clearly present: what data is needed, why, and the benefit to the user.",
             "User chooses whether to share. Only relevant data for their chosen option is collected.",
             "Enforces GDPR: 'process data only for limited purposes', collected data is 'adequate, relevant, and not excessive'."
+          ],
+          "answer_cn": [
+            "在数据收集前清楚展示：需要什么数据、为什么、对用户有什么好处。",
+            "用户选择是否共享。仅收集与所选选项相关的数据。",
+            "执行GDPR：'仅为有限目的处理'，数据'充分、相关且不过度'。"
           ]
         },
         {
@@ -1310,6 +1867,16 @@
             "Control: data subjects should control collection, storage, and processing.",
             "Enforce: implement and enforce privacy policies compatible with legal requirements.",
             "Demonstrate: data controller should be ready to demonstrate compliance."
+          ],
+          "answer_cn": [
+            "最小化：仅收集处理所需的数据。",
+            "隐藏：收集/处理的数据不应明文可见。",
+            "分离：在存储或处理阶段分布或隔离数据。",
+            "聚合：以最高可能的聚合级别存储/处理。",
+            "告知：处理个人数据时及时通知数据主体。",
+            "控制：数据主体应控制收集、存储和处理。",
+            "执行：实施并执行与法律要求兼容的隐私政策。",
+            "证明：数据控制者应准备好证明合规。"
           ]
         },
         {
@@ -1320,6 +1887,10 @@
           "answer": [
             "GDPR: General Data Protection Regulation — regulates how organisations collect, store, and process personal data.",
             "Motivation: privacy concerns in software adoption, data-hungry business models not accounting for human needs. The false 'privacy-utility trade-off' claim (less data = less utility) is challenged."
+          ],
+          "answer_cn": [
+            "GDPR：通用数据保护条例——规范组织如何收集、存储和处理个人数据。",
+            "动机：软件采用中的隐私担忧、不考虑人类需求的数据驱动商业模式。'隐私-实用性权衡'说法受到挑战。"
           ]
         }
       ]
