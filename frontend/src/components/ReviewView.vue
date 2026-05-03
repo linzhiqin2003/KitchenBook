@@ -38,7 +38,7 @@
             :key="cardIndex"
             :data-flipped="flipped"
             :data-starred="isStarred(currentQ)"
-            @click="flipped = !flipped"
+            @click="flipCard"
           >
             <!-- Star button -->
             <button class="rv__star" :data-on="isStarred(currentQ)" @click.stop="toggleStar(currentQ)" title="标记重要">
@@ -53,7 +53,7 @@
                 <span class="rv__cardMarks" data-mono>{{ currentQ.marks }} marks</span>
               </div>
               <p class="rv__cardQuestion">{{ currentQ.question }}</p>
-              <div class="rv__cardHint" data-mono>TAP TO REVEAL</div>
+              <button class="rv__flipBtn" @click.stop="flipCard">Show Answer</button>
             </div>
 
             <!-- Back: answer -->
@@ -68,6 +68,7 @@
                   <span v-if="currentQ.answer_cn && currentQ.answer_cn[i]" class="rv__cn">{{ currentQ.answer_cn[i] }}</span>
                 </li>
               </ul>
+              <button class="rv__flipBtn rv__flipBtn--back" @click.stop="flipCard">Back to Question</button>
             </div>
           </div>
         </transition>
@@ -161,6 +162,10 @@ function setChapter(id) {
   activeChapter.value = id;
   cardIndex.value = 0;
   flipped.value = false;
+}
+
+function flipCard() {
+  flipped.value = !flipped.value;
 }
 
 function go(delta) {
@@ -436,13 +441,33 @@ async function load() {
   white-space: pre-line;
 }
 
-.rv__cardHint {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--qg-text-muted);
-  text-align: center;
-  padding-top: 12px;
-  border-top: 1px dashed var(--qg-border-default);
+/* Flip button */
+.rv__flipBtn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px 0;
+  background: var(--qg-accent);
+  color: var(--qg-accent-on);
+  border: none;
+  border-radius: var(--qg-radius-md);
+  font-family: var(--qg-font-body);
+  font-size: var(--qg-text-sm);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background var(--qg-dur-fast) var(--qg-ease), transform var(--qg-dur-fast) var(--qg-ease);
+}
+.rv__flipBtn:hover { background: var(--qg-accent-hover); }
+.rv__flipBtn:active { transform: scale(0.98); }
+.rv__flipBtn--back {
+  background: transparent;
+  color: var(--qg-text-secondary);
+  border: 1px solid var(--qg-border-default);
+}
+.rv__flipBtn--back:hover {
+  background: var(--qg-surface-raised);
+  border-color: var(--qg-border-strong);
 }
 
 /* Answer list */
