@@ -46,7 +46,7 @@
             </button>
 
             <!-- Front: question -->
-            <div class="rv__cardFront">
+            <div v-show="!flipped" class="rv__cardFront">
               <div class="rv__cardMeta">
                 <span class="rv__cardNum" data-mono>Q{{ currentQ.id }}</span>
                 <span v-if="currentQ.mock" class="qg-pill" data-tint="essay">MOCK {{ currentQ.mock }}</span>
@@ -57,7 +57,7 @@
             </div>
 
             <!-- Back: answer -->
-            <div class="rv__cardBack">
+            <div v-show="flipped" class="rv__cardBack">
               <div class="rv__cardMeta">
                 <span class="rv__cardNum" data-mono>Q{{ currentQ.id }}</span>
                 <span class="rv__cardLabel" data-mono>ANSWER</span>
@@ -394,9 +394,6 @@ async function load() {
 .rv__cardBack {
   padding: clamp(20px, 3vw, 28px);
 }
-.rv__cardBack { display: none; }
-.rv__card[data-flipped="true"] .rv__cardFront { display: none; }
-.rv__card[data-flipped="true"] .rv__cardBack { display: block; }
 .rv__card[data-flipped="true"] {
   background: var(--qg-surface-sunken);
   border-color: var(--qg-accent);
