@@ -58,15 +58,20 @@ WORKDIR /opt/hermes
 # 这份源码已经包含 host 上 apply.sh 的 17 个 patch 改动 + tiktoken 等
 COPY --chown=hermes:hermes deploy/docker/_hermes_source/ /opt/hermes/
 
-# ---------- npm 依赖（build 但不下载 chromium） ----------
-# 国内服务器：用 npmmirror 镜像 + 延长 timeout，否则容易 ERR_SOCKET_TIMEOUT
-RUN npm config set registry https://registry.npmmirror.com && \
-    npm config set fetch-timeout 600000 && \
-    npm config set fetch-retries 5 && \
-    npm install --prefer-offline --no-audit && \
-    (cd web && npm install --prefer-offline --no-audit && npm run build) && \
-    (cd ui-tui && npm install --prefer-offline --no-audit && npm run build) && \
-    npm cache clean --force
+# ---------- npm 依赖（仅在需要 dashboard 时启用） ----------
+# Hermes gateway (OpenAI-compatible API server) 本身不需要 web / ui-tui 的
+# dashboard build，那是给 hermes dashboard / TUI 用的。当前 ailab 用例只走
+# /v1/chat/completions + /api/tools，跳过 npm 阶段。如果未来要用 dashboard,
+# 把下面这段重新启用（注意新加坡 server 到 npmjs/npmmirror 都不稳，可能要
+# 先在 host 上 npm install + npm run build，再把 web/dist + ui-tui/dist 包进
+# prepare-source.sh 的 rsync 范围）。
+#
+# RUN npm config set registry https://registry.npmmirror.com && \
+#     npm config set fetch-timeout 600000 && \
+#     npm install --prefer-offline --no-audit && \
+#     (cd web && npm install && npm run build) && \
+#     (cd ui-tui && npm install && npm run build) && \
+#     npm cache clean --force
 
 # ---------- Python venv ----------
 USER root
