@@ -12,8 +12,10 @@ WorkingDirectory=/home/admin/KitchenBook/backend
 Environment=DJANGO_SETTINGS_MODULE=config.settings
 Environment=PATH=/home/admin/KitchenBook/venv/bin:/usr/bin:/bin
 EnvironmentFile=-/home/admin/KitchenBook/backend/.env
-ExecStart=/home/admin/KitchenBook/venv/bin/python -m mcp_server.server \
-          --transport http --host 127.0.0.1 --port 8100
+# 用 fastmcp CLI 起 server —— fastmcp 3.x 的 mcp.run() 不再接受 host/port kwarg，
+# CLI 反而原生支持 --transport/--host/--port。0 侵入项目代码。
+ExecStart=/home/admin/KitchenBook/venv/bin/fastmcp run mcp_server/server.py:mcp \
+          --transport http --host 127.0.0.1 --port 8100 --no-banner
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30

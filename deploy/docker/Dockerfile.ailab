@@ -13,7 +13,11 @@
 #   - 不装 Playwright chromium（PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1）
 #   - 不装 docker-cli（防止容器内能起兄弟容器逃逸）
 
-ARG HERMES_VERSION=v2026.4.23-692-g853ed609
+# HERMES_VERSION 接受三种形式：
+#   - 完整 commit sha (推荐 / 服务器当前 853ed609a1a4ac056e810d7d3172c71517762420)
+#   - 标签 (e.g. v2026.4.23)
+#   - 分支名 (e.g. main)
+ARG HERMES_VERSION=853ed609a1a4ac056e810d7d3172c71517762420
 ARG HERMES_REPO=https://github.com/NousResearch/hermes-agent.git
 
 # ============================================================
@@ -27,10 +31,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git ca-certificates python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Hermes 上游 tag → /src
-RUN git clone --depth=1 --branch "${HERMES_VERSION}" "${HERMES_REPO}" /src \
-    || (mkdir -p /src && cd /src && git init -q && git remote add origin "${HERMES_REPO}" \
-        && git fetch --depth=1 origin "${HERMES_VERSION}" && git checkout -q FETCH_HEAD)
+# 通用 fetch：先 init + remote add，再 fetch 指定 ref。支持 sha / tag / branch
+# (--branch 模式不支持 commit sha，所以走 fetch+checkout 路径)
+RUN mkdir -p /src && cd /src && \
+    git init -q && \
+    git remote add origin "${HERMES_REPO}" && \
+    git -c protocol.version=2 fetch --depth=1 origin "${HERMES_VERSION}" && \
+    git checkout -q FETCH_HEAD
 
 # 我们的 patches + 容器版 apply 脚本
 COPY deploy/hermes-patches/ /patches/

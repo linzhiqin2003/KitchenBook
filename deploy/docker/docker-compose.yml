@@ -20,7 +20,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.ailab
       args:
-        HERMES_VERSION: ${HERMES_VERSION:-v2026.4.23-692-g853ed609}
+        HERMES_VERSION: ${HERMES_VERSION:-853ed609a1a4ac056e810d7d3172c71517762420}
     container_name: ailab-hermes
     restart: unless-stopped
 
