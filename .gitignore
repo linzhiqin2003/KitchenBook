@@ -67,3 +67,7 @@ MyWebInterpretation.xcodeproj/
 
 # Source notebook files (courseware lives in courses/*/courseware/)
 /软件工程.md
+
+# Hermes 源码 snapshot — 由 deploy/docker/prepare-source.sh 在部署前生成
+deploy/docker/_hermes_source/
+

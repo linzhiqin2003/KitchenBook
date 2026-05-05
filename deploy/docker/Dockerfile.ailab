@@ -2,57 +2,32 @@
 #
 # ailab Hermes Agent — containerized build
 #
-# 三阶段：
-#   1. source       : git clone 上游 hermes-agent (pinned tag) → sed 改路径 → apply 17 patches
-#   2. uv_source / gosu_source : 拉静态二进制
-#   3. runtime      : 复用上游的 debian + nodejs + python 栈，去掉 Playwright chromium
+# 策略：把 host 上当前能跑的 ~/.hermes/hermes-agent (已 patched) snapshot 进镜像。
+# 不在容器里 clone upstream + apply patch —— 因为 patches 跟上游会逐渐脱节
+# (anchor drift)。host 模式下 apply.sh 已经把状态固化，我们直接照搬。
+#
+# 部署前必须先跑：bash deploy/docker/prepare-source.sh
+# 它把 ~/.hermes/hermes-agent 用 rsync 拷到 _hermes_source/，排除
+# venv / node_modules / .git / *.bak / __pycache__。
+#
+# 阶段：
+#   1. uv_source / gosu_source : 拉静态二进制
+#   2. runtime                 : Debian + node + python，COPY snapshot，
+#                                npm install + uv pip install
 #
 # 关键差异 vs 上游 Dockerfile：
-#   - source 来自 git clone（不依赖 build context 里有 hermes-agent 源码）
-#   - apply 我们项目的 hermes-patches（构建时一次性 baked）
-#   - 不装 Playwright chromium（PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1）
-#   - 不装 docker-cli（防止容器内能起兄弟容器逃逸）
-
-# HERMES_VERSION 接受三种形式：
-#   - 完整 commit sha (推荐 / 服务器当前 853ed609a1a4ac056e810d7d3172c71517762420)
-#   - 标签 (e.g. v2026.4.23)
-#   - 分支名 (e.g. main)
-ARG HERMES_VERSION=853ed609a1a4ac056e810d7d3172c71517762420
-ARG HERMES_REPO=https://github.com/NousResearch/hermes-agent.git
+#   - source 来自 host snapshot（不是 git clone）
+#   - 不装 Playwright chromium (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)
+#   - 不装 docker-cli (防容器内 docker socket 逃逸)
 
 # ============================================================
-# Stage 1: clone upstream + sed-rewrite paths + apply patches
-# ============================================================
-FROM debian:13.4 AS source
-ARG HERMES_VERSION
-ARG HERMES_REPO
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        git ca-certificates python3 \
-    && rm -rf /var/lib/apt/lists/*
-
-# 通用 fetch：先 init + remote add，再 fetch 指定 ref。支持 sha / tag / branch
-# (--branch 模式不支持 commit sha，所以走 fetch+checkout 路径)
-RUN mkdir -p /src && cd /src && \
-    git init -q && \
-    git remote add origin "${HERMES_REPO}" && \
-    git -c protocol.version=2 fetch --depth=1 origin "${HERMES_VERSION}" && \
-    git checkout -q FETCH_HEAD
-
-# 我们的 patches + 容器版 apply 脚本
-COPY deploy/hermes-patches/ /patches/
-COPY deploy/docker/apply-patches-container.sh /usr/local/bin/apply-patches-container.sh
-RUN chmod +x /usr/local/bin/apply-patches-container.sh \
-    && /usr/local/bin/apply-patches-container.sh /src /patches
-
-# ============================================================
-# Stage 2: 静态二进制工具 (uv / gosu)
+# Stage 1: 静态二进制工具 (uv / gosu)
 # ============================================================
 FROM ghcr.io/astral-sh/uv:0.11.6-python3.13-trixie AS uv_source
 FROM tianon/gosu:1.19-trixie AS gosu_source
 
 # ============================================================
-# Stage 3: runtime
+# Stage 2: runtime
 # ============================================================
 FROM debian:13.4
 
@@ -61,7 +36,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1
 
-# 系统依赖（vs 上游：去掉 docker-cli，加 yaml 工具链供 patches 后续用）
+# 系统依赖（vs 上游：去掉 docker-cli）
 # tini: PID1 收割 MCP/git/bun 等子进程僵尸
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -78,11 +53,12 @@ COPY --chmod=0755 --from=uv_source /usr/local/bin/uv /usr/local/bin/uvx /usr/loc
 
 WORKDIR /opt/hermes
 
-# 拷已 patched 的源码（owner 给 hermes，方便 build 阶段 npm install）
-COPY --from=source --chown=hermes:hermes /src/ /opt/hermes/
+# ---------- Source snapshot from host ----------
+# 来源：deploy/docker/_hermes_source/（由 prepare-source.sh 生成）
+# 这份源码已经包含 host 上 apply.sh 的 17 个 patch 改动 + tiktoken 等
+COPY --chown=hermes:hermes deploy/docker/_hermes_source/ /opt/hermes/
 
 # ---------- npm 依赖（build 但不下载 chromium） ----------
-# 拆 npm install 和 web/ui-tui build 走子 shell —— 上游 Dockerfile 同款
 RUN npm install --prefer-offline --no-audit && \
     (cd web && npm install --prefer-offline --no-audit && npm run build) && \
     (cd ui-tui && npm install --prefer-offline --no-audit && npm run build) && \

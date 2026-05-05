@@ -128,16 +128,23 @@ mcp_servers:
 
 并确认 `skill_paths` 包含 `/opt/ailab-skills`（容器内路径）。
 
-### 5. 构建镜像 + 启动
+### 5. Snapshot host 上 hermes 源码 + 构建镜像 + 启动
 
-服务器内存只有 3.5GB，**强烈建议在 Mac 上 build 完 push 到 registry，服务器 pull**。
-如果坚持服务器 build：
+> 为什么不在容器里 git clone + apply patches：上游 hermes 持续演化，
+> 部分 patch anchor 在新 commit 里被收编/重构。host 上的 apply.sh 是
+> idempotent，已经把状态固化在文件里。镜像直接 snapshot host 当前能跑
+> 的源码，跟生产状态完全一致，最稳。
 
 ```bash
-cd /home/admin/KitchenBook/deploy/docker
-docker compose build 2>&1 | tee /tmp/hermes-build.log
-# 预计 10–20 分钟，吃满内存 + swap
+# 5.1 Snapshot host 源码到 build context（排除 venv/node_modules/.git/*.bak）
+bash /home/admin/KitchenBook/deploy/docker/prepare-source.sh
+# 输出类似：done — 2841 files, 45M
 
+# 5.2 Build (服务器内存 3.5GB+2GB swap 够；预计 10–15 分钟)
+cd /home/admin/KitchenBook/deploy/docker
+sudo docker compose build 2>&1 | tee /tmp/hermes-build.log
+
+# 5.3 启动新 services
 sudo systemctl enable --now ailab-mcp.service
 sudo systemctl enable --now hermes-docker.service
 
@@ -195,13 +202,23 @@ Mac 上 Django 用 `python manage.py runserver 0.0.0.0:8000`，
 
 ### 升级 Hermes 上游版本
 
-1. 改 `deploy/docker/.env` 里 `HERMES_VERSION=<新 git tag>`
-2. 验证 17 个 patch 是否还能 apply：
-   ```bash
-   docker compose build --no-cache 2>&1 | grep -i "PATCH FAILED"
-   ```
-   如果有失败的 patch，手动修 `deploy/hermes-patches/<n>_*.py`
-3. 部署：`docker compose up -d --build`
+```bash
+# 1. host 上正常升级（git pull + apply.sh），确保 host 模式能跑
+cd ~/.hermes/hermes-agent && git pull
+cd /home/admin/KitchenBook && bash deploy/hermes-patches/apply.sh
+systemctl --user restart hermes-gateway   # 验证 host 模式 OK
+
+# 2. snapshot 新源码进 build context
+bash deploy/docker/prepare-source.sh
+
+# 3. 重 build + 重启容器
+cd deploy/docker
+sudo docker compose build
+sudo systemctl restart hermes-docker.service
+```
+
+如果 patch 在 host 上已经 fail（anchor not found），先修
+`deploy/hermes-patches/<n>_*.py` 让 host 模式能跑，再 snapshot。
 
 ### 查日志
 
