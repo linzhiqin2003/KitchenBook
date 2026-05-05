@@ -52,6 +52,11 @@ services:
       # Hermes patch 08 通过此 token 反向调 Django 写消息
       DJANGO_BASE_URL: http://host.docker.internal:8004
       HERMES_INTERNAL_TOKEN: ${HERMES_INTERNAL_TOKEN}
+      # 让 hermes API server bind 0.0.0.0 而不是 localhost
+      # —— docker port forward 要求绑非 loopback，外部安全靠 ports: 127.0.0.1:8642 限制
+      # API_SERVER_KEY 是 hermes 内置 OpenAI Bearer auth 用的（前端 HERMES_API_KEY）
+      API_SERVER_HOST: 0.0.0.0
+      API_SERVER_KEY: ${HERMES_API_KEY:-ailab-hermes-2026}
 
     # ===== 资源上限 =====
     # 服务器 3.5GB RAM + 2GB swap，给容器 1.5GB 上限
