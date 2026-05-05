@@ -59,7 +59,11 @@ WORKDIR /opt/hermes
 COPY --chown=hermes:hermes deploy/docker/_hermes_source/ /opt/hermes/
 
 # ---------- npm 依赖（build 但不下载 chromium） ----------
-RUN npm install --prefer-offline --no-audit && \
+# 国内服务器：用 npmmirror 镜像 + 延长 timeout，否则容易 ERR_SOCKET_TIMEOUT
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 5 && \
+    npm install --prefer-offline --no-audit && \
     (cd web && npm install --prefer-offline --no-audit && npm run build) && \
     (cd ui-tui && npm install --prefer-offline --no-audit && npm run build) && \
     npm cache clean --force
