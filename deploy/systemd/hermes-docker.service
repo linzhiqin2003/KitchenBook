@@ -1,0 +1,30 @@
+[Unit]
+Description=Hermes Agent (containerized via docker compose)
+Documentation=file:///home/admin/KitchenBook/deploy/docker/README.md
+After=network.target docker.service ailab-mcp.service
+Requires=docker.service
+Wants=ailab-mcp.service
+
+# 旧 user-mode unit hermes-gateway.service 必须先停掉再启用本 unit，否则 8642 端口冲突
+Conflicts=hermes-gateway.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/home/admin/KitchenBook/deploy/docker
+
+# 启动前同步：拉镜像（如果是 registry 模式）+ up
+ExecStartPre=-/usr/bin/docker compose pull --quiet
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+
+# 单次操作的超时
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hermes-docker
+
+[Install]
+WantedBy=multi-user.target

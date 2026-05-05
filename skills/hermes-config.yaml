@@ -1,24 +1,37 @@
 # Hermes Agent 配置 — ailab 集成片段
 # 将此内容合并到 ~/.hermes/config.yaml
+#
+# 容器化部署（推荐）：
+#   - Hermes 跑在 docker container 内（ailab-hermes）
+#   - MCP server 跑在 host 上（systemd: ailab-mcp.service，HTTP :8100）
+#   - 容器通过 host.docker.internal 访问 host 上的 MCP server
+#
+# 详细部署步骤见 deploy/docker/README.md
 
 # ==================== MCP 服务器注册 ====================
 mcp_servers:
   ailab:
-    command: python
-    args:
-      - -m
-      - mcp_server.server
-    cwd: /Users/linzhiqin/Codespace/MyProject/MyWeb/backend
-    env:
-      DJANGO_SETTINGS_MODULE: config.settings
+    # HTTP transport —— Hermes 通过 streamable-http 连 host 上的 MCP server
+    transport: streamable-http
+    url: http://host.docker.internal:8100/mcp
+    timeout: 60
+
+    # === 旧版 stdio 配置（容器化前用，已废弃）===
+    # command: /home/admin/KitchenBook/venv/bin/python
+    # args: [-m, mcp_server.server]
+    # cwd: /home/admin/KitchenBook/backend
+    # env:
+    #   DJANGO_SETTINGS_MODULE: config.settings
+    #   PYTHONPATH: /home/admin/KitchenBook/backend
 
 # ==================== 技能加载路径 ====================
-# 将项目 skills/ 目录加入技能搜索路径
+# 容器内通过 bind mount 把项目 skills/ 暴露在 /opt/ailab-skills (ro)
+# 见 deploy/docker/docker-compose.yml volumes 段
 skill_paths:
-  - /Users/linzhiqin/Codespace/MyProject/MyWeb/skills
+  - /opt/ailab-skills
 
 # ==================== 推荐模型配置（可选） ====================
-# 如果使用 DeepSeek 作为默认 AI 对话模型：
+# DeepSeek API key 在 ~/.hermes/.env 中配置 DEEPSEEK_API_KEY
 # models:
 #   default: deepseek-v4-flash
 #   providers:

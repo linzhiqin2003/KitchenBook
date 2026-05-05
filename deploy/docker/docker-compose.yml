@@ -1,0 +1,85 @@
+# ailab Hermes Agent — containerized
+#
+# 一台主机上的拓扑（host 上有 Django + MCP server，容器只跑 Hermes）：
+#
+#   nginx (host) ──/hermes/──→ 127.0.0.1:8642 ──→ container:8642
+#                                                    │
+#                                                    └──→ host.docker.internal:8004 (Django)
+#                                                    └──→ host.docker.internal:8100 (MCP HTTP)
+#
+# 启动：
+#   cp .env.example .env  # 填 HERMES_INTERNAL_TOKEN，按需改路径
+#   HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up -d
+#
+# Mac 开发：默认 .env 里把 HERMES_HOST_DATA 改成 $HOME/.ailab-hermes 之类。
+
+services:
+  hermes:
+    image: ailab/hermes:${HERMES_TAG:-latest}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.ailab
+      args:
+        HERMES_VERSION: ${HERMES_VERSION:-v2026.4.23-692-g853ed609}
+    container_name: ailab-hermes
+    restart: unless-stopped
+
+    # 隔离：自定义 bridge 网络（不用 host network）
+    networks:
+      - ailab-net
+
+    # 端口仅暴露给 host loopback —— 公网由 nginx 代理 /hermes/
+    ports:
+      - "127.0.0.1:8642:8642"
+
+    # Linux 上让容器解析 host.docker.internal → 宿主网卡
+    # （Docker Desktop 上原生支持，写了也无害）
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # Hermes 数据目录：sessions / cron / memories / workspace 等
+      # 服务器：bind mount /home/admin/.hermes（保留现有 13MB 数据，零迁移）
+      # Mac:    bind mount $HOME/.ailab-hermes（首次启动 entrypoint 会建模板）
+      - ${HERMES_HOST_DATA:-./hermes-data}:/opt/data
+      # ailab 项目自定义技能（只读）
+      - ../../skills:/opt/ailab-skills:ro
+
+    environment:
+      # 把容器内 hermes 用户重映射到 host admin 用户，避免 bind mount 文件 owner 错乱
+      HERMES_UID: ${HERMES_UID:-1000}
+      HERMES_GID: ${HERMES_GID:-1000}
+      # Hermes patch 08 通过此 token 反向调 Django 写消息
+      DJANGO_BASE_URL: http://host.docker.internal:8004
+      HERMES_INTERNAL_TOKEN: ${HERMES_INTERNAL_TOKEN}
+
+    # ===== 资源上限 =====
+    # 服务器 3.5GB RAM + 2GB swap，给容器 1.5GB 上限
+    mem_limit: 1536m
+    memswap_limit: 2560m
+    cpus: 2.0
+    pids_limit: 2048
+
+    # ===== 安全 =====
+    # 容器内允许工具自由读写 /opt/data + /tmp（沙盒内自由），
+    # 但禁止提权 + 没有 docker.sock 挂载 → 出不去
+    security_opt:
+      - no-new-privileges:true
+
+    # ===== 日志收口（防止 log 撑爆磁盘） =====
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H \"Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}\" >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+networks:
+  ailab-net:
+    driver: bridge

@@ -1,0 +1,53 @@
+# 减小 build context —— Dockerfile 只需要 deploy/hermes-patches + deploy/docker 两个目录
+# 其他全部排除
+
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+
+# Python venv
+**/.venv
+**/venv
+
+# Node
+**/node_modules
+**/.vite
+
+# 前端构建产物
+frontend/dist
+receipts-frontend/dist
+
+# Django
+backend/db.sqlite3
+backend/db.sqlite3-*
+backend/media
+backend/staticfiles
+backend/logs
+
+# Git / IDE / OS
+.git
+.gitignore
+.github
+.idea
+.vscode
+.claude
+.DS_Store
+*.swp
+
+# 临时 / 备份
+backup/
+docs/
+courses/
+gpu_server_patch/
+ios/
+*.log
+*.bak
+*.docx
+*.pdf
+*.tmp
+
+# 子项目自带的 docker 配置（避免误用）
+**/Dockerfile
+!deploy/docker/Dockerfile.ailab
+docker-compose.yml
+!deploy/docker/docker-compose.yml

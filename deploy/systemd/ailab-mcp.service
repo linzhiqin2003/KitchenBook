@@ -1,0 +1,34 @@
+[Unit]
+Description=ailab MCP Server (HTTP transport for Hermes Agent)
+Documentation=file:///home/admin/KitchenBook/backend/mcp_server/README.md
+After=network.target gunicorn.service
+Wants=gunicorn.service
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/KitchenBook/backend
+Environment=DJANGO_SETTINGS_MODULE=config.settings
+Environment=PATH=/home/admin/KitchenBook/venv/bin:/usr/bin:/bin
+EnvironmentFile=-/home/admin/KitchenBook/backend/.env
+ExecStart=/home/admin/KitchenBook/venv/bin/python -m mcp_server.server \
+          --transport http --host 127.0.0.1 --port 8100
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# ===== 收紧 =====
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ailab-mcp
+
+[Install]
+WantedBy=multi-user.target
