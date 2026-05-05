@@ -36,10 +36,6 @@ fastmcp run mcp_server/server.py:mcp --transport http --port 8100
 
 | 工具 | 说明 |
 |------|------|
-| `ailab_chat` | DeepSeek AI 对话，支持多模型 + thinking + web_search |
-| `ailab_ocr` | 图片 OCR 识别（SiliconFlow DeepSeek-OCR） |
-| `ailab_transcribe` | 语音转录（Whisper） |
-| `ailab_emoji_generate` | 表情包视频生成（DashScope） |
 | `ailab_search_recipes` | 搜索菜谱 |
 | `ailab_get_blog_posts` | 获取博客文章 |
 
@@ -50,7 +46,7 @@ fastmcp run mcp_server/server.py:mcp --transport http --port 8100
 fastmcp inspect mcp_server/server.py:mcp
 
 # 测试单个工具
-fastmcp call mcp_server/server.py ailab_chat message="你好" model=deepseek-v4-flash
+fastmcp call mcp_server/server.py ailab_search_recipes query="番茄炒蛋"
 ```
 
 ## 注册到 Hermes Agent
