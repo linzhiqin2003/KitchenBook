@@ -14,8 +14,11 @@ Environment=PATH=/home/admin/KitchenBook/venv/bin:/usr/bin:/bin
 EnvironmentFile=-/home/admin/KitchenBook/backend/.env
 # 用 fastmcp CLI 起 server —— fastmcp 3.x 的 mcp.run() 不再接受 host/port kwarg，
 # CLI 反而原生支持 --transport/--host/--port。0 侵入项目代码。
+#
+# Bind 0.0.0.0 是为了让 docker 容器（从 bridge 网关 IP 172.18.0.1 访问）
+# 能连到 MCP。公网入站靠阿里云安全组 + iptables 拦截 8100 端口。
 ExecStart=/home/admin/KitchenBook/venv/bin/fastmcp run mcp_server/server.py:mcp \
-          --transport http --host 127.0.0.1 --port 8100 --no-banner
+          --transport http --host 0.0.0.0 --port 8100 --no-banner
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
