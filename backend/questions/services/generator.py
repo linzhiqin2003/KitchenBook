@@ -153,16 +153,20 @@ If any option contains code (e.g., function definitions, shell commands, SQL que
 
 
 
-def generate_question_for_topic(topic, course_id=None, context_data=None, target_difficulty=None):
+def generate_question_for_topic(topic, course_id=None, context_data=None, target_difficulty=None, seed_question=None):
     """
     Generate a new question for a specific topic.
     Used when user selects topic-based practice mode.
-    
+
     Args:
         topic: Topic name to generate question for
         course_id: Course identifier (uses default if None)
         context_data: Pre-loaded courseware context (loaded if None)
         target_difficulty: Specific difficulty ('easy', 'medium', 'hard') or None for auto
+        seed_question: Optional reference question (e.g. sampled from the mock paper)
+            used purely for style/difficulty calibration. When provided, it's added
+            as a "Reference Question" section in the prompt — the LLM is instructed
+            NOT to copy it.
     
     Returns:
         dict with question, options, answer, explanation, or error
@@ -272,7 +276,16 @@ Create an **original multiple-choice question** for the topic "{matching_topic}"
 If any option contains code (e.g., function definitions, shell commands, SQL queries), you MUST preserve code formatting with proper newlines (`\n`) and indentation. For example:
 - WRONG: `"A. char* foo() {{ int x = 1; return x; }}"`
 - CORRECT: `"A. char* foo() {{\n    int x = 1;\n    return x;\n}}"`
+"""
 
+    if seed_question:
+        prompt += f"""
+---
+## Reference Question (for difficulty/style reference ONLY, do NOT copy):
+{seed_question}
+"""
+
+    prompt += f"""
 ---
 ## Course Material ({matching_topic}) - USE THIS TO CREATE YOUR QUESTION:
 {context_snippet}
@@ -291,7 +304,7 @@ If any option contains code (e.g., function definitions, shell commands, SQL que
         )
         content = response.choices[0].message.content
         result = json.loads(content)
-        result["seed_question"] = f"Topic: {matching_topic}"
+        result["seed_question"] = seed_question if seed_question else f"Topic: {matching_topic}"
         result["course_id"] = course_id
         # Use target difficulty if specified
         if target_difficulty and target_difficulty in ["easy", "medium", "hard"]:

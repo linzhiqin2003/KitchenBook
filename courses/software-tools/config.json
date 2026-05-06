@@ -1,6 +1,18 @@
 {
     "name": "Software Tools",
     "display_name": "Software Tools 刷题",
-    "description": "系统管理、Shell、Git、SQL等工具课程",
-    "icon": "🛠️"
+    "description": "Bristol COMS10012：系统管理、Shell、Git、SQL、HTTP、HTML/CSS/JS、爬虫、PGP、协议、测试",
+    "icon": "🛠️",
+    "topic_keywords": {
+        "http": ["http", "url", "request", "response", "status code", "200 ok", "404", "header", "cookie", "curl", "method", "get", "post", "internet", "tcp/ip"],
+        "html": ["html", "doctype", "tag", "element", "form", "input", "table", "semantic", "head", "meta", "validator", "w3c", "dom", "accessibility", "alt"],
+        "css": ["css", "selector", "specificity", "cascade", "inheritance", "box model", "padding", "margin", "border", "font", "colour", "color", "reset", "framework"],
+        "css-layout": ["flexbox", "flex", "grid", "media query", "responsive", "viewport", "breakpoint", "mobile-first", "fr unit", "minmax", "auto-fill", "design", "alignment", "contrast", "repetition", "proximity", "crap"],
+        "js-basics": ["javascript", "var", "let", "const", "arrow function", "template literal", "===", "destructuring", "dom", "queryselector", "addeventlistener", "innerhtml", "textcontent", "node.js", "minesweeper"],
+        "js-advanced": ["json", "json.parse", "json.stringify", "promise", "async", "await", "fetch", "callback", "cgi", "cors", "same-origin", "event loop", "microtask", "xhr"],
+        "scraping": ["scraping", "crawl", "wget", "beautifulsoup", "find_all", "select", "robots.txt", "user-agent", "lxml", "selenium", "html parsing", "sitemap"],
+        "pgp": ["pgp", "openpgp", "gpg", "gnupg", "public key", "private key", "asymmetric", "symmetric", "fingerprint", "keyring", "web of trust", "rsa", "aes", "sha", "passphrase", "revocation", "sign", "verify", "encrypt", "decrypt", "keyserver"],
+        "protocols": ["protocol", "rfc", "finger", "gopher", "webfinger", "gemini", "htcpcp", "socket", "bsd socket", "bind", "listen", "accept", "connect", "inetd", "xinetd", "tcp", "port"],
+        "testing": ["pytest", "fixture", "parametrize", "assert", "unit test", "integration test", "tdd", "red-green-refactor", "black-box", "white-box", "equivalence partitioning", "boundary value", "coverage", "quickcheck", "hypothesis", "property-based", "cucumber", "bdd", "mock", "cribbage"]
+    }
 }
