@@ -83,6 +83,12 @@ export const questionApi = {
     getCoursewareTopics(courseId) {
         return api.get('/courseware/topics/', { params: { course_id: courseId } });
     },
+    getCoursewareSummary(courseId, topic, lang = 'en') {
+        return api.get('/courseware/summary/', { params: { course_id: courseId, topic, lang } });
+    },
+    getCoursewareSummaryIndex(courseId) {
+        return api.get('/courseware/summary-index/', { params: { course_id: courseId } });
+    },
     getReviewData(courseId) {
         return api.get('/courseware/review/', { params: { course_id: courseId } });
     },

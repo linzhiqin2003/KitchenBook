@@ -639,6 +639,69 @@ class CoursewareView(viewsets.ViewSet):
             ],
         })
 
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        """GET /api/questiongen/courseware/summary/?course_id=X&topic=Y&lang=en|zh
+
+        Returns a curated summary markdown for a chapter, in the requested
+        language. Looks up `courses/<course>/summaries/<lang>/<topic>.md`
+        (independent of the courseware/ scan path so it doesn't pollute the
+        LLM prompt).
+        """
+        course_id = request.query_params.get('course_id') or get_default_course()
+        topic = request.query_params.get('topic')
+        lang = (request.query_params.get('lang') or 'en').lower()
+        if not topic:
+            return Response({"error": "topic required"}, status=status.HTTP_400_BAD_REQUEST)
+        if lang not in ('en', 'zh'):
+            return Response({"error": "lang must be 'en' or 'zh'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        path = get_course_dir(course_id) / "summaries" / lang / f"{topic}.md"
+        if not path.exists():
+            # Try to compensate for case differences in the topic param.
+            alt = next(
+                (p for p in (path.parent.glob("*.md") if path.parent.exists() else [])
+                 if p.stem.lower() == topic.lower()),
+                None,
+            )
+            if not alt:
+                return Response(
+                    {"error": f"No {lang} summary for topic {topic!r} in course {course_id!r}"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            path = alt
+
+        body = path.read_text(encoding='utf-8')
+        return Response({
+            "course_id": course_id,
+            "topic": topic,
+            "lang": lang,
+            "content": body,
+            "char_count": len(body),
+            "line_count": body.count("\n") + 1,
+        })
+
+    @action(detail=False, methods=['get'], url_path='summary-index')
+    def summary_index(self, request):
+        """GET /api/questiongen/courseware/summary-index/?course_id=X
+
+        Lists which (topic, lang) pairs have a curated summary available so
+        the frontend can decide whether to show the EN/中 toggle.
+        """
+        course_id = request.query_params.get('course_id') or get_default_course()
+        sum_dir = get_course_dir(course_id) / "summaries"
+        index = {}
+        if sum_dir.exists():
+            for lang_dir in sum_dir.iterdir():
+                if not lang_dir.is_dir():
+                    continue
+                for f in lang_dir.glob("*.md"):
+                    index.setdefault(f.stem, []).append(lang_dir.name)
+        return Response({
+            "course_id": course_id,
+            "summaries": {topic: sorted(set(langs)) for topic, langs in index.items()},
+        })
+
 
 class KnowledgePointViewSet(viewsets.ReadOnlyModelViewSet):
     """List + lazily-generate study notes (knowledge points) for a course/topic."""

@@ -6,6 +6,18 @@
         {{ meta.char_count }} CHARS · {{ meta.line_count }} LINES
       </span>
       <span v-else-if="!loading && !error" class="cw__meta cw__meta--muted" data-mono>EMPTY</span>
+
+      <div v-if="hasAnyView" class="cw__viewSwitch" role="tablist" aria-label="View">
+        <button
+          v-for="v in availableViews"
+          :key="v.id"
+          role="tab"
+          :aria-selected="currentView === v.id"
+          class="cw__viewBtn"
+          :data-active="currentView === v.id"
+          @click="setView(v.id)"
+        >{{ v.label }}</button>
+      </div>
     </header>
 
     <div v-if="loading" class="cw__loading">
@@ -42,10 +54,56 @@ const meta = ref(null);
 const loading = ref(false);
 const error = ref('');
 
+// View state: 'summary-en', 'summary-zh', 'raw'
+const currentView = ref('summary-en');
+// Languages available for the current topic. Populated from /summary-index/.
+const availableLangs = ref([]);
+
+const VIEW_OPTIONS = [
+  { id: 'summary-en', label: '整理 EN', requiresLang: 'en' },
+  { id: 'summary-zh', label: '整理 中', requiresLang: 'zh' },
+  { id: 'raw', label: '原文', requiresLang: null },
+];
+const availableViews = computed(() => VIEW_OPTIONS.filter(
+  v => !v.requiresLang || availableLangs.value.includes(v.requiresLang)
+));
+const hasAnyView = computed(() => availableViews.value.length >= 2);
+
 const rendered = computed(() => marked.parse(content.value || ''));
 
-watch(() => [props.courseId, props.topic], reload);
-onMounted(reload);
+watch(() => [props.courseId, props.topic], async () => {
+  await refreshIndex();
+  await reload();
+});
+
+onMounted(async () => {
+  await refreshIndex();
+  await reload();
+});
+
+async function refreshIndex() {
+  if (!props.courseId || !props.topic) {
+    availableLangs.value = [];
+    return;
+  }
+  try {
+    const r = await questionApi.getCoursewareSummaryIndex(props.courseId);
+    const summaries = r.data?.summaries || {};
+    availableLangs.value = summaries[props.topic] || [];
+  } catch {
+    availableLangs.value = [];
+  }
+  // Pick a sensible default view: prefer EN summary, then ZH, else fall back to raw.
+  if (availableLangs.value.includes('en')) currentView.value = 'summary-en';
+  else if (availableLangs.value.includes('zh')) currentView.value = 'summary-zh';
+  else currentView.value = 'raw';
+}
+
+function setView(id) {
+  if (id === currentView.value) return;
+  currentView.value = id;
+  reload();
+}
 
 async function reload() {
   if (!props.courseId || !props.topic) return;
@@ -54,7 +112,14 @@ async function reload() {
   content.value = '';
   meta.value = null;
   try {
-    const r = await questionApi.getCoursewareChapter(props.courseId, props.topic);
+    let r;
+    if (currentView.value === 'summary-en') {
+      r = await questionApi.getCoursewareSummary(props.courseId, props.topic, 'en');
+    } else if (currentView.value === 'summary-zh') {
+      r = await questionApi.getCoursewareSummary(props.courseId, props.topic, 'zh');
+    } else {
+      r = await questionApi.getCoursewareChapter(props.courseId, props.topic);
+    }
     content.value = r.data?.content || '';
     meta.value = {
       char_count: r.data?.char_count || 0,
@@ -92,6 +157,35 @@ function formattedTopic(t) {
   color: var(--qg-text-tertiary);
 }
 .cw__meta--muted { color: var(--qg-text-muted); }
+
+.cw__viewSwitch {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--qg-surface-sunken);
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-sm, 6px);
+}
+.cw__viewBtn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--qg-text-tertiary);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.cw__viewBtn:hover { color: var(--qg-text-secondary); }
+.cw__viewBtn[data-active="true"] {
+  background: var(--qg-surface-elevated, var(--qg-surface-default));
+  color: var(--qg-text-primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
 
 .cw__loading {
   display: flex;
