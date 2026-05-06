@@ -59,13 +59,14 @@ const currentView = ref('summary-en');
 // Languages available for the current topic. Populated from /summary-index/.
 const availableLangs = ref([]);
 
+// Toggle only exposes the curated summaries. Chapters that have no
+// curated summary silently fall back to the raw concat (see refreshIndex).
 const VIEW_OPTIONS = [
   { id: 'summary-en', label: '整理 EN', requiresLang: 'en' },
   { id: 'summary-zh', label: '整理 中', requiresLang: 'zh' },
-  { id: 'raw', label: '原文', requiresLang: null },
 ];
 const availableViews = computed(() => VIEW_OPTIONS.filter(
-  v => !v.requiresLang || availableLangs.value.includes(v.requiresLang)
+  v => availableLangs.value.includes(v.requiresLang)
 ));
 const hasAnyView = computed(() => availableViews.value.length >= 2);
 
