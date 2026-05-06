@@ -624,39 +624,15 @@ async function loadTopics() {
   try {
     const response = await questionApi.getTopics(currentCourseId.value);
     const data = response.data;
-    let topics = data.courseware_topics || data.topics || [];
-    
-    // Sort topics intelligently
-    topics.sort((a, b) => {
-      // Extract numbers from topic names for natural sorting
-      // Handles patterns like "chapter-5", "01-topic", "a-topic"
-      const extractNumber = (str) => {
-        // Try to find chapter number (chapter-N or chapter_N)
-        const chapterMatch = str.match(/chapter[-_](\d+)/i);
-        if (chapterMatch) return parseInt(chapterMatch[1]);
-
-        // L1, L2 ... L11 style — letter prefix + multi-digit lecture number
-        const lectureMatch = str.match(/^[a-z](\d+)[-_]/i);
-        if (lectureMatch) return parseInt(lectureMatch[1]);
-
-        // Try leading number (01-topic, 02-topic)
-        const leadingMatch = str.match(/^(\d+)/);
-        if (leadingMatch) return parseInt(leadingMatch[1]);
-        
-        // Try single letter prefix (a-topic, b-topic)
-        const letterMatch = str.match(/^([a-z])[-_]/i);
-        if (letterMatch) return letterMatch[1].toLowerCase().charCodeAt(0) - 96; // a=1, b=2, etc.
-        
-        return 999; // No number found, put at end
-      };
-      
-      const numA = extractNumber(a);
-      const numB = extractNumber(b);
-      
-      if (numA !== numB) return numA - numB;
-      return a.localeCompare(b); // Fall back to alphabetical
-    });
-    
+    // The backend returns courseware_topics in syllabus order (parser sorts
+    // chapter directories naturally before iterating), so trust that order.
+    // Fall back to db topics with alpha sort only when no courseware exists.
+    let topics;
+    if (Array.isArray(data.courseware_topics) && data.courseware_topics.length) {
+      topics = [...data.courseware_topics];
+    } else {
+      topics = [...(data.topics || [])].sort((a, b) => a.localeCompare(b));
+    }
     availableTopics.value = topics;
     topicsLoaded.value = true;
   } catch (err) {

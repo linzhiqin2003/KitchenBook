@@ -108,10 +108,13 @@ def parse_courseware(course_id=None):
         return {}
     
     context_by_topic = {}
-    
+
     # Check if courseware is organized in subdirectories or flat
-    subdirs = [d for d in courseware_dir.iterdir() if d.is_dir() and not d.name.startswith('.')]
-    
+    subdirs = sorted(
+        [d for d in courseware_dir.iterdir() if d.is_dir() and not d.name.startswith('.')],
+        key=lambda d: _natural_chapter_key(d.name),
+    )
+
     if subdirs:
         # Subdirectory structure (e.g., 01-sysadmin, 02-fundamentals)
         for subdir in subdirs:
@@ -132,8 +135,11 @@ def parse_courseware(course_id=None):
                 context_by_topic[topic] = "\n\n---\n\n".join(topic_content)
     else:
         # Flat structure - group by filename or treat each file as a topic
-        md_files = glob.glob(str(courseware_dir / "*.md"))
-        
+        md_files = sorted(
+            glob.glob(str(courseware_dir / "*.md")),
+            key=lambda p: _natural_chapter_key(Path(p).stem),
+        )
+
         for md_file in md_files:
             filename = Path(md_file).stem
             topic = extract_topic_name(filename)
@@ -145,6 +151,33 @@ def parse_courseware(course_id=None):
                 pass
     
     return context_by_topic
+
+
+def _natural_chapter_key(name):
+    """Sort key for chapter directory names so that the dict iteration order
+    (and hence the order returned to the frontend) follows the syllabus.
+
+    Buckets, in order of preference:
+      0. Pure leading number:        "11-http", "02-fundamentals"
+      1. Letter + number prefix:     "l1-introduction", "L11-privacy"
+      2. "chapter-N-…":              "chapter-5-the-hack-architecture"
+      3. Single uppercase letter:    "A_Preamble", "K_Pointers"
+      4. Anything else: alphabetical fallback.
+    Each bucket sorts numerically before falling back to lowercase alpha.
+    """
+    m = re.match(r'^(\d+)[-_]', name)
+    if m:
+        return (0, int(m.group(1)), name.lower())
+    m = re.match(r'^[A-Za-z](\d+)[-_]', name)
+    if m:
+        return (1, int(m.group(1)), name.lower())
+    m = re.match(r'^chapter[-_](\d+)', name, re.IGNORECASE)
+    if m:
+        return (2, int(m.group(1)), name.lower())
+    m = re.match(r'^([A-Z])[-_]', name)
+    if m:
+        return (3, ord(m.group(1)), name.lower())
+    return (4, 0, name.lower())
 
 
 def extract_topic_name(raw_name):
