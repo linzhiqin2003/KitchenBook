@@ -696,7 +696,7 @@ defineExpose({
             <svg v-else-if="TAB_META[tab].icon === 'bell'" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7">
               <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
             </svg>
-            <span class="hidden sm:inline">{{ TAB_META[tab].label }}</span>
+            <span class="tab-label">{{ TAB_META[tab].label }}</span>
             <span
               v-if="tab === 'notifications' && notificationsUnread > 0"
               class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full text-[9px] font-semibold flex items-center justify-center px-1 ring-2 ring-[var(--theme-50,#f7f7f8)]"
@@ -1202,6 +1202,15 @@ defineExpose({
   background: #f7f7f8;
   border-left: 1px solid #ebebed;
   font-family: var(--ai-font-body);
+  container-type: inline-size;
+}
+.tab-label {
+  display: inline;
+}
+/* Panel 自身宽度 < 360px 时收起 tab 文字，只剩图标 —— 不依赖 viewport */
+@container (max-width: 359px) {
+  .tab-label { display: none; }
+  .tab-btn { padding-left: 6px; padding-right: 6px; }
 }
 @media (max-width: 1023px) {
   .panel-shell.panel-mobile {
