@@ -1938,7 +1938,13 @@ onMounted(async () => {
           <span class="text-[14px] font-semibold tracking-tight" style="color: var(--theme-700);">MyAgent</span>
         </div>
         <!-- 桌面端会话标题占据中间位置 -->
-        <div class="hidden lg:flex flex-1 min-w-0"></div>
+        <div class="hidden lg:flex flex-1 min-w-0 items-center">
+          <h2
+            v-if="conversationTitle"
+            class="truncate text-[14px] font-medium"
+            style="color: var(--theme-500);"
+          >{{ conversationTitle }}</h2>
+        </div>
 
         <AiLabUserMenu />
 

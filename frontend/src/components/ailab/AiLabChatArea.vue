@@ -128,11 +128,6 @@ defineExpose({
 
 <template>
   <div class="flex-1 flex flex-col overflow-hidden relative">
-    <!-- 会话标题栏 -->
-    <div v-if="conversationTitle" class="shrink-0 h-11 flex items-center px-5" style="border-bottom: 1px solid var(--theme-200, var(--theme-200));">
-      <h2 class="truncate" style="font-size: 14px; font-weight: 500; color: var(--theme-500, var(--theme-500));">{{ conversationTitle }}</h2>
-    </div>
-
     <!-- 消息列表 -->
     <div
       ref="messagesContainer"
