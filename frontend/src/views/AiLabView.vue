@@ -103,22 +103,42 @@ const isChatNearBottom = ref(true)
 const selectedAgentModel = ref(DEFAULT_AGENT_MODEL)
 
 // ===== 文件/语音状态 =====
-const selectedFile = ref(null)       // File object
-const filePreview = ref(null)        // base64 data URL (images) or filename (PDF)
-const fileType = ref(null)           // 'image' | 'pdf'
-const isFileProcessing = ref(false)
+// selectedFiles[]: 待发送的多附件，每项：
+//   { id, file, type: 'image'|'pdf'|'video', name, size, preview, processing }
+//   - preview 仅图片有：base64 dataUrl；视频用 file 现 createObjectURL 渲染（见 selectedAttachments）
+const selectedFiles = ref([])
+const isFileProcessing = ref(false)  // 任一附件正在做"耗时处理"（PDF 抽文本）
 const fileInputRef = ref(null)
 const isDragging = ref(false)
 
-const selectedAttachment = computed(() => {
-  if (!selectedFile.value) return null
-  return {
-    name: selectedFile.value.name,
-    size: selectedFile.value.size,
-    type: fileType.value,
-    preview: filePreview.value,
-  }
-})
+// 每次允许的最大附件数（与后端 BATCH_LIMIT 对齐）
+const MAX_ATTACHMENTS = 9
+
+// 视频用 object URL 提供 <video> 预览源；切换/卸载时记得 revoke
+const _videoPreviewUrls = new Map() // id -> objectURL
+const _ensureVideoPreview = (item) => {
+  if (item.type !== 'video' || !item.file) return null
+  if (_videoPreviewUrls.has(item.id)) return _videoPreviewUrls.get(item.id)
+  const url = URL.createObjectURL(item.file)
+  _videoPreviewUrls.set(item.id, url)
+  return url
+}
+const _revokeVideoPreview = (id) => {
+  const url = _videoPreviewUrls.get(id)
+  if (url) { try { URL.revokeObjectURL(url) } catch {} _videoPreviewUrls.delete(id) }
+}
+
+// 给 AiLabInput 用的视图层数据 —— 不直接暴露 File 对象，避免 prop diff 抖动
+const selectedAttachments = computed(() => selectedFiles.value.map(it => ({
+  id: it.id,
+  type: it.type,                                   // 'image' | 'pdf' | 'video'
+  name: it.name,
+  size: it.size,
+  preview: it.type === 'video' ? _ensureVideoPreview(it) : it.preview,
+  processing: it.processing,
+})))
+
+const hasSelectedFiles = computed(() => selectedFiles.value.length > 0)
 const isRecording = ref(false)
 const isTranscribing = ref(false)
 const recordingDuration = ref(0)
@@ -402,19 +422,33 @@ const normalizeAssistantMessage = (message) => {
   }
 }
 
+// 把后端 file_attachment（dict 或 list）规范成前端用的 fileAttachments 数组
+const _normalizeAttachment = (att) => {
+  if (!att || typeof att !== 'object') return null
+  if (att.type === 'image' && att.url) {
+    return { type: 'image', dataUrl: att.url, serverUrl: att.url, filename: att.filename, size: att.size }
+  }
+  if (att.type === 'video' && att.url) {
+    return { type: 'video', url: att.url, filename: att.filename, size: att.size }
+  }
+  if (att.type === 'pdf') {
+    return { type: 'pdf', filename: att.filename, pages: att.pages, text: att.text }
+  }
+  return null
+}
+
 const normalizeMessagesForUI = (list) => {
   return (list || []).map(m => {
     const normalized = normalizeAssistantMessage(m)
     if (!normalized.type) normalized.type = 'text'
-    // 从后端 file_attachment 恢复前端 fileAttachment（用于图片/PDF 显示）
-    if (normalized.role === 'user' && normalized.file_attachment && !normalized.fileAttachment) {
-      const att = normalized.file_attachment
-      if (att.type === 'image' && att.url) {
-        // dataUrl 用于前端 <img> 显示（Vite 开发代理 /media，生产 Nginx 代理）
-        // serverUrl 用于 apiMessages 拼接完整 URL 给 Hermes
-        normalized.fileAttachment = { type: 'image', dataUrl: att.url, serverUrl: att.url, filename: att.filename, size: att.size }
-      } else if (att.type === 'pdf') {
-        normalized.fileAttachment = att
+    // 从后端 file_attachment 恢复前端 fileAttachments（数组）
+    if (normalized.role === 'user' && !normalized.fileAttachments && normalized.file_attachment) {
+      const raw = normalized.file_attachment
+      if (Array.isArray(raw)) {
+        normalized.fileAttachments = raw.map(_normalizeAttachment).filter(Boolean)
+      } else {
+        const one = _normalizeAttachment(raw)
+        if (one) normalized.fileAttachments = [one]
       }
     }
     return normalized
@@ -595,10 +629,41 @@ const deleteMessageAndFollowing = async (messageId) => {
   }
 }
 
+// 上传一批图片/视频到 /api/ai/image-upload/，返回 [{type, url, filename, size}, ...]
+const _uploadMedia = async (files) => {
+  if (!files.length) return []
+  const formData = new FormData()
+  for (const f of files) formData.append('files', f)
+  const resp = await fetch(`${API_BASE_URL}/api/ai/image-upload/`, {
+    method: 'POST', headers: djangoHeaders(), body: formData,
+  })
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok) throw new Error(data.error || '上传失败')
+  return data.results || []
+}
+
+// 把单张图片读成 base64 dataUrl
+const _readDataUrl = (file) => new Promise((resolve, reject) => {
+  const r = new FileReader()
+  r.onload = e => resolve(e.target.result)
+  r.onerror = reject
+  r.readAsDataURL(file)
+})
+
+// PDF: 调后端抽文本（保持单文件 endpoint 接口不变，多 PDF 时串行）
+const _extractPdf = async (file) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  const resp = await fetch(`${API_BASE_URL}/api/ai/pdf-extract/`, { method: 'POST', body: fd })
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok) throw new Error(data.error || 'PDF 解析失败')
+  return { type: 'pdf', text: data.text, filename: data.filename, pages: data.pages }
+}
+
 // ===== 消息发送 =====
 const sendMessage = async (content = null, options = {}) => {
   const text = content || inputMessage.value.trim()
-  if (!text && !selectedFile.value) return
+  if (!text && selectedFiles.value.length === 0) return
   if (isLoading.value) return
 
   // 如果没有当前会话，先创建一个
@@ -606,85 +671,108 @@ const sendMessage = async (content = null, options = {}) => {
     await createConversation()
   }
 
-  // 处理文件附件
-  let fileContent = null
-  let persistAttachment = null  // 持久化到后端的附件元信息
-  if (selectedFile.value) {
-    if (fileType.value === 'image') {
-      // 图片：同时读取 base64（供 API 多模态调用）和上传到服务器（供持久化）
-      const [base64Result, uploadResult] = await Promise.all([
-        new Promise((resolve) => {
-          const reader = new FileReader()
-          reader.onload = (e) => resolve({
+  // ---- 处理多附件 ----
+  // attachmentsForUI: 给消息气泡渲染用（含 dataUrl/objectURL/text）
+  // persistAttachments: 落 DB（仅元信息：type/url/filename/size/pages）
+  const attachmentsForUI = []
+  const persistAttachments = []
+  let pdfContextSegments = []  // PDF 文本注入到 user content
+  let videoUrls = []           // 视频 URL 注入到 user content
+  const items = [...selectedFiles.value]
+
+  if (items.length) {
+    isFileProcessing.value = true
+    try {
+      const mediaItems = items.filter(it => it.type === 'image' || it.type === 'video')
+      const pdfItems = items.filter(it => it.type === 'pdf')
+
+      // 图片 base64（仅图片需要 — 视频走 URL）
+      const imageDataUrls = await Promise.all(items.map(it =>
+        it.type === 'image' ? _readDataUrl(it.file) : Promise.resolve(null)
+      ))
+
+      // 媒体（图+视频）一次性上传
+      const uploads = await _uploadMedia(mediaItems.map(it => it.file))
+      // 上传结果按提交顺序对应 mediaItems
+      const uploadByItem = new Map()
+      mediaItems.forEach((it, i) => uploadByItem.set(it.id, uploads[i]))
+
+      // PDF 串行抽文本（量少，不并发也不慢）
+      const pdfData = []
+      for (const it of pdfItems) pdfData.push([it.id, await _extractPdf(it.file)])
+      const pdfByItem = new Map(pdfData)
+
+      // 按用户拖入的顺序生成 UI / persist 数据
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]
+        if (it.type === 'image') {
+          const up = uploadByItem.get(it.id)
+          attachmentsForUI.push({
             type: 'image',
-            dataUrl: e.target.result,
-            filename: selectedFile.value.name,
-            size: selectedFile.value.size,
+            dataUrl: imageDataUrls[i],
+            serverUrl: up?.url || null,
+            filename: it.name,
+            size: it.size,
           })
-          reader.readAsDataURL(selectedFile.value)
-        }),
-        (async () => {
-          try {
-            isFileProcessing.value = true
-            const formData = new FormData()
-            formData.append('file', selectedFile.value)
-            const resp = await fetch(`${API_BASE_URL}/api/ai/image-upload/`, {
-              method: 'POST',
-              headers: djangoHeaders(),
-              body: formData,
-            })
-            const data = await resp.json()
-            if (!resp.ok) throw new Error(data.error || '图片上传失败')
-            isFileProcessing.value = false
-            return data  // { url, filename, size }
-          } catch (e) {
-            isFileProcessing.value = false
-            console.error('图片上传失败:', e)
-            return null
-          }
-        })(),
-      ])
-      fileContent = base64Result
-      if (uploadResult) {
-        persistAttachment = { type: 'image', url: uploadResult.url, filename: uploadResult.filename, size: uploadResult.size }
-        // 也把 URL 存到 fileContent 里，方便 apiMessages 构建
-        fileContent.serverUrl = uploadResult.url
+          if (up) persistAttachments.push({ type: 'image', url: up.url, filename: up.filename, size: up.size })
+        } else if (it.type === 'video') {
+          const up = uploadByItem.get(it.id)
+          if (!up) throw new Error(`视频「${it.name}」上传失败`)
+          attachmentsForUI.push({
+            type: 'video',
+            url: up.url,
+            filename: up.filename,
+            size: up.size,
+          })
+          persistAttachments.push({ type: 'video', url: up.url, filename: up.filename, size: up.size })
+          videoUrls.push({ url: up.url, filename: up.filename })
+        } else if (it.type === 'pdf') {
+          const data = pdfByItem.get(it.id)
+          attachmentsForUI.push({ type: 'pdf', filename: data.filename, pages: data.pages })
+          persistAttachments.push({ type: 'pdf', filename: data.filename, pages: data.pages })
+          pdfContextSegments.push(`[PDF: ${data.filename}, ${data.pages} pages]\n\n${data.text}`)
+        }
       }
-    } else if (fileType.value === 'pdf') {
-      // PDF：后端提取文本
-      isFileProcessing.value = true
-      try {
-        const formData = new FormData()
-        formData.append('file', selectedFile.value)
-        const resp = await fetch(`${API_BASE_URL}/api/ai/pdf-extract/`, { method: 'POST', body: formData })
-        const data = await resp.json()
-        if (!resp.ok) throw new Error(data.error || 'PDF 解析失败')
-        fileContent = { type: 'pdf', text: data.text, filename: data.filename, pages: data.pages }
-        persistAttachment = { type: 'pdf', filename: data.filename, pages: data.pages }
-      } catch (e) {
-        alert(`文件处理失败: ${e.message}`)
-        isFileProcessing.value = false
-        return
-      }
+    } catch (e) {
+      alert(`文件处理失败: ${e.message}`)
       isFileProcessing.value = false
+      return
     }
+    isFileProcessing.value = false
   }
 
   // 构建用户消息展示内容
+  const hasImage = attachmentsForUI.some(a => a.type === 'image')
+  const hasVideo = attachmentsForUI.some(a => a.type === 'video')
+  const pdfSummaries = attachmentsForUI
+    .filter(a => a.type === 'pdf')
+    .map(a => `📄 ${a.filename || 'document.pdf'}${a.pages ? ` (${a.pages} 页)` : ''}`)
+  const videoSummaries = videoUrls.map(v => `🎬 ${v.filename}`)
   let displayText = text || ''
-  if (fileContent?.type === 'pdf') {
-    displayText = `${text ? text + '\n\n' : ''}📄 ${fileContent.filename} (${fileContent.pages} 页)`
-  } else if (fileContent?.type === 'image') {
-    displayText = text || '(图片)'
+  const summaryLines = [...pdfSummaries, ...videoSummaries]
+  if (summaryLines.length) {
+    displayText = displayText
+      ? `${displayText}\n\n${summaryLines.join('\n')}`
+      : summaryLines.join('\n')
+  } else if (!displayText && hasImage) {
+    displayText = '(图片)'
   }
 
-  const userMessage = { role: 'user', content: displayText, type: 'text', fileAttachment: fileContent }
+  const userMessage = {
+    role: 'user',
+    content: displayText,
+    type: 'text',
+    fileAttachments: attachmentsForUI,
+  }
   messages.value.push(userMessage)
   inputMessage.value = ''
   removeFile()
 
   // 保存用户消息到后端（含附件元信息）
-  const savedUserMsg = await saveMessage(currentConversationId.value, 'user', displayText, null, null, null, null, persistAttachment)
+  const savedUserMsg = await saveMessage(
+    currentConversationId.value, 'user', displayText, null, null, null, null,
+    persistAttachments.length ? persistAttachments : null,
+  )
   if (savedUserMsg) {
     userMessage.id = savedUserMsg.id
   }
@@ -692,8 +780,8 @@ const sendMessage = async (content = null, options = {}) => {
   // 刷新会话列表以更新标题
   fetchConversations()
 
-  // 开始流式响应（传入文件内容供 API 调用使用）
-  await streamResponse(fileContent, options)
+  // 开始流式响应 — 传整组附件 + 抽出的 pdf/video 文本片段
+  await streamResponse({ attachments: attachmentsForUI, pdfContext: pdfContextSegments, videos: videoUrls }, options)
 
   // AI 标题在后端是异步生成（DeepSeek 1-2s 出结果），流式响应结束后
   // 再拉一次会话列表，把"新对话"换成生成出的真实标题
@@ -1119,39 +1207,56 @@ const streamResponse = async (fileContent = null, options = {}) => {
   }
 
   // 构建 API 消息
+  // 用户消息支持多附件：所有图片展开成多模态 image_url part；
+  // 视频以 URL 注入文本（OpenAI 协议无 video_url，agent 自行决定怎么处理）；
+  // PDF 抽取文本拼到尾部。
+  const _absUrl = (u) => {
+    if (!u) return null
+    if (u.startsWith('data:') || u.startsWith('http')) return u
+    return `${API_BASE_URL}${u}`
+  }
   const apiMessages = messages.value
     .filter(m => (m.role === 'user' || m.role === 'assistant') && !m.isStreaming)
     .map(m => {
       const text = m.content?.replace(/\n\n\*\[已停止生成\]\*$/, '') || ''
-      // 用户消息可能有文件附件
-      if (m.role === 'user' && m.fileAttachment) {
-        const att = m.fileAttachment
-        if (att.type === 'image') {
-          // 多模态：图片 + 文字
-          // 当前会话：base64 dataUrl（data:image/...）
-          // 历史消息：相对路径 /media/...，需拼 API_BASE_URL 变成完整 URL 给 Hermes
-          let imageUrl = att.dataUrl
-          if (imageUrl && !imageUrl.startsWith('data:') && !imageUrl.startsWith('http')) {
-            imageUrl = `${API_BASE_URL}${imageUrl}`
-          } else if (!imageUrl && att.serverUrl) {
-            imageUrl = att.serverUrl.startsWith('http') ? att.serverUrl : `${API_BASE_URL}${att.serverUrl}`
-          }
-          if (imageUrl) {
-            const parts = []
-            if (text && text !== '(图片)') parts.push({ type: 'text', text })
-            parts.push({ type: 'image_url', image_url: { url: imageUrl } })
-            return { role: 'user', content: parts }
+      // 兼容：老消息可能仍是 fileAttachment（单数）
+      const atts = Array.isArray(m.fileAttachments) && m.fileAttachments.length
+        ? m.fileAttachments
+        : (m.fileAttachment ? [m.fileAttachment] : [])
+
+      if (m.role === 'user' && atts.length) {
+        const imageParts = []
+        const trailingTextSegments = []
+        for (const att of atts) {
+          if (att.type === 'image') {
+            const url = _absUrl(att.dataUrl) || _absUrl(att.serverUrl)
+            if (url) imageParts.push({ type: 'image_url', image_url: { url } })
+          } else if (att.type === 'video') {
+            const url = _absUrl(att.url)
+            if (url) trailingTextSegments.push(`[视频 ${att.filename || ''}: ${url}]`)
+          } else if (att.type === 'pdf' && att.text) {
+            trailingTextSegments.push(`[PDF: ${att.filename}, ${att.pages} pages]\n\n${att.text}`)
           }
         }
-        if (att.type === 'pdf') {
-          // PDF：将提取的文本附加到消息
-          const pdfContext = `[PDF: ${att.filename}, ${att.pages} pages]\n\n${att.text}`
-          return { role: 'user', content: text ? `${text}\n\n${pdfContext}` : pdfContext }
+        // 文本主体：跳过 "(图片)" 占位符
+        const mainText = (text && text !== '(图片)') ? text : ''
+        const allText = [mainText, ...trailingTextSegments].filter(Boolean).join('\n\n')
+
+        // 有图片 → 多模态 content 数组；否则纯文本
+        if (imageParts.length) {
+          const parts = []
+          if (allText) parts.push({ type: 'text', text: allText })
+          parts.push(...imageParts)
+          return { role: 'user', content: parts }
         }
+        if (allText) return { role: 'user', content: allText }
       }
       return { role: m.role, content: text }
     })
-    .filter(m => m.content)
+    .filter(m => {
+      if (Array.isArray(m.content)) return m.content.length > 0
+      return !!m.content
+    })
 
   abortController = new AbortController()
 
@@ -1440,37 +1545,87 @@ const triggerFileInput = () => {
   fileInputRef.value?.click()
 }
 
-const acceptFile = (file) => {
-  if (!file) return
-  const isImage = file.type.startsWith('image/')
-  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-  if (!isImage && !isPdf) {
-    alert('支持图片和 PDF 文件')
+const VIDEO_EXT = /\.(mp4|mov|webm|mkv|avi|ogv)$/i
+const VIDEO_MAX = 100 * 1024 * 1024
+const IMAGE_PDF_MAX = 20 * 1024 * 1024
+
+const _classify = (file) => {
+  const ct = (file.type || '').toLowerCase()
+  if (ct.startsWith('image/')) return 'image'
+  if (ct === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) return 'pdf'
+  if (ct.startsWith('video/') || VIDEO_EXT.test(file.name)) return 'video'
+  return null
+}
+
+let _attachmentSeq = 0
+const _newId = () => `att-${Date.now()}-${++_attachmentSeq}`
+
+const acceptFiles = (fileList) => {
+  if (!fileList || fileList.length === 0) return
+  const incoming = Array.from(fileList)
+  const remaining = MAX_ATTACHMENTS - selectedFiles.value.length
+  if (remaining <= 0) {
+    alert(`一次最多上传 ${MAX_ATTACHMENTS} 个文件`)
     return
   }
-  if (file.size > 20 * 1024 * 1024) {
-    alert('文件不能超过 20MB')
-    return
+  const reasons = []
+  const accepted = []
+  for (const file of incoming) {
+    if (accepted.length >= remaining) {
+      reasons.push(`已超过 ${MAX_ATTACHMENTS} 个上限，剩余文件已忽略`)
+      break
+    }
+    const kind = _classify(file)
+    if (!kind) {
+      reasons.push(`「${file.name}」不支持的格式`)
+      continue
+    }
+    const cap = kind === 'video' ? VIDEO_MAX : IMAGE_PDF_MAX
+    if (file.size > cap) {
+      reasons.push(`「${file.name}」超过 ${cap / 1024 / 1024}MB 上限`)
+      continue
+    }
+    accepted.push({ file, kind })
   }
-  selectedFile.value = file
-  fileType.value = isImage ? 'image' : 'pdf'
-  if (isImage) {
-    const reader = new FileReader()
-    reader.onload = (e) => { filePreview.value = e.target.result }
-    reader.readAsDataURL(file)
-  } else {
-    filePreview.value = file.name
+  if (reasons.length) alert(reasons.join('\n'))
+
+  for (const { file, kind } of accepted) {
+    const item = {
+      id: _newId(),
+      file,
+      type: kind,
+      name: file.name,
+      size: file.size,
+      preview: kind === 'pdf' ? file.name : null,
+      processing: false,
+    }
+    selectedFiles.value.push(item)
+    if (kind === 'image') {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const target = selectedFiles.value.find(it => it.id === item.id)
+        if (target) target.preview = e.target.result
+      }
+      reader.readAsDataURL(file)
+    }
   }
 }
 
 const handleFileSelect = (event) => {
-  acceptFile(event.target.files?.[0])
+  acceptFiles(event.target.files)
+  // 允许重复选同一个文件
+  if (event.target) event.target.value = ''
 }
 
-const removeFile = () => {
-  selectedFile.value = null
-  filePreview.value = null
-  fileType.value = null
+const removeFile = (id) => {
+  if (id == null) {
+    // 清空
+    for (const it of selectedFiles.value) _revokeVideoPreview(it.id)
+    selectedFiles.value = []
+  } else {
+    _revokeVideoPreview(id)
+    selectedFiles.value = selectedFiles.value.filter(it => it.id !== id)
+  }
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
@@ -1480,19 +1635,24 @@ const handleDragLeave = () => { isDragging.value = false }
 const handleDrop = (e) => {
   e.preventDefault()
   isDragging.value = false
-  const file = e.dataTransfer?.files?.[0]
-  if (file) acceptFile(file)
+  const files = e.dataTransfer?.files
+  if (files && files.length) acceptFiles(files)
 }
 
 const handlePaste = (event) => {
   const items = event.clipboardData?.items
   if (!items) return
+  const files = []
   for (const item of items) {
-    if (item.type.startsWith('image/') || item.type === 'application/pdf') {
-      event.preventDefault()
-      acceptFile(item.getAsFile())
-      break
+    const t = (item.type || '').toLowerCase()
+    if (t.startsWith('image/') || t === 'application/pdf' || t.startsWith('video/')) {
+      const f = item.getAsFile()
+      if (f) files.push(f)
     }
+  }
+  if (files.length) {
+    event.preventDefault()
+    acceptFiles(files)
   }
 }
 
@@ -1768,8 +1928,8 @@ onMounted(async () => {
         :is-transcribing="isTranscribing"
         :is-ocr-processing="isFileProcessing"
         :recording-duration="recordingDuration"
-        :has-image="!!selectedFile"
-        :file-attachment="selectedAttachment"
+        :has-image="hasSelectedFiles"
+        :file-attachments="selectedAttachments"
         :session-tokens="sessionTokens"
         :context-limit="TOKEN_CONTEXT_LIMIT"
         @update:selected-model="handleAgentModelChange"
@@ -1802,16 +1962,17 @@ onMounted(async () => {
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
             </svg>
             <p class="text-[14px]" style="color: var(--theme-500);">拖放文件到此处</p>
-            <p class="text-[12px]" style="color: var(--theme-400);">支持图片和 PDF</p>
+            <p class="text-[12px]" style="color: var(--theme-400);">支持图片、视频、PDF（最多 9 个）</p>
           </div>
         </div>
       </Transition>
 
-      <!-- 隐藏的文件输入 -->
+      <!-- 隐藏的文件输入（多选） -->
       <input
         ref="fileInputRef"
         type="file"
-        accept="image/*,.pdf,application/pdf"
+        multiple
+        accept="image/*,video/*,.pdf,application/pdf,.mp4,.mov,.webm,.mkv,.avi,.ogv"
         class="hidden"
         @change="handleFileSelect"
       />
@@ -1828,8 +1989,8 @@ onMounted(async () => {
         :is-transcribing="isTranscribing"
         :is-ocr-processing="isFileProcessing"
         :recording-duration="recordingDuration"
-        :has-image="!!selectedFile"
-        :file-attachment="selectedAttachment"
+        :has-image="hasSelectedFiles"
+        :file-attachments="selectedAttachments"
         :session-tokens="sessionTokens"
         :context-limit="TOKEN_CONTEXT_LIMIT"
         :show-scroll-bottom="!isChatNearBottom"

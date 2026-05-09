@@ -1637,39 +1637,93 @@ class AiLabAccessPermission(permissions.BasePermission):
 
 
 class AiLabImageUploadView(APIView):
-    """AI Lab 图片上传 — 保存到 MEDIA/ailab/uploads/ 并返回公开 URL"""
+    """AI Lab 媒体上传 — 多文件、图片 + 视频，落地到 MEDIA/ailab/uploads/
+
+    POST 接受：
+      - `files` 多文件（FormData append 多次同名）—— 新格式，推荐
+      - `file` 单文件 —— 兼容老前端
+
+    每个文件：图片 ≤ 20MB，视频 ≤ 100MB，单次最多 9 个。
+
+    响应：
+      - 单文件请求：扁平 `{type, url, filename, size}`（保旧前端兼容）
+      - 多文件请求：`{results: [{type, url, filename, size}, ...]}`
+    """
     authentication_classes = [_JWTAuth]
     permission_classes = [permissions.IsAuthenticated, AiLabAccessPermission]
 
-    def post(self, request):
-        image_file = request.FILES.get('file')
-        if not image_file:
-            return Response({'error': '请上传图片文件'}, status=status.HTTP_400_BAD_REQUEST)
+    IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
+    VIDEO_TYPES = {
+        'video/mp4', 'video/quicktime', 'video/webm',
+        'video/x-matroska', 'video/x-msvideo', 'video/ogg',
+    }
+    IMAGE_MAX = 20 * 1024 * 1024     # 20 MB
+    VIDEO_MAX = 100 * 1024 * 1024    # 100 MB
+    BATCH_LIMIT = 9
 
-        allowed_types = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
-        if image_file.content_type not in allowed_types:
-            return Response({'error': '仅支持 JPG/PNG/GIF/WebP 格式'}, status=status.HTTP_400_BAD_REQUEST)
+    def _classify(self, f):
+        """返回 ('image'|'video', max_size) 或抛 ValueError"""
+        ct = (f.content_type or '').lower()
+        if ct in self.IMAGE_TYPES:
+            return 'image', self.IMAGE_MAX
+        if ct in self.VIDEO_TYPES:
+            return 'video', self.VIDEO_MAX
+        # 兜底：用扩展名判断（部分浏览器对 .mov 给出 application/octet-stream）
+        ext = Path(f.name).suffix.lower()
+        if ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+            return 'image', self.IMAGE_MAX
+        if ext in ('.mp4', '.mov', '.webm', '.mkv', '.avi', '.ogv'):
+            return 'video', self.VIDEO_MAX
+        raise ValueError(f'不支持的文件类型：{f.name}（{ct or "未知"}）')
 
-        if image_file.size > 10 * 1024 * 1024:
-            return Response({'error': '图片不能超过 10MB'}, status=status.HTTP_400_BAD_REQUEST)
+    def _save_one(self, f):
+        kind, max_size = self._classify(f)
+        if f.size > max_size:
+            mb = max_size // (1024 * 1024)
+            label = '视频' if kind == 'video' else '图片'
+            raise ValueError(f'{label}「{f.name}」超过 {mb}MB 上限')
 
         upload_dir = Path(settings.MEDIA_ROOT) / 'ailab' / 'uploads'
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        ext = Path(image_file.name).suffix or '.jpg'
+        ext = Path(f.name).suffix or ('.mp4' if kind == 'video' else '.jpg')
         unique_name = f"{timezone.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}{ext}"
         save_path = upload_dir / unique_name
+        with open(save_path, 'wb') as out:
+            for chunk in f.chunks():
+                out.write(chunk)
+        return {
+            'type': kind,
+            'url': f"{settings.MEDIA_URL}ailab/uploads/{unique_name}",
+            'filename': f.name,
+            'size': f.size,
+        }
 
-        with open(save_path, 'wb') as f:
-            for chunk in image_file.chunks():
-                f.write(chunk)
+    def post(self, request):
+        files = request.FILES.getlist('files')
+        # 兼容旧的单文件字段
+        legacy_single = request.FILES.get('file') if not files else None
+        if legacy_single is not None:
+            files = [legacy_single]
 
-        url = f"{settings.MEDIA_URL}ailab/uploads/{unique_name}"
-        return Response({
-            'url': url,
-            'filename': image_file.name,
-            'size': image_file.size,
-        })
+        if not files:
+            return Response({'error': '请上传文件'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(files) > self.BATCH_LIMIT:
+            return Response(
+                {'error': f'一次最多上传 {self.BATCH_LIMIT} 个文件'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            results = [self._save_one(f) for f in files]
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 单文件 + 老字段名调用：返回扁平结构，避免破坏旧前端
+        if legacy_single is not None and len(results) == 1:
+            return Response(results[0])
+        return Response({'results': results})
 
 
 @api_view(['GET'])
@@ -1786,6 +1840,310 @@ def ailab_invites(request):
         'created_at': invite.created_at,
         'expires_at': invite.expires_at,
     }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@authentication_classes([_JWTAuth])
+@permission_classes([])
+def ailab_admin_visitor_stats(request):
+    """owner-only: GET /api/ai/admin/visitor-stats/
+
+    汇总所有非 owner 访客的 MyAgent 用量：会话数 / 消息数 / token 三件套 /
+    估算 cost / 模型分桶 / 最近活跃。owner 看自己访客「用得多不多、贵不贵」。
+    """
+    u = request.user
+    if not getattr(u, 'is_authenticated', False):
+        return Response({"error": "unauthenticated"}, status=status.HTTP_401_UNAUTHORIZED)
+    if not is_ai_lab_owner(u):
+        return Response({"error": "owner only"}, status=status.HTTP_403_FORBIDDEN)
+
+    from django.contrib.auth import get_user_model
+    from django.db.models import Sum, Count, Max, Q
+    from common.pricing import (
+        estimate_cost,
+        normalize_model_name,
+        DEFAULT_MODEL,
+        CURRENCY,
+    )
+    from decimal import Decimal
+
+    User = get_user_model()
+
+    # ---- 1. 找出 owner user_ids（要从结果里排除）----
+    raw = (getattr(settings, 'AI_LAB_OWNER_USERNAMES', '') or '').strip()
+    owner_names = {x.strip().lower() for x in raw.split(',') if x.strip()}
+    owner_filter = Q(is_superuser=True)
+    if owner_names:
+        name_q = Q()
+        for n in owner_names:
+            name_q |= Q(username__iexact=n) | Q(email__iexact=n)
+        owner_filter = owner_filter | name_q
+    owner_ids = set(User.objects.filter(owner_filter).values_list('id', flat=True))
+
+    # ---- 2. 访客 = profile.ai_lab_enabled=True 且不在 owner 集合 ----
+    visitor_qs = (
+        User.objects.filter(profile__ai_lab_enabled=True)
+        .exclude(id__in=owner_ids)
+        .select_related('profile')
+    )
+
+    # ---- 3. 一次查 message 聚合：按 (visitor, model) 分桶 ----
+    msg_qs = AiLabMessage.objects.filter(
+        role='assistant',
+        conversation__user__in=visitor_qs,
+    )
+    per_user_model_rows = (
+        msg_qs.values('conversation__user_id', 'model_name')
+        .annotate(
+            prompt=Sum('prompt_tokens'),
+            completion=Sum('completion_tokens'),
+            cache=Sum('cache_tokens'),
+            turns=Count('id'),
+            last_at=Max('created_at'),
+        )
+    )
+
+    # ---- 4. session 计数 + 最近会话时间 ----
+    per_user_session = (
+        AiLabConversation.objects.filter(user__in=visitor_qs)
+        .values('user_id')
+        .annotate(
+            session_count=Count('id'),
+            last_session_at=Max('updated_at'),
+        )
+    )
+
+    # ---- 5. message 总数（含 user role）----
+    per_user_message = (
+        AiLabMessage.objects.filter(conversation__user__in=visitor_qs)
+        .values('conversation__user_id', 'role')
+        .annotate(c=Count('id'))
+    )
+
+    # ---- 6. active session 数（至少有一轮 prompt_tokens>0）----
+    active_session_rows = (
+        msg_qs.filter(prompt_tokens__gt=0)
+        .values('conversation__user_id')
+        .annotate(active=Count('conversation_id', distinct=True))
+    )
+
+    # ---- 7. invite note：每个访客取最近一条已用 invite 的 note ----
+    visitor_invites = {}
+    for inv in AiLabInvite.objects.filter(used_by__in=visitor_qs).order_by('used_by_id', '-used_at'):
+        if inv.used_by_id not in visitor_invites:
+            visitor_invites[inv.used_by_id] = {
+                'note': inv.note,
+                'used_at': inv.used_at,
+                'code': inv.code,
+            }
+
+    # ---- 组装 visitor map ----
+    visitors = {}
+    for v in visitor_qs:
+        profile = getattr(v, 'profile', None)
+        invite_meta = visitor_invites.get(v.id) or {}
+        activated = (
+            getattr(profile, 'ai_lab_activated_at', None)
+            or invite_meta.get('used_at')
+            or v.date_joined
+        )
+        visitors[v.id] = {
+            'user_id': v.id,
+            'username': v.username,
+            'email': v.email,
+            'nickname': (getattr(profile, 'nickname', '') or '').strip(),
+            'invite_note': invite_meta.get('note') or '',
+            'invite_code': invite_meta.get('code'),
+            'activated_at': activated,
+            'session_count': 0,
+            'active_session_count': 0,
+            'message_count': 0,
+            'user_message_count': 0,
+            'assistant_turn_count': 0,
+            'prompt_tokens': 0,
+            'completion_tokens': 0,
+            'cache_tokens': 0,
+            'last_active': None,
+            'models': {},
+        }
+
+    for row in per_user_session:
+        uid = row['user_id']
+        if uid in visitors:
+            visitors[uid]['session_count'] = int(row['session_count'] or 0)
+            last_session = row['last_session_at']
+            if last_session and (
+                visitors[uid]['last_active'] is None or last_session > visitors[uid]['last_active']
+            ):
+                visitors[uid]['last_active'] = last_session
+
+    for row in per_user_message:
+        uid = row['conversation__user_id']
+        if uid not in visitors:
+            continue
+        c = int(row['c'] or 0)
+        visitors[uid]['message_count'] += c
+        if row['role'] == 'user':
+            visitors[uid]['user_message_count'] = c
+        elif row['role'] == 'assistant':
+            visitors[uid]['assistant_turn_count'] = c
+
+    for row in active_session_rows:
+        uid = row['conversation__user_id']
+        if uid in visitors:
+            visitors[uid]['active_session_count'] = int(row['active'] or 0)
+
+    for row in per_user_model_rows:
+        uid = row['conversation__user_id']
+        if uid not in visitors:
+            continue
+        tp = int(row['prompt'] or 0)
+        tc = int(row['completion'] or 0)
+        tk = int(row['cache'] or 0)
+        if tp == 0 and tc == 0 and tk == 0:
+            continue
+        v = visitors[uid]
+        raw_model_name = row['model_name']
+        model_name = normalize_model_name(raw_model_name)
+        bucket = v['models'].setdefault(model_name, {
+            'model': model_name,
+            'raw_model': raw_model_name or model_name,
+            'prompt': 0,
+            'completion': 0,
+            'cache': 0,
+            'turns': 0,
+            'last_at': None,
+        })
+        bucket['prompt'] += tp
+        bucket['completion'] += tc
+        bucket['cache'] += tk
+        bucket['turns'] += int(row['turns'] or 0)
+        if row['last_at'] and (bucket['last_at'] is None or row['last_at'] > bucket['last_at']):
+            bucket['last_at'] = row['last_at']
+        v['prompt_tokens'] += tp
+        v['completion_tokens'] += tc
+        v['cache_tokens'] += tk
+        if row['last_at'] and (v['last_active'] is None or row['last_at'] > v['last_active']):
+            v['last_active'] = row['last_at']
+
+    # ---- 算每访客 cost + 输出列表 ----
+    q = Decimal('0.000001')
+    visitor_list = []
+    sum_input = Decimal('0')
+    sum_cache_cost = Decimal('0')
+    sum_output = Decimal('0')
+
+    for v in visitors.values():
+        models_list = []
+        v_input = Decimal('0')
+        v_cache = Decimal('0')
+        v_output = Decimal('0')
+        for m in sorted(v['models'].values(), key=lambda x: x['prompt'], reverse=True):
+            cost = estimate_cost(
+                prompt_tokens=m['prompt'],
+                completion_tokens=m['completion'],
+                cache_tokens=m['cache'],
+                model=m['model'],
+            )
+            models_list.append({
+                'model': cost['model'],
+                'raw_model': m['raw_model'],
+                'priced': cost['model'] == m['model'],
+                'prompt_tokens': m['prompt'],
+                'completion_tokens': m['completion'],
+                'cache_tokens': m['cache'],
+                'non_cache_input_tokens': cost['non_cache_input_tokens'],
+                'turns': m['turns'],
+                'last_active': m['last_at'].isoformat() if m['last_at'] else None,
+                'cost': {
+                    'currency': CURRENCY,
+                    'input': cost['input_cost'],
+                    'cache': cost['cache_cost'],
+                    'output': cost['output_cost'],
+                    'total': cost['total_cost'],
+                },
+            })
+            v_input += Decimal(cost['input_cost'])
+            v_cache += Decimal(cost['cache_cost'])
+            v_output += Decimal(cost['output_cost'])
+
+        v_total_cost = v_input + v_cache + v_output
+        sum_input += v_input
+        sum_cache_cost += v_cache
+        sum_output += v_output
+
+        visitor_list.append({
+            'user_id': v['user_id'],
+            'username': v['username'],
+            'email': v['email'],
+            'nickname': v['nickname'],
+            'invite_note': v['invite_note'],
+            'invite_code': v['invite_code'],
+            'activated_at': v['activated_at'].isoformat() if v['activated_at'] else None,
+            'session_count': v['session_count'],
+            'active_session_count': v['active_session_count'],
+            'message_count': v['message_count'],
+            'user_message_count': v['user_message_count'],
+            'assistant_turn_count': v['assistant_turn_count'],
+            'prompt_tokens': v['prompt_tokens'],
+            'completion_tokens': v['completion_tokens'],
+            'cache_tokens': v['cache_tokens'],
+            'non_cache_input_tokens': max(v['prompt_tokens'] - v['cache_tokens'], 0),
+            'total_tokens': v['prompt_tokens'] + v['completion_tokens'],
+            'last_active': v['last_active'].isoformat() if v['last_active'] else None,
+            'cost': {
+                'currency': CURRENCY,
+                'input': str(v_input.quantize(q)),
+                'cache': str(v_cache.quantize(q)),
+                'output': str(v_output.quantize(q)),
+                'total': str(v_total_cost.quantize(q)),
+            },
+            'models': models_list,
+        })
+
+    # 按 total_tokens 倒序，token 相同时按 last_active 倒序
+    visitor_list.sort(
+        key=lambda x: (x['total_tokens'], x['last_active'] or ''),
+        reverse=True,
+    )
+
+    total_prompt = sum(v['prompt_tokens'] for v in visitor_list)
+    total_completion = sum(v['completion_tokens'] for v in visitor_list)
+    total_cache = sum(v['cache_tokens'] for v in visitor_list)
+    total_sessions = sum(v['session_count'] for v in visitor_list)
+    total_active_sessions = sum(v['active_session_count'] for v in visitor_list)
+    total_messages = sum(v['message_count'] for v in visitor_list)
+    active_visitors = sum(1 for v in visitor_list if v['total_tokens'] > 0)
+    last_active = None
+    for v in visitor_list:
+        if v['last_active'] and (last_active is None or v['last_active'] > last_active):
+            last_active = v['last_active']
+
+    sum_total = sum_input + sum_cache_cost + sum_output
+
+    return Response({
+        'totals': {
+            'visitor_count': len(visitor_list),
+            'active_visitor_count': active_visitors,
+            'session_count': total_sessions,
+            'active_session_count': total_active_sessions,
+            'message_count': total_messages,
+            'total_prompt_tokens': total_prompt,
+            'total_completion_tokens': total_completion,
+            'total_cache_tokens': total_cache,
+            'non_cache_input_tokens': max(total_prompt - total_cache, 0),
+            'total_tokens': total_prompt + total_completion,
+            'last_active': last_active,
+            'cost': {
+                'currency': CURRENCY,
+                'input': str(sum_input.quantize(q)),
+                'cache': str(sum_cache_cost.quantize(q)),
+                'output': str(sum_output.quantize(q)),
+                'total': str(sum_total.quantize(q)),
+            },
+        },
+        'visitors': visitor_list,
+    })
 
 
 _AILAB_WORKSPACE_LIST_LIMIT = 500

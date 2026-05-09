@@ -6,7 +6,8 @@ from .views import (
     DeepSeekOCRView, WhisperTranscribeView, PDFExtractView, AiLabImageUploadView, RecipeStepViewSet,
     RecipeIngredientViewSet, AiLabConversationViewSet, AiLabMessageViewSet,
     AiLabNotificationViewSet, ailab_internal_add_message, ailab_internal_push_notification,
-    ailab_me, ailab_redeem_invite, ailab_invites, ailab_workspace, ailab_workspace_preview,
+    ailab_me, ailab_redeem_invite, ailab_invites, ailab_admin_visitor_stats,
+    ailab_workspace, ailab_workspace_preview,
     ailab_skills_browser, ailab_skills_preview,
 )
 
@@ -46,6 +47,8 @@ urlpatterns = [
     path('ai/skills/preview/', ailab_skills_preview, name='ai-skills-preview'),
     path('ai/invites/', ailab_invites, name='ai-invites'),
     path('ai/invites/redeem/', ailab_redeem_invite, name='ai-invites-redeem'),
+    # MyAgent owner 后台：访客用量统计
+    path('ai/admin/visitor-stats/', ailab_admin_visitor_stats, name='ai-admin-visitor-stats'),
     path('tarot/', include('cards.urls')),
     path('tarot/', include('readings.urls')),
     path('tarot/', include('oracle.urls')),

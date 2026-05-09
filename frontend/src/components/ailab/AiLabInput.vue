@@ -10,7 +10,7 @@ const props = defineProps({
   isOcrProcessing: { type: Boolean, default: false },
   recordingDuration: { type: Number, default: 0 },
   hasImage: { type: Boolean, default: false },
-  fileAttachment: { type: Object, default: null },
+  fileAttachments: { type: Array, default: () => [] },
   floating: { type: Boolean, default: true },
   selectedModel: { type: String, default: '' },
   modelOptions: { type: Array, default: () => [] },
@@ -99,14 +99,20 @@ const handleKeydown = (e) => {
 
 const handlePaste = (e) => { emit('paste', e) }
 
-const hasAttachment = computed(() => !!props.fileAttachment)
+const attachments = computed(() => props.fileAttachments || [])
+const hasAttachment = computed(() => attachments.value.length > 0)
+const attachmentCount = computed(() => attachments.value.length)
 
-const fileSizeLabel = computed(() => {
-  const size = props.fileAttachment?.size || 0
+const formatSize = (size) => {
   if (!size) return ''
   if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
   return `${Math.max(1, Math.round(size / 1024))} KB`
-})
+}
+
+const attachmentTooltip = (att) => {
+  const sz = formatSize(att.size)
+  return att.name + (sz ? ' · ' + sz : '')
+}
 
 const formatDuration = (seconds) => {
   const mins = Math.floor(seconds / 60)
@@ -166,37 +172,58 @@ const getInlineSublabel = (option) => {
       <div class="input-shell transition-all">
         <div v-if="hasAttachment" class="attachment-row">
           <div
+            v-for="att in attachments"
+            :key="att.id"
             class="attachment-card"
-            :class="{ 'is-pdf': fileAttachment.type !== 'image' }"
-            :title="fileAttachment.name + (fileSizeLabel ? ' · ' + fileSizeLabel : '')"
+            :class="{
+              'is-pdf': att.type === 'pdf',
+              'is-video': att.type === 'video',
+            }"
+            :title="attachmentTooltip(att)"
           >
             <!-- 图片：直接铺满 -->
             <img
-              v-if="fileAttachment.type === 'image' && fileAttachment.preview"
-              :src="fileAttachment.preview"
+              v-if="att.type === 'image' && att.preview"
+              :src="att.preview"
               class="attachment-card__img"
               alt=""
             />
-            <!-- 图片预览未就绪：FileReader 还在读，先占位（skeleton 闪烁），
-                 避免在加载窗口里短暂掉到下面的 PDF 分支造成"先 PDF 后图"的视觉跳变 -->
             <div
-              v-else-if="fileAttachment.type === 'image'"
+              v-else-if="att.type === 'image'"
               class="attachment-card__skeleton"
               aria-label="图片加载中"
             ></div>
-            <!-- PDF：页面 + 角标 -->
+            <!-- 视频：内嵌缩略 + ▶ 角标 -->
+            <template v-else-if="att.type === 'video'">
+              <video
+                v-if="att.preview"
+                :src="att.preview"
+                class="attachment-card__video"
+                muted
+                preload="metadata"
+                playsinline
+              ></video>
+              <div v-else class="attachment-card__skeleton" aria-label="视频加载中"></div>
+              <span class="attachment-card__video-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+                视频
+              </span>
+            </template>
+            <!-- PDF -->
             <template v-else>
               <div class="attachment-card__pdf-page">
                 <svg class="attachment-card__pdf-glyph" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
                 </svg>
-                <div class="attachment-card__pdf-name">{{ fileAttachment.name }}</div>
+                <div class="attachment-card__pdf-name">{{ att.name }}</div>
               </div>
               <span class="attachment-card__pdf-badge">PDF</span>
             </template>
-            <!-- hover 关闭按钮 -->
+            <!-- 关闭按钮 -->
             <button
-              @click="emit('remove-file')"
+              @click="emit('remove-file', att.id)"
               :disabled="isLoading || isOcrProcessing"
               class="attachment-card__remove"
               title="移除文件"
@@ -205,7 +232,7 @@ const getInlineSublabel = (option) => {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
               </svg>
             </button>
-            <!-- OCR 处理时的 loading 遮罩 -->
+            <!-- 整批处理时的 loading 遮罩 -->
             <div v-if="isOcrProcessing" class="attachment-card__loading">
               <svg class="w-4 h-4 attachment-card__spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
@@ -238,13 +265,13 @@ const getInlineSublabel = (option) => {
               :disabled="isLoading || isOcrProcessing || isRecording"
               class="input-icon-button input-add-button"
               :class="{ active: hasAttachment }"
-              title="上传图片或 PDF"
+              title="上传图片、视频或 PDF（最多 9 个）"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
               </svg>
             </button>
-            <span v-if="hasAttachment" class="attachment-count">1</span>
+            <span v-if="hasAttachment" class="attachment-count">{{ attachmentCount }}</span>
           </div>
 
           <!-- 右侧：模型切换 + 语音 + 发送 -->
@@ -825,6 +852,31 @@ const getInlineSublabel = (option) => {
 /* PDF 卡片：模拟一页文档 */
 .attachment-card.is-pdf {
   background: #fff;
+}
+.attachment-card.is-video {
+  background: #000;
+}
+.attachment-card__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.attachment-card__video-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 .attachment-card__pdf-page {
   position: absolute;

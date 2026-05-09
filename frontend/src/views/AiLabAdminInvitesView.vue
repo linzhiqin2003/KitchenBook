@@ -90,7 +90,10 @@ onMounted(async () => {
           <h1 class="text-[22px] font-semibold tracking-tight" style="color: var(--theme-700);">邀请码管理</h1>
           <p class="text-[13px] mt-1" style="color: var(--theme-500);">生成邀请码分发给信任的访客，他们用码激活后才能使用 MyAgent。</p>
         </div>
-        <router-link to="/ai-lab" class="text-[13px] cursor-pointer" style="color: var(--theme-500);">← 返回 MyAgent</router-link>
+        <div class="flex items-center gap-3 text-[13px]">
+          <router-link to="/ai-lab/admin/usage" class="cursor-pointer hover:underline" style="color: var(--theme-500);">访客用量 →</router-link>
+          <router-link to="/ai-lab" class="cursor-pointer" style="color: var(--theme-500);">← 返回 MyAgent</router-link>
+        </div>
       </div>
 
       <!-- 生成新码 -->

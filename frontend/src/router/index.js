@@ -214,6 +214,12 @@ const router = createRouter({
       component: () => import('../views/AiLabAdminInvitesView.vue'),
       meta: { title: 'MyAgent 邀请码管理' }
     },
+    {
+      path: '/ai-lab/admin/usage',
+      name: 'ai-lab-admin-usage',
+      component: () => import('../views/AiLabAdminUsageView.vue'),
+      meta: { title: 'MyAgent 访客用量' }
+    },
 
     // ========================================
     // Games 模块 - /games 路径下

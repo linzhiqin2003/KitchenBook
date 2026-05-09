@@ -151,6 +151,11 @@ const goInvites = () => {
   router.push('/ai-lab/admin/invites')
 }
 
+const goVisitorUsage = () => {
+  open.value = false
+  router.push('/ai-lab/admin/usage')
+}
+
 const goStats = () => {
   view.value = 'stats'
 }
@@ -254,6 +259,17 @@ onUnmounted(() => {
               <svg class="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
               </svg>
+            </button>
+            <button
+              v-if="me?.is_owner"
+              @click="goVisitorUsage"
+              class="w-full px-4 py-2 flex items-center gap-2 text-left text-[13px] cursor-pointer transition-colors hover:bg-[var(--theme-100)]"
+              style="color: var(--theme-600);"
+            >
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.74-1.22m0 0l-5.94-2.281m5.94 2.281l-2.28 5.941"/>
+              </svg>
+              访客用量
             </button>
             <button
               v-if="me?.is_owner"

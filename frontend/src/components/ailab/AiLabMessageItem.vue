@@ -189,6 +189,45 @@ const subTurns = computed(() => Array.isArray(props.message.subTurns) ? props.me
 const currentReasoning = computed(() => props.message.currentReasoning || '')
 const currentToolCall = computed(() => props.message.currentToolCall || null)
 
+// === 用户消息附件（兼容老 fileAttachment 单数） ===
+const userAttachments = computed(() => {
+  const m = props.message
+  if (Array.isArray(m.fileAttachments) && m.fileAttachments.length) return m.fileAttachments
+  if (m.fileAttachment) return [m.fileAttachment]
+  return []
+})
+const userImageAttachments = computed(() =>
+  userAttachments.value.filter(a => a && a.type === 'image' && (a.dataUrl || a.serverUrl))
+)
+const userVideoAttachments = computed(() =>
+  userAttachments.value.filter(a => a && a.type === 'video' && a.url)
+)
+const userPdfAttachments = computed(() =>
+  userAttachments.value.filter(a => a && a.type === 'pdf')
+)
+const userTextContent = computed(() => {
+  const c = props.message.content || ''
+  // 隐藏带视频时自动追加的 "🎬 file.mp4"、PDF "📄 file.pdf (n 页)" 占位行
+  // —— 它们是发送时的展示行，渲染了 video/pdf 卡片就不再重复
+  if (!userVideoAttachments.value.length && !userPdfAttachments.value.length) return c
+  const lines = c.split('\n')
+  return lines
+    .filter(line => {
+      const t = line.trim()
+      return !t.startsWith('🎬') && !t.startsWith('📄')
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+})
+const showUserText = computed(() => {
+  const txt = userTextContent.value
+  if (!txt) return false
+  // 只有图片时，"(图片)" 占位符不渲染
+  if (txt === '(图片)' && userImageAttachments.value.length) return false
+  return true
+})
+
 const hasTraceTimeline = computed(() => {
   return subTurns.value.length > 0 || Boolean(currentReasoning.value) || Boolean(currentToolCall.value)
 })
@@ -761,34 +800,63 @@ const openImage = (dataUrl) => {
                ref="bubbleRef"
                class="rounded-xl px-4 py-3 leading-relaxed break-words max-w-[600px]"
                style="background: var(--theme-100); color: var(--theme-700); font-size: 15.5px;">
-            <!-- 图片附件缩略图 -->
+            <!-- 多附件渲染 -->
+            <template v-if="userAttachments.length">
+              <!-- 图片：单图占满，多图九宫格 -->
+              <div
+                v-if="userImageAttachments.length"
+                :class="[
+                  'user-attachment-grid',
+                  `count-${Math.min(userImageAttachments.length, 4)}`,
+                  showUserText ? 'mb-2' : ''
+                ]"
+              >
+                <div
+                  v-for="(att, i) in userImageAttachments"
+                  :key="`img-${i}`"
+                  class="user-attachment-grid__cell"
+                  @click="openImage(att.dataUrl || att.serverUrl)"
+                >
+                  <img
+                    :src="att.dataUrl || att.serverUrl"
+                    :alt="att.filename || 'image'"
+                  />
+                </div>
+              </div>
+              <!-- 视频：每个独立 player -->
+              <div
+                v-for="(att, i) in userVideoAttachments"
+                :key="`vid-${i}`"
+                class="user-attachment-video"
+                :class="(showUserText || i < userVideoAttachments.length - 1 || userPdfAttachments.length) ? 'mb-2' : ''"
+              >
+                <video
+                  :src="att.url"
+                  controls
+                  preload="metadata"
+                  playsinline
+                ></video>
+                <div class="user-attachment-video__name">{{ att.filename || 'video' }}</div>
+              </div>
+              <!-- PDF -->
+              <div
+                v-for="(att, i) in userPdfAttachments"
+                :key="`pdf-${i}`"
+                class="user-attachment-pdf"
+                :class="(showUserText || i < userPdfAttachments.length - 1) ? 'mb-2' : ''"
+              >
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m-7 5h8a2 2 0 002-2V8.5L15.5 3H7a2 2 0 00-2 2v14a2 2 0 002 2zm6-18v5h5"/>
+                </svg>
+                <span class="truncate">{{ att.filename || 'document.pdf' }}</span>
+                <span v-if="att.pages" class="opacity-60 shrink-0">· {{ att.pages }} 页</span>
+              </div>
+            </template>
+            <!-- 文本内容（"（图片）"占位符不渲染） -->
             <div
-              v-if="message.fileAttachment && message.fileAttachment.type === 'image' && message.fileAttachment.dataUrl"
-              :class="['user-attachment-image', message.content && message.content !== '(图片)' ? 'mb-2' : '']"
-            >
-              <img
-                :src="message.fileAttachment.dataUrl"
-                :alt="message.fileAttachment.filename || 'image'"
-                @click="openImage(message.fileAttachment.dataUrl)"
-              />
-            </div>
-            <!-- PDF 附件标签 -->
-            <div
-              v-else-if="message.fileAttachment && message.fileAttachment.type === 'pdf'"
-              class="user-attachment-pdf"
-              :class="message.content ? 'mb-2' : ''"
-            >
-              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m-7 5h8a2 2 0 002-2V8.5L15.5 3H7a2 2 0 00-2 2v14a2 2 0 002 2zm6-18v5h5"/>
-              </svg>
-              <span class="truncate">{{ message.fileAttachment.filename || 'document.pdf' }}</span>
-              <span v-if="message.fileAttachment.pages" class="opacity-60 shrink-0">· {{ message.fileAttachment.pages }} 页</span>
-            </div>
-            <!-- 文本内容（"（图片）"占位符不渲染，避免和缩略图重复显示无意义文字） -->
-            <div
-              v-if="message.content && !(message.fileAttachment?.type === 'image' && message.content === '(图片)')"
+              v-if="showUserText"
               class="whitespace-pre-wrap"
-            >{{ message.content }}</div>
+            >{{ userTextContent }}</div>
           </div>
         </div>
       </div>
@@ -1599,6 +1667,64 @@ const openImage = (dataUrl) => {
   border-radius: 0.5rem;
   cursor: zoom-in;
   object-fit: cover;
+}
+
+/* 多图九宫格：1 张占满；2 张并列；3-4 张 2x2；>=5 张 3 列 */
+.user-attachment-grid {
+  display: grid;
+  gap: 4px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  max-width: 480px;
+}
+.user-attachment-grid.count-1 { grid-template-columns: 1fr; }
+.user-attachment-grid.count-2 { grid-template-columns: 1fr 1fr; }
+.user-attachment-grid.count-3,
+.user-attachment-grid.count-4 { grid-template-columns: 1fr 1fr; }
+.user-attachment-grid:not(.count-1):not(.count-2):not(.count-3):not(.count-4) {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.user-attachment-grid__cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: rgba(0, 0, 0, 0.04);
+}
+.user-attachment-grid.count-1 .user-attachment-grid__cell {
+  aspect-ratio: auto;
+  max-height: 320px;
+}
+.user-attachment-grid__cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
+}
+.user-attachment-grid.count-1 .user-attachment-grid__cell img {
+  height: auto;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.user-attachment-video {
+  display: block;
+  max-width: 480px;
+}
+.user-attachment-video video {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  border-radius: 0.5rem;
+  background: #000;
+}
+.user-attachment-video__name {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--theme-500);
+  opacity: 0.85;
+  word-break: break-all;
 }
 
 .user-attachment-pdf {

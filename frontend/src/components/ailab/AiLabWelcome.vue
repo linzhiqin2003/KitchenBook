@@ -9,7 +9,7 @@ const props = defineProps({
   isOcrProcessing: { type: Boolean, default: false },
   recordingDuration: { type: Number, default: 0 },
   hasImage: { type: Boolean, default: false },
-  fileAttachment: { type: Object, default: null },
+  fileAttachments: { type: Array, default: () => [] },
   selectedModel: { type: String, default: '' },
   modelOptions: { type: Array, default: () => [] },
   sessionTokens: {
@@ -59,7 +59,7 @@ const examplePrompts = [
         :is-ocr-processing="isOcrProcessing"
         :recording-duration="recordingDuration"
         :has-image="hasImage"
-        :file-attachment="fileAttachment"
+        :file-attachments="fileAttachments"
         :selected-model="selectedModel"
         :model-options="modelOptions"
         :session-tokens="sessionTokens"
@@ -71,7 +71,7 @@ const examplePrompts = [
         @image-click="emit('image-click')"
         @voice-click="emit('voice-click')"
         @paste="emit('paste', $event)"
-        @remove-file="emit('remove-file')"
+        @remove-file="(id) => emit('remove-file', id)"
       />
 
       <div class="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
