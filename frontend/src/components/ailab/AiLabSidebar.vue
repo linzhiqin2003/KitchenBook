@@ -389,18 +389,31 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s;
+}
+.custom-scrollbar:hover {
+  scrollbar-color: rgba(67, 60, 38, 0.12) transparent;
+}
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
+  background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
+  background: transparent;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(67, 60, 38, 0.1);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: rgba(67, 60, 38, 0.18);
 }
 
 /* Modal transition */

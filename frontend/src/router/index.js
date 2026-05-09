@@ -242,6 +242,17 @@ const router = createRouter({
 // 路由守卫
 let initPromise = null
 
+// agent.* 子域名是 ailab 专属入口 —— 根路径以及任何非 ailab 路径都重定向到 /ai-lab
+const AILAB_HOST_RE = /^agent\./i
+router.beforeEach((to, from, next) => {
+  if (typeof window !== 'undefined' && AILAB_HOST_RE.test(window.location.hostname)) {
+    if (to.path === '/' || (!to.path.startsWith('/ai-lab') && !to.path.startsWith('/login'))) {
+      return next({ path: '/ai-lab', query: to.query, hash: to.hash })
+    }
+  }
+  return next()
+})
+
 router.beforeEach(async (to, from, next) => {
   // 动态设置页面标题
   document.title = to.meta.title || DEFAULT_TITLE
