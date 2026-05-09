@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
 import { useAuthStore } from '../../store/auth'
 import api from '../../api/client'
+import EntryIcon from './EntryIcon.vue'
 
 const authStore = useAuthStore()
 
@@ -578,7 +579,14 @@ const selectSkill = (skill) => {
   selectedSkillName.value = skill.name
 }
 
-// 双击：弹浮窗，展示该 skill 的文件浏览器；切换 skill 时重置路径。
+// 双击：直接预览该 skill 的 SKILL.md。需要看完整目录用 folder 按钮入口。
+const openSkillReadme = async (skill) => {
+  if (!skill?.name) return
+  selectedSkillName.value = skill.name
+  await previewSkillEntry({ name: 'SKILL.md', path: 'SKILL.md' })
+}
+
+// folder 按钮：弹浮窗展示该 skill 的目录结构。切换 skill 时重置路径。
 const openSkillBrowser = async (skill) => {
   if (!skill?.name) return
   if (selectedSkillName.value !== skill.name) {
@@ -638,9 +646,10 @@ defineExpose({
 
       <div class="flex items-center justify-between px-4 pt-3.5 pb-2.5">
         <div class="flex items-center gap-2">
-          <span class="relative flex items-center justify-center w-5 h-5 rounded-md" style="background: var(--ai-accent-soft);">
-            <span class="w-1.5 h-1.5 rounded-full" style="background: var(--ai-accent);"></span>
-            <span class="absolute inset-0 rounded-md" style="box-shadow: 0 0 0 1px rgba(61,124,201,0.15);"></span>
+          <span class="flex items-center justify-center w-5 h-5 rounded-md" style="background: var(--ai-accent-soft); color: var(--ai-accent);">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
+            </svg>
           </span>
           <span class="text-[13.5px] font-semibold tracking-tight" style="color: #2c2c30;">Agent Panel</span>
         </div>
@@ -756,18 +765,27 @@ defineExpose({
                   class="card-item flex items-start justify-between gap-2 px-3 py-2 rounded-lg cursor-pointer relative"
                   :class="{ 'is-selected': skill.isSelected }"
                   @click="selectSkill(skill)"
-                  @dblclick="openSkillBrowser(skill)">
+                  @dblclick="openSkillReadme(skill)">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1.5">
                       <span class="text-[13.5px] truncate font-medium" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</span>
                     </div>
                     <div v-if="skill.description" class="text-[11px] mt-0.5 line-clamp-2 leading-snug" style="color: #9a9aa0;">{{ skill.description }}</div>
                   </div>
-                  <button @click.stop="toggleSkill(skill)"
-                    class="toggle-pill shrink-0 ml-2 cursor-pointer text-[10.5px] font-semibold uppercase tracking-wider transition-all"
-                    :class="{ 'is-on': skill.enabled }">
-                    {{ skill.enabled ? 'on' : 'off' }}
-                  </button>
+                  <div class="shrink-0 ml-2 flex items-center gap-1">
+                    <button @click.stop="openSkillBrowser(skill)"
+                      class="icon-btn cursor-pointer transition-all"
+                      title="查看文件目录">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"/>
+                      </svg>
+                    </button>
+                    <button @click.stop="toggleSkill(skill)"
+                      class="toggle-pill cursor-pointer text-[10.5px] font-semibold uppercase tracking-wider transition-all"
+                      :class="{ 'is-on': skill.enabled }">
+                      {{ skill.enabled ? 'on' : 'off' }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -803,17 +821,7 @@ defineExpose({
                 @click="selectMemoryEntry(entry)"
                 @dblclick="openMemoryEntry(entry)"
               >
-                <span class="entry-icon shrink-0 mt-0.5" :data-kind="entry.type">
-                  <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
-                  </svg>
-                  <svg v-else-if="entry.type === 'symlink'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 016.364 6.364l-1.757 1.757a4.5 4.5 0 01-6.364 0m-1.414-9.9a4.5 4.5 0 00-6.364 0L2.44 8.666a4.5 4.5 0 006.364 6.364l1.757-1.757" />
-                  </svg>
-                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.625a1.125 1.125 0 00-1.125-1.125H8.25m11.25 9.75h-2.625a1.125 1.125 0 00-1.125 1.125V18m4.875-3.75l-3.375 3.375a2.25 2.25 0 01-1.59.659H6.375A1.125 1.125 0 015.25 17.16V5.625A1.125 1.125 0 016.375 4.5H8.25m0 0l2.25 2.25m-2.25-2.25V6.75m0-2.25h6.75" />
-                  </svg>
-                </span>
+                <EntryIcon :entry="entry" class="mt-0.5" />
 
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 min-w-0">
@@ -905,17 +913,7 @@ defineExpose({
               @click="selectWorkspaceEntry(entry)"
               @dblclick="openWorkspaceEntry(entry)"
             >
-              <span class="entry-icon shrink-0 mt-0.5" :data-kind="entry.type">
-                <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
-                </svg>
-                <svg v-else-if="entry.type === 'symlink'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 016.364 6.364l-1.757 1.757a4.5 4.5 0 01-6.364 0m-1.414-9.9a4.5 4.5 0 00-6.364 0L2.44 8.666a4.5 4.5 0 006.364 6.364l1.757-1.757" />
-                </svg>
-                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.625a1.125 1.125 0 00-1.125-1.125H8.25m11.25 9.75h-2.625a1.125 1.125 0 00-1.125 1.125V18m4.875-3.75l-3.375 3.375a2.25 2.25 0 01-1.59.659H6.375A1.125 1.125 0 015.25 17.16V5.625A1.125 1.125 0 016.375 4.5H8.25m0 0l2.25 2.25m-2.25-2.25V6.75m0-2.25h6.75" />
-                </svg>
-              </span>
+              <EntryIcon :entry="entry" class="mt-0.5" />
 
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
@@ -1090,30 +1088,17 @@ defineExpose({
             <button
               v-for="entry in skillBrowserEntries"
               :key="`${selectedSkillName}-${entry.path}`"
-              class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
-              :style="skillBrowserSelectedPath === entry.path
-                ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
-                : 'background: #fff; border: 1px solid #ececef;'"
+              class="card-item w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left cursor-pointer relative"
+              :class="{ 'is-selected': skillBrowserSelectedPath === entry.path }"
               @click="selectSkillBrowserEntry(entry)"
               @dblclick="openSkillBrowserEntry(entry)"
             >
-              <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
-                <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
-                </svg>
-                <svg v-else-if="entry.type === 'symlink'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 016.364 6.364l-1.757 1.757a4.5 4.5 0 01-6.364 0m-1.414-9.9a4.5 4.5 0 00-6.364 0L2.44 8.666a4.5 4.5 0 006.364 6.364l1.757-1.757" />
-                </svg>
-                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.625a1.125 1.125 0 00-1.125-1.125H8.25m11.25 9.75h-2.625a1.125 1.125 0 00-1.125 1.125V18m4.875-3.75l-3.375 3.375a2.25 2.25 0 01-1.59.659H6.375A1.125 1.125 0 015.25 17.16V5.625A1.125 1.125 0 016.375 4.5H8.25m0 0l2.25 2.25m-2.25-2.25V6.75m0-2.25h6.75" />
-                </svg>
-              </span>
+              <EntryIcon :entry="entry" class="mt-0.5" />
 
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
-                  <span class="text-[13px] truncate" style="color: #2c2c30;">{{ entry.name }}</span>
-                  <span v-if="entry.type === 'dir' && entry.has_children" class="text-[10px] shrink-0" style="color: #b0b0b6;">folder</span>
-                  <span v-else-if="entry.type !== 'dir'" class="text-[11px] shrink-0" style="color: #9a9aa0;">{{ formatWorkspaceSize(entry.size) }}</span>
+                  <span class="text-[13px] truncate font-medium" style="color: #2c2c30;">{{ entry.name }}</span>
+                  <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: #8a8a90;">{{ formatWorkspaceSize(entry.size) }}</span>
                 </div>
                 <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
                   <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
@@ -1372,11 +1357,21 @@ defineExpose({
   line-height: 1.5;
 }
 
-/* Entry icon kinds */
-.entry-icon[data-kind="dir"] { color: var(--ai-accent); }
-.entry-icon[data-kind="symlink"] { color: #8b5cf6; }
-.entry-icon[data-kind="file"],
-.entry-icon:not([data-kind="dir"]):not([data-kind="symlink"]) { color: #8a8a93; }
+/* Icon button (e.g. folder shortcut on skill cards) */
+.icon-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #9a9aa0;
+  background: transparent;
+}
+.icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--ai-accent);
+}
 
 /* Files header */
 .files-header {
