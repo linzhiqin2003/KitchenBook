@@ -63,16 +63,6 @@ def get_pricing(model: Optional[str]) -> Dict[str, Decimal]:
     return PRICING[DEFAULT_MODEL]
 
 
-def supports_cache(model: Optional[str]) -> bool:
-    """这个模型是否启用 prompt cache（用于决定是否对 cache_tokens=0
-    的轮做"同 session 历史 100% 命中"估算）。
-
-    当前 PRICING 里出现的全部当作支持——DeepSeek V4 / 小米 MiMo 系
-    都有 cache 能力，差别只在上游有没有把字段传回来。
-    """
-    return normalize_model_name(model) in PRICING
-
-
 def estimate_cost(
     *,
     prompt_tokens: int,
