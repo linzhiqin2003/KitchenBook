@@ -1229,7 +1229,10 @@ const streamResponse = async (fileContent = null, options = {}) => {
         const trailingTextSegments = []
         for (const att of atts) {
           if (att.type === 'image') {
-            const url = _absUrl(att.dataUrl) || _absUrl(att.serverUrl)
+            // 优先用上传到 MEDIA 的 web URL（小、稳定、上游兼容性好）。
+            // base64 dataUrl 单张就几百 KB，多图叠加会让请求体涨到几 MB，
+            // 不少上游网关 / provider 会直接拒掉或超时（用户报"多图模型不回复"）。
+            const url = _absUrl(att.serverUrl) || _absUrl(att.dataUrl)
             if (url) imageParts.push({ type: 'image_url', image_url: { url } })
           } else if (att.type === 'video') {
             const url = _absUrl(att.url)
