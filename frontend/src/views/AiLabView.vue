@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../config/api'
+import API_BASE_URL, { getHermesApiUrl, setHermesPath, HERMES_API_KEY } from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
 import AiLabPanel from '../components/ailab/AiLabPanel.vue'
 import { useRouter } from 'vue-router'
@@ -1308,7 +1308,7 @@ const streamResponse = async (fileContent = null, options = {}) => {
       // edit / regenerate 后让 Hermes 信任请求体里的 messages，不要从 state.db 重放旧消息
       chatHeaders['X-Hermes-History-Source'] = 'request'
     }
-    const response = await fetch(`${HERMES_API_URL}/v1/chat/completions`, {
+    const response = await fetch(`${getHermesApiUrl()}/v1/chat/completions`, {
       method: 'POST',
       headers: chatHeaders,
       body: JSON.stringify({
@@ -1865,6 +1865,10 @@ const verifyAiLabAccess = async () => {
     const me = await r.json()
     if (!me.is_owner && !me.ai_lab_enabled) {
       router.replace('/ai-lab/activate')
+    }
+    // 设置用户专属 Hermes 路径（多容器隔离）
+    if (me.hermes_path) {
+      setHermesPath(me.hermes_path)
     }
   } catch { /* silent */ }
 }

@@ -1,89 +1,112 @@
-# ailab Hermes Agent — containerized
+# ailab Hermes Agent — per-user containerized
 #
-# 一台主机上的拓扑（host 上有 Django + MCP server，容器只跑 Hermes）：
+# 多用户隔离拓扑（每个用户一个独立 Hermes 容器）：
 #
-#   nginx (host) ──/hermes/──→ 127.0.0.1:8642 ──→ container:8642
-#                                                    │
-#                                                    └──→ host.docker.internal:8004 (Django)
-#                                                    └──→ host.docker.internal:8100 (MCP HTTP)
+#   nginx (host) ──/hermes/u1/──→ 127.0.0.1:8642 ──→ hermes-user1:8642
+#               ──/hermes/u2/──→ 127.0.0.1:8643 ──→ hermes-user2:8642
+#               ──/hermes/u3/──→ 127.0.0.1:8644 ──→ hermes-user3:8642
+#
+# 每个容器内部端口都是 8642，只是宿主机映射端口不同。
+# 数据完全隔离：各自 bind mount 独立数据卷，共享只读 skills 目录。
 #
 # 启动：
 #   cp .env.example .env  # 填 HERMES_INTERNAL_TOKEN，按需改路径
 #   HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up -d
 #
-# Mac 开发：默认 .env 里把 HERMES_HOST_DATA 改成 $HOME/.ailab-hermes 之类。
+# Mac 开发：默认 .env 里把 HERMES_U*_DATA 改成 $HOME/.ailab-hermes/users/* 之类。
+#
+# 新增用户：
+#   1. 在本文件中添加 hermes-userN 服务
+#   2. 在 .env 中添加 HERMES_UN_DATA 路径
+#   3. 在 nginx.conf 中添加 /hermes/uN/ location
+#   4. 在 Django settings HERMES_USER_CONTAINERS 中添加映射
+
+x-hermes-common: &hermes-common
+  image: ailab/hermes:${HERMES_TAG:-latest}
+  build:
+    context: ../..
+    dockerfile: deploy/docker/Dockerfile.ailab
+    args:
+      HERMES_VERSION: ${HERMES_VERSION:-853ed609a1a4ac056e810d7d3172c71517762420}
+  restart: unless-stopped
+  networks:
+    - ailab-net
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  environment: &hermes-env
+    HERMES_UID: ${HERMES_UID:-1000}
+    HERMES_GID: ${HERMES_GID:-1000}
+    DJANGO_BASE_URL: http://host.docker.internal:8004
+    HERMES_INTERNAL_TOKEN: ${HERMES_INTERNAL_TOKEN}
+    API_SERVER_HOST: 0.0.0.0
+    API_SERVER_KEY: ${HERMES_API_KEY:-ailab-hermes-2026}
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  # 每用户资源限制（多实例共存，保守分配）
+  mem_limit: 512m
+  memswap_limit: 768m
+  cpus: 1.0
+  pids_limit: 1024
 
 services:
-  hermes:
-    image: ailab/hermes:${HERMES_TAG:-latest}
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.ailab
-      args:
-        HERMES_VERSION: ${HERMES_VERSION:-853ed609a1a4ac056e810d7d3172c71517762420}
-    container_name: ailab-hermes
-    restart: unless-stopped
-
-    # 隔离：自定义 bridge 网络（不用 host network）
-    networks:
-      - ailab-net
-
-    # 端口仅暴露给 host loopback —— 公网由 nginx 代理 /hermes/
+  # ──────────────────────────────────────
+  # User 1 — owner / 主账号
+  # ──────────────────────────────────────
+  hermes-user1:
+    <<: *hermes-common
+    container_name: ailab-hermes-u1
     ports:
       - "127.0.0.1:8642:8642"
-
-    # Linux 上让容器解析 host.docker.internal → 宿主网卡
-    # （Docker Desktop 上原生支持，写了也无害）
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
     volumes:
-      # Hermes 数据目录：sessions / cron / memories / workspace 等
-      # 服务器：bind mount /home/admin/.hermes（保留现有 13MB 数据，零迁移）
-      # Mac:    bind mount $HOME/.ailab-hermes（首次启动 entrypoint 会建模板）
-      - ${HERMES_HOST_DATA:-./hermes-data}:/opt/data
-      # ailab 项目自定义技能（只读）
+      - ${HERMES_U1_DATA:-./hermes-data-u1}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
-
-    environment:
-      # 把容器内 hermes 用户重映射到 host admin 用户，避免 bind mount 文件 owner 错乱
-      HERMES_UID: ${HERMES_UID:-1000}
-      HERMES_GID: ${HERMES_GID:-1000}
-      # Hermes patch 08 通过此 token 反向调 Django 写消息
-      DJANGO_BASE_URL: http://host.docker.internal:8004
-      HERMES_INTERNAL_TOKEN: ${HERMES_INTERNAL_TOKEN}
-      # 让 hermes API server bind 0.0.0.0 而不是 localhost
-      # —— docker port forward 要求绑非 loopback，外部安全靠 ports: 127.0.0.1:8642 限制
-      # API_SERVER_KEY 是 hermes 内置 OpenAI Bearer auth 用的（前端 HERMES_API_KEY）
-      API_SERVER_HOST: 0.0.0.0
-      API_SERVER_KEY: ${HERMES_API_KEY:-ailab-hermes-2026}
-
-    # ===== 资源上限 =====
-    # 服务器 3.5GB RAM + 2GB swap，给容器 1.5GB 上限
-    mem_limit: 1536m
-    memswap_limit: 2560m
-    cpus: 2.0
-    pids_limit: 2048
-
-    # ===== 安全 =====
-    # 容器内允许工具自由读写 /opt/data + /tmp（沙盒内自由），
-    # 但禁止提权 + 没有 docker.sock 挂载 → 出不去
-    security_opt:
-      - no-new-privileges:true
-
-    # ===== 日志收口（防止 log 撑爆磁盘） =====
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H \"Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}\" >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 60s
+
+  # ──────────────────────────────────────
+  # User 2 — 访客账号
+  # ──────────────────────────────────────
+  hermes-user2:
+    <<: *hermes-common
+    container_name: ailab-hermes-u2
+    ports:
+      - "127.0.0.1:8643:8642"
+    volumes:
+      - ${HERMES_U2_DATA:-./hermes-data-u2}:/opt/data
+      - ../../skills:/opt/ailab-skills:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # ──────────────────────────────────────
+  # User 3 — 如需更多用户，复制此模板并递增端口
+  # ──────────────────────────────────────
+  # hermes-user3:
+  #   <<: *hermes-common
+  #   container_name: ailab-hermes-u3
+  #   ports:
+  #     - "127.0.0.1:8644:8642"
+  #   volumes:
+  #     - ${HERMES_U3_DATA:-./hermes-data-u3}:/opt/data
+  #     - ../../skills:/opt/ailab-skills:ro
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 60s
 
 networks:
   ailab-net:

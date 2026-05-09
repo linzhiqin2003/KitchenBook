@@ -1745,6 +1745,8 @@ def ailab_me(request):
                 avatar_url = ''
         if not avatar_url:
             avatar_url = profile.avatar_url or ''
+    containers = getattr(settings, 'HERMES_USER_CONTAINERS', {})
+    hermes_path = f"/hermes/u{u.id}" if u.id in containers else None
     return Response({
         'id': u.id,
         'username': u.username,
@@ -1753,6 +1755,7 @@ def ailab_me(request):
         'avatar_url': avatar_url,
         'is_owner': is_ai_lab_owner(u),
         'ai_lab_enabled': has_ai_lab_access(u),
+        'hermes_path': hermes_path,
     })
 
 
@@ -2301,6 +2304,11 @@ _AILAB_WORKSPACE_TEXT_EXTS = {
 
 def _ailab_user_workspace_root(user_id: int) -> Path:
     """Return the per-user Hermes workspace root mirrored by AI Lab."""
+    # 多容器隔离模式：从映射表读取宿主机 bind mount 路径
+    containers = getattr(settings, 'HERMES_USER_CONTAINERS', {})
+    if user_id in containers:
+        return Path(containers[user_id]['data_dir'])
+    # 回退：共享实例模式，读 ~/.hermes/users/<uid>/
     hermes_home = Path(os.path.expanduser(getattr(settings, 'HERMES_HOME', '~/.hermes')))
     return hermes_home / 'users' / str(user_id)
 

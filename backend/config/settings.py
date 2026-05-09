@@ -42,8 +42,10 @@ CSRF_TRUSTED_ORIGINS = [
     # 新域名 - lzqqq.org
     'https://lzqqq.org',
     'https://www.lzqqq.org',
+    'https://agent.lzqqq.org',
     'http://lzqqq.org',
     'http://www.lzqqq.org',
+    'http://agent.lzqqq.org',
     # 旧域名 - lzqqqkitchen.org (迁移期间保留)
     'https://lzqqqkitchen.org',
     'https://www.lzqqqkitchen.org',
@@ -252,6 +254,11 @@ CEREBRAS_API_KEY_POOL = os.environ.get('CEREBRAS_API_KEY_POOL', '')
 # 用这个 secret 调 Django 的 messages/internal/ 端点把最终结果落库。
 # Hermes systemd unit 需 export 同名环境变量。
 HERMES_INTERNAL_TOKEN = os.environ.get('HERMES_INTERNAL_TOKEN', '')
+
+# 每个用户的 Hermes 容器映射
+# key: Django user id, value: {"port": 宿主机端口, "data_dir": bind mount 宿主路径}
+# 部署时根据实际启用 AI Lab 的用户填写，与 docker-compose.yml / nginx.conf 保持同步。
+HERMES_USER_CONTAINERS = {}
 
 # MyAgent 主人账号 —— 可以无限制使用 AI Lab、生成邀请码、看到所有 admin UI。
 # 逗号分隔的 username 或 email；is_superuser=True 也算 owner。

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { HERMES_API_URL, HERMES_API_KEY } from '../../config/api'
+import { getHermesApiUrl, HERMES_API_KEY } from '../../config/api'
 import { useAuthStore } from '../../store/auth'
 import api from '../../api/client'
 import EntryIcon from './EntryIcon.vue'
@@ -115,7 +115,7 @@ const responseErrorMessage = (data, fallback) => {
 const fetchTools = async () => {
   loadingTools.value = true
   try {
-    const r = await fetch(`${HERMES_API_URL}/api/tools`, { headers: headers.value })
+    const r = await fetch(`${getHermesApiUrl()}/api/tools`, { headers: headers.value })
     if (r.ok) {
       const data = await r.json()
       tools.value = data.tools || []
@@ -126,7 +126,7 @@ const fetchTools = async () => {
 
 const toggleTool = async (tool) => {
   try {
-    await fetch(`${HERMES_API_URL}/api/tools/toggle`, {
+    await fetch(`${getHermesApiUrl()}/api/tools/toggle`, {
       method: 'POST', headers: headers.value,
       body: JSON.stringify({ name: tool.name, enable: !tool.enabled })
     })
@@ -137,7 +137,7 @@ const toggleTool = async (tool) => {
 const fetchSkills = async () => {
   loadingSkills.value = true
   try {
-    const r = await fetch(`${HERMES_API_URL}/api/skills`, { headers: headers.value })
+    const r = await fetch(`${getHermesApiUrl()}/api/skills`, { headers: headers.value })
     if (r.ok) {
       const data = await r.json()
       skills.value = data.skills || []
@@ -160,7 +160,7 @@ const fetchSkills = async () => {
 const toggleSkill = async (skill) => {
   const next = !skill.enabled
   try {
-    const r = await fetch(`${HERMES_API_URL}/api/skills/toggle`, {
+    const r = await fetch(`${getHermesApiUrl()}/api/skills/toggle`, {
       method: 'POST', headers: headers.value,
       body: JSON.stringify({ name: skill.name, enable: next })
     })
