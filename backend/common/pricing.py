@@ -14,19 +14,22 @@ from decimal import Decimal
 from typing import Any, Dict, Optional
 
 
-# USD per 1 million tokens. DeepSeek V4 系列以 OpenRouter 现价为准；
-# mimo 系直接照 OpenRouter dashboard。cache 价没明示的取 input 的 10%
-# （DeepSeek 官方 cache 大约 1/10 input 的经验比例）。
+# USD per 1 million tokens.
+# DeepSeek V4 系列：以 https://api-docs.deepseek.com/quick_start/pricing 为准。
+# 自 2026-04-26 12:15 UTC 起，DeepSeek 把 cache hit 价砍到了 launch 价的 1/10。
+# Flash 当前 cache hit = input × 2% (= $0.0028)；Pro 当前 cache hit = $0.003625
+# (这是 75% off 价；peak 时价是 $0.0145，按 multi-tier 优先取 off-peak 实价记账)。
+# mimo 系直接照 OpenRouter dashboard。
 PRICING: Dict[str, Dict[str, Decimal]] = {
     "deepseek-v4-flash": {
         "input": Decimal("0.14"),
         "output": Decimal("0.28"),
-        "cache": Decimal("0.014"),
+        "cache": Decimal("0.0028"),
     },
     "deepseek-v4-pro": {
         "input": Decimal("0.435"),
         "output": Decimal("0.87"),
-        "cache": Decimal("0.0435"),
+        "cache": Decimal("0.003625"),
     },
     "xiaomi/mimo-v2.5": {
         "input": Decimal("0.4"),
