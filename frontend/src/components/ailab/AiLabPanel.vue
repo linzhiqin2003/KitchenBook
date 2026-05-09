@@ -834,21 +834,7 @@ defineExpose({
 
         <template v-if="activeTab === 'files'">
           <div class="files-header rounded-xl mb-3 overflow-hidden">
-            <div class="px-3 pt-2.5 pb-2 flex items-center gap-1.5 flex-wrap">
-              <button
-                v-for="root in workspaceRoots"
-                :key="root.key"
-                @click="openWorkspaceRoot(root.key)"
-                class="root-chip px-2.5 py-1 rounded-md text-[11.5px] cursor-pointer transition-all font-medium"
-                :class="{ 'is-active': workspaceActiveRoot === root.key }"
-              >
-                {{ root.label }}
-              </button>
-            </div>
-            <div class="px-3 pb-2 text-[10.5px] break-all" style="color: var(--theme-400); font-family: var(--ai-font-mono);">
-              {{ workspaceRootHint }}
-            </div>
-            <div class="files-toolbar px-2 py-1.5 flex items-center gap-1 flex-wrap" style="border-top: 1px solid rgba(0,0,0,0.05);">
+            <div class="files-toolbar px-2 py-1.5 flex items-center gap-1 flex-wrap">
               <button
                 class="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
                 :disabled="!workspaceCanGoUp"

@@ -312,7 +312,7 @@ onUnmounted(() => {
 
     <!-- 底部用户菜单 -->
     <div class="px-3 pt-3 pb-4 shrink-0" :class="isCollapsed ? 'flex justify-center' : ''">
-      <AiLabUserMenu placement="up" align="left" :show-name="true" />
+      <AiLabUserMenu placement="up" align="left" :show-name="!isCollapsed" />
     </div>
 
     <!-- 拖动 resize 手柄 -->

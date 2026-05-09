@@ -1,0 +1,12 @@
+{
+  "sandbox": {
+    "excludedCommands": ["git", "ssh", "sshpass"],
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "githubusercontent.com",
+        "47.237.121.152"
+      ]
+    }
+  }
+}
