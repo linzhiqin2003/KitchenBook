@@ -1242,6 +1242,12 @@ const streamResponse = async (fileContent = null, options = {}) => {
   const _absUrl = (u) => {
     if (!u) return null
     if (u.startsWith('data:') || u.startsWith('http')) return u
+    // ⚠️ 生产 API_BASE_URL='' (相对路径)，给 LLM image_url 时上游 OpenRouter / mimo
+    // 拿到 '/media/...' 这种相对 URL 完全 fetch 不到。必须用 window.location.origin
+    // 拼成公网可访问的绝对 URL（生产: https://www.lzqqq.org/media/...）。
+    if (u.startsWith('/') && typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin + u
+    }
     return `${API_BASE_URL}${u}`
   }
   const apiMessages = messages.value
