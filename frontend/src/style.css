@@ -6,18 +6,18 @@
    AI Lab route (including /ai-lab/studio entered via direct refresh) can
    resolve var(--theme-*) without depending on AiLabView being mounted. */
 :root {
-  /* Warm cream theme — Claude.ai paper aesthetic */
-  --theme-50: #faf9f5;   /* main bg / paper */
-  --theme-100: #f0ede1;  /* sidebar / panel surface */
-  --theme-200: #e6e2d2;  /* divider / border */
-  --theme-300: #d4cfb8;  /* disabled border */
-  --theme-400: #9b9784;  /* placeholder / icon */
-  --theme-500: #6e695a;  /* secondary text */
-  --theme-600: #4a4639;  /* body text */
-  --theme-700: #2c2a20;  /* heading */
-  --theme-gradient: #2c2a20;
-  --theme-gradient-btn: #2c2a20;
-  --theme-shadow: rgba(67, 60, 38, 0.08);
+  /* Neutral gray theme — clean white aesthetic */
+  --theme-50: #fafafa;   /* main bg / paper */
+  --theme-100: #f3f3f3;  /* sidebar / panel surface */
+  --theme-200: #e7e7e7;  /* active state / highlight */
+  --theme-300: #d6d6d6;  /* divider / border */
+  --theme-400: #9e9e9e;  /* placeholder / icon */
+  --theme-500: #6b6b6b;  /* secondary text */
+  --theme-600: #484848;  /* body text */
+  --theme-700: #1a1a1a;  /* heading */
+  --theme-gradient: #1a1a1a;
+  --theme-gradient-btn: #1a1a1a;
+  --theme-shadow: rgba(0, 0, 0, 0.06);
   /* Accent: warm clay/terracotta — Anthropic-inspired */
   --ai-accent: #c97956;
   --ai-accent-hover: #b56947;

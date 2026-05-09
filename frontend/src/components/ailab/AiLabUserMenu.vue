@@ -12,6 +12,8 @@ const props = defineProps({
   placement: { type: String, default: 'down' },
   // 'right' (默认) | 'left' — 弹窗水平对齐方向
   align: { type: String, default: 'right' },
+  // 是否在按钮旁显示用户名
+  showName: { type: Boolean, default: false },
 })
 
 const open = ref(false)
@@ -190,23 +192,32 @@ onUnmounted(() => {
 
 <template>
   <div ref="wrapperRef" class="relative inline-block">
-    <button
+    <div
       @click.stop="open = !open"
-      class="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer relative overflow-hidden"
-      :style="open
-        ? 'background: var(--theme-700); color: var(--theme-50); border: 1px solid var(--theme-700);'
-        : 'background: #fff; color: var(--theme-700); border: 1px solid var(--theme-300);'"
+      class="flex items-center gap-2 cursor-pointer group"
       :title="displayName"
     >
-      <img v-if="me?.avatar_url" :src="me.avatar_url" class="w-full h-full object-cover" />
-      <span v-else class="text-[12px] font-semibold tracking-tight">{{ initials }}</span>
+      <div
+        class="w-8 h-8 rounded-full flex items-center justify-center transition-all relative overflow-hidden shrink-0"
+        :style="open
+          ? 'background: var(--theme-700); color: var(--theme-50); border: 1px solid var(--theme-700);'
+          : 'background: #fff; color: var(--theme-700); border: 1px solid var(--theme-300);'"
+      >
+        <img v-if="me?.avatar_url" :src="me.avatar_url" class="w-full h-full object-cover" />
+        <span v-else class="text-[12px] font-semibold tracking-tight">{{ initials }}</span>
+        <span
+          v-if="me?.is_owner"
+          class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full"
+          style="background: var(--ai-accent, var(--ai-accent)); border: 1.5px solid #fff;"
+          title="Owner"
+        ></span>
+      </div>
       <span
-        v-if="me?.is_owner"
-        class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full"
-        style="background: var(--ai-accent, var(--ai-accent)); border: 1.5px solid #fff;"
-        title="Owner"
-      ></span>
-    </button>
+        v-if="showName"
+        class="text-[13px] font-medium truncate max-w-[120px] group-hover:text-[var(--theme-700)] transition-colors"
+        style="color: var(--theme-600);"
+      >{{ displayName }}</span>
+    </div>
 
     <Transition name="panel">
       <div

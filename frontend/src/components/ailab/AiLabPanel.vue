@@ -1396,9 +1396,9 @@ defineExpose({
   background: rgba(0, 0, 0, 0.035);
 }
 .root-chip.is-active {
-  background: var(--theme-700, #2c2a20);
-  color: var(--theme-50, #faf9f5);
-  box-shadow: 0 1px 2px rgba(67, 60, 38, 0.12);
+  background: var(--theme-700, #1a1a1a);
+  color: var(--theme-50, #fafafa);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Resize handle grip */

@@ -195,13 +195,13 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col relative ai-sidebar"
        :style="{
-         background: '#ffffff',
+         background: '#f8f8f8',
          fontFamily: 'var(--ai-font-body)',
          height: '100dvh',
          width: isCollapsed ? '0px' : sidebarWidth + 'px',
          minWidth: isCollapsed ? '0px' : sidebarWidth + 'px',
          transition: isResizing ? 'none' : 'width 0.3s, min-width 0.3s',
-         boxShadow: isCollapsed ? 'none' : '4px 0 16px -2px rgba(67, 60, 38, 0.08), 1px 0 0 rgba(67, 60, 38, 0.06)',
+         boxShadow: isCollapsed ? 'none' : '1px 0 0 rgba(0, 0, 0, 0.06)',
        }"
        :class="[
          isCollapsed ? 'overflow-hidden lg:!w-16 lg:!min-w-16' : '',
@@ -312,7 +312,7 @@ onUnmounted(() => {
 
     <!-- 底部用户菜单 -->
     <div class="px-3 pt-3 pb-4 shrink-0" :class="isCollapsed ? 'flex justify-center' : ''">
-      <AiLabUserMenu placement="up" align="left" />
+      <AiLabUserMenu placement="up" align="left" :show-name="true" />
     </div>
 
     <!-- 拖动 resize 手柄 -->
@@ -395,7 +395,7 @@ onUnmounted(() => {
   transition: scrollbar-color 0.2s;
 }
 .custom-scrollbar:hover {
-  scrollbar-color: rgba(67, 60, 38, 0.12) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
@@ -410,10 +410,10 @@ onUnmounted(() => {
   transition: background 0.2s;
 }
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: rgba(67, 60, 38, 0.1);
+  background: rgba(0, 0, 0, 0.1);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(67, 60, 38, 0.18);
+  background: rgba(0, 0, 0, 0.15);
 }
 
 /* Modal transition */
