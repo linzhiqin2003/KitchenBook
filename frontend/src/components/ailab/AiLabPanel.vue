@@ -14,6 +14,13 @@ const emit = defineEmits(['close'])
 
 const activeTab = ref('tools')
 const tabs = ['tools', 'skills', 'memory', 'files', 'notifications']
+const TAB_META = {
+  tools: { label: 'Tools', icon: 'wrench' },
+  skills: { label: 'Skills', icon: 'sparkles' },
+  memory: { label: 'Memory', icon: 'memory' },
+  files: { label: 'Files', icon: 'folder' },
+  notifications: { label: 'Inbox', icon: 'bell' },
+}
 const tools = ref([])
 const skills = ref([])
 const selectedSkillName = ref('')
@@ -629,63 +636,100 @@ defineExpose({
         @pointerdown="startResize"
       ></div>
 
-      <div class="flex items-center justify-between px-4 pt-3 pb-2">
-        <span class="text-[14px] font-semibold" style="color: #2c2c30;">Agent Panel</span>
-        <button @click="emit('close')" class="p-1 rounded-md cursor-pointer hover:bg-black/[0.04]" style="color: #9a9aa0;">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
+      <div class="flex items-center justify-between px-4 pt-3.5 pb-2.5">
+        <div class="flex items-center gap-2">
+          <span class="relative flex items-center justify-center w-5 h-5 rounded-md" style="background: var(--ai-accent-soft);">
+            <span class="w-1.5 h-1.5 rounded-full" style="background: var(--ai-accent);"></span>
+            <span class="absolute inset-0 rounded-md" style="box-shadow: 0 0 0 1px rgba(61,124,201,0.15);"></span>
+          </span>
+          <span class="text-[13.5px] font-semibold tracking-tight" style="color: #2c2c30;">Agent Panel</span>
+        </div>
+        <div class="flex items-center gap-0.5">
+          <button
+            v-if="activeTab !== 'notifications'"
+            @click="loadTab(activeTab)"
+            class="w-7 h-7 rounded-md cursor-pointer transition-colors hover:bg-black/[0.04] flex items-center justify-center"
+            :class="{ 'is-refreshing': isCurrentTabLoading }"
+            :title="`刷新 ${activeTab}`"
+            style="color: #9a9aa0;"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+            </svg>
+          </button>
+          <button @click="emit('close')" class="w-7 h-7 rounded-md cursor-pointer hover:bg-black/[0.04] flex items-center justify-center transition-colors" style="color: #9a9aa0;" title="关闭">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <div class="flex items-center px-3 pb-2 gap-1">
-        <button v-for="tab in tabs" :key="tab"
-          @click="loadTab(tab)"
-          class="px-3 py-1 rounded-md text-[13px] font-medium transition-colors cursor-pointer relative"
-          :style="activeTab === tab ? 'background: #fff; color: #2c2c30; box-shadow: 0 1px 2px rgba(0,0,0,0.05);' : 'color: #9a9aa0;'">
-          {{ tab === 'tools' ? 'Tools' : tab === 'skills' ? 'Skills' : tab === 'memory' ? 'Memory' : tab === 'files' ? 'Files' : 'Inbox' }}
-          <span
-            v-if="tab === 'notifications' && notificationsUnread > 0"
-            class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full text-[9px] font-semibold flex items-center justify-center px-1"
-            style="background: #ef4444; color: #fff;"
-          >{{ notificationsUnread > 99 ? '99+' : notificationsUnread }}</span>
-        </button>
-        <button
-          v-if="activeTab !== 'notifications'"
-          @click="loadTab(activeTab)"
-          class="ml-auto p-1 rounded-md cursor-pointer transition-colors hover:bg-black/[0.04]"
-          :class="{ 'is-refreshing': isCurrentTabLoading }"
-          :title="`刷新 ${activeTab}`"
-          style="color: #9a9aa0;"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
-          </svg>
-        </button>
+      <div class="px-3 pb-2.5">
+        <div class="tab-bar flex items-center gap-0.5 p-1 rounded-lg" style="background: rgba(0,0,0,0.035);">
+          <button v-for="tab in tabs" :key="tab"
+            @click="loadTab(tab)"
+            class="tab-btn flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all cursor-pointer relative"
+            :class="{ 'tab-active': activeTab === tab }"
+            :title="TAB_META[tab].label">
+            <svg v-if="TAB_META[tab].icon === 'wrench'" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
+            </svg>
+            <svg v-else-if="TAB_META[tab].icon === 'sparkles'" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/>
+            </svg>
+            <svg v-else-if="TAB_META[tab].icon === 'memory'" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/>
+            </svg>
+            <svg v-else-if="TAB_META[tab].icon === 'folder'" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/>
+            </svg>
+            <svg v-else-if="TAB_META[tab].icon === 'bell'" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
+            </svg>
+            <span class="hidden sm:inline">{{ TAB_META[tab].label }}</span>
+            <span
+              v-if="tab === 'notifications' && notificationsUnread > 0"
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full text-[9px] font-semibold flex items-center justify-center px-1 ring-2 ring-[var(--theme-50,#f7f7f8)]"
+              style="background: #ef4444; color: #fff;"
+            >{{ notificationsUnread > 99 ? '99+' : notificationsUnread }}</span>
+          </button>
+        </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto px-3 pb-4">
+      <div class="flex-1 overflow-y-auto px-3 pb-4 panel-body">
         <template v-if="activeTab === 'tools'">
-          <div v-if="loadingTools" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">加载中…</div>
+          <div v-if="loadingTools" class="space-y-2 pt-1">
+            <div v-for="n in 5" :key="`tools-skel-${n}`" class="skeleton-row" />
+          </div>
+          <template v-else-if="tools.length === 0">
+            <div class="empty-state">
+              <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: #c8c8d0;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085"/>
+              </svg>
+              <div class="empty-title">暂无可用工具</div>
+              <div class="empty-hint">登录或连接 Hermes 后可启用</div>
+            </div>
+          </template>
           <template v-else>
             <div class="space-y-0.5">
               <template v-for="tool in tools.filter(t => t.type === 'builtin')" :key="tool.name">
-                <div class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/60 transition-colors">
+                <div class="row-item flex items-center justify-between px-3 py-2 rounded-lg">
                   <div class="flex items-center gap-2 flex-1 min-w-0">
-                    <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="tool.enabled ? 'background: #2c2c30;' : 'background: #d1d1d6;'"></span>
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0 transition-colors" :style="tool.enabled ? 'background: var(--ai-accent);' : 'background: #d1d1d6;'"></span>
                     <span class="text-[14px] truncate" :style="tool.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ tool.name }}</span>
                   </div>
-                  <button @click="toggleTool(tool)" class="shrink-0 ml-2 cursor-pointer px-2 py-0.5 rounded text-[12px] transition-colors"
-                    :style="tool.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">
+                  <button @click="toggleTool(tool)" class="toggle-pill shrink-0 ml-2 cursor-pointer text-[10.5px] font-semibold uppercase tracking-wider transition-all"
+                    :class="{ 'is-on': tool.enabled }">
                     {{ tool.enabled ? 'on' : 'off' }}
                   </button>
                 </div>
               </template>
             </div>
             <div v-if="tools.some(t => t.type === 'mcp')" class="mt-4">
-              <div class="px-3 pb-1.5" style="font-size: 11px; font-weight: 600; color: #9a9aa0; letter-spacing: 0.03em;">MCP Servers</div>
+              <div class="section-label">MCP Servers</div>
               <div v-for="tool in tools.filter(t => t.type === 'mcp')" :key="'mcp-' + tool.name"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/60 transition-colors">
+                class="row-item flex items-center gap-2 px-3 py-2 rounded-lg">
                 <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--ai-accent);"></span>
                 <span class="text-[14px]" style="color: #2c2c30;">{{ tool.name }}</span>
               </div>
@@ -694,57 +738,72 @@ defineExpose({
         </template>
 
         <template v-if="activeTab === 'skills'">
-          <div v-if="loadingSkills" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">加载中…</div>
-          <div v-else-if="skills.length === 0" class="text-center py-8" style="color: #b0b0b6; font-size: 13px;">暂无已安装的技能</div>
+          <div v-if="loadingSkills" class="space-y-2 pt-1">
+            <div v-for="n in 4" :key="`skills-skel-${n}`" class="skeleton-card" />
+          </div>
+          <div v-else-if="skills.length === 0" class="empty-state">
+            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: #c8c8d0;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/>
+            </svg>
+            <div class="empty-title">暂无已安装的技能</div>
+            <div class="empty-hint">在 Hermes 配置中安装 skill 后即可启用</div>
+          </div>
           <template v-else>
             <div v-for="(group, category) in skillsByCategoryWithSelected" :key="category" class="mb-3">
-              <div v-if="category" class="px-3 pb-1 pt-2" style="font-size: 11px; font-weight: 600; color: #9a9aa0; letter-spacing: 0.03em;">{{ category || 'Other' }}</div>
-              <div class="space-y-0.5">
+              <div v-if="category" class="section-label">{{ category || 'Other' }}</div>
+              <div class="space-y-1">
                 <div v-for="skill in group" :key="skill.name"
-                  class="flex items-start justify-between gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer"
-                  :style="skill.isSelected
-                    ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
-                    : 'background: #fff; border: 1px solid #ececef;'"
+                  class="card-item flex items-start justify-between gap-2 px-3 py-2 rounded-lg cursor-pointer relative"
+                  :class="{ 'is-selected': skill.isSelected }"
                   @click="selectSkill(skill)"
                   @dblclick="openSkillBrowser(skill)">
                   <div class="min-w-0 flex-1">
-                    <div class="text-[14px] truncate" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</div>
-                    <div v-if="skill.description" class="text-[11px] mt-0.5 line-clamp-2" style="color: #9a9aa0;">{{ skill.description }}</div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[13.5px] truncate font-medium" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</span>
+                    </div>
+                    <div v-if="skill.description" class="text-[11px] mt-0.5 line-clamp-2 leading-snug" style="color: #9a9aa0;">{{ skill.description }}</div>
                   </div>
                   <button @click.stop="toggleSkill(skill)"
-                    class="shrink-0 ml-2 cursor-pointer px-2 py-0.5 rounded text-[12px] transition-colors"
-                    :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">
+                    class="toggle-pill shrink-0 ml-2 cursor-pointer text-[10.5px] font-semibold uppercase tracking-wider transition-all"
+                    :class="{ 'is-on': skill.enabled }">
                     {{ skill.enabled ? 'on' : 'off' }}
                   </button>
                 </div>
               </div>
             </div>
-
+            <div class="text-[10.5px] text-center mt-2" style="color: #b8b8be;">
+              单击选中 · 双击查看文件
+            </div>
           </template>
         </template>
 
         <template v-if="activeTab === 'memory'">
-          <div v-if="loadingMemory" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
+          <div v-if="loadingMemory" class="space-y-2 pt-1">
+            <div v-for="n in 4" :key="`mem-skel-${n}`" class="skeleton-card" />
+          </div>
           <template v-else>
-            <div v-if="memoryError" class="mb-3 rounded-lg px-3 py-2 text-[13px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
-              {{ memoryError }}
+            <div v-if="memoryError" class="error-banner">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+              <span>{{ memoryError }}</span>
             </div>
 
-            <div v-if="visibleMemoryEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
-              当前目录是空的
+            <div v-if="visibleMemoryEntries.length === 0" class="empty-state">
+              <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.3" style="color: #c8c8d0;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/>
+              </svg>
+              <div class="empty-title">尚无记忆条目</div>
+              <div class="empty-hint">Agent 会自动把跨会话的事实存到这里</div>
             </div>
             <div v-else class="space-y-1">
               <button
                 v-for="entry in visibleMemoryEntries"
                 :key="entry.path"
-                class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
-                :style="memorySelectedPath === entry.path
-                  ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
-                  : 'background: #fff; border: 1px solid #ececef;'"
+                class="card-item w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left cursor-pointer relative"
+                :class="{ 'is-selected': memorySelectedPath === entry.path }"
                 @click="selectMemoryEntry(entry)"
                 @dblclick="openMemoryEntry(entry)"
               >
-                <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
+                <span class="entry-icon shrink-0 mt-0.5" :data-kind="entry.type">
                   <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
                   </svg>
@@ -758,9 +817,8 @@ defineExpose({
 
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 min-w-0">
-                    <span class="text-[13px] truncate" style="color: #2c2c30;">{{ entry.name }}</span>
-                    <span v-if="entry.type === 'dir' && entry.has_children" class="text-[10px] shrink-0" style="color: #b0b0b6;">folder</span>
-                    <span v-else-if="entry.type !== 'dir'" class="text-[11px] shrink-0" style="color: #9a9aa0;">{{ formatWorkspaceSize(entry.size) }}</span>
+                    <span class="text-[13px] truncate font-medium" style="color: #2c2c30;">{{ entry.name }}</span>
+                    <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: #8a8a90;">{{ formatWorkspaceSize(entry.size) }}</span>
                   </div>
                   <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
                     <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
@@ -773,83 +831,81 @@ defineExpose({
         </template>
 
         <template v-if="activeTab === 'files'">
-          <div class="rounded-xl border px-3 py-3 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
-            <div class="text-[12px] font-semibold mb-2" style="color: #6e6e76;">{{ workspaceRootLabel || 'Workspace' }}</div>
-            <div class="flex flex-wrap gap-1.5 mb-2">
+          <div class="files-header rounded-xl mb-3 overflow-hidden">
+            <div class="px-3 pt-2.5 pb-2 flex items-center gap-1.5 flex-wrap">
               <button
                 v-for="root in workspaceRoots"
                 :key="root.key"
                 @click="openWorkspaceRoot(root.key)"
-                class="px-2.5 py-1 rounded-md text-[12px] cursor-pointer transition-colors"
-                :style="workspaceActiveRoot === root.key
-                  ? 'background: var(--theme-700); color: #fff;'
-                  : 'background: #fff; color: #6e6e76; border: 1px solid #ececef;'"
+                class="root-chip px-2.5 py-1 rounded-md text-[11.5px] cursor-pointer transition-all font-medium"
+                :class="{ 'is-active': workspaceActiveRoot === root.key }"
               >
                 {{ root.label }}
               </button>
             </div>
-            <div class="text-[11px] break-all" style="color: #9a9aa0; font-family: var(--ai-font-mono);">
+            <div class="px-3 pb-2 text-[10.5px] break-all" style="color: #a4a4ac; font-family: var(--ai-font-mono);">
               {{ workspaceRootHint }}
             </div>
-            <div class="text-[11px] mt-2 flex flex-wrap gap-x-3 gap-y-1" style="color: #9a9aa0;">
-              <span>{{ workspaceEntryCount }} 项</span>
-              <span v-if="workspaceListLimit > 0">单目录上限 {{ workspaceListLimit }}</span>
-            </div>
-            <div
-              v-if="workspaceTruncated"
-              class="text-[11px] mt-2"
-              style="color: #b45309;"
-            >当前目录条目过多，只展示前 {{ workspaceListLimit }} 项</div>
-          </div>
-
-          <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
-            <div class="flex items-center gap-1.5 flex-wrap">
+            <div class="files-toolbar px-2 py-1.5 flex items-center gap-1 flex-wrap" style="border-top: 1px solid rgba(0,0,0,0.05);">
               <button
-                class="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
+                class="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
                 :disabled="!workspaceCanGoUp"
                 :style="workspaceCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
                 title="返回上一级"
                 @click="openWorkspaceBreadcrumb(workspaceParentPath)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
                 </svg>
               </button>
-              <button
-                v-for="crumb in workspaceBreadcrumbs"
-                :key="`${workspaceActiveRoot}-${crumb.path || 'root'}`"
-                class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
-                style="color: #6e6e76;"
-                @click="openWorkspaceBreadcrumb(crumb.path)"
-              >
-                {{ crumb.name }}
-              </button>
+              <template v-for="(crumb, ci) in workspaceBreadcrumbs" :key="`${workspaceActiveRoot}-${crumb.path || 'root'}`">
+                <span v-if="ci > 0" class="text-[11px] select-none" style="color: #cfcfd4;">/</span>
+                <button
+                  class="px-1.5 py-0.5 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
+                  style="color: #5e5e66;"
+                  @click="openWorkspaceBreadcrumb(crumb.path)"
+                >
+                  {{ crumb.name }}
+                </button>
+              </template>
+              <span class="ml-auto text-[10.5px] flex items-center gap-1.5 pr-1" style="color: #a4a4ac;">
+                <span>{{ workspaceEntryCount }} 项</span>
+              </span>
+            </div>
+            <div
+              v-if="workspaceTruncated"
+              class="px-3 py-1.5 text-[10.5px] flex items-center gap-1.5"
+              style="background: rgba(180,83,9,0.06); color: #b45309; border-top: 1px solid rgba(180,83,9,0.12);"
+            >
+              <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+              只展示前 {{ workspaceListLimit }} 项
             </div>
           </div>
 
-          <div v-if="loadingWorkspace" class="text-center py-8" style="color: #9a9aa0; font-size: 13px;">加载中…</div>
-          <div
-            v-else-if="workspaceError"
-            class="rounded-lg px-3 py-2 text-[13px]"
-            style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;"
-          >
-            {{ workspaceError }}
+          <div v-if="loadingWorkspace" class="space-y-2 pt-1">
+            <div v-for="n in 5" :key="`ws-skel-${n}`" class="skeleton-card" />
           </div>
-          <div v-else-if="workspaceEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
-            当前目录是空的
+          <div v-else-if="workspaceError" class="error-banner">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+            <span>{{ workspaceError }}</span>
+          </div>
+          <div v-else-if="workspaceEntries.length === 0" class="empty-state">
+            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: #c8c8d0;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"/>
+            </svg>
+            <div class="empty-title">当前目录是空的</div>
+            <div class="empty-hint">这里会列出 workspace 下的文件与子目录</div>
           </div>
           <div v-else class="space-y-1">
             <button
               v-for="entry in workspaceEntries"
               :key="entry.path"
-              class="w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
-              :style="workspaceSelectedPath === entry.path
-                ? 'background: rgba(61, 124, 201, 0.08); border: 1px solid rgba(61, 124, 201, 0.18);'
-                : 'background: #fff; border: 1px solid #ececef;'"
+              class="card-item w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left cursor-pointer relative"
+              :class="{ 'is-selected': workspaceSelectedPath === entry.path }"
               @click="selectWorkspaceEntry(entry)"
               @dblclick="openWorkspaceEntry(entry)"
             >
-              <span class="w-4 h-4 shrink-0 mt-0.5" :style="entry.type === 'dir' ? 'color: #d97706;' : entry.type === 'symlink' ? 'color: #8b5cf6;' : 'color: #64748b;'">
+              <span class="entry-icon shrink-0 mt-0.5" :data-kind="entry.type">
                 <svg v-if="entry.type === 'dir'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h6.56a2.25 2.25 0 012.25 2.25v8.25a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75z" />
                 </svg>
@@ -863,9 +919,8 @@ defineExpose({
 
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
-                  <span class="text-[13px] truncate" style="color: #2c2c30;">{{ entry.name }}</span>
-                  <span v-if="entry.type === 'dir' && entry.has_children" class="text-[10px] shrink-0" style="color: #b0b0b6;">folder</span>
-                  <span v-else-if="entry.type !== 'dir'" class="text-[11px] shrink-0" style="color: #9a9aa0;">{{ formatWorkspaceSize(entry.size) }}</span>
+                  <span class="text-[13px] truncate font-medium" style="color: #2c2c30;">{{ entry.name }}</span>
+                  <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: #8a8a90;">{{ formatWorkspaceSize(entry.size) }}</span>
                 </div>
                 <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
                   <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
@@ -874,34 +929,50 @@ defineExpose({
               </div>
             </button>
           </div>
-          <div class="mt-3 text-[11px] text-center" style="color: #b0b0b6;">
-            单击选择，双击打开
+          <div v-if="workspaceEntries.length > 0" class="mt-3 text-[10.5px] text-center" style="color: #b8b8be;">
+            单击选中 · 双击打开
           </div>
         </template>
 
         <template v-if="activeTab === 'notifications'">
-          <div class="flex items-center justify-between mb-2 px-1">
-            <span class="text-[13px]" style="color: #6e6e76;">
-              {{ notifications.length === 0 ? '暂无通知' : `共 ${notifications.length} 条` }}
+          <div v-if="notifications.length > 0" class="flex items-center justify-between mb-2.5 px-1">
+            <span class="text-[12px] flex items-center gap-1.5" style="color: #6e6e76;">
+              <span class="text-[13px] font-medium" style="color: #2c2c30;">{{ notifications.length }}</span>
+              <span>条通知</span>
+              <span v-if="notificationsUnread > 0" class="px-1.5 py-px rounded text-[10px] font-semibold" style="background: rgba(239,68,68,0.1); color: #ef4444;">{{ notificationsUnread }} 未读</span>
             </span>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2.5">
               <button
                 v-if="notificationsUnread > 0"
                 @click="markNotificationRead('all')"
-                class="text-[12px] cursor-pointer hover:underline"
-                style="color: var(--theme-500);"
+                class="text-[11.5px] cursor-pointer transition-colors"
+                style="color: var(--ai-accent);"
               >全部已读</button>
               <button
                 v-if="notifications.length > 0"
                 @click="clearAllNotifications"
-                class="text-[12px] cursor-pointer hover:underline"
-                style="color: var(--theme-500);"
+                class="text-[11.5px] cursor-pointer transition-colors hover:text-red-500"
+                style="color: #9a9aa0;"
               >清空</button>
             </div>
           </div>
-          <div v-if="notificationsLoading && notifications.length === 0" class="text-center py-8 text-[12px]" style="color: #b0b0b6;">加载中…</div>
-          <div v-else-if="notificationsError" class="text-center py-8 text-[12px]" style="color: #b91c1c;">{{ notificationsError }}</div>
-          <div v-else-if="notifications.length === 0" class="text-center py-12 text-[12px]" style="color: #b0b0b6;">收件箱是空的</div>
+          <div v-if="notificationsLoading && notifications.length === 0" class="space-y-2 pt-1">
+            <div v-for="n in 3" :key="`notif-skel-${n}`" class="skeleton-card" />
+          </div>
+          <div v-else-if="notificationsError" class="error-banner">
+            <svg class="w-4 h-4 shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+            <div class="flex-1 min-w-0">
+              <div>{{ notificationsError }}</div>
+              <button @click="fetchNotifications" class="text-[11px] mt-1 underline cursor-pointer" style="color: #b42318;">重试</button>
+            </div>
+          </div>
+          <div v-else-if="notifications.length === 0" class="empty-state">
+            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: #c8c8d0;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
+            </svg>
+            <div class="empty-title">收件箱是空的</div>
+            <div class="empty-hint">Cron / Hook / Agent 异步通知会出现在这里</div>
+          </div>
           <div v-else class="space-y-2">
             <div
               v-for="n in notifications"
@@ -1165,6 +1236,199 @@ defineExpose({
 @keyframes refresh-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+.tab-bar {
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+.tab-btn {
+  color: #8a8a90;
+}
+.tab-btn:hover:not(.tab-active) {
+  color: #5e5e66;
+  background: rgba(255, 255, 255, 0.55);
+}
+.tab-btn.tab-active {
+  background: #fff;
+  color: #2c2c30;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.tab-btn.tab-active svg {
+  color: var(--ai-accent);
+}
+
+/* List items */
+.row-item {
+  transition: background-color 0.15s ease;
+}
+.row-item:hover {
+  background: rgba(0, 0, 0, 0.025);
+}
+.card-item {
+  background: #fff;
+  border: 1px solid #ececef;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.card-item:hover {
+  border-color: rgba(0, 0, 0, 0.09);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.card-item.is-selected {
+  background: rgba(61, 124, 201, 0.06);
+  border-color: rgba(61, 124, 201, 0.28);
+  box-shadow: 0 1px 3px rgba(61, 124, 201, 0.08);
+}
+.card-item.is-selected::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--ai-accent);
+}
+
+/* Toggle pill */
+.toggle-pill {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.04);
+  color: #b0b0b6;
+  border: 1px solid transparent;
+}
+.toggle-pill:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+.toggle-pill.is-on {
+  background: rgba(61, 124, 201, 0.1);
+  color: var(--ai-accent);
+  border-color: rgba(61, 124, 201, 0.18);
+}
+
+/* Section label */
+.section-label {
+  padding: 8px 12px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #9a9aa0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 16px 28px;
+  text-align: center;
+}
+.empty-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #5e5e66;
+  margin-bottom: 4px;
+}
+.empty-hint {
+  font-size: 11.5px;
+  color: #a4a4ac;
+  line-height: 1.5;
+  max-width: 220px;
+}
+
+/* Skeleton */
+.skeleton-row,
+.skeleton-card {
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.035) 0%,
+    rgba(0, 0, 0, 0.06) 50%,
+    rgba(0, 0, 0, 0.035) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+.skeleton-row { height: 32px; }
+.skeleton-card { height: 48px; }
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Error banner */
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff4f4;
+  color: #b42318;
+  border: 1px solid #ffd7d7;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Entry icon kinds */
+.entry-icon[data-kind="dir"] { color: var(--ai-accent); }
+.entry-icon[data-kind="symlink"] { color: #8b5cf6; }
+.entry-icon[data-kind="file"],
+.entry-icon:not([data-kind="dir"]):not([data-kind="symlink"]) { color: #8a8a93; }
+
+/* Files header */
+.files-header {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #ececef;
+}
+.root-chip {
+  background: transparent;
+  color: #6e6e76;
+  border: 1px solid transparent;
+}
+.root-chip:hover {
+  background: rgba(0, 0, 0, 0.035);
+}
+.root-chip.is-active {
+  background: var(--theme-700, #2d2d28);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Resize handle grip */
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 1.5px;
+  width: 4px;
+  height: 36px;
+  margin-top: -18px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.resize-handle:hover::before,
+.resizing .resize-handle::before {
+  opacity: 1;
+}
+
+/* Custom scrollbar for panel body */
+.panel-body::-webkit-scrollbar {
+  width: 6px;
+}
+.panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.panel-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+.panel-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
 }
 .resize-handle {
   position: absolute;
