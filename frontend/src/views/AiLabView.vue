@@ -1945,18 +1945,6 @@ onMounted(async () => {
           >{{ conversationTitle }}</h2>
         </div>
 
-        <button
-          @click="togglePanelTab('files')"
-          class="w-8 h-8 rounded-md flex items-center justify-center transition-colors cursor-pointer"
-          :style="isPanelOpen && panelActiveTab === 'files' ? 'color: var(--theme-700); background: var(--theme-100);' : 'color: var(--theme-400);'"
-          title="Workspace Files"
-        >
-          <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75A2.25 2.25 0 016 4.5h4.19a2.25 2.25 0 011.59.659l1.06 1.06a2.25 2.25 0 001.59.659h3.315A2.25 2.25 0 0120 9.128v8.122A2.25 2.25 0 0117.75 19.5H6a2.25 2.25 0 01-2.25-2.25V6.75z" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 11.25h7.5M8.25 14.25h4.5" />
-          </svg>
-        </button>
-
         <!-- Agent Panel 入口（Tools / Skills / Memory / Inbox）+ Inbox 未读 badge -->
         <button
           @click="togglePanelTab('tools')"
