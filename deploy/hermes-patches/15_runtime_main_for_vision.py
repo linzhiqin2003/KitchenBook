@@ -28,7 +28,11 @@ from pathlib import Path
 
 AUX = Path("/home/admin/.hermes/hermes-agent/agent/auxiliary_client.py")
 APIS = Path("/home/admin/.hermes/hermes-agent/gateway/platforms/api_server.py")
-SENTINEL = "# [patch15] runtime main provider/model"
+# 两个 NEW 块的注释都以 "# [patch15]" 开头（aux: "runtime main provider/model"
+# / apis: "tell auxiliary helpers"）。SENTINEL 用前缀就能正确判定幂等，
+# 否则 apis 已 patched 但 SENTINEL 全文不在文件里，main 会再次进入 apply
+# 路径并对已替换的 anchor 报 FATAL。
+SENTINEL = "# [patch15]"
 
 
 # ── auxiliary_client.py edits ─────────────────────────────────────────
