@@ -821,8 +821,7 @@ defineExpose({
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="text-[13px] truncate font-medium" style="color: var(--theme-700);">{{ entry.name }}</span>
-                    <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: var(--theme-400);">{{ formatWorkspaceSize(entry.size) }}</span>
-                  </div>
+                                      </div>
                   <div class="text-[11px] mt-0.5" style="color: var(--theme-300);">
                     <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
                     <span v-if="entry.target"> · {{ entry.target }}</span>
@@ -871,17 +870,6 @@ defineExpose({
                   {{ crumb.name }}
                 </button>
               </template>
-              <span class="ml-auto text-[10.5px] flex items-center gap-1.5 pr-1" style="color: var(--theme-400);">
-                <span>{{ workspaceEntryCount }} 项</span>
-              </span>
-            </div>
-            <div
-              v-if="workspaceTruncated"
-              class="px-3 py-1.5 text-[10.5px] flex items-center gap-1.5"
-              style="background: rgba(180,83,9,0.06); color: #b45309; border-top: 1px solid rgba(180,83,9,0.12);"
-            >
-              <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
-              只展示前 {{ workspaceListLimit }} 项
             </div>
           </div>
 
@@ -913,8 +901,7 @@ defineExpose({
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <span class="text-[13px] truncate font-medium" style="color: var(--theme-700);">{{ entry.name }}</span>
-                  <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: var(--theme-400);">{{ formatWorkspaceSize(entry.size) }}</span>
-                </div>
+                                  </div>
                 <div class="text-[11px] mt-0.5" style="color: var(--theme-300);">
                   <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
                   <span v-if="entry.target"> · {{ entry.target }}</span>
@@ -1093,8 +1080,7 @@ defineExpose({
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <span class="text-[13px] truncate font-medium" style="color: var(--theme-700);">{{ entry.name }}</span>
-                  <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: var(--theme-400);">{{ formatWorkspaceSize(entry.size) }}</span>
-                </div>
+                                  </div>
                 <div class="text-[11px] mt-0.5" style="color: var(--theme-300);">
                   <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
                   <span v-if="entry.target"> · {{ entry.target }}</span>
