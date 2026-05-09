@@ -33,6 +33,10 @@ const editContent = ref('')
 const editTextarea = ref(null)
 const bubbleRef = ref(null)
 const editBoxWidth = ref(400)
+// 编辑模式下保留 / 移除的附件副本。entries 跟 message.fileAttachments 同源
+// （含 type / serverUrl 或 url / dataUrl / filename / size）。用户 x 掉的会从这里删，
+// 提交时把剩下的回传给上层。
+const editAttachments = ref([])
 
 // 复制状态
 const copied = ref(false)
@@ -43,7 +47,12 @@ const startEdit = async () => {
   if (bubbleRef.value) {
     editBoxWidth.value = Math.max(bubbleRef.value.offsetWidth, 200)
   }
-  editContent.value = props.message.content
+  editContent.value = props.message.content || ''
+  // 把原 message 的附件 clone 一份进编辑状态（用户可 x 掉）
+  const src = Array.isArray(props.message.fileAttachments) && props.message.fileAttachments.length
+    ? props.message.fileAttachments
+    : (props.message.fileAttachment ? [props.message.fileAttachment] : [])
+  editAttachments.value = src.map(a => ({ ...a }))
   isEditing.value = true
   await nextTick()
   if (editTextarea.value) {
@@ -64,14 +73,28 @@ function autoResizeTextarea() {
 const cancelEdit = () => {
   isEditing.value = false
   editContent.value = ''
+  editAttachments.value = []
+}
+
+const removeEditAttachment = (idx) => {
+  editAttachments.value = editAttachments.value.filter((_, i) => i !== idx)
 }
 
 // 提交编辑
 const submitEdit = () => {
-  if (editContent.value.trim()) {
-    emit('edit', props.message.id, editContent.value.trim())
-    isEditing.value = false
-  }
+  const txt = editContent.value.trim()
+  // 允许"只保留附件 + 空文本"（非空附件即可发）；只全空才不发
+  if (!txt && editAttachments.value.length === 0) return
+  emit('edit', props.message.id, txt, editAttachments.value.slice())
+  isEditing.value = false
+}
+
+// 给 textarea 行内附件块用 — 渲染前 normalize url 字段
+const editAttachmentSrc = (att) => {
+  if (!att) return ''
+  if (att.type === 'image') return att.serverUrl || att.dataUrl || att.url || ''
+  if (att.type === 'video') return att.url || att.serverUrl || ''
+  return ''
 }
 
 // 复制内容
@@ -772,6 +795,48 @@ const openImage = (dataUrl) => {
           </div>
 
           <div v-if="isEditing" class="flex flex-col items-end gap-2" style="min-width: 280px;">
+            <!-- 已保留的附件：可 x 掉 -->
+            <div v-if="editAttachments.length" class="edit-attach-row">
+              <div
+                v-for="(att, i) in editAttachments"
+                :key="i"
+                class="edit-attach-card"
+                :class="{
+                  'is-pdf': att.type === 'pdf',
+                  'is-video': att.type === 'video',
+                }"
+                :title="att.filename || ''"
+              >
+                <img v-if="att.type === 'image'" :src="editAttachmentSrc(att)" alt="" class="edit-attach-card__img" />
+                <template v-else-if="att.type === 'video'">
+                  <video :src="editAttachmentSrc(att)" muted preload="metadata" playsinline class="edit-attach-card__img"></video>
+                  <span class="edit-attach-card__vbadge" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="9" height="9" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    视频
+                  </span>
+                </template>
+                <template v-else-if="att.type === 'pdf'">
+                  <div class="edit-attach-card__pdf">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25"/>
+                    </svg>
+                    <div class="edit-attach-card__pdfname">{{ att.filename || 'document.pdf' }}</div>
+                    <span class="edit-attach-card__pdfbadge">PDF</span>
+                  </div>
+                </template>
+                <button
+                  @click="removeEditAttachment(i)"
+                  class="edit-attach-card__remove"
+                  title="移除"
+                  type="button"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
             <textarea
               ref="editTextarea"
               v-model="editContent"
@@ -790,7 +855,7 @@ const openImage = (dataUrl) => {
                 取消
               </button>
               <button @click="submitEdit"
-                      :disabled="!editContent.trim()"
+                      :disabled="!editContent.trim() && editAttachments.length === 0"
                       class="px-3 py-1 text-xs rounded-md transition-colors disabled:opacity-50 cursor-pointer"
                       style="background: var(--theme-700); color: var(--theme-50);">
                 发送
@@ -1854,5 +1919,105 @@ const openImage = (dataUrl) => {
     opacity: 1;
     transform: translateY(-2px);
   }
+}
+
+/* === Edit-mode attachment thumbnails === */
+.edit-attach-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-self: flex-end;
+  max-width: 100%;
+}
+.edit-attach-card {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--theme-100, #ececea);
+  border: 1px solid var(--theme-200, #e6e4dd);
+  flex-shrink: 0;
+}
+.edit-attach-card.is-pdf  { background: #fff; }
+.edit-attach-card.is-video { background: #000; }
+.edit-attach-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.edit-attach-card__vbadge {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+.edit-attach-card__pdf {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 4px 12px;
+  gap: 2px;
+  color: var(--theme-400);
+}
+.edit-attach-card__pdfname {
+  font-size: 8px;
+  line-height: 1.1;
+  color: var(--theme-500);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+.edit-attach-card__pdfbadge {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  font-size: 7px;
+  font-weight: 700;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: #dc2626;
+  color: #fff;
+  line-height: 1;
+}
+.edit-attach-card__remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.85;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.edit-attach-card__remove:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  background: rgba(0, 0, 0, 0.9);
 }
 </style>

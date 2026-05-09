@@ -148,7 +148,7 @@ defineExpose({
           :is-streaming="index === currentStreamingIndex"
           :is-reasoning-phase="index === currentStreamingIndex && isReasoningPhase"
           :reasoning-collapsed="reasoningCollapsed[index]"
-          @edit="(id, content) => emit('edit', id, content, index)"
+          @edit="(id, content, attachments) => emit('edit', id, content, attachments)"
           @regenerate="(id) => emit('regenerate', id, index)"
           @toggle-reasoning="toggleReasoning"
         />

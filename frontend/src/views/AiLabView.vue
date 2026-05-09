@@ -663,7 +663,8 @@ const _extractPdf = async (file) => {
 // ===== 消息发送 =====
 const sendMessage = async (content = null, options = {}) => {
   const text = content || inputMessage.value.trim()
-  if (!text && selectedFiles.value.length === 0) return
+  const preloaded = Array.isArray(options.preloadedAttachments) ? options.preloadedAttachments : []
+  if (!text && selectedFiles.value.length === 0 && preloaded.length === 0) return
   if (isLoading.value) return
 
   // 如果没有当前会话，先创建一个
@@ -679,6 +680,34 @@ const sendMessage = async (content = null, options = {}) => {
   let pdfContextSegments = []  // PDF 文本注入到 user content
   let videoUrls = []           // 视频 URL 注入到 user content
   const items = [...selectedFiles.value]
+
+  // 预加载附件（编辑时保留的图片/视频/PDF）— 已经上传过，跳过 _uploadMedia
+  for (const att of preloaded) {
+    if (!att || !att.type) continue
+    if (att.type === 'image') {
+      attachmentsForUI.push({
+        type: 'image',
+        dataUrl: att.dataUrl || null,
+        serverUrl: att.serverUrl || att.url || null,
+        filename: att.filename, size: att.size,
+      })
+      const url = att.serverUrl || att.url
+      if (url) persistAttachments.push({ type: 'image', url, filename: att.filename, size: att.size })
+    } else if (att.type === 'video') {
+      const url = att.url || att.serverUrl
+      attachmentsForUI.push({ type: 'video', url, filename: att.filename, size: att.size })
+      if (url) {
+        persistAttachments.push({ type: 'video', url, filename: att.filename, size: att.size })
+        videoUrls.push({ url, filename: att.filename })
+      }
+    } else if (att.type === 'pdf') {
+      attachmentsForUI.push({ type: 'pdf', filename: att.filename, pages: att.pages })
+      persistAttachments.push({ type: 'pdf', filename: att.filename, pages: att.pages })
+      if (att.text) {
+        pdfContextSegments.push(`[PDF: ${att.filename}, ${att.pages} pages]\n\n${att.text}`)
+      }
+    }
+  }
 
   if (items.length) {
     isFileProcessing.value = true
@@ -1521,10 +1550,11 @@ const handleAgentModelChange = async (nextModel) => {
 }
 
 // 编辑消息（删除原 user 消息及后续 → 重新发起）
-const handleEditMessage = async (messageId, newContent /* index ignored — 改用 id 查 */) => {
-  if (!messageId || !newContent) return
+// preservedAttachments: messageItem 编辑时用户保留的附件副本（已上传 web URL）
+const handleEditMessage = async (messageId, newContent, preservedAttachments) => {
+  if (!messageId) return
+  if (!newContent && (!preservedAttachments || preservedAttachments.length === 0)) return
   if (isLoading.value) return  // 流式中拒绝，避免 race
-  // 用 id 实时查位置，避免 v-for closure index 在 await 期间失效
   const idx = messages.value.findIndex(m => m && m.id === messageId)
   if (idx < 0) {
     console.warn('[handleEditMessage] message not in current array', messageId)
@@ -1532,8 +1562,10 @@ const handleEditMessage = async (messageId, newContent /* index ignored — 改�
   }
   await deleteMessageAndFollowing(messageId)
   messages.value = messages.value.slice(0, idx)
-  // sendMessage 会调 streamResponse；这里要让 Hermes 用 request body 而不是 DB 历史
-  await sendMessage(newContent, { useRequestHistory: true })
+  await sendMessage(newContent || '', {
+    useRequestHistory: true,
+    preloadedAttachments: Array.isArray(preservedAttachments) ? preservedAttachments : [],
+  })
 }
 
 // 重新生成（删除目标 AI 消息及后续 → 直接 streamResponse）
