@@ -1518,24 +1518,38 @@ const handleAgentModelChange = async (nextModel) => {
 }
 
 // 编辑消息（删除原 user 消息及后续 → 重新发起）
-const handleEditMessage = async (messageId, newContent, index) => {
+const handleEditMessage = async (messageId, newContent /* index ignored — 改用 id 查 */) => {
   if (!messageId || !newContent) return
+  if (isLoading.value) return  // 流式中拒绝，避免 race
+  // 用 id 实时查位置，避免 v-for closure index 在 await 期间失效
+  const idx = messages.value.findIndex(m => m && m.id === messageId)
+  if (idx < 0) {
+    console.warn('[handleEditMessage] message not in current array', messageId)
+    return
+  }
   await deleteMessageAndFollowing(messageId)
-  messages.value = messages.value.slice(0, index)
+  messages.value = messages.value.slice(0, idx)
   // sendMessage 会调 streamResponse；这里要让 Hermes 用 request body 而不是 DB 历史
   await sendMessage(newContent, { useRequestHistory: true })
 }
 
 // 重新生成（删除目标 AI 消息及后续 → 直接 streamResponse）
-const handleRegenerate = async (messageId, index) => {
+const handleRegenerate = async (messageId /* index ignored */) => {
   if (!messageId) return
-  let userMessageIndex = index - 1
+  if (isLoading.value) return
+  const idx = messages.value.findIndex(m => m && m.id === messageId)
+  if (idx < 0) {
+    console.warn('[handleRegenerate] message not in current array', messageId)
+    return
+  }
+  // 找最近一条 user 消息（必须存在）
+  let userMessageIndex = idx - 1
   while (userMessageIndex >= 0 && messages.value[userMessageIndex].role !== 'user') {
     userMessageIndex--
   }
   if (userMessageIndex < 0) return
   await deleteMessageAndFollowing(messageId)
-  messages.value = messages.value.slice(0, index)
+  messages.value = messages.value.slice(0, idx)
   // 让 Hermes 把请求体的 messages 当成真实的对话历史
   await streamResponse(null, { useRequestHistory: true })
 }

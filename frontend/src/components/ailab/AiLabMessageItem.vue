@@ -771,14 +771,16 @@ const openImage = (dataUrl) => {
             </button>
           </div>
 
-          <div v-if="isEditing" class="flex flex-col items-end gap-2 w-full">
+          <div v-if="isEditing" class="flex flex-col items-end gap-2" style="min-width: 280px;">
             <textarea
               ref="editTextarea"
               v-model="editContent"
               @keydown.ctrl.enter="submitEdit"
               @keydown.esc="cancelEdit"
               @input="autoResizeTextarea"
-              :style="{ width: '100%', maxWidth: Math.min(editBoxWidth, window.innerWidth - 48) + 'px' }"
+              :style="{
+                width: Math.max(280, Math.min(editBoxWidth || 400, (typeof window !== 'undefined' ? window.innerWidth - 48 : 400))) + 'px'
+              }"
               class="rounded-xl px-4 py-3 bg-white leading-relaxed resize-none focus:outline-none overflow-hidden"
               style="border: 1px solid var(--ai-accent); color: var(--theme-700); font-size: 15px;"
             ></textarea>
