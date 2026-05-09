@@ -3,7 +3,6 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import API_BASE_URL, { HERMES_API_URL, HERMES_API_KEY } from '../config/api'
 import { AiLabSidebar, AiLabWelcome, AiLabInput, AiLabChatArea } from '../components/ailab'
 import AiLabPanel from '../components/ailab/AiLabPanel.vue'
-import AiLabUserMenu from '../components/ailab/AiLabUserMenu.vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -1945,8 +1944,6 @@ onMounted(async () => {
             style="color: var(--theme-500);"
           >{{ conversationTitle }}</h2>
         </div>
-
-        <AiLabUserMenu />
 
         <button
           @click="togglePanelTab('files')"

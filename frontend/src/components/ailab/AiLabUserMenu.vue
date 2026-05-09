@@ -7,6 +7,13 @@ import api from '../../api/client'
 const router = useRouter()
 const authStore = useAuthStore()
 
+const props = defineProps({
+  // 'down' (默认，菜单向下展开) | 'up' (菜单向上展开 — 用于 sidebar 底部)
+  placement: { type: String, default: 'down' },
+  // 'right' (默认) | 'left' — 弹窗水平对齐方向
+  align: { type: String, default: 'right' },
+})
+
 const open = ref(false)
 const me = ref(null)
 const wrapperRef = ref(null)
@@ -204,7 +211,11 @@ onUnmounted(() => {
     <Transition name="panel">
       <div
         v-if="open"
-        class="absolute right-0 top-full mt-1.5 w-[280px] rounded-xl shadow-lg overflow-hidden z-50"
+        class="absolute w-[280px] rounded-xl shadow-lg overflow-hidden z-50"
+        :class="[
+          props.placement === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
+          props.align === 'left' ? 'left-0' : 'right-0',
+        ]"
         style="background: var(--theme-50); border: 1px solid var(--theme-200);"
         @click.stop
       >
