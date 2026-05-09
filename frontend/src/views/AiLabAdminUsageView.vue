@@ -122,24 +122,30 @@ const maxVisitorTokens = computed(() => {
   return Math.max(...arr.map(v => v.total_tokens || 0))
 })
 
-// prompt 段内 cache vs 非 cache 占比 — 计算 totals 区段
-const promptCacheRatio = computed(() => {
+// cache 命中率：cache / (cache + non_cache_input)
+const cacheHitRatio = computed(() => {
   const t = totals.value
-  if (!t) return { cache: 0, nonCache: 0 }
-  const p = Number(t.total_prompt_tokens) || 0
-  if (!p) return { cache: 0, nonCache: 0 }
-  const cache = Math.min(Number(t.total_cache_tokens) || 0, p)
-  return { cache: (cache / p) * 100, nonCache: ((p - cache) / p) * 100 }
+  if (!t) return 0
+  const cache = Number(t.total_cache_tokens) || 0
+  const prompt = Number(t.total_prompt_tokens) || 0
+  if (!prompt) return 0
+  return (Math.min(cache, prompt) / prompt) * 100
 })
 
-const promptVsCompletion = computed(() => {
+// 三段 token 占比（输入 / 缓存 / 输出），对应 input / cache / output 三种计费
+const tokenSplit = computed(() => {
   const t = totals.value
-  if (!t) return { p: 0, c: 0 }
-  const p = Number(t.total_prompt_tokens) || 0
-  const c = Number(t.total_completion_tokens) || 0
-  const sum = p + c
-  if (!sum) return { p: 0, c: 0 }
-  return { p: (p / sum) * 100, c: (c / sum) * 100 }
+  if (!t) return { input: 0, cache: 0, output: 0 }
+  const inp = Number(t.non_cache_input_tokens) || 0
+  const cache = Number(t.total_cache_tokens) || 0
+  const out = Number(t.total_completion_tokens) || 0
+  const sum = inp + cache + out
+  if (!sum) return { input: 0, cache: 0, output: 0 }
+  return {
+    input: (inp / sum) * 100,
+    cache: (cache / sum) * 100,
+    output: (out / sum) * 100,
+  }
 })
 </script>
 
@@ -198,12 +204,14 @@ const promptVsCompletion = computed(() => {
             {{ formatNumber(totals.total_tokens) }}
           </div>
           <div class="mt-2 h-1.5 rounded-full overflow-hidden flex" style="background: var(--theme-100);">
-            <div :style="{ width: promptVsCompletion.p + '%', background: 'var(--theme-500)' }" class="h-full"></div>
-            <div :style="{ width: promptVsCompletion.c + '%', background: 'var(--theme-300)' }" class="h-full"></div>
+            <div :style="{ width: tokenSplit.input + '%', background: 'var(--theme-600)' }" class="h-full" title="按 input 价"></div>
+            <div :style="{ width: tokenSplit.cache + '%', background: 'var(--theme-300)' }" class="h-full" title="按 cache 价"></div>
+            <div :style="{ width: tokenSplit.output + '%', background: 'var(--theme-500)' }" class="h-full" title="按 output 价"></div>
           </div>
-          <div class="mt-1 flex items-center justify-between text-[11px]" style="color: var(--theme-400);">
-            <span>P {{ formatNumber(totals.total_prompt_tokens) }}</span>
-            <span>C {{ formatNumber(totals.total_completion_tokens) }}</span>
+          <div class="mt-1 flex items-center justify-between text-[11px] gap-1" style="color: var(--theme-400);">
+            <span title="按 input 价计费">输入 {{ formatNumber(totals.non_cache_input_tokens) }}</span>
+            <span title="按 cache 价计费">缓存 {{ formatNumber(totals.total_cache_tokens) }}</span>
+            <span title="按 output 价计费">输出 {{ formatNumber(totals.total_completion_tokens) }}</span>
           </div>
         </div>
 
@@ -213,7 +221,7 @@ const promptVsCompletion = computed(() => {
             {{ formatCost(totals.cost?.total) }}
           </div>
           <div class="mt-1 text-[11px] flex items-center gap-2" style="color: var(--theme-400);">
-            <span>cache 命中 {{ promptCacheRatio.cache.toFixed(0) }}%</span>
+            <span>cache 命中 {{ cacheHitRatio.toFixed(1) }}%</span>
             <span>·</span>
             <span>{{ totals.last_active ? formatRelative(totals.last_active) + '活跃' : '尚无活动' }}</span>
           </div>
@@ -275,7 +283,7 @@ const promptVsCompletion = computed(() => {
                 <div class="text-[12px] tabular-nums mb-1.5" style="color: var(--theme-600);">
                   {{ formatNumber(v.total_tokens) }} tok
                   <span class="text-[11px]" style="color: var(--theme-400);">
-                    P {{ formatNumber(v.prompt_tokens) }} · C {{ formatNumber(v.completion_tokens) }}
+                    输入 {{ formatNumber(v.non_cache_input_tokens) }} · 缓存 {{ formatNumber(v.cache_tokens) }} · 输出 {{ formatNumber(v.completion_tokens) }}
                   </span>
                 </div>
                 <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--theme-100);">
@@ -324,9 +332,9 @@ const promptVsCompletion = computed(() => {
                       <div class="text-[12px] font-medium tabular-nums shrink-0" style="color: var(--theme-700);">{{ formatCost(m.cost?.total) }}</div>
                     </div>
                     <div class="mt-1.5 grid grid-cols-4 gap-2 text-[11px] tabular-nums" style="color: var(--theme-500);">
-                      <div><span style="color: var(--theme-400);">prompt</span> {{ formatNumber(m.prompt_tokens) }}</div>
-                      <div><span style="color: var(--theme-400);">cache</span> {{ formatNumber(m.cache_tokens) }}</div>
-                      <div><span style="color: var(--theme-400);">输出</span> {{ formatNumber(m.completion_tokens) }}</div>
+                      <div title="按 input 价计费"><span style="color: var(--theme-400);">输入</span> {{ formatNumber(m.non_cache_input_tokens) }}</div>
+                      <div title="按 cache 价计费"><span style="color: var(--theme-400);">缓存</span> {{ formatNumber(m.cache_tokens) }}</div>
+                      <div title="按 output 价计费"><span style="color: var(--theme-400);">输出</span> {{ formatNumber(m.completion_tokens) }}</div>
                       <div><span style="color: var(--theme-400);">轮数</span> {{ m.turns }}</div>
                     </div>
                   </div>
@@ -383,9 +391,9 @@ const promptVsCompletion = computed(() => {
                     <span class="text-[12px] font-medium tabular-nums" style="color: var(--theme-700);">{{ formatCost(m.cost?.total) }}</span>
                   </div>
                   <div class="grid grid-cols-4 gap-1 text-[10px] tabular-nums" style="color: var(--theme-500);">
-                    <div>P {{ formatNumber(m.prompt_tokens) }}</div>
-                    <div>K {{ formatNumber(m.cache_tokens) }}</div>
-                    <div>O {{ formatNumber(m.completion_tokens) }}</div>
+                    <div title="按 input 价">输入 {{ formatNumber(m.non_cache_input_tokens) }}</div>
+                    <div title="按 cache 价">缓存 {{ formatNumber(m.cache_tokens) }}</div>
+                    <div title="按 output 价">输出 {{ formatNumber(m.completion_tokens) }}</div>
                     <div>{{ m.turns }} 轮</div>
                   </div>
                 </div>
