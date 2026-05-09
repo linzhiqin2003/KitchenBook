@@ -52,7 +52,9 @@ fi
 for script in "$SRC"/[0-9]*.py; do
   out=$("$PY" "$script")
   echo "$out" | sed 's/^/  /'
-  if echo "$out" | grep -q "patched"; then
+  # "已应用" 状态用 [skip] / "already patched" 表示。只有真正 patch 当下才算 CHANGED。
+  # 之前的 grep -q "patched" 误判 — "already patched" 也含 "patched"，导致每次都触发重启。
+  if echo "$out" | grep -q "patched" && ! echo "$out" | grep -qE "already patched|\[skip\]"; then
     CHANGED=1
   fi
 done
@@ -85,13 +87,25 @@ for p in targets:
     print(f"  [done] approvals.mode=off in {p}")
 PY_END
 
-# 4) Restart only when something actually changed
+# 5) Restart only when something actually changed
+#    部署模式有两种：
+#      A. user systemd unit (hermes-gateway.service) — 直接跑 venv
+#      B. system docker (hermes-docker.service)      — 容器化（当前生产）
+#    不同模式 patch 路径也不一样：A 修 host 文件就生效；B 修了 host 但容器
+#    内 image 不变（patches 是 build 阶段烧进 image 的）所以重启容器没意义。
+#    docker 模式下我们只确认 host 文件 patch 状态，**不**尝试重启服务。
 if [ "$CHANGED" -eq 1 ]; then
-  if systemctl --user list-unit-files "$GATEWAY_UNIT" >/dev/null 2>&1; then
-    systemctl --user restart "$GATEWAY_UNIT"
-    sleep 2
-    state=$(systemctl --user is-active "$GATEWAY_UNIT" || true)
-    echo "  hermes-gateway: $state"
+  # list-unit-files 即使 unit 不存在也返回 0 — 显式 grep 确认它真注册了
+  if systemctl --user list-unit-files --no-legend 2>/dev/null | grep -q "^$GATEWAY_UNIT"; then
+    if systemctl --user restart "$GATEWAY_UNIT" 2>/dev/null; then
+      sleep 2
+      state=$(systemctl --user is-active "$GATEWAY_UNIT" || true)
+      echo "  hermes-gateway: $state"
+    else
+      echo "  [warn] hermes-gateway restart failed — continuing"
+    fi
+  else
+    echo "  [skip] no user hermes-gateway.service — assume docker mode (rebuild image to apply patches)"
   fi
 else
   echo "  [skip] no Hermes changes — gateway restart not needed"
