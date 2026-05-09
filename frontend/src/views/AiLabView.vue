@@ -1923,7 +1923,7 @@ onMounted(async () => {
     <!-- 主内容区 -->
     <div class="flex-1 flex flex-col min-w-0 relative">
       <!-- 顶部栏（所有屏幕都显示；汉堡按钮仍然只在移动端） -->
-      <header class="shrink-0 h-12 border-b flex items-center px-4 gap-3" style="border-color: var(--theme-200); background: var(--theme-50);">
+      <header class="shrink-0 h-12 flex items-center px-4 gap-3" style="background: var(--theme-50);">
         <button
           @click="toggleSidebar"
           class="w-8 h-8 rounded-md items-center justify-center transition-colors cursor-pointer flex lg:hidden"
