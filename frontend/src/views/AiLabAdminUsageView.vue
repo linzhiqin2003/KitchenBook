@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import API_BASE_URL from '../config/api'
+import AiLabUsageHeatmap from '../components/ailab/AiLabUsageHeatmap.vue'
 
 const router = useRouter()
 const me = ref(null)
@@ -9,6 +10,47 @@ const stats = ref(null)
 const loading = ref(false)
 const error = ref('')
 const expanded = ref(new Set())
+// per-visitor 详情面板状态：{uid: {tab: 'overview'|'models', range: 'all'|'30d'|'7d'}}
+const detailState = ref({})
+
+const detailFor = (uid) => {
+  if (!detailState.value[uid]) {
+    detailState.value[uid] = { tab: 'overview', range: 'all' }
+  }
+  return detailState.value[uid]
+}
+const setDetailTab = (uid, tab) => { detailFor(uid); detailState.value[uid].tab = tab }
+const setDetailRange = (uid, range) => { detailFor(uid); detailState.value[uid].range = range }
+
+// 按时间范围过滤 daily 数据 — 给 heatmap 显示用
+const filterDaily = (daily, range) => {
+  if (!Array.isArray(daily) || range === 'all') return daily || []
+  const days = range === '7d' ? 6 : 29
+  const today = new Date(); today.setHours(0,0,0,0)
+  const start = new Date(today); start.setDate(start.getDate() - days)
+  return daily.filter(d => new Date(d.date) >= start)
+}
+
+// 按时间范围算 stats 卡的衍生数字
+const visitorWindowStats = (v, range) => {
+  const list = filterDaily(v.daily, range)
+  const tokens = list.reduce((a, d) => a + (d.tokens || 0), 0)
+  const messages = list.reduce((a, d) => a + (d.messages || 0), 0)
+  const sessions = list.reduce((a, d) => a + (d.sessions || 0), 0)
+  const activeDays = list.filter(d => (d.tokens || 0) > 0).length
+  return { tokens, messages, sessions, activeDays, days: list }
+}
+
+// 把 hour (0-23) 格式化成 "4 PM" / "2 AM"
+const formatHour = (h) => {
+  if (h === null || h === undefined) return '—'
+  const n = Number(h)
+  if (!isFinite(n)) return '—'
+  if (n === 0) return '12 AM'
+  if (n < 12)  return `${n} AM`
+  if (n === 12) return '12 PM'
+  return `${n - 12} PM`
+}
 
 const headers = () => {
   const t = localStorage.getItem('access_token') || ''
@@ -153,26 +195,45 @@ const tokenSplit = computed(() => {
   <div class="min-h-screen px-4 py-10" style="background: var(--theme-50, #f8f8f6);">
     <div class="max-w-5xl mx-auto">
       <!-- Header -->
-      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 class="text-[22px] font-semibold tracking-tight" style="color: var(--theme-700);">访客用量</h1>
-          <p class="text-[13px] mt-1" style="color: var(--theme-500);">所有兑换过邀请码、开通了 MyAgent 的访客的使用情况。</p>
+      <header class="usage-header">
+        <div class="usage-header__title">
+          <router-link to="/ai-lab" class="usage-header__back" title="返回 MyAgent">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+          </router-link>
+          <div class="usage-header__heading">
+            <h1>访客用量</h1>
+            <p>MyAgent 访客的使用情况与日活、token、cost 拆分。</p>
+          </div>
         </div>
-        <div class="flex items-center gap-3 text-[13px]">
-          <router-link
-            to="/ai-lab/admin/invites"
-            class="cursor-pointer hover:underline"
-            style="color: var(--theme-500);"
-          >邀请码管理 →</router-link>
+        <div class="usage-header__actions">
           <button
             @click="fetchStats({ silent: false })"
             :disabled="loading"
-            class="px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-50"
-            style="border: 1px solid var(--theme-200); background: #fff; color: var(--theme-600);"
-          >{{ loading ? '刷新中…' : '刷新' }}</button>
-          <router-link to="/ai-lab" class="cursor-pointer" style="color: var(--theme-500);">← 返回 MyAgent</router-link>
+            class="usage-btn usage-btn--icon"
+            :class="{ 'is-loading': loading }"
+            title="刷新数据"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+              <polyline points="21 3 21 8 16 8"/>
+              <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+              <polyline points="3 21 3 16 8 16"/>
+            </svg>
+            <span>{{ loading ? '刷新中' : '刷新' }}</span>
+          </button>
+          <router-link to="/ai-lab/admin/invites" class="usage-btn usage-btn--ghost">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <line x1="19" y1="8" x2="19" y2="14"/>
+              <line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+            <span>邀请码</span>
+          </router-link>
         </div>
-      </div>
+      </header>
 
       <div v-if="error" class="mb-4 px-4 py-3 rounded-lg text-[13px]" style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;">
         加载失败：{{ error }}
@@ -310,36 +371,108 @@ const tokenSplit = computed(() => {
               </div>
             </div>
 
-            <!-- Desktop expanded -->
-            <div v-if="isExpanded(v.user_id)" class="hidden md:block px-5 py-4" style="background: var(--theme-50); border-bottom: 1px solid var(--theme-100);">
-              <div v-if="v.models.length === 0" class="text-[12px]" style="color: var(--theme-400);">
-                该访客尚未产生计费 token。
+            <!-- Expanded — analytics panel (responsive desktop + mobile) -->
+            <div v-if="isExpanded(v.user_id)" class="analytics" :data-uid="v.user_id" @click.stop>
+              <!-- Tabs + range -->
+              <div class="analytics__toolbar">
+                <div class="analytics__tabs">
+                  <button
+                    class="analytics__tab"
+                    :class="{ 'is-active': detailFor(v.user_id).tab === 'overview' }"
+                    @click="setDetailTab(v.user_id, 'overview')"
+                  >Overview</button>
+                  <button
+                    class="analytics__tab"
+                    :class="{ 'is-active': detailFor(v.user_id).tab === 'models' }"
+                    @click="setDetailTab(v.user_id, 'models')"
+                  >Models</button>
+                </div>
+                <div class="analytics__range">
+                  <button
+                    v-for="r in ['all','30d','7d']"
+                    :key="r"
+                    class="analytics__range-btn"
+                    :class="{ 'is-active': detailFor(v.user_id).range === r }"
+                    @click="setDetailRange(v.user_id, r)"
+                  >{{ r === 'all' ? 'All' : r }}</button>
+                </div>
               </div>
-              <div v-else>
-                <div class="text-[11px] font-semibold uppercase tracking-wide mb-2" style="color: var(--theme-500);">模型分布</div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+
+              <!-- Overview tab -->
+              <template v-if="detailFor(v.user_id).tab === 'overview'">
+                <!-- Stats grid -->
+                <div class="analytics__stats">
+                  <div class="stat">
+                    <div class="stat__label">Sessions</div>
+                    <div class="stat__value">{{ visitorWindowStats(v, detailFor(v.user_id).range).sessions }}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">Messages</div>
+                    <div class="stat__value">{{ visitorWindowStats(v, detailFor(v.user_id).range).messages.toLocaleString() }}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">Total tokens</div>
+                    <div class="stat__value">{{ formatNumber(visitorWindowStats(v, detailFor(v.user_id).range).tokens) }}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">Active days</div>
+                    <div class="stat__value">{{ visitorWindowStats(v, detailFor(v.user_id).range).activeDays }}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">Current streak</div>
+                    <div class="stat__value">{{ v.current_streak || 0 }}<span class="stat__unit">d</span></div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">Longest streak</div>
+                    <div class="stat__value">{{ v.longest_streak || 0 }}<span class="stat__unit">d</span></div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">Peak hour</div>
+                    <div class="stat__value">{{ formatHour(v.peak_hour) }}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">Favorite model</div>
+                    <div class="stat__value stat__value--text" :title="v.favorite_model || '—'">{{ v.favorite_model || '—' }}</div>
+                  </div>
+                </div>
+
+                <!-- Heatmap -->
+                <div class="analytics__heatmap">
+                  <AiLabUsageHeatmap
+                    :daily="v.daily || []"
+                    :start-date="v.activated_at"
+                    :range="detailFor(v.user_id).range"
+                  />
+                </div>
+              </template>
+
+              <!-- Models tab -->
+              <template v-else>
+                <div v-if="v.models.length === 0" class="analytics__empty">
+                  该访客尚未产生计费 token。
+                </div>
+                <div v-else class="analytics__models">
                   <div
                     v-for="m in v.models"
                     :key="m.raw_model || m.model"
-                    class="rounded-lg px-3 py-2.5"
-                    style="background: #fff; border: 1px solid var(--theme-200);"
+                    class="model-card"
                   >
-                    <div class="flex items-center justify-between gap-2">
-                      <div class="min-w-0 flex items-center gap-1.5">
-                        <code class="text-[12px] truncate" style="color: var(--theme-700); font-family: var(--ai-font-mono, ui-monospace, monospace);">{{ m.raw_model || m.model }}</code>
-                        <span v-if="!m.priced" class="text-[10px] px-1.5 py-0.5 rounded shrink-0" style="background: #fef9c3; color: #854d0e;" title="此模型不在价格表中，按默认模型估算">默认价</span>
+                    <div class="model-card__head">
+                      <div class="model-card__name">
+                        <code>{{ m.raw_model || m.model }}</code>
+                        <span v-if="!m.priced" class="model-card__badge" title="此模型不在价格表中，按默认模型估算">默认价</span>
                       </div>
-                      <div class="text-[12px] font-medium tabular-nums shrink-0" style="color: var(--theme-700);">{{ formatCost(m.cost?.total) }}</div>
+                      <div class="model-card__cost">{{ formatCost(m.cost?.total) }}</div>
                     </div>
-                    <div class="mt-1.5 grid grid-cols-4 gap-2 text-[11px] tabular-nums" style="color: var(--theme-500);">
-                      <div title="按 input 价计费"><span style="color: var(--theme-400);">输入</span> {{ formatNumber(m.non_cache_input_tokens) }}</div>
-                      <div title="按 cache 价计费"><span style="color: var(--theme-400);">缓存</span> {{ formatNumber(m.cache_tokens) }}</div>
-                      <div title="按 output 价计费"><span style="color: var(--theme-400);">输出</span> {{ formatNumber(m.completion_tokens) }}</div>
-                      <div><span style="color: var(--theme-400);">轮数</span> {{ m.turns }}</div>
+                    <div class="model-card__stats">
+                      <div title="按 input 价计费"><span>输入</span> {{ formatNumber(m.non_cache_input_tokens) }}</div>
+                      <div title="按 cache 价计费"><span>缓存</span> {{ formatNumber(m.cache_tokens) }}</div>
+                      <div title="按 output 价计费"><span>输出</span> {{ formatNumber(m.completion_tokens) }}</div>
+                      <div><span>轮数</span> {{ m.turns }}</div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </template>
             </div>
 
             <!-- Mobile card -->
@@ -379,25 +512,7 @@ const tokenSplit = computed(() => {
                   }"
                 ></div>
               </div>
-              <div v-if="isExpanded(v.user_id) && v.models.length" class="mt-3 space-y-2">
-                <div
-                  v-for="m in v.models"
-                  :key="m.raw_model || m.model"
-                  class="rounded-lg px-3 py-2"
-                  style="background: #fff; border: 1px solid var(--theme-200);"
-                >
-                  <div class="flex items-center justify-between gap-2 mb-1">
-                    <code class="text-[11px] truncate" style="color: var(--theme-700); font-family: var(--ai-font-mono, ui-monospace, monospace);">{{ m.raw_model || m.model }}</code>
-                    <span class="text-[12px] font-medium tabular-nums" style="color: var(--theme-700);">{{ formatCost(m.cost?.total) }}</span>
-                  </div>
-                  <div class="grid grid-cols-4 gap-1 text-[10px] tabular-nums" style="color: var(--theme-500);">
-                    <div title="按 input 价">输入 {{ formatNumber(m.non_cache_input_tokens) }}</div>
-                    <div title="按 cache 价">缓存 {{ formatNumber(m.cache_tokens) }}</div>
-                    <div title="按 output 价">输出 {{ formatNumber(m.completion_tokens) }}</div>
-                    <div>{{ m.turns }} 轮</div>
-                  </div>
-                </div>
-              </div>
+              <!-- 展开 analytics 由顶部统一渲染；mobile 此处不再重复列模型 -->
             </div>
           </div>
         </div>
@@ -405,3 +520,279 @@ const tokenSplit = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* === Header toolbar === */
+.usage-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.usage-header__title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.usage-header__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--theme-200, #e6e4dd);
+  color: var(--theme-500, #888578);
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease, color 0.12s ease;
+  flex-shrink: 0;
+}
+.usage-header__back:hover {
+  background: var(--theme-100, #ececea);
+  color: var(--theme-700, #2d2d28);
+  transform: translateX(-1px);
+}
+.usage-header__heading h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--theme-700, #2d2d28);
+  margin: 0;
+  line-height: 1.2;
+}
+.usage-header__heading p {
+  font-size: 13px;
+  color: var(--theme-500, #888578);
+  margin: 4px 0 0;
+}
+.usage-header__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: var(--theme-100, #ececea);
+  border: 1px solid var(--theme-200, #e6e4dd);
+  border-radius: 12px;
+}
+.usage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--theme-600, #6c6a5e);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+  text-decoration: none;
+}
+.usage-btn:hover {
+  background: #fff;
+  color: var(--theme-700, #2d2d28);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.usage-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.usage-btn--icon svg {
+  transition: transform 0.4s ease;
+}
+.usage-btn--icon.is-loading svg {
+  animation: usage-btn-spin 0.9s linear infinite;
+}
+@keyframes usage-btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* === Analytics panel inside expanded row === */
+.analytics {
+  background: var(--theme-50, #f8f8f6);
+  border-bottom: 1px solid var(--theme-100, #ececea);
+  padding: 18px 20px 22px;
+}
+.analytics__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.analytics__tabs,
+.analytics__range {
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--theme-200, #e6e4dd);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 1px;
+}
+.analytics__tab,
+.analytics__range-btn {
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--theme-500, #888578);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.analytics__tab:hover,
+.analytics__range-btn:hover {
+  color: var(--theme-700, #2d2d28);
+}
+.analytics__tab.is-active,
+.analytics__range-btn.is-active {
+  background: var(--theme-700, #2d2d28);
+  color: var(--theme-50, #f8f8f6);
+}
+.analytics__range-btn {
+  font-size: 11px;
+  min-width: 38px;
+  text-align: center;
+}
+
+/* Stats grid (8 cards) */
+.analytics__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+@media (min-width: 640px) {
+  .analytics__stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+}
+@media (min-width: 1024px) {
+  .analytics__stats { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .analytics { padding: 14px 12px 16px; }
+  .analytics__toolbar { gap: 6px; }
+}
+.stat {
+  background: #fff;
+  border: 1px solid var(--theme-200, #e6e4dd);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.stat__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--theme-400, #b3b1a6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat__value {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--theme-700, #2d2d28);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.stat__value--text {
+  font-size: 13px;
+  font-family: var(--ai-font-mono, ui-monospace, monospace);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat__unit {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--theme-400, #b3b1a6);
+}
+
+/* Heatmap container */
+.analytics__heatmap {
+  background: #fff;
+  border: 1px solid var(--theme-200, #e6e4dd);
+  border-radius: 10px;
+  padding: 14px 14px 10px;
+}
+
+/* Models tab cards */
+.analytics__empty {
+  font-size: 12px;
+  color: var(--theme-400, #b3b1a6);
+  padding: 24px 0;
+  text-align: center;
+}
+.analytics__models {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+@media (min-width: 1024px) {
+  .analytics__models { grid-template-columns: 1fr 1fr; }
+}
+.model-card {
+  background: #fff;
+  border: 1px solid var(--theme-200, #e6e4dd);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.model-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.model-card__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.model-card__name code {
+  font-size: 12px;
+  font-family: var(--ai-font-mono, ui-monospace, monospace);
+  color: var(--theme-700, #2d2d28);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-card__badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #fef9c3;
+  color: #854d0e;
+  flex-shrink: 0;
+}
+.model-card__cost {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--theme-700, #2d2d28);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.model-card__stats {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 11px;
+  color: var(--theme-500, #888578);
+  font-variant-numeric: tabular-nums;
+}
+.model-card__stats span {
+  color: var(--theme-400, #b3b1a6);
+  margin-right: 3px;
+}
+</style>

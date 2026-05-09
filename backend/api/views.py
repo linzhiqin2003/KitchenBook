@@ -1927,6 +1927,90 @@ def ailab_admin_visitor_stats(request):
         .annotate(active=Count('conversation_id', distinct=True))
     )
 
+    # ---- 7'. 按 (visitor, day) 聚合每日 token / message 用量 ----
+    # 提供给前端日历热力图。day key 用 server local TZ 的 YYYY-MM-DD。
+    from django.db.models.functions import TruncDate, ExtractHour
+    daily_tok_rows = (
+        msg_qs.annotate(day=TruncDate('created_at'))
+        .values('conversation__user_id', 'day')
+        .annotate(
+            prompt=Sum('prompt_tokens'),
+            completion=Sum('completion_tokens'),
+            cache=Sum('cache_tokens'),
+            turns=Count('id'),
+        )
+    )
+    # message 数（含 user role）按 (visitor, day) 聚合
+    daily_msg_rows = (
+        AiLabMessage.objects.filter(conversation__user__in=visitor_qs)
+        .annotate(day=TruncDate('created_at'))
+        .values('conversation__user_id', 'day')
+        .annotate(c=Count('id'))
+    )
+    # 按 (visitor, hour) 算 peak_hour（小时维度）
+    hour_rows = (
+        msg_qs.annotate(hour=ExtractHour('created_at'))
+        .values('conversation__user_id', 'hour')
+        .annotate(c=Count('id'))
+    )
+    # 按 (visitor, day) session 计数（distinct conversation 在该天产生过 message）
+    daily_session_rows = (
+        msg_qs.annotate(day=TruncDate('created_at'))
+        .values('conversation__user_id', 'day')
+        .annotate(s=Count('conversation_id', distinct=True))
+    )
+
+    daily_by_user = {}     # uid -> {date_str -> {prompt, completion, cache, turns, messages, sessions}}
+    for row in daily_tok_rows:
+        uid = row['conversation__user_id']
+        d = row['day'].isoformat() if row['day'] else None
+        if not d:
+            continue
+        bucket = daily_by_user.setdefault(uid, {}).setdefault(d, {
+            'prompt': 0, 'completion': 0, 'cache': 0, 'turns': 0,
+            'messages': 0, 'sessions': 0,
+        })
+        bucket['prompt'] += int(row['prompt'] or 0)
+        bucket['completion'] += int(row['completion'] or 0)
+        bucket['cache'] += int(row['cache'] or 0)
+        bucket['turns'] += int(row['turns'] or 0)
+    for row in daily_msg_rows:
+        uid = row['conversation__user_id']
+        d = row['day'].isoformat() if row['day'] else None
+        if not d:
+            continue
+        bucket = daily_by_user.setdefault(uid, {}).setdefault(d, {
+            'prompt': 0, 'completion': 0, 'cache': 0, 'turns': 0,
+            'messages': 0, 'sessions': 0,
+        })
+        bucket['messages'] += int(row['c'] or 0)
+    for row in daily_session_rows:
+        uid = row['conversation__user_id']
+        d = row['day'].isoformat() if row['day'] else None
+        if not d:
+            continue
+        bucket = daily_by_user.setdefault(uid, {}).setdefault(d, {
+            'prompt': 0, 'completion': 0, 'cache': 0, 'turns': 0,
+            'messages': 0, 'sessions': 0,
+        })
+        bucket['sessions'] += int(row['s'] or 0)
+
+    # peak_hour by uid
+    peak_hour_by_user = {}
+    hour_count_by_user = {}
+    for row in hour_rows:
+        uid = row['conversation__user_id']
+        h = row['hour']
+        c = int(row['c'] or 0)
+        if h is None:
+            continue
+        d = hour_count_by_user.setdefault(uid, {})
+        d[h] = d.get(h, 0) + c
+    for uid, d in hour_count_by_user.items():
+        if not d:
+            continue
+        peak_hour_by_user[uid] = max(d.items(), key=lambda kv: kv[1])[0]
+
     # ---- 7. invite note：每个访客取最近一条已用 invite 的 note ----
     visitor_invites = {}
     for inv in AiLabInvite.objects.filter(used_by__in=visitor_qs).order_by('used_by_id', '-used_at'):
@@ -2072,6 +2156,58 @@ def ailab_admin_visitor_stats(request):
         sum_cache_cost += v_cache
         sum_output += v_output
 
+        # ---- daily 数据 + 衍生 streak/active_days/favorite_model ----
+        daily_map = daily_by_user.get(v['user_id'], {})
+        daily_list = []
+        for date_str in sorted(daily_map.keys()):
+            row = daily_map[date_str]
+            tokens_total = row['prompt'] + row['completion']
+            daily_list.append({
+                'date': date_str,
+                'tokens': tokens_total,
+                'prompt_tokens': row['prompt'],
+                'cache_tokens': row['cache'],
+                'completion_tokens': row['completion'],
+                'turns': row['turns'],
+                'messages': row['messages'],
+                'sessions': row['sessions'],
+            })
+
+        # streak: 用 active 日（tokens > 0）按日期排序，连续天数
+        from datetime import date as _date, timedelta as _td
+        active_dates = sorted({d['date'] for d in daily_list if d['tokens'] > 0})
+        active_days_count = len(active_dates)
+        longest_streak = 0
+        current_streak = 0
+        if active_dates:
+            run = 1
+            for i in range(1, len(active_dates)):
+                prev = _date.fromisoformat(active_dates[i-1])
+                curr = _date.fromisoformat(active_dates[i])
+                if (curr - prev).days == 1:
+                    run += 1
+                else:
+                    longest_streak = max(longest_streak, run)
+                    run = 1
+            longest_streak = max(longest_streak, run)
+            # current_streak: 如果最后活跃日是今天或昨天，从那向前数
+            today = _date.today()
+            last_active_d = _date.fromisoformat(active_dates[-1])
+            if (today - last_active_d).days <= 1:
+                # 反向数连续日
+                cs = 1
+                for i in range(len(active_dates)-1, 0, -1):
+                    prev = _date.fromisoformat(active_dates[i-1])
+                    curr = _date.fromisoformat(active_dates[i])
+                    if (curr - prev).days == 1:
+                        cs += 1
+                    else:
+                        break
+                current_streak = cs
+
+        # favorite_model: 该访客 token 用量最大的模型
+        favorite_model = models_list[0]['model'] if models_list else None
+
         visitor_list.append({
             'user_id': v['user_id'],
             'username': v['username'],
@@ -2098,6 +2234,13 @@ def ailab_admin_visitor_stats(request):
                 'output': str(v_output.quantize(q)),
                 'total': str(v_total_cost.quantize(q)),
             },
+            # ---- 新增: 时间维度 analytics ----
+            'daily': daily_list,
+            'active_days': active_days_count,
+            'current_streak': current_streak,
+            'longest_streak': longest_streak,
+            'peak_hour': peak_hour_by_user.get(v['user_id']),
+            'favorite_model': favorite_model,
             'models': models_list,
         })
 
