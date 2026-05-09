@@ -6,20 +6,22 @@
    AI Lab route (including /ai-lab/studio entered via direct refresh) can
    resolve var(--theme-*) without depending on AiLabView being mounted. */
 :root {
-  --theme-50: #f8f8f6;
-  --theme-100: #f0f0ed;
-  --theme-200: #e4e4df;
-  --theme-300: #c8c8c1;
-  --theme-400: #9c9c93;
-  --theme-500: #6b6b63;
-  --theme-600: #484843;
-  --theme-700: #2d2d28;
-  --theme-gradient: #2d2d28;
-  --theme-gradient-btn: #2d2d28;
-  --theme-shadow: rgba(45, 45, 40, 0.06);
-  --ai-accent: #3d7cc9;
-  --ai-accent-hover: #2e6ab5;
-  --ai-accent-soft: #edf2f8;
+  /* Warm cream theme — Claude.ai paper aesthetic */
+  --theme-50: #faf9f5;   /* main bg / paper */
+  --theme-100: #f0ede1;  /* sidebar / panel surface */
+  --theme-200: #e6e2d2;  /* divider / border */
+  --theme-300: #d4cfb8;  /* disabled border */
+  --theme-400: #9b9784;  /* placeholder / icon */
+  --theme-500: #6e695a;  /* secondary text */
+  --theme-600: #4a4639;  /* body text */
+  --theme-700: #2c2a20;  /* heading */
+  --theme-gradient: #2c2a20;
+  --theme-gradient-btn: #2c2a20;
+  --theme-shadow: rgba(67, 60, 38, 0.08);
+  /* Accent: warm clay/terracotta — Anthropic-inspired */
+  --ai-accent: #c97956;
+  --ai-accent-hover: #b56947;
+  --ai-accent-soft: #f4ebe1;
   --ai-font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --ai-font-body: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', sans-serif;
   --ai-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;

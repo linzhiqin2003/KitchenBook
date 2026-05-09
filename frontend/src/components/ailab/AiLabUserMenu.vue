@@ -196,7 +196,7 @@ onUnmounted(() => {
       <span
         v-if="me?.is_owner"
         class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full"
-        style="background: var(--ai-accent, #3d7cc9); border: 1.5px solid #fff;"
+        style="background: var(--ai-accent, var(--ai-accent)); border: 1.5px solid #fff;"
         title="Owner"
       ></span>
     </button>
@@ -228,7 +228,7 @@ onUnmounted(() => {
                   <span
                     v-if="me?.is_owner"
                     class="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                    style="background: var(--ai-accent, #3d7cc9); color: #fff;"
+                    style="background: var(--ai-accent, var(--ai-accent)); color: #fff;"
                   >Owner</span>
                   <span
                     v-else-if="me?.ai_lab_enabled"
@@ -347,7 +347,7 @@ onUnmounted(() => {
               <!-- 非缓存输入段 -->
               <div
                 class="h-full transition-all duration-500"
-                :style="{ width: `${promptCompletionRatio.p * promptCacheRatio.nonCache / 100}%`, background: 'var(--ai-accent, #3d7cc9)' }"
+                :style="{ width: `${promptCompletionRatio.p * promptCacheRatio.nonCache / 100}%`, background: 'var(--ai-accent, var(--ai-accent))' }"
                 title="非缓存输入"
               ></div>
               <!-- 缓存命中段 -->
@@ -372,7 +372,7 @@ onUnmounted(() => {
           <div class="px-4 py-2.5 space-y-1" style="border-top: 1px solid var(--theme-100); background: var(--theme-100);">
             <div class="flex items-center justify-between text-[12px]">
               <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
-                <span class="w-1.5 h-1.5 rounded-full" style="background: var(--ai-accent, #3d7cc9);"></span>
+                <span class="w-1.5 h-1.5 rounded-full" style="background: var(--ai-accent, var(--ai-accent));"></span>
                 输入（非缓存）
               </span>
               <span class="font-mono shrink-0" style="color: var(--theme-700);">

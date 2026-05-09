@@ -192,15 +192,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col relative"
+  <div class="flex flex-col relative ai-sidebar"
        :style="{
-         background: '#f7f7f8',
-         borderRight: '1px solid #ebebed',
+         background: 'var(--theme-100)',
+         borderRight: '1px solid var(--theme-200)',
          fontFamily: 'var(--ai-font-body)',
          height: '100dvh',
          width: isCollapsed ? '0px' : sidebarWidth + 'px',
          minWidth: isCollapsed ? '0px' : sidebarWidth + 'px',
          transition: isResizing ? 'none' : 'width 0.3s, min-width 0.3s',
+         boxShadow: isCollapsed ? 'none' : '6px 0 24px -16px rgba(67, 60, 38, 0.18), 1px 0 0 rgba(67, 60, 38, 0.04)',
        }"
        :class="[
          isCollapsed ? 'overflow-hidden lg:!w-16 lg:!min-w-16' : '',
@@ -214,20 +215,20 @@ onUnmounted(() => {
              几何化、对称、跟暖色低饱和主题协调 -->
         <!-- MyAgent logo: 简化的"使者剪影" —— 圆头 + 肩 + 一个微小的思考闪念。
              直白传达 "为你做事的小家伙" -->
-        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color: #2c2c30;">
+        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color: var(--theme-700);">
           <!-- 思考闪念：右上方虚化小点，暗示 agent 的"念头" -->
           <circle cx="19" cy="4" r="1.1" fill="currentColor" opacity="0.55"/>
           <!-- 头：accent 蓝实心圆 -->
-          <circle cx="12" cy="9" r="3.4" fill="var(--ai-accent, #3d7cc9)"/>
+          <circle cx="12" cy="9" r="3.4" fill="var(--ai-accent)"/>
           <!-- 肩 / 上半身：经典 user 剪影的下半弧 -->
           <path d="M5 20.5c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="currentColor" stroke-width="1.8"/>
         </svg>
-        <span class="text-[14px] font-semibold" style="color: #2c2c30;">MyAgent</span>
+        <span class="text-[14px] font-semibold" style="color: var(--theme-700);">MyAgent</span>
       </div>
       <div v-if="!isCollapsed" class="flex items-center gap-0.5">
         <button @click="emit('toggle-collapse')"
                 class="p-1.5 rounded-md transition-all cursor-pointer hover:bg-black/[0.04]"
-                style="color: #9a9aa0;"
+                style="color: var(--theme-400);"
                 title="折叠侧边栏">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
@@ -236,7 +237,7 @@ onUnmounted(() => {
       </div>
       <button v-else @click="emit('toggle-collapse')"
               class="p-1.5 rounded-md transition-all cursor-pointer"
-              style="color: #9a9aa0;" title="展开侧边栏">
+              style="color: var(--theme-400);" title="展开侧边栏">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
         </svg>
@@ -247,8 +248,8 @@ onUnmounted(() => {
     <div v-if="!isCollapsed" class="px-2 pb-1">
       <button @click="emit('new')"
               class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/[0.04]"
-              style="font-size: 14px; color: #2c2c30;">
-        <svg class="w-4 h-4 shrink-0" style="color: #6e6e76;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              style="font-size: 14px; color: var(--theme-700);">
+        <svg class="w-4 h-4 shrink-0" style="color: var(--theme-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
         </svg>
         新对话
@@ -257,12 +258,12 @@ onUnmounted(() => {
 
     <!-- 会话列表 -->
     <div class="flex-1 min-h-0 overflow-y-auto px-2 py-1 custom-scrollbar">
-      <div v-if="conversations.length === 0 && !isCollapsed" class="text-center mt-8 px-4" style="color: #b0b0b6; font-size: 13px;">
+      <div v-if="conversations.length === 0 && !isCollapsed" class="text-center mt-8 px-4" style="color: var(--theme-300); font-size: 13px;">
         暂无历史记录
       </div>
 
       <template v-for="(group, groupName) in groupedConversations" :key="groupName">
-        <div v-if="!isCollapsed" class="px-2.5 pt-4 pb-1" style="font-size: 12px; font-weight: 500; color: #9a9aa0;">
+        <div v-if="!isCollapsed" class="px-2.5 pt-4 pb-1" style="font-size: 12px; font-weight: 500; color: var(--theme-400);">
           {{ groupName }}
         </div>
         <div v-for="chat in group" :key="chat.id"
@@ -271,7 +272,7 @@ onUnmounted(() => {
              :class="[
                isCollapsed ? 'justify-center' : ''
              ]"
-             :style="currentId === chat.id ? 'background: #eeeef0; color: #2c2c30;' : 'color: #6e6e76;'"
+             :style="currentId === chat.id ? 'background: var(--theme-200); color: var(--theme-700);' : 'color: var(--theme-500);'"
              :title="isCollapsed ? chat.title : ''">
 
           <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -310,11 +311,11 @@ onUnmounted(() => {
     </div>
 
     <!-- 底部导航 -->
-    <div class="px-2 pt-2 pb-8 space-y-0.5 shrink-0" style="border-top: 1px solid #ebebed;">
+    <div class="px-2 pt-2 pb-8 space-y-0.5 shrink-0" style="border-top: 1px solid var(--theme-200);">
       <router-link
         to="/ai-lab/studio"
         :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors hover:bg-black/[0.04]', isCollapsed && 'justify-center']"
-        style="color: #8a8a90; font-size: 13px;"
+        style="color: var(--theme-500); font-size: 13px;"
         :title="isCollapsed ? 'Studio' : ''"
       >
         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -325,7 +326,7 @@ onUnmounted(() => {
       <router-link
         to="/"
         :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors hover:bg-black/[0.04]', isCollapsed && 'justify-center']"
-        style="color: #8a8a90; font-size: 13px;"
+        style="color: var(--theme-500); font-size: 13px;"
       >
         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
@@ -354,8 +355,8 @@ onUnmounted(() => {
            style="width: 160px; background: #fff; border-radius: 12px; box-shadow: 0 2px 16px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04); padding: 6px;">
         <button @click.stop="handleRename(activeChat)"
                 class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-black/[0.03]"
-                style="font-size: 14px; color: #2c2c30;">
-          <svg class="w-[18px] h-[18px] shrink-0" style="color: #6e6e76;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                style="font-size: 14px; color: var(--theme-700);">
+          <svg class="w-[18px] h-[18px] shrink-0" style="color: var(--theme-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z"/>
           </svg>
           重命名

@@ -1239,7 +1239,7 @@ const openImage = (dataUrl) => {
   width: 0.4rem;
   height: 0.4rem;
   border-radius: 999px;
-  background: var(--ai-accent, #3d7cc9);
+  background: var(--ai-accent, var(--ai-accent));
   animation: progressPulse 1.2s ease-in-out infinite;
 }
 
@@ -1279,7 +1279,7 @@ const openImage = (dataUrl) => {
   font-size: 0.76rem;
   line-height: 1.7;
   color: var(--theme-500);
-  background: var(--theme-50, #f8f8f6);
+  background: var(--theme-50, var(--theme-50));
   border-radius: 0.45rem;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1305,7 +1305,7 @@ const openImage = (dataUrl) => {
 
 .trace-result-text {
   padding: 0.4rem 0.55rem;
-  background: var(--theme-50, #f8f8f6);
+  background: var(--theme-50, var(--theme-50));
   border-radius: 0.45rem;
   font-size: 0.75rem;
   line-height: 1.6;
@@ -1320,11 +1320,11 @@ const openImage = (dataUrl) => {
 .trace-shimmer-text {
   background: linear-gradient(
     90deg,
-    var(--theme-400, #9a9a91) 0%,
-    var(--theme-400, #9a9a91) 35%,
-    var(--theme-700, #2d2d28) 50%,
-    var(--theme-400, #9a9a91) 65%,
-    var(--theme-400, #9a9a91) 100%
+    var(--theme-400, var(--theme-400)) 0%,
+    var(--theme-400, var(--theme-400)) 35%,
+    var(--theme-700, var(--theme-700)) 50%,
+    var(--theme-400, var(--theme-400)) 65%,
+    var(--theme-400, var(--theme-400)) 100%
   );
   background-size: 220% 100%;
   -webkit-background-clip: text;
@@ -1404,7 +1404,7 @@ const openImage = (dataUrl) => {
   width: 8px;
   height: 8px;
   border: 1.5px solid #cbd5e1;
-  border-top-color: #3b82f6;
+  border-top-color: var(--ai-accent);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   flex-shrink: 0;
@@ -1420,7 +1420,7 @@ const openImage = (dataUrl) => {
   gap: 0.375rem;
   margin: 0.25rem 0 0.125rem 1rem;
   font-size: 0.7rem;
-  color: #3b82f6;
+  color: var(--ai-accent);
   animation: fadeInSoft 0.2s ease-out;
 }
 
@@ -1428,7 +1428,7 @@ const openImage = (dataUrl) => {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--ai-accent);
   animation: progressPulse 1.2s ease-in-out infinite;
   flex-shrink: 0;
 }
@@ -1440,7 +1440,7 @@ const openImage = (dataUrl) => {
 
 /* Markdown — The Quiet Studio */
 .markdown-content {
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
   line-height: 1.7;
   font-size: 15.5px;
 }
@@ -1454,7 +1454,7 @@ const openImage = (dataUrl) => {
 .markdown-content :deep(h3),
 .markdown-content :deep(h4) {
   font-weight: 600;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
   margin-top: 1.25em;
   margin-bottom: 0.4em;
   letter-spacing: -0.01em;
@@ -1476,29 +1476,29 @@ const openImage = (dataUrl) => {
 
 .markdown-content :deep(strong) {
   font-weight: 600;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
 }
 
 .markdown-content :deep(em) {
   font-style: italic;
-  color: var(--theme-500, #6b6b63);
+  color: var(--theme-500, var(--theme-500));
 }
 
 .markdown-content :deep(a) {
-  color: var(--ai-accent, #3d7cc9);
+  color: var(--ai-accent, var(--ai-accent));
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: border-color 0.2s;
 }
 
 .markdown-content :deep(a:hover) {
-  border-bottom-color: var(--ai-accent, #3d7cc9);
+  border-bottom-color: var(--ai-accent, var(--ai-accent));
 }
 
 .markdown-content :deep(code:not(pre code)),
 .markdown-content :deep(.inline-code) {
-  background: var(--theme-100, #f0f0ed);
-  color: var(--theme-600, #484843);
+  background: var(--theme-100, var(--theme-100));
+  color: var(--theme-600, var(--theme-600));
   padding: 0.15em 0.35em;
   border-radius: 4px;
   font-size: 0.88em;
@@ -1507,8 +1507,8 @@ const openImage = (dataUrl) => {
 
 .markdown-content :deep(pre),
 .markdown-content :deep(.code-block) {
-  background: var(--theme-50, #f8f8f6);
-  border: 1px solid var(--theme-200, #e4e4df);
+  background: var(--theme-50, var(--theme-50));
+  border: 1px solid var(--theme-200, var(--theme-200));
   border-radius: 8px;
   padding: 0.875em 1em;
   margin: 0.75em 0;
@@ -1518,7 +1518,7 @@ const openImage = (dataUrl) => {
 .markdown-content :deep(pre code),
 .markdown-content :deep(.code-block code) {
   background: transparent;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
   padding: 0;
   font-size: 0.85em;
   line-height: 1.65;
@@ -1527,11 +1527,11 @@ const openImage = (dataUrl) => {
 
 .markdown-content :deep(blockquote),
 .markdown-content :deep(.md-quote) {
-  background: var(--theme-100, #f0f0ed);
+  background: var(--theme-100, var(--theme-100));
   padding: 0.75em 1em;
   margin: 0.75em 0;
   border-radius: 8px;
-  color: var(--theme-500, #6b6b63);
+  color: var(--theme-500, var(--theme-500));
 }
 
 .markdown-content :deep(blockquote p) { margin: 0; }
@@ -1539,7 +1539,7 @@ const openImage = (dataUrl) => {
 .markdown-content :deep(hr) {
   border: none;
   height: 1px;
-  background: var(--theme-200, #e4e4df);
+  background: var(--theme-200, var(--theme-200));
   margin: 1.25em 0;
 }
 
@@ -1552,19 +1552,19 @@ const openImage = (dataUrl) => {
 
 .markdown-content :deep(th),
 .markdown-content :deep(td) {
-  border: 1px solid var(--theme-200, #e4e4df);
+  border: 1px solid var(--theme-200, var(--theme-200));
   padding: 0.5em 0.75em;
   text-align: left;
 }
 
 .markdown-content :deep(th) {
-  background: var(--theme-100, #f0f0ed);
+  background: var(--theme-100, var(--theme-100));
   font-weight: 600;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
 }
 
 .markdown-content :deep(tr:nth-child(even)) {
-  background: var(--theme-50, #f8f8f6);
+  background: var(--theme-50, var(--theme-50));
 }
 
 .markdown-content :deep(img) {
@@ -1620,8 +1620,8 @@ const openImage = (dataUrl) => {
   justify-content: center;
   font-size: 0.7em;
   font-weight: 600;
-  color: var(--ai-accent, #3d7cc9);
-  background: var(--ai-accent-soft, #edf2f8);
+  color: var(--ai-accent, var(--ai-accent));
+  background: var(--ai-accent-soft, var(--ai-accent-soft));
   padding: 0.05em 0.35em;
   border-radius: 3px;
   text-decoration: none;
@@ -1632,7 +1632,7 @@ const openImage = (dataUrl) => {
 }
 
 .markdown-content :deep(.ref-link:hover) {
-  background: var(--ai-accent, #3d7cc9);
+  background: var(--ai-accent, var(--ai-accent));
   color: #fff;
   border-bottom: none !important;
 }
@@ -1669,7 +1669,7 @@ const openImage = (dataUrl) => {
 .markdown-content :deep(.md-asset-placeholder) {
   margin: 0.65rem 0;
   padding: 0.95rem 1rem;
-  border: 1px solid var(--theme-200, #e4e4df);
+  border: 1px solid var(--theme-200, var(--theme-200));
   border-radius: 0.85rem;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 248, 246, 0.96));
@@ -1718,7 +1718,7 @@ const openImage = (dataUrl) => {
 .markdown-content :deep(.md-asset-placeholder__title) {
   font-size: 0.96rem;
   font-weight: 600;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
 }
 
 .markdown-content :deep(.md-asset-placeholder__meta) {

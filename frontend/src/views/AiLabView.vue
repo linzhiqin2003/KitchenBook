@@ -1848,7 +1848,7 @@ const handleQuickAsk = (prompt) => {
 // ===== 初始化 =====
 // macOS 窗口圆角会裁切四角，露出 body 背景色；覆盖为浅色，离开时还原
 const _prevBodyBg = document.body.style.backgroundColor
-document.body.style.backgroundColor = '#f8f8f6' // warm stone-50
+document.body.style.backgroundColor = 'var(--theme-50)' // warm stone-50
 
 onUnmounted(() => {
   if (memoryRefreshTimer) {
@@ -1907,7 +1907,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-dvh w-full fixed inset-0 flex overflow-hidden" style="background: #f8f8f6; font-family: var(--ai-font-body);"
+  <div class="h-dvh w-full fixed inset-0 flex overflow-hidden" style="background: var(--theme-50); font-family: var(--ai-font-body);"
        @dragover="handleDragOver" @dragleave="handleDragLeave" @drop="handleDrop">
     <!-- 侧边栏 -->
     <AiLabSidebar
@@ -2074,28 +2074,6 @@ onMounted(async () => {
   </div>
 </template>
 
-<style>
-/* The Quiet Studio — CSS variables must be unscoped to cascade into child components */
-:root {
-  --theme-50: #f8f8f6;
-  --theme-100: #f0f0ed;
-  --theme-200: #e4e4df;
-  --theme-300: #c8c8c1;
-  --theme-400: #9c9c93;
-  --theme-500: #6b6b63;
-  --theme-600: #484843;
-  --theme-700: #2d2d28;
-  --theme-gradient: #2d2d28;
-  --theme-gradient-btn: #2d2d28;
-  --theme-shadow: rgba(45, 45, 40, 0.06);
-  --ai-accent: #3d7cc9;
-  --ai-accent-hover: #2e6ab5;
-  --ai-accent-soft: #edf2f8;
-  --ai-font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --ai-font-body: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', sans-serif;
-  --ai-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-</style>
 
 <style scoped>
 

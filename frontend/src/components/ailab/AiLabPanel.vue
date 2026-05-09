@@ -651,7 +651,7 @@ defineExpose({
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
             </svg>
           </span>
-          <span class="text-[13.5px] font-semibold tracking-tight" style="color: #2c2c30;">Agent Panel</span>
+          <span class="text-[13.5px] font-semibold tracking-tight" style="color: var(--theme-700);">Agent Panel</span>
         </div>
         <div class="flex items-center gap-0.5">
           <button
@@ -660,13 +660,13 @@ defineExpose({
             class="w-7 h-7 rounded-md cursor-pointer transition-colors hover:bg-black/[0.04] flex items-center justify-center"
             :class="{ 'is-refreshing': isCurrentTabLoading }"
             :title="`刷新 ${activeTab}`"
-            style="color: #9a9aa0;"
+            style="color: var(--theme-400);"
           >
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
             </svg>
           </button>
-          <button @click="emit('close')" class="w-7 h-7 rounded-md cursor-pointer hover:bg-black/[0.04] flex items-center justify-center transition-colors" style="color: #9a9aa0;" title="关闭">
+          <button @click="emit('close')" class="w-7 h-7 rounded-md cursor-pointer hover:bg-black/[0.04] flex items-center justify-center transition-colors" style="color: var(--theme-400);" title="关闭">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
@@ -699,7 +699,7 @@ defineExpose({
             <span class="tab-label">{{ TAB_META[tab].label }}</span>
             <span
               v-if="tab === 'notifications' && notificationsUnread > 0"
-              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full text-[9px] font-semibold flex items-center justify-center px-1 ring-2 ring-[var(--theme-50,#f7f7f8)]"
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full text-[9px] font-semibold flex items-center justify-center px-1 ring-2 ring-[var(--theme-50,var(--theme-50))]"
               style="background: #ef4444; color: #fff;"
             >{{ notificationsUnread > 99 ? '99+' : notificationsUnread }}</span>
           </button>
@@ -713,7 +713,7 @@ defineExpose({
           </div>
           <template v-else-if="tools.length === 0">
             <div class="empty-state">
-              <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: #c8c8d0;">
+              <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: var(--theme-300);">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085"/>
               </svg>
               <div class="empty-title">暂无可用工具</div>
@@ -725,8 +725,8 @@ defineExpose({
               <template v-for="tool in tools.filter(t => t.type === 'builtin')" :key="tool.name">
                 <div class="row-item flex items-center justify-between px-3 py-2 rounded-lg">
                   <div class="flex items-center gap-2 flex-1 min-w-0">
-                    <span class="w-1.5 h-1.5 rounded-full shrink-0 transition-colors" :style="tool.enabled ? 'background: var(--ai-accent);' : 'background: #d1d1d6;'"></span>
-                    <span class="text-[14px] truncate" :style="tool.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ tool.name }}</span>
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0 transition-colors" :style="tool.enabled ? 'background: var(--ai-accent);' : 'background: var(--theme-300);'"></span>
+                    <span class="text-[14px] truncate" :style="tool.enabled ? 'color: var(--theme-700);' : 'color: var(--theme-300);'">{{ tool.name }}</span>
                   </div>
                   <button @click="toggleTool(tool)" class="toggle-pill shrink-0 ml-2 cursor-pointer text-[10.5px] font-semibold uppercase tracking-wider transition-all"
                     :class="{ 'is-on': tool.enabled }">
@@ -740,7 +740,7 @@ defineExpose({
               <div v-for="tool in tools.filter(t => t.type === 'mcp')" :key="'mcp-' + tool.name"
                 class="row-item flex items-center gap-2 px-3 py-2 rounded-lg">
                 <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--ai-accent);"></span>
-                <span class="text-[14px]" style="color: #2c2c30;">{{ tool.name }}</span>
+                <span class="text-[14px]" style="color: var(--theme-700);">{{ tool.name }}</span>
               </div>
             </div>
           </template>
@@ -751,7 +751,7 @@ defineExpose({
             <div v-for="n in 4" :key="`skills-skel-${n}`" class="skeleton-card" />
           </div>
           <div v-else-if="skills.length === 0" class="empty-state">
-            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: #c8c8d0;">
+            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: var(--theme-300);">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/>
             </svg>
             <div class="empty-title">暂无已安装的技能</div>
@@ -768,9 +768,9 @@ defineExpose({
                   @dblclick="openSkillReadme(skill)">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1.5">
-                      <span class="text-[13.5px] truncate font-medium" :style="skill.enabled ? 'color: #2c2c30;' : 'color: #b0b0b6;'">{{ skill.name }}</span>
+                      <span class="text-[13.5px] truncate font-medium" :style="skill.enabled ? 'color: var(--theme-700);' : 'color: var(--theme-300);'">{{ skill.name }}</span>
                     </div>
-                    <div v-if="skill.description" class="text-[11px] mt-0.5 line-clamp-2 leading-snug" style="color: #9a9aa0;">{{ skill.description }}</div>
+                    <div v-if="skill.description" class="text-[11px] mt-0.5 line-clamp-2 leading-snug" style="color: var(--theme-400);">{{ skill.description }}</div>
                   </div>
                   <div class="shrink-0 ml-2 flex items-center gap-1">
                     <button @click.stop="openSkillBrowser(skill)"
@@ -789,7 +789,7 @@ defineExpose({
                 </div>
               </div>
             </div>
-            <div class="text-[10.5px] text-center mt-2" style="color: #b8b8be;">
+            <div class="text-[10.5px] text-center mt-2" style="color: var(--theme-300);">
               单击选中 · 双击查看文件
             </div>
           </template>
@@ -806,7 +806,7 @@ defineExpose({
             </div>
 
             <div v-if="visibleMemoryEntries.length === 0" class="empty-state">
-              <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.3" style="color: #c8c8d0;">
+              <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.3" style="color: var(--theme-300);">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/>
               </svg>
               <div class="empty-title">尚无记忆条目</div>
@@ -825,10 +825,10 @@ defineExpose({
 
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 min-w-0">
-                    <span class="text-[13px] truncate font-medium" style="color: #2c2c30;">{{ entry.name }}</span>
-                    <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: #8a8a90;">{{ formatWorkspaceSize(entry.size) }}</span>
+                    <span class="text-[13px] truncate font-medium" style="color: var(--theme-700);">{{ entry.name }}</span>
+                    <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: var(--theme-400);">{{ formatWorkspaceSize(entry.size) }}</span>
                   </div>
-                  <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
+                  <div class="text-[11px] mt-0.5" style="color: var(--theme-300);">
                     <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
                     <span v-if="entry.target"> · {{ entry.target }}</span>
                   </div>
@@ -851,14 +851,14 @@ defineExpose({
                 {{ root.label }}
               </button>
             </div>
-            <div class="px-3 pb-2 text-[10.5px] break-all" style="color: #a4a4ac; font-family: var(--ai-font-mono);">
+            <div class="px-3 pb-2 text-[10.5px] break-all" style="color: var(--theme-400); font-family: var(--ai-font-mono);">
               {{ workspaceRootHint }}
             </div>
             <div class="files-toolbar px-2 py-1.5 flex items-center gap-1 flex-wrap" style="border-top: 1px solid rgba(0,0,0,0.05);">
               <button
                 class="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
                 :disabled="!workspaceCanGoUp"
-                :style="workspaceCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
+                :style="workspaceCanGoUp ? 'color: var(--theme-500);' : 'color: var(--theme-300);'"
                 title="返回上一级"
                 @click="openWorkspaceBreadcrumb(workspaceParentPath)"
               >
@@ -867,16 +867,16 @@ defineExpose({
                 </svg>
               </button>
               <template v-for="(crumb, ci) in workspaceBreadcrumbs" :key="`${workspaceActiveRoot}-${crumb.path || 'root'}`">
-                <span v-if="ci > 0" class="text-[11px] select-none" style="color: #cfcfd4;">/</span>
+                <span v-if="ci > 0" class="text-[11px] select-none" style="color: var(--theme-300);">/</span>
                 <button
                   class="px-1.5 py-0.5 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
-                  style="color: #5e5e66;"
+                  style="color: var(--theme-500);"
                   @click="openWorkspaceBreadcrumb(crumb.path)"
                 >
                   {{ crumb.name }}
                 </button>
               </template>
-              <span class="ml-auto text-[10.5px] flex items-center gap-1.5 pr-1" style="color: #a4a4ac;">
+              <span class="ml-auto text-[10.5px] flex items-center gap-1.5 pr-1" style="color: var(--theme-400);">
                 <span>{{ workspaceEntryCount }} 项</span>
               </span>
             </div>
@@ -898,7 +898,7 @@ defineExpose({
             <span>{{ workspaceError }}</span>
           </div>
           <div v-else-if="workspaceEntries.length === 0" class="empty-state">
-            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: #c8c8d0;">
+            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: var(--theme-300);">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"/>
             </svg>
             <div class="empty-title">当前目录是空的</div>
@@ -917,25 +917,25 @@ defineExpose({
 
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
-                  <span class="text-[13px] truncate font-medium" style="color: #2c2c30;">{{ entry.name }}</span>
-                  <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: #8a8a90;">{{ formatWorkspaceSize(entry.size) }}</span>
+                  <span class="text-[13px] truncate font-medium" style="color: var(--theme-700);">{{ entry.name }}</span>
+                  <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: var(--theme-400);">{{ formatWorkspaceSize(entry.size) }}</span>
                 </div>
-                <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
+                <div class="text-[11px] mt-0.5" style="color: var(--theme-300);">
                   <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
                   <span v-if="entry.target"> · {{ entry.target }}</span>
                 </div>
               </div>
             </button>
           </div>
-          <div v-if="workspaceEntries.length > 0" class="mt-3 text-[10.5px] text-center" style="color: #b8b8be;">
+          <div v-if="workspaceEntries.length > 0" class="mt-3 text-[10.5px] text-center" style="color: var(--theme-300);">
             单击选中 · 双击打开
           </div>
         </template>
 
         <template v-if="activeTab === 'notifications'">
           <div v-if="notifications.length > 0" class="flex items-center justify-between mb-2.5 px-1">
-            <span class="text-[12px] flex items-center gap-1.5" style="color: #6e6e76;">
-              <span class="text-[13px] font-medium" style="color: #2c2c30;">{{ notifications.length }}</span>
+            <span class="text-[12px] flex items-center gap-1.5" style="color: var(--theme-500);">
+              <span class="text-[13px] font-medium" style="color: var(--theme-700);">{{ notifications.length }}</span>
               <span>条通知</span>
               <span v-if="notificationsUnread > 0" class="px-1.5 py-px rounded text-[10px] font-semibold" style="background: rgba(239,68,68,0.1); color: #ef4444;">{{ notificationsUnread }} 未读</span>
             </span>
@@ -950,7 +950,7 @@ defineExpose({
                 v-if="notifications.length > 0"
                 @click="clearAllNotifications"
                 class="text-[11.5px] cursor-pointer transition-colors hover:text-red-500"
-                style="color: #9a9aa0;"
+                style="color: var(--theme-400);"
               >清空</button>
             </div>
           </div>
@@ -965,7 +965,7 @@ defineExpose({
             </div>
           </div>
           <div v-else-if="notifications.length === 0" class="empty-state">
-            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: #c8c8d0;">
+            <svg class="w-10 h-10 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.4" style="color: var(--theme-300);">
               <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
             </svg>
             <div class="empty-title">收件箱是空的</div>
@@ -1021,21 +1021,21 @@ defineExpose({
     >
       <div
         class="w-full max-w-2xl max-h-full rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
-        style="background: #f7f7f8; border-color: rgba(255,255,255,0.24);"
+        style="background: var(--theme-50); border-color: rgba(255,255,255,0.24);"
         @click.stop
       >
-        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b" style="border-color: #e8e8ec;">
+        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b" style="border-color: var(--theme-200);">
           <div class="min-w-0">
-            <div class="text-[14px] font-semibold truncate" style="color: #2c2c30;">
+            <div class="text-[14px] font-semibold truncate" style="color: var(--theme-700);">
               {{ selectedSkillName || 'Skill' }}
             </div>
-            <div v-if="selectedSkillMeta?.description" class="text-[11px] truncate mt-0.5" style="color: #9a9aa0;">
+            <div v-if="selectedSkillMeta?.description" class="text-[11px] truncate mt-0.5" style="color: var(--theme-400);">
               {{ selectedSkillMeta.description }}
             </div>
           </div>
           <button
             class="w-8 h-8 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.05] shrink-0"
-            style="color: #9a9aa0;"
+            style="color: var(--theme-400);"
             title="关闭"
             @click="closeSkillBrowser"
           >
@@ -1046,12 +1046,12 @@ defineExpose({
         </div>
 
         <div class="flex-1 overflow-auto p-4">
-          <div class="rounded-xl border p-2 mb-3" style="border-color: #ececef; background: rgba(255,255,255,0.88);">
+          <div class="rounded-xl border p-2 mb-3" style="border-color: var(--theme-200); background: rgba(255,255,255,0.88);">
             <div class="flex items-center gap-1.5 flex-wrap">
               <button
                 class="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.04]"
                 :disabled="!skillBrowserCanGoUp"
-                :style="skillBrowserCanGoUp ? 'color: #6e6e76;' : 'color: #d1d1d6;'"
+                :style="skillBrowserCanGoUp ? 'color: var(--theme-500);' : 'color: var(--theme-300);'"
                 title="返回上一级"
                 @click="openSkillBrowserBreadcrumb(skillBrowserParentPath)"
               >
@@ -1063,7 +1063,7 @@ defineExpose({
                 v-for="crumb in skillBrowserBreadcrumbs"
                 :key="`skill-${selectedSkillName}-${crumb.path || 'root'}`"
                 class="px-2 py-1 rounded-md text-[11px] cursor-pointer transition-colors hover:bg-black/[0.04]"
-                style="color: #6e6e76;"
+                style="color: var(--theme-500);"
                 @click="openSkillBrowserBreadcrumb(crumb.path)"
               >
                 {{ crumb.name }}
@@ -1071,7 +1071,7 @@ defineExpose({
             </div>
           </div>
 
-          <div v-if="loadingSkillBrowser" class="text-center py-8 text-[12px]" style="color: #b0b0b6;">
+          <div v-if="loadingSkillBrowser" class="text-center py-8 text-[12px]" style="color: var(--theme-300);">
             加载中…
           </div>
           <div
@@ -1081,7 +1081,7 @@ defineExpose({
           >
             {{ skillBrowserError }}
           </div>
-          <div v-else-if="skillBrowserEntries.length === 0" class="text-center py-10 text-[12px]" style="color: #b0b0b6;">
+          <div v-else-if="skillBrowserEntries.length === 0" class="text-center py-10 text-[12px]" style="color: var(--theme-300);">
             当前目录是空的
           </div>
           <div v-else class="space-y-1">
@@ -1097,10 +1097,10 @@ defineExpose({
 
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
-                  <span class="text-[13px] truncate font-medium" style="color: #2c2c30;">{{ entry.name }}</span>
-                  <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: #8a8a90;">{{ formatWorkspaceSize(entry.size) }}</span>
+                  <span class="text-[13px] truncate font-medium" style="color: var(--theme-700);">{{ entry.name }}</span>
+                  <span v-if="entry.type !== 'dir'" class="text-[10.5px] shrink-0 px-1.5 py-px rounded" style="background: rgba(0,0,0,0.04); color: var(--theme-400);">{{ formatWorkspaceSize(entry.size) }}</span>
                 </div>
-                <div class="text-[11px] mt-0.5" style="color: #b0b0b6;">
+                <div class="text-[11px] mt-0.5" style="color: var(--theme-300);">
                   <span>{{ formatWorkspaceTime(entry.modified_at) }}</span>
                   <span v-if="entry.target"> · {{ entry.target }}</span>
                 </div>
@@ -1120,25 +1120,25 @@ defineExpose({
     >
       <div
         class="w-full max-w-4xl max-h-full rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
-        style="background: #f7f7f8; border-color: rgba(255,255,255,0.24);"
+        style="background: var(--theme-50); border-color: rgba(255,255,255,0.24);"
         @click.stop
       >
-        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b" style="border-color: #e8e8ec;">
+        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b" style="border-color: var(--theme-200);">
           <div class="min-w-0">
-            <div class="text-[14px] font-semibold truncate" style="color: #2c2c30;">
+            <div class="text-[14px] font-semibold truncate" style="color: var(--theme-700);">
               {{ workspacePreview?.name || 'Preview' }}
             </div>
-            <div class="text-[11px] truncate mt-0.5" style="color: #9a9aa0;">
+            <div class="text-[11px] truncate mt-0.5" style="color: var(--theme-400);">
               {{ workspacePreview?.display_path }}
             </div>
           </div>
           <div class="flex items-center gap-3 shrink-0">
-            <span v-if="workspacePreviewMeta" class="text-[11px]" style="color: #9a9aa0;">
+            <span v-if="workspacePreviewMeta" class="text-[11px]" style="color: var(--theme-400);">
               {{ workspacePreviewMeta }}
             </span>
             <button
               class="w-8 h-8 rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-black/[0.05]"
-              style="color: #9a9aa0;"
+              style="color: var(--theme-400);"
               title="关闭"
               @click="closeWorkspacePreview"
             >
@@ -1150,7 +1150,7 @@ defineExpose({
         </div>
 
         <div class="flex-1 overflow-auto p-4">
-          <div v-if="loadingWorkspacePreview" class="text-center py-10 text-[13px]" style="color: #9a9aa0;">加载预览…</div>
+          <div v-if="loadingWorkspacePreview" class="text-center py-10 text-[13px]" style="color: var(--theme-400);">加载预览…</div>
           <div v-else-if="workspacePreviewError" class="rounded-lg px-3 py-2 text-[13px]" style="background: #fff4f4; color: #b42318; border: 1px solid #ffd7d7;">
             {{ workspacePreviewError }}
           </div>
@@ -1158,22 +1158,22 @@ defineExpose({
             <pre
               v-if="workspacePreview.preview_type === 'text'"
               class="rounded-xl p-4 whitespace-pre-wrap break-words min-h-[240px]"
-              style="background: #fff; color: #2c2c30; font-size: 12px; line-height: 1.6; font-family: var(--ai-font-mono);"
+              style="background: #fff; color: var(--theme-700); font-size: 12px; line-height: 1.6; font-family: var(--ai-font-mono);"
             >{{ workspacePreview.content }}</pre>
             <img
               v-else-if="workspacePreview.preview_type === 'image'"
               :src="workspacePreview.data_url"
               :alt="workspacePreview.name"
               class="max-w-full max-h-[75vh] mx-auto rounded-xl border bg-white"
-              style="border-color: #ececef;"
+              style="border-color: var(--theme-200);"
             />
             <iframe
               v-else-if="workspacePreview.preview_type === 'pdf'"
               :src="workspacePreview.data_url"
               class="w-full h-[75vh] rounded-xl border bg-white"
-              style="border-color: #ececef;"
+              style="border-color: var(--theme-200);"
             ></iframe>
-            <div v-else class="rounded-xl p-4 text-[13px]" style="background: #fff; color: #6e6e76; border: 1px solid #ececef;">
+            <div v-else class="rounded-xl p-4 text-[13px]" style="background: #fff; color: var(--theme-500); border: 1px solid var(--theme-200);">
               这个文件类型暂不支持内联预览。
             </div>
             <div v-if="workspacePreview.truncated" class="text-[11px] mt-3" style="color: #b45309;">
@@ -1199,8 +1199,8 @@ defineExpose({
 .panel-shell {
   position: relative;
   height: 100dvh;
-  background: #f7f7f8;
-  border-left: 1px solid #ebebed;
+  background: var(--theme-50);
+  border-left: 1px solid var(--theme-200);
   font-family: var(--ai-font-body);
   container-type: inline-size;
 }
@@ -1235,15 +1235,15 @@ defineExpose({
   border: 1px solid rgba(0, 0, 0, 0.04);
 }
 .tab-btn {
-  color: #8a8a90;
+  color: var(--theme-400);
 }
 .tab-btn:hover:not(.tab-active) {
-  color: #5e5e66;
+  color: var(--theme-500);
   background: rgba(255, 255, 255, 0.55);
 }
 .tab-btn.tab-active {
   background: #fff;
-  color: #2c2c30;
+  color: var(--theme-700);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 .tab-btn.tab-active svg {
@@ -1259,7 +1259,7 @@ defineExpose({
 }
 .card-item {
   background: #fff;
-  border: 1px solid #ececef;
+  border: 1px solid var(--theme-200);
   transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 .card-item:hover {
@@ -1287,7 +1287,7 @@ defineExpose({
   padding: 3px 8px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.04);
-  color: #b0b0b6;
+  color: var(--theme-300);
   border: 1px solid transparent;
 }
 .toggle-pill:hover {
@@ -1304,7 +1304,7 @@ defineExpose({
   padding: 8px 12px 4px;
   font-size: 10.5px;
   font-weight: 600;
-  color: #9a9aa0;
+  color: var(--theme-400);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -1321,12 +1321,12 @@ defineExpose({
 .empty-title {
   font-size: 13px;
   font-weight: 500;
-  color: #5e5e66;
+  color: var(--theme-500);
   margin-bottom: 4px;
 }
 .empty-hint {
   font-size: 11.5px;
-  color: #a4a4ac;
+  color: var(--theme-400);
   line-height: 1.5;
   max-width: 220px;
 }
@@ -1374,7 +1374,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  color: #9a9aa0;
+  color: var(--theme-400);
   background: transparent;
 }
 .icon-btn:hover {
@@ -1385,20 +1385,20 @@ defineExpose({
 /* Files header */
 .files-header {
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #ececef;
+  border: 1px solid var(--theme-200);
 }
 .root-chip {
   background: transparent;
-  color: #6e6e76;
+  color: var(--theme-500);
   border: 1px solid transparent;
 }
 .root-chip:hover {
   background: rgba(0, 0, 0, 0.035);
 }
 .root-chip.is-active {
-  background: var(--theme-700, #2d2d28);
-  color: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  background: var(--theme-700, #2c2a20);
+  color: var(--theme-50, #faf9f5);
+  box-shadow: 0 1px 2px rgba(67, 60, 38, 0.12);
 }
 
 /* Resize handle grip */

@@ -473,7 +473,7 @@ const getInlineSublabel = (option) => {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
   font-family: inherit;
   transition: color 0.16s ease, background 0.16s ease;
   cursor: pointer;
@@ -487,12 +487,12 @@ const getInlineSublabel = (option) => {
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
 }
 .model-select__sub-label {
   font-size: 13px;
   line-height: 1;
-  color: var(--theme-400, #9a9a92);
+  color: var(--theme-400, var(--theme-400));
   white-space: nowrap;
   font-weight: 500;
 }
@@ -501,7 +501,7 @@ const getInlineSublabel = (option) => {
   height: 11px;
   flex-shrink: 0;
   margin-left: 1px;
-  color: var(--theme-400, #9a9a92);
+  color: var(--theme-400, var(--theme-400));
   transition: transform 0.16s ease;
 }
 .model-select__chevron.is-open {
@@ -547,7 +547,7 @@ const getInlineSublabel = (option) => {
 }
 .model-select__option.is-active {
   background: rgba(15, 23, 42, 0.05);
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
 }
 .model-select__option-body {
   display: inline-flex;
@@ -560,13 +560,13 @@ const getInlineSublabel = (option) => {
   font-size: 12.5px;
   font-weight: 600;
   line-height: 1.2;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
   white-space: nowrap;
 }
 .model-select__option-meta {
   font-size: 11px;
   line-height: 1.2;
-  color: var(--theme-400, #9a9a92);
+  color: var(--theme-400, var(--theme-400));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -575,7 +575,7 @@ const getInlineSublabel = (option) => {
   width: 13px;
   height: 13px;
   flex-shrink: 0;
-  color: var(--ai-accent, #3d7cc9);
+  color: var(--ai-accent, var(--ai-accent));
 }
 .input-shell {
   background: rgba(255, 255, 255, 0.94);
@@ -602,7 +602,7 @@ const getInlineSublabel = (option) => {
   border: 0;
   outline: none;
   background: transparent;
-  color: #111827;
+  color: var(--theme-700);
   font-size: 15px;
   line-height: 22px;
   min-height: 24px;
@@ -658,11 +658,11 @@ const getInlineSublabel = (option) => {
 }
 .model-select__locked-label {
   font-weight: 600;
-  color: var(--theme-700, #2d2d28);
+  color: var(--theme-700, var(--theme-700));
 }
 .model-select__locked-sub {
   font-size: 13px;
-  color: var(--theme-400, #9a9a92);
+  color: var(--theme-400, var(--theme-400));
   font-weight: 500;
 }
 /* 旧的 .input-actions 还在被某些地方引用，保留为向后兼容 */
@@ -680,7 +680,7 @@ const getInlineSublabel = (option) => {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 999px;
-  color: #111827;
+  color: var(--theme-700);
   background: transparent;
   transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
   cursor: pointer;
