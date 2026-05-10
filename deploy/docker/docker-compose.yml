@@ -89,9 +89,9 @@ services:
     volumes:
       - ${HERMES_U9_DATA:-./hermes-data-u9}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
-      # 容器里 HERMES_HOME=/opt/data 直接是 hermes 的"home"，所以 .env / config.yaml
-      # 都挂在 root（不是 /opt/data/.hermes/）——entrypoint.sh 也是从这里 chmod 640
-      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.env:ro
+      # u9 走 per-user .env（位于 /home/admin/hermes-users/user9/.env，自然落在 /opt/data 卷里）。
+      # 不再挂 owner 的 .env，避免共享 owner 的 WEIXIN_* 凭证导致多个容器同时连同一 channel。
+      # config.yaml 仍共享 owner 模板（model 选择等无 user-specific 字段）。
       - ${HERMES_OWNER_CONFIG:-/home/admin/.hermes/config.yaml}:/opt/data/config.yaml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
@@ -111,9 +111,7 @@ services:
     volumes:
       - ${HERMES_U550_DATA:-./hermes-data-u550}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
-      # 容器里 HERMES_HOME=/opt/data 直接是 hermes 的"home"，所以 .env / config.yaml
-      # 都挂在 root（不是 /opt/data/.hermes/）——entrypoint.sh 也是从这里 chmod 640
-      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.env:ro
+      # u550 走 per-user .env（同 u9，避免共享 owner WEIXIN_* 触发多 bot 抢答）
       - ${HERMES_OWNER_CONFIG:-/home/admin/.hermes/config.yaml}:/opt/data/config.yaml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
