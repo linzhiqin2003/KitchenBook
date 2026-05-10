@@ -29,11 +29,12 @@ class PersonalReceiptTests(TestCase):
         self.assertEqual(receipt.user, self.user1)
 
     def test_user_sees_only_own_receipts(self):
+        # total 由 Receipt.save() 派生 (subtotal + tax - discount)，测试只设 subtotal
         Receipt.objects.create(
-            user=self.user1, merchant="Shop A", status=Receipt.STATUS_READY, total=Decimal("10.00")
+            user=self.user1, merchant="Shop A", status=Receipt.STATUS_READY, subtotal=Decimal("10.00")
         )
         Receipt.objects.create(
-            user=self.user2, merchant="Shop B", status=Receipt.STATUS_READY, total=Decimal("20.00")
+            user=self.user2, merchant="Shop B", status=Receipt.STATUS_READY, subtotal=Decimal("20.00")
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -78,7 +79,7 @@ class OrgReceiptTests(TestCase):
     def test_org_member_sees_org_receipts(self):
         Receipt.objects.create(
             user=self.owner, organization=self.org, merchant="Org Shop",
-            status=Receipt.STATUS_READY, total=Decimal("50.00"),
+            status=Receipt.STATUS_READY, subtotal=Decimal("50.00"),
         )
         self.client.force_authenticate(user=self.member)
         resp = self.client.get("/receipts/api/receipts/", HTTP_X_ACTIVE_ORG=str(self.org.id))
@@ -88,7 +89,7 @@ class OrgReceiptTests(TestCase):
     def test_outsider_cannot_see_org_receipts(self):
         Receipt.objects.create(
             user=self.owner, organization=self.org, merchant="Org Shop",
-            status=Receipt.STATUS_READY, total=Decimal("50.00"),
+            status=Receipt.STATUS_READY, subtotal=Decimal("50.00"),
         )
         self.client.force_authenticate(user=self.outsider)
         # Outsider provides org header but is not a member — falls back to personal mode
@@ -112,17 +113,17 @@ class StatsOverviewTests(TestCase):
         self.org = Organization.objects.create(name="StatsOrg", created_by=self.owner)
         OrganizationMember.objects.create(org=self.org, user=self.owner, role="owner")
 
-        # Personal receipts
+        # total 由 Receipt.save() 派生 (subtotal + tax - discount)，测试只设 subtotal
         Receipt.objects.create(
-            user=self.user1, merchant="Shop", status=Receipt.STATUS_CONFIRMED, total=Decimal("100.00"),
+            user=self.user1, merchant="Shop", status=Receipt.STATUS_CONFIRMED, subtotal=Decimal("100.00"),
         )
         Receipt.objects.create(
-            user=self.user2, merchant="Shop", status=Receipt.STATUS_CONFIRMED, total=Decimal("200.00"),
+            user=self.user2, merchant="Shop", status=Receipt.STATUS_CONFIRMED, subtotal=Decimal("200.00"),
         )
         # Org receipt
         Receipt.objects.create(
             user=self.owner, organization=self.org, merchant="Org Shop",
-            status=Receipt.STATUS_CONFIRMED, total=Decimal("300.00"), payer="Owner",
+            status=Receipt.STATUS_CONFIRMED, subtotal=Decimal("300.00"), payer="Owner",
         )
 
     def test_stats_personal_scope(self):
@@ -152,7 +153,7 @@ class UnauthenticatedReceiptTests(TestCase):
             username="authtest@example.com", email="authtest@example.com", password="pass123"
         )
         Receipt.objects.create(
-            user=self.user, merchant="Secret", status=Receipt.STATUS_READY, total=Decimal("999.00"),
+            user=self.user, merchant="Secret", status=Receipt.STATUS_READY, subtotal=Decimal("999.00"),
         )
 
     def test_unauthenticated_list_returns_401(self):
