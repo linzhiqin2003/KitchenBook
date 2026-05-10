@@ -494,12 +494,20 @@ def chat_stream(mode, messages, current_question, course_id=None):
     if mode == 'qa':
         system_prompt = build_qa_system_prompt(current_question, course_id)
         temperature = 0.7
+        thinking_mode = False
+        max_output_tokens = 1500
     elif mode == 'study':
         system_prompt = build_study_system_prompt(current_question or {}, course_id)
         temperature = 0.7
+        thinking_mode = False
+        max_output_tokens = 1500
     else:
         system_prompt = build_review_system_prompt(current_question, course_id)
         temperature = 0.3
+        # 审核模式天然需要长链推理；让思考走 reasoning_content 通道（不占 max_tokens），
+        # 前端再渲染到独立的"思考过程"折叠区，避免独白挤占正式回答的 token 配额并被截断。
+        thinking_mode = True
+        max_output_tokens = 4000
 
     full_messages = [{"role": "system", "content": system_prompt}] + messages
 
@@ -508,20 +516,27 @@ def chat_stream(mode, messages, current_question, course_id=None):
             model=CHAT_MODEL,
             messages=full_messages,
             temperature=temperature,
-            max_tokens=1500,
+            max_tokens=max_output_tokens,
             stream=True,
             tools=CHAT_TOOLS,
-            **non_thinking_kwargs(),
+            **(thinking_kwargs(effort="high") if thinking_mode else non_thinking_kwargs()),
         )
         stream = client.chat.completions.create(**create_kwargs)
 
         full_response = ""
+        full_reasoning = ""
         tool_calls_acc = {}
 
         for chunk in stream:
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
+
+            # DeepSeek v4-flash thinking 模式下推理片段在 reasoning_content / reasoning
+            reasoning_piece = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
+            if reasoning_piece:
+                full_reasoning += reasoning_piece
+                yield {"reasoning": reasoning_piece}
 
             if delta.content:
                 full_response += delta.content
@@ -599,7 +614,12 @@ def chat_stream(mode, messages, current_question, course_id=None):
         recommend_delete = (
             "[RECOMMENDATION: DELETE]" in full_response if mode == "review" else False
         )
-        yield {"done": True, "full_response": full_response, "recommend_delete": recommend_delete}
+        yield {
+            "done": True,
+            "full_response": full_response,
+            "full_reasoning": full_reasoning,
+            "recommend_delete": recommend_delete,
+        }
 
     except Exception as e:
         yield {"error": str(e)}

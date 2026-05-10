@@ -61,7 +61,7 @@
 
         <!-- Messages -->
         <div class="qg-sidebar__messages" ref="messagesRef" @scroll="onMessagesScroll">
-          <div v-if="!messages.length && !streamingContent && !loading" class="qg-sidebar__empty">
+          <div v-if="!messages.length && !streamingContent && !streamingReasoning && !loading" class="qg-sidebar__empty">
             <svg class="qg-sidebar__emptyIcon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
@@ -70,6 +70,14 @@
           </div>
 
           <div v-for="(msg, i) in messages" :key="i" class="qg-sidebar__msg" :data-role="msg.role">
+            <div v-if="msg.reasoning" class="qg-sidebar__reasoning" :class="{ 'is-open': expandedReasoning.has(i) }">
+              <button type="button" class="qg-sidebar__reasoningHead" @click="toggleReasoning(i)">
+                <svg class="qg-sidebar__reasoningChevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>思考过程</span>
+                <span class="qg-sidebar__reasoningMeta" data-mono>{{ msg.reasoning.length }}</span>
+              </button>
+              <div v-if="expandedReasoning.has(i)" class="qg-sidebar__reasoningBody" v-html="formatMessage(msg.reasoning)"></div>
+            </div>
             <div class="qg-sidebar__bubble" v-html="formatMessage(msg.content)"></div>
             <div v-if="msg.recommendDelete" class="qg-sidebar__deleteCard">
               <span>建议删除此题</span>
@@ -77,8 +85,16 @@
             </div>
           </div>
 
-          <div v-if="streamingContent" class="qg-sidebar__msg" data-role="assistant">
-            <div class="qg-sidebar__bubble">
+          <div v-if="streamingReasoning || streamingContent" class="qg-sidebar__msg" data-role="assistant">
+            <div v-if="streamingReasoning" class="qg-sidebar__reasoning is-open is-streaming">
+              <div class="qg-sidebar__reasoningHead is-static">
+                <span class="qg-sidebar__reasoningPulse"></span>
+                <span>思考中…</span>
+                <span class="qg-sidebar__reasoningMeta" data-mono>{{ streamingReasoning.length }}</span>
+              </div>
+              <div class="qg-sidebar__reasoningBody" v-html="formatMessage(streamingReasoning)"></div>
+            </div>
+            <div v-if="streamingContent" class="qg-sidebar__bubble">
               <span v-html="formatMessage(streamingContent)"></span>
               <span class="qg-sidebar__cursor"></span>
             </div>
@@ -90,7 +106,7 @@
             <span data-mono>{{ toolStatus }}</span>
           </div>
 
-          <div v-if="loading && !streamingContent && !toolStatus" class="qg-sidebar__msg" data-role="assistant">
+          <div v-if="loading && !streamingContent && !streamingReasoning && !toolStatus" class="qg-sidebar__msg" data-role="assistant">
             <div class="qg-sidebar__bubble">
               <span class="qg-sidebar__dots"><span></span><span></span><span></span></span>
             </div>
@@ -104,7 +120,7 @@
 
         <!-- Scroll-to-bottom indicator -->
         <transition name="qg-fade">
-          <button v-if="userScrolledUp && (streamingContent || loading)" class="qg-sidebar__scrollDown" @click="forceScrollBottom">
+          <button v-if="userScrolledUp && (streamingContent || streamingReasoning || loading)" class="qg-sidebar__scrollDown" @click="forceScrollBottom">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </button>
         </transition>
@@ -258,6 +274,8 @@ const inputFocused = ref(false);
 const isComposing = ref(false);
 const loading = ref(false);
 const streamingContent = ref('');
+const streamingReasoning = ref('');
+const expandedReasoning = ref(new Set());  // 历史消息中已展开的索引
 const deleteLoading = ref(false);
 const deleteResult = ref(null);
 const messagesRef = ref(null);
@@ -338,6 +356,8 @@ watch(() => props.currentQuestion?.id, () => {
     messages.value = [];
     deleteResult.value = null;
     streamingContent.value = '';
+    streamingReasoning.value = '';
+    expandedReasoning.value = new Set();
   }
 });
 
@@ -345,6 +365,8 @@ watch(() => [props.studyMode, props.topic], () => {
   if (props.studyMode !== 'answer') {
     messages.value = [];
     streamingContent.value = '';
+    streamingReasoning.value = '';
+    expandedReasoning.value = new Set();
   }
 });
 
@@ -352,6 +374,8 @@ watch(() => props.questionAnswered, (val) => {
   if (!val && props.studyMode === 'answer') {
     messages.value = [];
     streamingContent.value = '';
+    streamingReasoning.value = '';
+    expandedReasoning.value = new Set();
   }
 });
 
@@ -392,7 +416,7 @@ function forceScrollBottom() {
   });
 }
 
-watch([messages, streamingContent], scrollToBottom, { deep: true });
+watch([messages, streamingContent, streamingReasoning], scrollToBottom, { deep: true });
 
 // ─── Resize ──────────────────────────────────────────────────────────
 function startResize(e) {
@@ -460,6 +484,7 @@ async function sendMessage() {
   nextTick(autoResize);
   loading.value = true;
   streamingContent.value = '';
+  streamingReasoning.value = '';
   toolStatus.value = '';
   userScrolledUp.value = false;
 
@@ -492,6 +517,7 @@ async function sendMessage() {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let fullResponse = '';
+    let fullReasoning = '';
     let recommendDelete = false;
 
     while (true) {
@@ -503,6 +529,10 @@ async function sendMessage() {
         try {
           const data = JSON.parse(line.slice(6));
           if (data.error) throw new Error(data.error);
+          if (data.reasoning) {
+            fullReasoning += data.reasoning;
+            streamingReasoning.value = fullReasoning;
+          }
           if (data.chunk) {
             fullResponse += data.chunk;
             streamingContent.value = fullResponse;
@@ -514,21 +544,38 @@ async function sendMessage() {
             toolStatus.value = '';
             if (data.tool_result.success) loadArchive();
           }
-          if (data.done) recommendDelete = data.recommend_delete || false;
+          if (data.done) {
+            recommendDelete = data.recommend_delete || false;
+            if (data.full_reasoning) fullReasoning = data.full_reasoning;
+          }
         } catch { /* partial chunk */ }
       }
     }
 
     streamingContent.value = '';
+    streamingReasoning.value = '';
     toolStatus.value = '';
-    messages.value.push({ role: 'assistant', content: fullResponse, recommendDelete });
+    messages.value.push({
+      role: 'assistant',
+      content: fullResponse,
+      reasoning: fullReasoning,
+      recommendDelete,
+    });
   } catch (err) {
     streamingContent.value = '';
+    streamingReasoning.value = '';
     toolStatus.value = '';
     messages.value.push({ role: 'assistant', content: 'Error: ' + err.message });
   } finally {
     loading.value = false;
   }
+}
+
+function toggleReasoning(idx) {
+  const next = new Set(expandedReasoning.value);
+  if (next.has(idx)) next.delete(idx);
+  else next.add(idx);
+  expandedReasoning.value = next;
 }
 
 // ─── Deletion ────────────────────────────────────────────────────────
@@ -900,6 +947,58 @@ defineExpose({ focusInput: () => nextTick(() => inputRef.value?.focus()) });
   font-size: var(--qg-text-xs); font-weight: 500; color: var(--qg-danger);
 }
 .qg-sidebar__deleteBtn { padding: 4px 10px !important; font-size: var(--qg-text-xs) !important; flex-shrink: 0; }
+
+/* ─── Reasoning (思考过程) ────────────────────────────────────────────── */
+.qg-sidebar__reasoning {
+  margin-bottom: 8px;
+  border: 1px solid var(--qg-border-default);
+  border-radius: var(--qg-radius-md);
+  background: color-mix(in oklch, var(--qg-surface-base) 60%, transparent);
+  overflow: hidden;
+}
+.qg-sidebar__reasoningHead {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 6px 10px;
+  background: none; border: none;
+  font-size: var(--qg-text-xs); font-weight: 500;
+  color: var(--qg-text-secondary);
+  cursor: pointer; text-align: left;
+  transition: background 0.15s ease;
+}
+.qg-sidebar__reasoningHead.is-static { cursor: default; }
+.qg-sidebar__reasoningHead:not(.is-static):hover { background: color-mix(in oklch, var(--qg-text-primary) 5%, transparent); }
+.qg-sidebar__reasoningChevron {
+  flex-shrink: 0;
+  transition: transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.qg-sidebar__reasoning.is-open .qg-sidebar__reasoningChevron { transform: rotate(90deg); }
+.qg-sidebar__reasoningMeta {
+  margin-left: auto;
+  font-size: 10px; opacity: 0.55;
+}
+.qg-sidebar__reasoningPulse {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--qg-accent);
+  animation: qg-reasoningPulse 1.2s ease-in-out infinite;
+}
+@keyframes qg-reasoningPulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+.qg-sidebar__reasoningBody {
+  padding: 8px 12px 10px;
+  font-size: 12px; line-height: 1.55;
+  color: var(--qg-text-secondary);
+  border-top: 1px solid var(--qg-border-default);
+  white-space: pre-wrap;
+  max-height: 320px; overflow-y: auto;
+}
+.qg-sidebar__reasoning.is-streaming .qg-sidebar__reasoningBody {
+  /* 流式时不限高，让用户跟随生成 */
+  max-height: none;
+}
+.qg-sidebar__reasoningBody :deep(p) { margin: 0 0 6px; }
+.qg-sidebar__reasoningBody :deep(p:last-child) { margin-bottom: 0; }
 
 .qg-sidebar__notice {
   display: flex; align-items: center; justify-content: space-between;
