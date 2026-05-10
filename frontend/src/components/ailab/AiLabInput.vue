@@ -395,8 +395,10 @@ const getInlineSublabel = (option) => {
         <AiLabTokenUsage
           :prompt-tokens="sessionTokens.promptTokens"
           :completion-tokens="sessionTokens.completionTokens"
+          :cache-tokens="sessionTokens.cacheTokens"
           :total-prompt-tokens="sessionTokens.totalPromptTokens"
           :total-completion-tokens="sessionTokens.totalCompletionTokens"
+          :total-cache-tokens="sessionTokens.totalCacheTokens"
           :turn-count="sessionTokens.turnCount"
           :context-limit="contextLimit"
           :breakdown="sessionTokens.breakdown"

@@ -5,9 +5,11 @@ const props = defineProps({
   // 最近一次请求的 token 数（代表当前 context 占用）
   promptTokens: { type: Number, default: 0 },
   completionTokens: { type: Number, default: 0 },
+  cacheTokens: { type: Number, default: 0 },
   // 整个 session 的累计统计
   totalPromptTokens: { type: Number, default: 0 },
   totalCompletionTokens: { type: Number, default: 0 },
+  totalCacheTokens: { type: Number, default: 0 },
   turnCount: { type: Number, default: 0 },
   // context 上限
   contextLimit: { type: Number, default: 1_000_000 },
@@ -107,6 +109,13 @@ const sectionShareLabel = (tokens) => {
   if (p < 10) return `${p.toFixed(1)}%`
   return `${p.toFixed(0)}%`
 }
+
+// Session 累计：把 cache 从 prompt 里拆出来。OpenAI 计费定义里
+// prompt_tokens = non_cache_input + cache_read + cache_write，所以非缓存输入
+// = totalPromptTokens - totalCacheTokens（夹紧到非负，防极端情况下回退口径）。
+const totalNonCacheInput = computed(() => {
+  return Math.max(0, (props.totalPromptTokens || 0) - (props.totalCacheTokens || 0))
+})
 
 const togglePanel = () => {
   isExpanded.value = !isExpanded.value
@@ -257,11 +266,24 @@ onUnmounted(() => {
               <span class="font-mono" style="color: var(--theme-700);">{{ turnCount }}</span>
             </div>
             <div class="flex items-center justify-between text-[12px]">
-              <span style="color: var(--theme-500);">输入累计</span>
-              <span class="font-mono" style="color: var(--theme-700);">{{ formatNumber(totalPromptTokens) }}</span>
+              <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--ai-accent);"></span>
+                输入（非缓存）
+              </span>
+              <span class="font-mono" style="color: var(--theme-700);">{{ formatNumber(totalNonCacheInput) }}</span>
             </div>
             <div class="flex items-center justify-between text-[12px]">
-              <span style="color: var(--theme-500);">输出累计</span>
+              <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: #a78bfa;"></span>
+                缓存命中
+              </span>
+              <span class="font-mono" style="color: var(--theme-700);">{{ formatNumber(totalCacheTokens) }}</span>
+            </div>
+            <div class="flex items-center justify-between text-[12px]">
+              <span class="flex items-center gap-1.5" style="color: var(--theme-500);">
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: #16a34a;"></span>
+                输出
+              </span>
               <span class="font-mono" style="color: var(--theme-700);">{{ formatNumber(totalCompletionTokens) }}</span>
             </div>
             <div class="flex items-center justify-between text-[12px] pt-1" style="border-top: 1px dashed var(--theme-200);">
