@@ -1,5 +1,4 @@
 from decimal import Decimal
-from django.db import models
 from rest_framework import serializers
 from .models import CategoryMain, Receipt, ReceiptImage, ReceiptItem
 
@@ -85,7 +84,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
             "items",
             "images",
         ]
-        read_only_fields = ["user_id", "status", "image", "raw_model_output", "raw_model_json", "created_at", "updated_at"]
+        read_only_fields = ["user_id", "status", "image", "raw_model_output", "raw_model_json", "created_at", "updated_at", "total"]
 
     def get_uploader_name(self, obj):
         if obj.user:
@@ -121,11 +120,5 @@ class ReceiptSerializer(serializers.ModelSerializer):
                     line_index=line_index,
                     **item,
                 )
-
-            if instance.total is None:
-                total = instance.items.aggregate(total=models.Sum("total_price"))["total"]
-                if total is not None:
-                    instance.total = Decimal(total)
-                    instance.save(update_fields=["total"])
 
         return instance

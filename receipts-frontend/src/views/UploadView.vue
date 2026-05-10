@@ -142,7 +142,7 @@
         </div>
         <div class="form-field">
           <label>总计</label>
-          <input class="input" v-model="receipt.total" />
+          <div class="input input-readonly">{{ computedTotal.toFixed(2) }}</div>
         </div>
         <div class="form-field">
           <label>付款人</label>
@@ -200,6 +200,14 @@ const showImage = ref(false);
 const lightboxIndex = ref<number | null>(null);
 
 const totalSize = computed(() => files.value.reduce((sum, f) => sum + f.size, 0));
+
+// 总计 = 小计 + 税费 - 折扣（自动计算，不可编辑）
+const computedTotal = computed(() => {
+  const sub = parseFloat(receipt.value?.subtotal) || 0;
+  const tax = parseFloat(receipt.value?.tax) || 0;
+  const disc = parseFloat(receipt.value?.discount) || 0;
+  return parseFloat((sub + tax - disc).toFixed(2));
+});
 
 const resolveImageUrl = (img: string) => {
   if (!img) return "";
@@ -379,11 +387,11 @@ async function compressImageFile(file: File): Promise<File> {
   });
 }
 
-// 明细增删改时重算总计
+// 明细增删改时刷新小计（总计由 computedTotal 自动派生）
 watch(items, (rows) => {
   if (!receipt.value) return;
   const sum = rows.reduce((s: number, r: any) => s + (parseFloat(r.total_price) || 0), 0);
-  receipt.value.total = sum.toFixed(2);
+  receipt.value.subtotal = sum.toFixed(2);
 }, { deep: true });
 
 const submit = async () => {
@@ -428,7 +436,6 @@ const save = async (itemsData?: any[]) => {
     subtotal: receipt.value.subtotal,
     tax: receipt.value.tax,
     discount: receipt.value.discount,
-    total: receipt.value.total,
     notes: receipt.value.notes,
     payer: receipt.value.payer,
     items: itemsData || items.value
@@ -675,6 +682,16 @@ onMounted(async () => {
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-weight: 500;
+}
+
+.input-readonly {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text, #1d1d1f);
+  font-weight: 600;
+  cursor: default;
+  user-select: none;
+  display: flex;
+  align-items: center;
 }
 
 .action-bar {

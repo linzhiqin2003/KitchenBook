@@ -112,7 +112,7 @@ def _apply_parsed_result(receipt: Receipt, parsed, raw_text: str, raw_json: dict
     receipt.subtotal = to_decimal(payload.subtotal)
     receipt.tax = to_decimal(payload.tax)
     receipt.discount = to_decimal(payload.discount)
-    receipt.total = to_decimal(payload.total)
+    # total 由 Receipt.save() 自动派生，不接受 LLM 输出
 
     receipt.items.all().delete()
     for index, item in enumerate(payload.items):
@@ -141,9 +141,10 @@ def _apply_parsed_result(receipt: Receipt, parsed, raw_text: str, raw_json: dict
             line_index=index,
         )
 
-    if receipt.total is None:
-        total = receipt.items.aggregate(total=models.Sum("total_price"))["total"]
-        receipt.total = total or Decimal("0")
+    # 若 LLM 未输出 subtotal，则从子项 total_price 求和补全（total 仍由 save() 派生）
+    if receipt.subtotal is None:
+        item_sum = receipt.items.aggregate(s=models.Sum("total_price"))["s"]
+        receipt.subtotal = item_sum or Decimal("0")
 
     receipt.status = Receipt.STATUS_READY
     receipt.save()

@@ -28,7 +28,6 @@ class ParsedReceipt(BaseModel):
     subtotal: float | None = None
     tax: float | None = None
     discount: float | None = None
-    total: float | None = None
     items: list[ParsedItem] = Field(default_factory=list)
 
 

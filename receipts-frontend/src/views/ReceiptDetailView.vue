@@ -79,7 +79,7 @@
         <span v-if="convert(receipt.discount)" class="converted-hint">{{ convert(receipt.discount) }}</span>
       </div>
       <div class="form-field">
-        <label>总计（自动）</label>
+        <label>总计</label>
         <div class="input input-readonly">{{ computedTotal.toFixed(2) }}</div>
         <span v-if="convert(computedTotal)" class="converted-hint">{{ convert(computedTotal) }}</span>
       </div>

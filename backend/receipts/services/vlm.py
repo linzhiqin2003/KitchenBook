@@ -33,7 +33,6 @@ PROMPT_TEMPLATE = """
   "subtotal": 12.34,
   "tax": 0.0,
   "discount": 0.0,
-  "total": 12.34,
   "items": [
     {{
       "main_category": "主类（见规则）",
@@ -131,7 +130,8 @@ PROMPT_TEMPLATE = """
 网购订单截图的特殊处理：
 - merchant：使用店铺名称（非平台名）。如"盒马鲜生"而非"淘宝"；若只能看到平台名则用平台名
 - purchased_at：优先使用"下单时间/付款时间"，其次"发货时间/完成时间"
-- total：使用"实付款/实际支付"金额；如有运费则包含在 total 中，不单独列为商品
+- subtotal：商品行小计（折前合计），系统会自动按 subtotal + tax - discount 计算最终总价，不要输出 total
+- 运费/服务费：作为名为"运费"或"服务费"的 item 行计入 items（unit_price 填实付金额，quantity=1）
 - discount：优先级别折扣/满减/优惠券等总折扣金额，从原价与实付差额推算
 - items：每个商品行独立提取，规格（如颜色/尺码/型号）放入 tags
 - unit_price/total_price：使用实际支付价格，非划线原价

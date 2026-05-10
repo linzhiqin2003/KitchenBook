@@ -66,6 +66,18 @@ class Receipt(models.Model):
     def __str__(self) -> str:
         return f"Receipt {self.id}"
 
+    def save(self, *args, **kwargs):
+        # 总计强制由 (小计 + 税 - 折扣) 派生，禁止外部直接写入
+        self.total = (
+            (self.subtotal or Decimal("0"))
+            + (self.tax or Decimal("0"))
+            - (self.discount or Decimal("0"))
+        )
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "total" not in update_fields:
+            kwargs["update_fields"] = list(update_fields) + ["total"]
+        super().save(*args, **kwargs)
+
 
 class ReceiptImage(models.Model):
     receipt = models.ForeignKey(Receipt, on_delete=models.CASCADE, related_name="images")
