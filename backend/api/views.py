@@ -2338,6 +2338,11 @@ def _all_ailab_workspace_roots(user) -> list[dict]:
         'label': 'User Data',
         'path': _ailab_user_workspace_root(user.id),
     }
+    # 多容器隔离模式：所有用户（含 owner）只看自己容器内的数据目录
+    containers = getattr(settings, 'HERMES_USER_CONTAINERS', {})
+    if user.id in containers:
+        return [user_root]
+    # 共享实例模式：owner 可以看到更多 root
     if not is_ai_lab_owner(user):
         return [user_root]
     return [
