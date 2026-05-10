@@ -2,9 +2,9 @@
 #
 # 多用户隔离拓扑（每个用户一个独立 Hermes 容器）：
 #
-#   nginx (host) ──/hermes/u1/──→ 127.0.0.1:8642 ──→ hermes-user1:8642
-#               ──/hermes/u2/──→ 127.0.0.1:8643 ──→ hermes-user2:8642
-#               ──/hermes/u3/──→ 127.0.0.1:8644 ──→ hermes-user3:8642
+#   nginx (host) ──/hermes/u3/───→ 127.0.0.1:8642 ──→ hermes-u3:8642   (owner)
+#               ──/hermes/u9/───→ 127.0.0.1:8643 ──→ hermes-u9:8642
+#               ──/hermes/u550/─→ 127.0.0.1:8644 ──→ hermes-u550:8642
 #
 # 每个容器内部端口都是 8642，只是宿主机映射端口不同。
 # 数据完全隔离：各自 bind mount 独立数据卷，共享只读 skills 目录。
@@ -13,13 +13,11 @@
 #   cp .env.example .env  # 填 HERMES_INTERNAL_TOKEN，按需改路径
 #   HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up -d
 #
-# Mac 开发：默认 .env 里把 HERMES_U*_DATA 改成 $HOME/.ailab-hermes/users/* 之类。
-#
 # 新增用户：
-#   1. 在本文件中添加 hermes-userN 服务
-#   2. 在 .env 中添加 HERMES_UN_DATA 路径
-#   3. 在 nginx.conf 中添加 /hermes/uN/ location
-#   4. 在 Django settings HERMES_USER_CONTAINERS 中添加映射
+#   1. 在本文件中添加 hermes-u<N> 服务（递增宿主机端口）
+#   2. 在 .env 中添加 HERMES_U<N>_DATA 路径
+#   3. 在 nginx.conf 中添加 /hermes/u<N>/ location
+#   4. 在 .env 中更新 HERMES_USER_CONTAINERS_JSON 映射
 
 x-hermes-common: &hermes-common
   image: ailab/hermes:${HERMES_TAG:-latest}
@@ -55,15 +53,15 @@ x-hermes-common: &hermes-common
 
 services:
   # ──────────────────────────────────────
-  # User 1 — owner / 主账号
+  # User 3 — owner (13818524101@163.com)
   # ──────────────────────────────────────
-  hermes-user1:
+  hermes-u3:
     <<: *hermes-common
-    container_name: ailab-hermes-u1
+    container_name: ailab-hermes-u3
     ports:
       - "127.0.0.1:8642:8642"
     volumes:
-      - ${HERMES_U1_DATA:-./hermes-data-u1}:/opt/data
+      - ${HERMES_U3_DATA:-./hermes-data-u3}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
@@ -73,15 +71,15 @@ services:
       start_period: 60s
 
   # ──────────────────────────────────────
-  # User 2 — 访客账号
+  # User 9 — gzhang1819298200@gmail.com
   # ──────────────────────────────────────
-  hermes-user2:
+  hermes-u9:
     <<: *hermes-common
-    container_name: ailab-hermes-u2
+    container_name: ailab-hermes-u9
     ports:
       - "127.0.0.1:8643:8642"
     volumes:
-      - ${HERMES_U2_DATA:-./hermes-data-u2}:/opt/data
+      - ${HERMES_U9_DATA:-./hermes-data-u9}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
@@ -91,22 +89,22 @@ services:
       start_period: 60s
 
   # ──────────────────────────────────────
-  # User 3 — 如需更多用户，复制此模板并递增端口
+  # User 550 — 775872646@qq.com
   # ──────────────────────────────────────
-  # hermes-user3:
-  #   <<: *hermes-common
-  #   container_name: ailab-hermes-u3
-  #   ports:
-  #     - "127.0.0.1:8644:8642"
-  #   volumes:
-  #     - ${HERMES_U3_DATA:-./hermes-data-u3}:/opt/data
-  #     - ../../skills:/opt/ailab-skills:ro
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
-  #     interval: 30s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 60s
+  hermes-u550:
+    <<: *hermes-common
+    container_name: ailab-hermes-u550
+    ports:
+      - "127.0.0.1:8644:8642"
+    volumes:
+      - ${HERMES_U550_DATA:-./hermes-data-u550}:/opt/data
+      - ../../skills:/opt/ailab-skills:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
 networks:
   ailab-net:

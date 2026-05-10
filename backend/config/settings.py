@@ -256,9 +256,20 @@ CEREBRAS_API_KEY_POOL = os.environ.get('CEREBRAS_API_KEY_POOL', '')
 HERMES_INTERNAL_TOKEN = os.environ.get('HERMES_INTERNAL_TOKEN', '')
 
 # 每个用户的 Hermes 容器映射
-# key: Django user id, value: {"port": 宿主机端口, "data_dir": bind mount 宿主路径}
-# 部署时根据实际启用 AI Lab 的用户填写，与 docker-compose.yml / nginx.conf 保持同步。
-HERMES_USER_CONTAINERS = {}
+# key: Django user id (int), value: {"port": 宿主机端口, "data_dir": bind mount 宿主路径}
+# 部署时通过环境变量 HERMES_USER_CONTAINERS_JSON 注入，格式：
+#   {"3": {"port": 8642, "data_dir": "/home/admin/hermes-users/user3"}, ...}
+# 与 docker-compose.yml / nginx.conf 保持同步。
+_hermes_containers_json = os.environ.get('HERMES_USER_CONTAINERS_JSON', '')
+if _hermes_containers_json:
+    import json as _json
+    try:
+        _raw = _json.loads(_hermes_containers_json)
+        HERMES_USER_CONTAINERS = {int(k): v for k, v in _raw.items()}
+    except (ValueError, TypeError):
+        HERMES_USER_CONTAINERS = {}
+else:
+    HERMES_USER_CONTAINERS = {}
 
 # MyAgent 主人账号 —— 可以无限制使用 AI Lab、生成邀请码、看到所有 admin UI。
 # 逗号分隔的 username 或 email；is_superuser=True 也算 owner。
