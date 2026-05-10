@@ -1,28 +1,11 @@
 import json
 from datetime import datetime
 
-from cerebras.cloud.sdk import Cerebras
 from django.conf import settings
 
+from common.deepseek_models import CHAT_MODEL, get_client, non_thinking_kwargs
+
 from .vlm import _build_prompt, _strip_json_fences
-
-
-# ── Cerebras key pool (mirrors api/tools.py) ──
-_cerebras_key_index = 0
-
-
-def _get_cerebras_key():
-    """从 key pool 中轮询取一个 Cerebras API key"""
-    global _cerebras_key_index
-    pool_str = getattr(settings, 'CEREBRAS_API_KEY_POOL', '')
-    if not pool_str:
-        return None
-    keys = [k.strip() for k in pool_str.split(',') if k.strip()]
-    if not keys:
-        return None
-    key = keys[_cerebras_key_index % len(keys)]
-    _cerebras_key_index += 1
-    return key
 
 
 CHAT_INSTRUCTIONS = """
@@ -73,7 +56,7 @@ def _build_chat_prompt() -> str:
 
 
 def chat_or_generate(messages: list[dict]) -> dict:
-    """Multi-turn conversation for receipt generation.
+    """Multi-turn conversation for receipt generation, backed by deepseek-v4-flash.
 
     Args:
         messages: List of {"role": "user"|"assistant", "content": "..."}
@@ -82,22 +65,27 @@ def chat_or_generate(messages: list[dict]) -> dict:
         {"type": "chat", "message": "..."} — AI asks a question
         {"type": "receipt", "content": "..."} — AI outputs receipt JSON
     """
-    api_key = _get_cerebras_key()
+    api_key = getattr(settings, "DEEPSEEK_API_KEY", "")
     if not api_key:
-        raise RuntimeError("Missing CEREBRAS_API_KEY_POOL")
+        raise RuntimeError("Missing DEEPSEEK_API_KEY")
 
-    client = Cerebras(api_key=api_key)
+    client = get_client(api_key)
+    if client is None:
+        raise RuntimeError("Failed to initialize DeepSeek client")
+
     system_prompt = _build_chat_prompt()
-
     api_messages = [{"role": "system", "content": system_prompt}] + messages
 
+    # v4-flash 默认开启 thinking，会消耗 reasoning tokens 并可能返回空 content；
+    # 这里是快速 chat 场景，必须显式 disable。
     completion = client.chat.completions.create(
-        model="gpt-oss-120b",
+        model=CHAT_MODEL,
         messages=api_messages,
         temperature=0.3,
+        **non_thinking_kwargs(),
     )
     msg = completion.choices[0].message
-    raw = (msg.content or getattr(msg, 'reasoning', '') or '').strip()
+    raw = (msg.content or "").strip()
 
     # Try to detect if the response is receipt JSON
     cleaned = _strip_json_fences(raw)
