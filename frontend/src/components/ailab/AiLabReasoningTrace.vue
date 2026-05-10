@@ -321,7 +321,7 @@ watch(
   color: var(--theme-700);
 }
 .trace-header-text {
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   font-weight: 500;
   white-space: normal;
   overflow-wrap: break-word;

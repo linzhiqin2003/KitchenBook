@@ -957,7 +957,7 @@ const openImage = (dataUrl) => {
         <!-- 按 segment 循环：每段 = 一组思考/工具调用 + 该段输出的文字 -->
         <template v-for="(seg, segIdx) in segments" :key="seg.id || segIdx">
           <!-- trace 区：这一段产生的思考/工具调用 -->
-          <div class="w-full mb-2">
+          <div class="w-full mb-0.5">
             <AiLabReasoningTrace
               :segment="seg"
               :is-streaming="isStreaming && isLastSegment(segIdx)"
