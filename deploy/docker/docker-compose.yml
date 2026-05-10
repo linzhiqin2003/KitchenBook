@@ -67,8 +67,10 @@ services:
       # .env 提供 LLM provider API keys；config.yaml 提供 model 选择、agent 设置等。
       # sessions/、state.db、auth.json 等 user-level 数据仍走 per-user /opt/data，
       # 等 per-user 凭证 + 配置就位后改为各自版本即可。
-      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.hermes/.env:ro
-      - ${HERMES_OWNER_CONFIG:-/home/admin/.hermes/config.yaml}:/opt/data/.hermes/config.yaml:ro
+      # 容器里 HERMES_HOME=/opt/data 直接是 hermes 的"home"，所以 .env / config.yaml
+      # 都挂在 root（不是 /opt/data/.hermes/）——entrypoint.sh 也是从这里 chmod 640
+      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.env:ro
+      - ${HERMES_OWNER_CONFIG:-/home/admin/.hermes/config.yaml}:/opt/data/config.yaml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
       interval: 30s
@@ -87,8 +89,10 @@ services:
     volumes:
       - ${HERMES_U9_DATA:-./hermes-data-u9}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
-      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.hermes/.env:ro
-      - ${HERMES_OWNER_CONFIG:-/home/admin/.hermes/config.yaml}:/opt/data/.hermes/config.yaml:ro
+      # 容器里 HERMES_HOME=/opt/data 直接是 hermes 的"home"，所以 .env / config.yaml
+      # 都挂在 root（不是 /opt/data/.hermes/）——entrypoint.sh 也是从这里 chmod 640
+      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.env:ro
+      - ${HERMES_OWNER_CONFIG:-/home/admin/.hermes/config.yaml}:/opt/data/config.yaml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
       interval: 30s
@@ -107,8 +111,10 @@ services:
     volumes:
       - ${HERMES_U550_DATA:-./hermes-data-u550}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
-      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.hermes/.env:ro
-      - ${HERMES_OWNER_CONFIG:-/home/admin/.hermes/config.yaml}:/opt/data/.hermes/config.yaml:ro
+      # 容器里 HERMES_HOME=/opt/data 直接是 hermes 的"home"，所以 .env / config.yaml
+      # 都挂在 root（不是 /opt/data/.hermes/）——entrypoint.sh 也是从这里 chmod 640
+      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.env:ro
+      - ${HERMES_OWNER_CONFIG:-/home/admin/.hermes/config.yaml}:/opt/data/config.yaml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
       interval: 30s
