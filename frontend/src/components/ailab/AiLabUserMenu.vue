@@ -157,12 +157,12 @@ const handleLogout = () => {
 
 const goInvites = () => {
   open.value = false
-  router.push('/ai-lab/admin/invites')
+  router.push({ name: 'ai-lab-admin-invites' })
 }
 
 const goVisitorUsage = () => {
   open.value = false
-  router.push('/ai-lab/admin/usage')
+  router.push({ name: 'ai-lab-admin-usage' })
 }
 
 const goStats = () => {

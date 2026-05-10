@@ -20,14 +20,14 @@ const headers = () => {
   return h
 }
 
-// 已经激活就不该停在这页 —— 直接送回 /ai-lab
+// 已经激活就不该停在这页 —— 直接送回 MyAgent 首页
 const checkAccess = async () => {
   try {
     const r = await fetch(`${API_BASE_URL}/api/ai/me/`, { headers: headers() })
     if (r.ok) {
       const me = await r.json()
       if (me.is_owner || me.ai_lab_enabled) {
-        router.replace('/ai-lab')
+        router.replace({ name: 'ai-lab' })
         return
       }
     }
@@ -53,7 +53,7 @@ const submit = async () => {
       return
     }
     success.value = true
-    setTimeout(() => router.replace('/ai-lab'), 800)
+    setTimeout(() => router.replace({ name: 'ai-lab' }), 800)
   } catch (e) {
     error.value = e.message || '网络错误'
   } finally {
@@ -63,7 +63,8 @@ const submit = async () => {
 
 onMounted(() => {
   if (!authStore.isLoggedIn) {
-    router.replace({ path: '/login', query: { redirect: '/ai-lab' } })
+    const redirect = router.resolve({ name: 'ai-lab' }).fullPath
+    router.replace({ path: '/login', query: { redirect } })
     return
   }
   checkAccess()

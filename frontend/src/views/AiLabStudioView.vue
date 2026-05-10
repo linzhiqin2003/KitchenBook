@@ -1020,10 +1020,10 @@ onUnmounted(() => {
       <div class="max-w-[1240px] mx-auto px-4 w-full flex items-center justify-between">
         <div class="flex items-center gap-3">
           <router-link
-            to="/ai-lab"
+            :to="{ name: 'ai-lab' }"
             class="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
             style="color: var(--theme-400);"
-            title="返回 AI Lab"
+            title="返回 MyAgent"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>

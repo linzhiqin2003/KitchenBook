@@ -12,13 +12,17 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 // 个人首页独立布局
-const isPortfolioHome = computed(() => route.path === '/')
+const isPortfolioHome = computed(() => route.name === 'home')
 // 统一登录页独立布局
 const isAuthPage = computed(() => route.path === '/login')
 // 更新为新的 /kitchen 路径结构
 const isChefMode = computed(() => route.path.startsWith('/kitchen/chef'))
 const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
-const isAiLabPage = computed(() => route.path.startsWith('/ai-lab'))
+// MyAgent 页面（agent.lzqqq.org 子域专属，按 route.name 识别）
+const isAiLabPage = computed(() => {
+  const n = route.name
+  return typeof n === 'string' && n.startsWith('ai-lab')
+})
 // 博客页面独立布局 (/blog)
 const isBlogPage = computed(() => route.path === '/blog' || route.path.startsWith('/blog/'))
 // QuestionGen 刷题页面独立布局 (/questiongen)
@@ -225,13 +229,6 @@ const handleFullLogout = () => {
               <span>也逛逛</span>
               <router-link to="/blog" class="text-stone-600 hover:text-purple-600 transition-colors font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-purple-400">
                 我的技术博客
-              </router-link>
-              <span>？</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <span>或者体验</span>
-              <router-link to="/kitchen/ai-lab" class="text-stone-600 hover:text-pink-600 transition-colors font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-pink-400">
-                更强大的AI开源模型
               </router-link>
               <span>？</span>
             </div>

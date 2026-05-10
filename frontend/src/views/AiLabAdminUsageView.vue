@@ -63,7 +63,7 @@ const fetchMe = async () => {
   const r = await fetch(`${API_BASE_URL}/api/ai/me/`, { headers: headers() })
   if (!r.ok) throw new Error('me')
   me.value = await r.json()
-  if (!me.value.is_owner) router.replace('/ai-lab')
+  if (!me.value.is_owner) router.replace({ name: 'ai-lab' })
 }
 
 const fetchStats = async ({ silent = false } = {}) => {
@@ -88,7 +88,7 @@ onMounted(async () => {
     await fetchMe()
     await fetchStats()
   } catch {
-    router.replace('/ai-lab')
+    router.replace({ name: 'ai-lab' })
   }
 })
 
@@ -197,7 +197,7 @@ const tokenSplit = computed(() => {
       <!-- Header -->
       <header class="usage-header">
         <div class="usage-header__title">
-          <router-link to="/ai-lab" class="usage-header__back" title="返回 MyAgent">
+          <router-link :to="{ name: 'ai-lab' }" class="usage-header__back" title="返回 MyAgent">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
@@ -223,7 +223,7 @@ const tokenSplit = computed(() => {
             </svg>
             <span>{{ loading ? '刷新中' : '刷新' }}</span>
           </button>
-          <router-link to="/ai-lab/admin/invites" class="usage-btn usage-btn--ghost">
+          <router-link :to="{ name: 'ai-lab-admin-invites' }" class="usage-btn usage-btn--ghost">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
               <circle cx="9" cy="7" r="4"/>

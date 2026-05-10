@@ -44,16 +44,6 @@ const navBlocks = [
     featured: true
   },
   {
-    id: 'ai-lab',
-    title: 'MyAgent',
-    subtitle: 'MyAgent',
-    description: 'AI 对话 · 同声传译 · OCR · 表情包',
-    path: '/ai-lab',
-    gradient: 'from-emerald-400 via-teal-500 to-cyan-500',
-    shadowColor: 'shadow-teal-500/30',
-    features: ['思维链推理', '语音输入']
-  },
-  {
     id: 'questiongen',
     title: '智能刷题',
     subtitle: 'Question Gen',

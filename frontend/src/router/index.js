@@ -30,18 +30,37 @@ const TarotRitualView = () => import('../views/tarot/TarotRitualView.vue')
 // 默认站点标题
 const DEFAULT_TITLE = 'LZQ的个人空间'
 
+// agent.lzqqq.org 子域是 MyAgent 专属入口，根路径直接挂 ailab，不带 /ai-lab 前缀
+// dev 下额外支持 ?agent=1 触发 agent 分支用于本地验证（生产 import.meta.env.DEV=false 时 tree-shake 掉）
+const IS_AGENT_HOST =
+  typeof window !== 'undefined' && (
+    /^agent\./i.test(window.location.hostname) ||
+    (import.meta.env.DEV && new URLSearchParams(window.location.search).has('agent'))
+  )
+
+// agent 子域：根路径 = ailab；其他模块（kitchen/blog/tarot/games...）在该域下不挂载
+const aiLabRoutes = IS_AGENT_HOST
+  ? [
+      { path: '/', name: 'ai-lab', component: AiLabView, meta: { title: 'MyAgent | 智能助手' } },
+      { path: '/studio', name: 'ai-lab-studio', component: AiLabStudioView, meta: { title: 'AI Studio | LZQ' } },
+      { path: '/activate', name: 'ai-lab-activate', component: () => import('../views/AiLabActivateView.vue'), meta: { title: '激活 MyAgent' } },
+      { path: '/admin/invites', name: 'ai-lab-admin-invites', component: () => import('../views/AiLabAdminInvitesView.vue'), meta: { title: 'MyAgent 邀请码管理' } },
+      { path: '/admin/usage', name: 'ai-lab-admin-usage', component: () => import('../views/AiLabAdminUsageView.vue'), meta: { title: 'MyAgent 访客用量' } },
+    ]
+  : []
+
+// 主域 / 其他域：根路径 = PortfolioHome；ailab 入口已迁出，不再挂载
+const homeRoute = IS_AGENT_HOST
+  ? null  // agent 域的根路径由 aiLabRoutes 提供
+  : { path: '/', name: 'home', component: PortfolioHomeView, meta: { public: true, title: 'LZQ的个人空间' } }
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     // ========================================
     // 公开页面
     // ========================================
-    {
-      path: '/',
-      name: 'home',
-      component: PortfolioHomeView,
-      meta: { public: true, title: 'LZQ的个人空间' }
-    },
+    ...(homeRoute ? [homeRoute] : []),
     {
       path: '/login',
       name: 'login',
@@ -188,38 +207,11 @@ const router = createRouter({
     },
 
     // ========================================
-    // AI Lab 模块 - /ai-lab 路径下
+    // MyAgent / AI Lab 模块
+    // - agent.lzqqq.org 上挂在根路径下（/、/studio、/activate、/admin/invites、/admin/usage）
+    // - 主域 lzqqq.org 上不再挂载，统一从 agent 子域进入
     // ========================================
-    {
-      path: '/ai-lab',
-      name: 'ai-lab',
-      component: AiLabView,
-      meta: { title: 'MyAgent | 智能助手' }
-    },
-    {
-      path: '/ai-lab/studio',
-      name: 'ai-lab-studio',
-      component: AiLabStudioView,
-      meta: { title: 'AI Studio | LZQ' }
-    },
-    {
-      path: '/ai-lab/activate',
-      name: 'ai-lab-activate',
-      component: () => import('../views/AiLabActivateView.vue'),
-      meta: { title: '激活 MyAgent' }
-    },
-    {
-      path: '/ai-lab/admin/invites',
-      name: 'ai-lab-admin-invites',
-      component: () => import('../views/AiLabAdminInvitesView.vue'),
-      meta: { title: 'MyAgent 邀请码管理' }
-    },
-    {
-      path: '/ai-lab/admin/usage',
-      name: 'ai-lab-admin-usage',
-      component: () => import('../views/AiLabAdminUsageView.vue'),
-      meta: { title: 'MyAgent 访客用量' }
-    },
+    ...aiLabRoutes,
 
     // ========================================
     // Games 模块 - /games 路径下
@@ -242,15 +234,17 @@ const router = createRouter({
 // 路由守卫
 let initPromise = null
 
-// agent.* 子域名是 ailab 专属入口 —— 根路径以及任何非 ailab 路径都重定向到 /ai-lab
-const AILAB_HOST_RE = /^agent\./i
+// agent 子域纯 ailab：非白名单路由（包括无匹配 fallthrough）一律跳回根
+const AGENT_ALLOWED_NAMES = new Set([
+  'ai-lab', 'ai-lab-studio', 'ai-lab-activate',
+  'ai-lab-admin-invites', 'ai-lab-admin-usage',
+  'login',
+])
 router.beforeEach((to, from, next) => {
-  if (typeof window !== 'undefined' && AILAB_HOST_RE.test(window.location.hostname)) {
-    if (to.path === '/' || (!to.path.startsWith('/ai-lab') && !to.path.startsWith('/login'))) {
-      return next({ path: '/ai-lab', query: to.query, hash: to.hash })
-    }
+  if (IS_AGENT_HOST && (!to.name || !AGENT_ALLOWED_NAMES.has(String(to.name)))) {
+    return next({ name: 'ai-lab' })
   }
-  return next()
+  next()
 })
 
 router.beforeEach(async (to, from, next) => {
@@ -272,7 +266,8 @@ router.beforeEach(async (to, from, next) => {
   // Public routes — let through; redirect logged-in users away from /login
   if (isPublic) {
     if (to.path === '/login' && authStore.isLoggedIn) {
-      return next(to.query.redirect ? String(to.query.redirect) : '/kitchen')
+      // 默认回根路径：主域 / = PortfolioHome；agent 子域 / = MyAgent
+      return next(to.query.redirect ? String(to.query.redirect) : '/')
     }
     return next()
   }

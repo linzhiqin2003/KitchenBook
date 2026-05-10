@@ -1864,7 +1864,7 @@ const verifyAiLabAccess = async () => {
     if (!r.ok) return
     const me = await r.json()
     if (!me.is_owner && !me.ai_lab_enabled) {
-      router.replace('/ai-lab/activate')
+      router.replace({ name: 'ai-lab-activate' })
     }
     // 设置用户专属 Hermes 路径（多容器隔离）
     if (me.hermes_path) {
