@@ -63,6 +63,9 @@ services:
     volumes:
       - ${HERMES_U3_DATA:-./hermes-data-u3}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
+      # 临时方案 A：三个用户容器共享 owner 的 ~/.hermes/.env（含 LLM API keys），
+      # 等 per-user 凭证就位后改为各自的 .env
+      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.hermes/.env:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
       interval: 30s
@@ -81,6 +84,7 @@ services:
     volumes:
       - ${HERMES_U9_DATA:-./hermes-data-u9}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
+      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.hermes/.env:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
       interval: 30s
@@ -99,6 +103,7 @@ services:
     volumes:
       - ${HERMES_U550_DATA:-./hermes-data-u550}:/opt/data
       - ../../skills:/opt/ailab-skills:ro
+      - ${HERMES_OWNER_ENV:-/home/admin/.hermes/.env}:/opt/data/.hermes/.env:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8642/api/tools -H 'Authorization: Bearer ${HERMES_API_KEY:-ailab-hermes-2026}' >/dev/null || exit 1"]
       interval: 30s
