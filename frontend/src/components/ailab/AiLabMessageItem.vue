@@ -934,8 +934,6 @@ const openImage = (dataUrl) => {
   <div v-else-if="message.role === 'assistant'" class="w-full py-3 px-3 sm:px-6 animate-fade-in flex justify-start" style="font-family: var(--ai-font-body);">
     <div class="flex gap-3 max-w-full sm:max-w-[calc(100%-48px)] w-full">
       <div class="flex flex-col items-start flex-1 min-w-0 w-full">
-        <div class="mb-1.5" style="font-size: 13px; font-weight: 600; color: var(--theme-400); letter-spacing: 0.01em;">{{ message.modelName || 'AI' }}</div>
-
         <!-- 流式刚启动还没收到任何 chunk 时（新 session 第一回合的网络冷启动尤为明显）：
              segments 仍为空，下面 v-for 跑 0 次什么都不渲染。给一个最顶层的"准备中"占位 —
              保证用户立刻看到反馈，避免空白等待 -->
@@ -1011,19 +1009,18 @@ const openImage = (dataUrl) => {
                 </svg>
                 <span>再次生成</span>
               </button>
+              <span
+                v-if="message.stats && message.stats.endTime"
+                class="flex items-center gap-1 ml-1 px-2 py-1 text-xs"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                {{ ((message.stats.endTime - message.stats.startTime) / 1000).toFixed(1) }}s
+              </span>
             </div>
           </div>
         </template>
-
-        <!-- 耗时信息（token 用量统一在底部状态栏展示） -->
-        <div v-if="message.stats && message.stats.endTime" class="flex items-center gap-4 mt-2 text-xs text-gray-400 animate-fade-in-soft">
-          <span class="flex items-center gap-1">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            {{ ((message.stats.endTime - message.stats.startTime) / 1000).toFixed(1) }}s
-          </span>
-        </div>
       </div>
     </div>
   </div>
