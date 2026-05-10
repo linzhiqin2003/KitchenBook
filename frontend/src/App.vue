@@ -11,6 +11,14 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
+// agent.lzqqq.org 子域专属判断 — 不依赖 router 状态，启动第一帧就可用，
+// 避免 router ready 之前 fallthrough 到默认厨房 layout 闪一下。
+// dev 下 ?agent=1 触发同一分支，方便本地验证（与 router/index.js 的 IS_AGENT_HOST 对齐）
+const isAgentHost = typeof window !== 'undefined' && (
+  /^agent\./i.test(window.location.hostname) ||
+  (import.meta.env.DEV && new URLSearchParams(window.location.search).has('agent'))
+)
+
 // 个人首页独立布局
 const isPortfolioHome = computed(() => route.name === 'home')
 // 统一登录页独立布局
@@ -18,8 +26,9 @@ const isAuthPage = computed(() => route.path === '/login')
 // 更新为新的 /kitchen 路径结构
 const isChefMode = computed(() => route.path.startsWith('/kitchen/chef'))
 const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
-// MyAgent 页面（agent.lzqqq.org 子域专属，按 route.name 识别）
+// MyAgent 页面：agent 子域永远走 ai-lab layout；主域按 route.name 识别
 const isAiLabPage = computed(() => {
+  if (isAgentHost) return true
   const n = route.name
   return typeof n === 'string' && n.startsWith('ai-lab')
 })
