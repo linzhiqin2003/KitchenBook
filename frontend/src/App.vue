@@ -19,8 +19,19 @@ const isAgentHost = typeof window !== 'undefined' && (
   (import.meta.env.DEV && new URLSearchParams(window.location.search).has('agent'))
 )
 
-// 个人首页独立布局
-const isPortfolioHome = computed(() => route.name === 'home')
+// 主域根路径同款"第一帧就可用"hint：避免 router.isReady() 之前 route.name 还是
+// undefined → 所有 isXxx 都 false → 掉到默认厨房 layout 闪一下。
+// 必须用 location.pathname（同步可读）而不是 route.path（vue-router 启动时为 '/'
+// 直到 history listener 跑完才同步到真实 URL，会让 /kitchen 也错命中）。
+const isInitialRootPath = typeof window !== 'undefined'
+  && window.location.pathname === '/'
+  && !isAgentHost
+
+// 个人首页独立布局：route resolve 后用 name 精确判断；resolve 之前用 initial hint 兜底
+const isPortfolioHome = computed(() => {
+  if (isAgentHost) return false
+  return route.name === 'home' || (isInitialRootPath && !route.name)
+})
 // 统一登录页独立布局
 const isAuthPage = computed(() => route.path === '/login')
 // 更新为新的 /kitchen 路径结构
