@@ -46,7 +46,9 @@ const isAiLabPage = computed(() => {
 // 博客页面独立布局 (/blog)
 const isBlogPage = computed(() => route.path === '/blog' || route.path.startsWith('/blog/'))
 // QuestionGen 刷题页面独立布局 (/questiongen)
-const isQuestionGenPage = computed(() => route.path === '/questiongen')
+// 容错 trailing slash / query string — 移动端分享链接、PWA 主屏快捷方式经常会加
+// 跟 isBlogPage / isGamesPage 保持一致的判断口径
+const isQuestionGenPage = computed(() => route.path === '/questiongen' || route.path.startsWith('/questiongen/'))
 // Games 页面独立布局 (/games)
 const isGamesPage = computed(() => route.path === '/games' || route.path.startsWith('/games/'))
 // Tarot 页面独立布局 (/tarot)
