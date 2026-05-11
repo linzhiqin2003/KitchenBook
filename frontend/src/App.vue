@@ -19,21 +19,25 @@ const isAgentHost = typeof window !== 'undefined' && (
   (import.meta.env.DEV && new URLSearchParams(window.location.search).has('agent'))
 )
 
-// 主域根路径同款"第一帧就可用"hint：避免 router.isReady() 之前 route.name 还是
-// undefined → 所有 isXxx 都 false → 掉到默认厨房 layout 闪一下。
-// 必须用 location.pathname（同步可读）而不是 route.path（vue-router 启动时为 '/'
-// 直到 history listener 跑完才同步到真实 URL，会让 /kitchen 也错命中）。
-const isInitialRootPath = typeof window !== 'undefined'
-  && window.location.pathname === '/'
-  && !isAgentHost
+// ── 第一帧 layout hint ────────────────────────────────────────────────
+// vue-router 在 router.isReady() 之前 route.path 是初始值 '/'、route.name 是
+// undefined，所以基于 route.* 的 computed 在首帧全为 false，会 fallthrough 到
+// 默认厨房 layout 闪一下。这里用同步可读的 location.pathname 捕一份初始路径，
+// 提供"router 还没就绪时也能判断"的兜底。
+const initialPathname = typeof window !== 'undefined' ? window.location.pathname : '/'
+const matchesInitial = (prefix) => initialPathname === prefix || initialPathname.startsWith(prefix + '/')
 
-// 个人首页独立布局：route resolve 后用 name 精确判断；resolve 之前用 initial hint 兜底
+// 个人首页独立布局
 const isPortfolioHome = computed(() => {
   if (isAgentHost) return false
-  return route.name === 'home' || (isInitialRootPath && !route.name)
+  if (route.name === 'home') return true
+  return !route.name && initialPathname === '/'
 })
 // 统一登录页独立布局
-const isAuthPage = computed(() => route.path === '/login')
+const isAuthPage = computed(() => {
+  if (route.path === '/login') return true
+  return !route.name && initialPathname === '/login'
+})
 // 更新为新的 /kitchen 路径结构
 const isChefMode = computed(() => route.path.startsWith('/kitchen/chef'))
 const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
@@ -41,18 +45,29 @@ const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
 const isAiLabPage = computed(() => {
   if (isAgentHost) return true
   const n = route.name
-  return typeof n === 'string' && n.startsWith('ai-lab')
+  if (typeof n === 'string' && n.startsWith('ai-lab')) return true
+  return !route.name && matchesInitial('/ai-lab')
 })
 // 博客页面独立布局 (/blog)
-const isBlogPage = computed(() => route.path === '/blog' || route.path.startsWith('/blog/'))
+const isBlogPage = computed(() => {
+  if (route.path === '/blog' || route.path.startsWith('/blog/')) return true
+  return !route.name && matchesInitial('/blog')
+})
 // QuestionGen 刷题页面独立布局 (/questiongen)
-// 容错 trailing slash / query string — 移动端分享链接、PWA 主屏快捷方式经常会加
-// 跟 isBlogPage / isGamesPage 保持一致的判断口径
-const isQuestionGenPage = computed(() => route.path === '/questiongen' || route.path.startsWith('/questiongen/'))
+const isQuestionGenPage = computed(() => {
+  if (route.path === '/questiongen' || route.path.startsWith('/questiongen/')) return true
+  return !route.name && matchesInitial('/questiongen')
+})
 // Games 页面独立布局 (/games)
-const isGamesPage = computed(() => route.path === '/games' || route.path.startsWith('/games/'))
+const isGamesPage = computed(() => {
+  if (route.path === '/games' || route.path.startsWith('/games/')) return true
+  return !route.name && matchesInitial('/games')
+})
 // Tarot 页面独立布局 (/tarot)
-const isTarotPage = computed(() => route.path.startsWith('/tarot'))
+const isTarotPage = computed(() => {
+  if (route.path.startsWith('/tarot')) return true
+  return !route.name && matchesInitial('/tarot')
+})
 // Kitchen 首页模式 - 排除chef和ai-lab
 const isKitchenPage = computed(() => route.path.startsWith('/kitchen') && !isChefMode.value && !isAiLabPage.value)
 
