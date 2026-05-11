@@ -176,7 +176,7 @@ curl -fsS http://127.0.0.1:8642/api/tools \
 
 ### 6. 端到端验证（前端 AI Lab）
 
-打开 https://www.lzqqq.org/ai-lab/，发一条测试消息。检查：
+打开 https://agent.lzqqq.org/，发一条测试消息。检查：
 - 消息能正常返回（chat completions 流）
 - Hermes 能调到 ailab MCP 工具（如让它 `搜索菜谱 番茄炒蛋`）
 - `docker logs ailab-hermes` 没报错

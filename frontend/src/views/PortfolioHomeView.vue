@@ -186,8 +186,6 @@ const navigateTo = (path) => {
               <div class="decor-icon" :class="block.featured ? 'decor-lg' : 'decor-sm'">
                 <!-- Kitchen: 叉勺交叉 -->
                 <svg v-if="block.id === 'kitchen'" viewBox="0 0 48 48" fill="currentColor"><path d="M14 4v14c0 2.2 1.8 4 4 4h1v22h2V22h1c2.2 0 4-1.8 4-4V4h-3v12h-2V4h-2v12h-2V4h-3zm20 0c-2 8-4 12-4 18 0 2.2 1.8 4 4 4v18h2V26c2.2 0 4-1.8 4-4 0-6-2-10-4-18h-2z"/></svg>
-                <!-- AI Lab: 原子轨道 -->
-                <svg v-else-if="block.id === 'ai-lab'" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(0 24 24)"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(60 24 24)"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(120 24 24)"/><circle cx="24" cy="24" r="3" fill="currentColor"/></svg>
                 <!-- QuestionGen: 灯泡 -->
                 <svg v-else-if="block.id === 'questiongen'" viewBox="0 0 48 48" fill="currentColor"><path d="M24 4C16.3 4 10 10.3 10 18c0 4.8 2.4 9 6 11.6V34a4 4 0 004 4h8a4 4 0 004-4v-4.4c3.6-2.6 6-6.8 6-11.6 0-7.7-6.3-14-14-14zm4 36h-8a2 2 0 010-4h8a2 2 0 010 4z"/></svg>
                 <!-- Tarot: 月亮与星 -->
@@ -208,12 +206,6 @@ const navigateTo = (path) => {
                 >
                   <!-- Kitchen: emoji -->
                   <span v-if="block.id === 'kitchen'" :class="block.featured ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'">🍳</span>
-                  <!-- AI Lab: 多角星火花 -->
-                  <svg v-else-if="block.id === 'ai-lab'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
-                    <path d="M12 1.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5L4.5 9l5.5-2 2-5.5z" fill-opacity="0.92"/>
-                    <path d="M20 12l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" fill-opacity="0.5"/>
-                    <path d="M4 17l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5L2 19l1.5-.5.5-1.5z" fill-opacity="0.35"/>
-                  </svg>
                   <!-- QuestionGen: 灯泡 -->
                   <svg v-else-if="block.id === 'questiongen'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="none">
                     <path d="M9 21h6m-5-1.5h4M12 3a6 6 0 00-3.5 10.9c.5.5.8 1.2.9 1.8.05.25.2.3.6.3h4c.4 0 .55-.05.6-.3.1-.6.4-1.3.9-1.8A6 6 0 0012 3z" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
