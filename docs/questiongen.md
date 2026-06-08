@@ -106,7 +106,8 @@ QuestionGen 是项目中的“刷题/题目生成”子系统，包含：
 #### 课程系统
 
 - `backend/questions/services/courses.py`
-  - 课程根目录：`{repo}/courses/`
+  - 活跃课程根目录：`{repo}/courses/`
+  - 现状：个人课程资料已归档到 `archive/course-files/courses/`，默认不再作为 MyWeb 应用数据加载
   - 每门课结构：
     - `courses/{course-id}/courseware/`：课件 Markdown（可分子目录）
     - `courses/{course-id}/simulation/`：模拟题/种子题 Markdown
@@ -155,14 +156,16 @@ QuestionGen 是项目中的“刷题/题目生成”子系统，包含：
 
 ---
 
-## 5) 课程数据（courses/）说明
+## 5) 课程数据归档说明
 
-当前仓库已存在课程示例（目录：`courses/`）：
+个人课程资料已从运行目录移到：
 
-- `software-tools`：课件在 `courseware/` 的多个主题子目录，模拟题在 `simulation/`
-- `c-programming`：课件为扁平 markdown 文件，模拟题在 `simulation/`
+- `archive/course-files/courses/`：原 QuestionGen 课程 registry、课件、模拟题、review、fixtures
+- `archive/course-files/questiongen-data/`：原 `backend/questiongen-data/` 历史 OCR/课件资料
 
-`parser.parse_courseware()` 会根据是否存在子目录来决定“按目录聚合”或“按文件聚合”。
+当前后端代码仍以 `{repo}/courses/` 作为活跃课程根目录。需要临时恢复 QuestionGen 课程数据时，把 `archive/course-files/courses/` 复制或移动回仓库根目录并命名为 `courses/`。
+
+`parser.parse_courseware()` 会根据活跃课程目录中是否存在子目录来决定“按目录聚合”或“按文件聚合”。如果 `courses/` 不存在，课程列表为空，前端会显示课程资料已归档的空状态。
 
 ---
 
@@ -228,9 +231,6 @@ rg -n "api/questiongen|include\\(\"questions\\.urls\"\\)|INSTALLED_APPS" backend
 
 ---
 
-## 8) 备注：`backend/questiongen-data/`
+## 8) 备注：历史课程资料
 
-仓库里还有 `backend/questiongen-data/` 目录，内容看起来是课件/实验/模拟题数据的历史版本（例如 `01-sysadmin/`、`03-regex/`、`08-sql/` 等）。
-
-当前后端代码的课程系统 **读取的是仓库根目录的 `courses/`**（见 `backend/questions/services/courses.py`），并未直接引用 `backend/questiongen-data/`；如需清理/迁移，请先全仓搜索确认是否有外部脚本依赖该目录。
-
+`backend/questiongen-data/` 已归档为 `archive/course-files/questiongen-data/`。当前后端代码的课程系统 **读取的是仓库根目录的 `courses/`**（见 `backend/questions/services/courses.py`），并未直接引用这批历史资料。

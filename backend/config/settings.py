@@ -42,10 +42,8 @@ CSRF_TRUSTED_ORIGINS = [
     # 新域名 - lzqqq.org
     'https://lzqqq.org',
     'https://www.lzqqq.org',
-    'https://agent.lzqqq.org',
     'http://lzqqq.org',
     'http://www.lzqqq.org',
-    'http://agent.lzqqq.org',
     # 旧域名 - lzqqqkitchen.org (迁移期间保留)
     'https://lzqqqkitchen.org',
     'https://www.lzqqqkitchen.org',
@@ -240,40 +238,15 @@ SILICONFLOW_BASE_URL = os.environ.get('SILICONFLOW_BASE_URL', 'https://api.silic
 # OpenRouter API 配置 (用于 StepFun 等第三方模型)
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
-# Serper API 配置 (用于 AI Lab 网页搜索)
+# Serper API 配置 (用于网页搜索工具)
 SERPER_API_KEY = os.environ.get('SERPER_API_KEY', '')
 
-# Google CSE 配置 (用于 AI Lab 网页搜索，主搜索引擎)
+# Google CSE 配置 (用于网页搜索工具，主搜索引擎)
 GOOGLE_CSE_API_KEY = os.environ.get('GOOGLE_CSE_API_KEY', '')
 GOOGLE_CSE_CX = os.environ.get('GOOGLE_CSE_CX', '')
 
-# Cerebras API 配置 (用于 AI Lab 快速 AI 提取，极速推理)
+# Cerebras API 配置 (用于快速 AI 提取，极速推理)
 CEREBRAS_API_KEY_POOL = os.environ.get('CEREBRAS_API_KEY_POOL', '')
-
-# Hermes ↔ Django 内部回写 token：客户端断开后 Hermes 在后台跑完 agent，
-# 用这个 secret 调 Django 的 messages/internal/ 端点把最终结果落库。
-# Hermes systemd unit 需 export 同名环境变量。
-HERMES_INTERNAL_TOKEN = os.environ.get('HERMES_INTERNAL_TOKEN', '')
-
-# 每个用户的 Hermes 容器映射
-# key: Django user id (int), value: {"port": 宿主机端口, "data_dir": bind mount 宿主路径}
-# 部署时通过环境变量 HERMES_USER_CONTAINERS_JSON 注入，格式：
-#   {"3": {"port": 8642, "data_dir": "/home/admin/hermes-users/user3"}, ...}
-# 与 docker-compose.yml / nginx.conf 保持同步。
-_hermes_containers_json = os.environ.get('HERMES_USER_CONTAINERS_JSON', '')
-if _hermes_containers_json:
-    import json as _json
-    try:
-        _raw = _json.loads(_hermes_containers_json)
-        HERMES_USER_CONTAINERS = {int(k): v for k, v in _raw.items()}
-    except (ValueError, TypeError):
-        HERMES_USER_CONTAINERS = {}
-else:
-    HERMES_USER_CONTAINERS = {}
-
-# MyAgent 主人账号 —— 可以无限制使用 AI Lab、生成邀请码、看到所有 admin UI。
-# 逗号分隔的 username 或 email；is_superuser=True 也算 owner。
-AI_LAB_OWNER_USERNAMES = os.environ.get('AI_LAB_OWNER_USERNAMES', '').strip()
 
 # Fernet encryption key for sensitive fields (API keys stored in DB)
 # Auto-generated on first run and persisted to .env

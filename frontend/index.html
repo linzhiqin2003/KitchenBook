@@ -27,9 +27,7 @@
       // 在 Vue 挂载前同步设置背景色，防止主题闪烁
       (function(){
         var p = location.pathname;
-        // agent.lzqqq.org 子域永远是 MyAgent，配 ai-lab cream 背景（避免厨房闪现）
-        var isAgentHost = /^agent\./i.test(location.hostname);
-        if (isAgentHost || p.startsWith('/ai-lab') || p.startsWith('/questiongen')) {
+        if (p.startsWith('/questiongen')) {
           document.body.style.backgroundColor = '#f8f8f6';
           return;
         }

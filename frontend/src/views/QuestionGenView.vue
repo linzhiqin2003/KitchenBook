@@ -51,6 +51,10 @@
               <span class="qg-menu__title">{{ course.name }}</span>
               <span class="qg-menu__sub">{{ course.description }}</span>
             </button>
+            <div v-if="!hasActiveCourse" class="qg-menu__row qg-menu__row--empty">
+              <span class="qg-menu__title">暂无课程</span>
+              <span class="qg-menu__sub">课程资料已归档</span>
+            </div>
           </div>
         </div>
 
@@ -156,8 +160,15 @@
 
     <!-- ─── Stage ─── -->
     <main class="qg-stage" @mouseup="onStageMouseUp">
+      <div v-if="!hasActiveCourse" class="qg-stage__inner">
+        <div class="qg-card qg-empty">
+          <div class="qg-empty__heading">课程资料已归档</div>
+          <p class="qg-empty__body">当前没有启用的 QuestionGen 课程目录。需要恢复刷题数据时，把归档里的课程目录恢复到项目根目录。</p>
+        </div>
+      </div>
+
       <!-- Notes mode: structured knowledge points -->
-      <div v-if="studyMode === 'notes'" class="qg-stage__inner">
+      <div v-else-if="studyMode === 'notes'" class="qg-stage__inner">
         <NotesView
           :course-id="currentCourseId"
           :topic="selectedTopic === 'all' ? null : selectedTopic"
@@ -470,8 +481,9 @@ const difficultyOptions = [
 const correctCount = computed(() => historyQuestions.value.filter(h => h.correct).length);
 
 const currentCourse = computed(() => availableCourses.value[currentCourseId.value] || {});
-const currentCourseName = computed(() => currentCourse.value.name || '选择课程');
-const currentCourseDisplayName = computed(() => currentCourse.value.display_name || currentCourse.value.name || '刷题');
+const hasActiveCourse = computed(() => Boolean(currentCourseId.value && currentCourse.value.id));
+const currentCourseName = computed(() => currentCourse.value.name || '暂无课程');
+const currentCourseDisplayName = computed(() => currentCourse.value.display_name || currentCourse.value.name || 'QuestionGen');
 
 // Question types this course supports — backend returns in course config.
 // Default to ['mcq'] for any course that doesn't opt into fill/essay.
@@ -495,10 +507,18 @@ async function loadCourses() {
     const storedCourse = localStorage.getItem(CURRENT_COURSE_KEY);
     if (storedCourse && availableCourses.value[storedCourse]) {
       currentCourseId.value = storedCourse;
-    } else if (data.default) {
+    } else if (data.default && availableCourses.value[data.default]) {
       currentCourseId.value = data.default;
     } else {
-      currentCourseId.value = Object.keys(availableCourses.value)[0];
+      currentCourseId.value = Object.keys(availableCourses.value)[0] || null;
+    }
+
+    if (!currentCourseId.value) {
+      availableTopics.value = [];
+      topicStats.value = {};
+      notesTopicStats.value = {};
+      totalCachedQuestions.value = 0;
+      topicsLoaded.value = true;
     }
   } catch (err) {
     console.error('Failed to load courses:', err);
@@ -548,6 +568,12 @@ async function selectCourse(courseId) {
 
 // Load stats from server
 async function loadStats() {
+  if (!currentCourseId.value) {
+    totalCachedQuestions.value = 0;
+    topicStats.value = {};
+    return;
+  }
+
   try {
     const response = await questionApi.getStats(currentCourseId.value);
     const data = response.data;
@@ -560,6 +586,11 @@ async function loadStats() {
 
 // Load knowledge-point counts per chapter (used by Topic dropdown in notes mode)
 async function loadNotesStats() {
+  if (!currentCourseId.value) {
+    notesTopicStats.value = {};
+    return;
+  }
+
   try {
     const r = await questionApi.getNotesTopics(currentCourseId.value);
     const map = {};
@@ -621,6 +652,12 @@ async function setDifficulty(difficulty) {
 
 // Load topics from server
 async function loadTopics() {
+  if (!currentCourseId.value) {
+    availableTopics.value = [];
+    topicsLoaded.value = true;
+    return;
+  }
+
   try {
     const response = await questionApi.getTopics(currentCourseId.value);
     const data = response.data;
@@ -748,6 +785,7 @@ async function setQuestionType(qtype) {
   if (qtype === selectedQuestionType.value) return;
   selectedQuestionType.value = qtype;
   localStorage.setItem(QUESTION_TYPE_KEY, qtype);
+  if (!currentCourseId.value) return;
   prefetchedQuestion.value = null;
   loading.value = true;
   loadingMessage.value = `正在加载${QUESTION_TYPES.find(t => t.value === qtype)?.label || ''}...`;
@@ -796,6 +834,11 @@ function clearHistory() {
 
 // Get next question
 async function getSmartNextQuestion() {
+  if (!currentCourseId.value) {
+    currentQuestion.value = null;
+    return null;
+  }
+
   try {
     error.value = null;
     // Cycle Logic: If we've viewed all available cached questions in this session, reset session history
@@ -844,6 +887,7 @@ async function getSmartNextQuestion() {
 
 // Retry after error
 async function retryGenerate() {
+  if (!currentCourseId.value) return;
   loading.value = true;
   loadingMessage.value = '正在重新加载题目...';
   error.value = null;
@@ -858,6 +902,7 @@ async function retryGenerate() {
 
 // Prefetch next question
 async function prefetchNextQuestion() {
+  if (!currentCourseId.value) return;
   if (prefetching.value || prefetchedQuestion.value) return;
   
   prefetching.value = true;
@@ -1053,6 +1098,12 @@ onMounted(async () => {
 
   // Load courses first
   await loadCourses();
+
+  if (!currentCourseId.value) {
+    loading.value = false;
+    currentQuestion.value = null;
+    return;
+  }
 
   // If the persisted type isn't supported by the current course (e.g. a stale
   // 'essay' from a prior course), snap to mcq before fetching the first question.
@@ -1369,6 +1420,13 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 8px 10px;
   font-size: var(--qg-text-sm);
+}
+.qg-menu__row--empty {
+  cursor: default;
+}
+.qg-menu__row--empty:hover {
+  background: transparent;
+  color: var(--qg-text-secondary);
 }
 .qg-menu__count {
   font-size: 11px;

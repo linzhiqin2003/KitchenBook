@@ -11,14 +11,6 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-// agent.lzqqq.org 子域专属判断 — 不依赖 router 状态，启动第一帧就可用，
-// 避免 router ready 之前 fallthrough 到默认厨房 layout 闪一下。
-// dev 下 ?agent=1 触发同一分支，方便本地验证（与 router/index.js 的 IS_AGENT_HOST 对齐）
-const isAgentHost = typeof window !== 'undefined' && (
-  /^agent\./i.test(window.location.hostname) ||
-  (import.meta.env.DEV && new URLSearchParams(window.location.search).has('agent'))
-)
-
 // ── 第一帧 layout hint ────────────────────────────────────────────────
 // vue-router 在 router.isReady() 之前 route.path 是初始值 '/'、route.name 是
 // undefined，所以基于 route.* 的 computed 在首帧全为 false，会 fallthrough 到
@@ -29,7 +21,6 @@ const matchesInitial = (prefix) => initialPathname === prefix || initialPathname
 
 // 个人首页独立布局
 const isPortfolioHome = computed(() => {
-  if (isAgentHost) return false
   if (route.name === 'home') return true
   return !route.name && initialPathname === '/'
 })
@@ -41,13 +32,6 @@ const isAuthPage = computed(() => {
 // 更新为新的 /kitchen 路径结构
 const isChefMode = computed(() => route.path.startsWith('/kitchen/chef'))
 const isLoginPage = computed(() => route.path === '/kitchen/chef/login')
-// MyAgent 页面：agent 子域永远走 ai-lab layout；主域按 route.name 识别
-const isAiLabPage = computed(() => {
-  if (isAgentHost) return true
-  const n = route.name
-  if (typeof n === 'string' && n.startsWith('ai-lab')) return true
-  return !route.name && matchesInitial('/ai-lab')
-})
 // 博客页面独立布局 (/blog)
 const isBlogPage = computed(() => {
   if (route.path === '/blog' || route.path.startsWith('/blog/')) return true
@@ -68,8 +52,8 @@ const isTarotPage = computed(() => {
   if (route.path.startsWith('/tarot')) return true
   return !route.name && matchesInitial('/tarot')
 })
-// Kitchen 首页模式 - 排除chef和ai-lab
-const isKitchenPage = computed(() => route.path.startsWith('/kitchen') && !isChefMode.value && !isAiLabPage.value)
+// Kitchen 首页模式 - 排除 chef 管理页
+const isKitchenPage = computed(() => route.path.startsWith('/kitchen') && !isChefMode.value)
 
 // 移动端菜单状态
 const mobileMenuOpen = ref(false)
@@ -104,11 +88,6 @@ const handleFullLogout = () => {
     <RouterView />
   </div>
 
-  <!-- AI Lab 全屏模式 — bg-slate-50 防止 macOS 窗口圆角露出深色 body -->
-  <div v-else-if="isAiLabPage" class="min-h-screen bg-slate-50">
-    <RouterView />
-  </div>
-  
   <!-- 博客独立页面模式 -->
   <div v-else-if="isBlogPage" class="min-h-screen">
     <RouterView />

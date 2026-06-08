@@ -64,9 +64,6 @@ cd ~/KitchenBook/receipts-frontend
 npm install --silent
 npm run build
 
-echo -e "${YELLOW}🧠 6.2 同步 Hermes 本地补丁...${NC}"
-bash ~/KitchenBook/deploy/hermes-patches/apply.sh
-
 echo -e "${YELLOW}🔄 7. 重启服务...${NC}"
 sudo systemctl restart gunicorn
 sudo systemctl restart daphne
@@ -100,4 +97,3 @@ fi
 
 echo -e "${GREEN}🎉 部署完成！${NC}"
 echo -e "访问您的网站: ${GREEN}https://$(hostname -I | awk '{print $1}')${NC}"
-

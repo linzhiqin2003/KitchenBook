@@ -1,100 +1,142 @@
 <template>
-  <div class="auth-page">
-    <!-- Floating ambient blobs -->
-    <div class="auth-ambient">
-      <div class="auth-blob auth-blob--1"></div>
-      <div class="auth-blob auth-blob--2"></div>
-      <div class="auth-blob auth-blob--3"></div>
-    </div>
+  <div class="login-page">
+    <!-- Left: brand panel -->
+    <aside class="login-hero" aria-hidden="false">
+      <div class="login-hero__grid" aria-hidden="true"></div>
+      <div class="login-hero__glow" aria-hidden="true"></div>
 
-    <div class="auth-wrapper">
-      <!-- App Icon + Brand -->
-      <div class="auth-brand" :style="{ animationDelay: '0s' }">
-        <div class="auth-app-icon">
-          <BookOpenText :size="28" color="#fff" />
-        </div>
-        <span class="auth-app-name">Receipt Ledger</span>
-      </div>
-
-      <!-- Title -->
-      <div class="auth-header" :style="{ animationDelay: '0.06s' }">
-        <h1>欢迎回来</h1>
-        <p>登录以继续管理你的收据</p>
-      </div>
-
-      <!-- Form Card (iOS grouped style) -->
-      <form class="auth-form" @submit.prevent="handleLogin" :style="{ animationDelay: '0.12s' }">
-        <div class="ios-group">
-          <div class="ios-field">
-            <Mail :size="17" class="ios-field__icon" />
-            <input
-              type="email"
-              v-model="email"
-              required
-              placeholder="邮箱地址"
-              autocomplete="email"
-            />
+      <div class="login-hero__content">
+        <div class="login-hero__brand" :style="{ '--delay': '0ms' }">
+          <div class="login-hero__logo">
+            <Receipt :size="22" stroke-width="1.75" />
           </div>
-          <div class="ios-divider"></div>
-          <div class="ios-field">
-            <Lock :size="17" class="ios-field__icon" />
-            <input
-              :type="showPassword ? 'text' : 'password'"
-              v-model="password"
-              required
-              placeholder="密码"
-              autocomplete="current-password"
-            />
-            <button type="button" class="ios-field__toggle" @click="showPassword = !showPassword" tabindex="-1">
-              <EyeOff v-if="showPassword" :size="17" />
-              <Eye v-else :size="17" />
-            </button>
-          </div>
+          <span class="login-hero__name">Receipt Ledger</span>
         </div>
 
-        <!-- Error -->
-        <Transition name="ios-alert">
-          <div v-if="error" class="ios-error">
-            <AlertCircle :size="15" />
-            <span>{{ error }}</span>
-          </div>
-        </Transition>
+        <div class="login-hero__copy" :style="{ '--delay': '60ms' }">
+          <h2>每一笔支出，清清楚楚</h2>
+          <p>拍照录入、自动分类、团队共享——让收据管理像记账一样简单。</p>
+        </div>
 
-        <!-- Submit -->
-        <button class="ios-button" type="submit" :disabled="loading" :class="{ 'ios-button--loading': loading }">
-          <Loader2 v-if="loading" :size="18" class="ios-spinner" />
-          <span>{{ loading ? '登录中…' : '登录' }}</span>
-        </button>
-      </form>
-
-      <!-- Features -->
-      <div class="auth-features" :style="{ animationDelay: '0.18s' }">
-        <div class="auth-feature-chip">
-          <ScanLine :size="14" />
-          <span>拍照即录入</span>
-        </div>
-        <div class="auth-feature-chip">
-          <Users :size="14" />
-          <span>团队协作</span>
-        </div>
-        <div class="auth-feature-chip">
-          <BarChart3 :size="14" />
-          <span>消费洞察</span>
-        </div>
+        <ul class="login-hero__features" :style="{ '--delay': '120ms' }">
+          <li>
+            <span class="login-hero__feature-icon"><ScanLine :size="16" /></span>
+            <span>
+              <strong>智能识别</strong>
+              <small>拍照即可提取金额与商户</small>
+            </span>
+          </li>
+          <li>
+            <span class="login-hero__feature-icon"><Users :size="16" /></span>
+            <span>
+              <strong>团队协作</strong>
+              <small>组织内共享账本与权限</small>
+            </span>
+          </li>
+          <li>
+            <span class="login-hero__feature-icon"><BarChart3 :size="16" /></span>
+            <span>
+              <strong>消费洞察</strong>
+              <small>图表汇总，趋势一目了然</small>
+            </span>
+          </li>
+        </ul>
       </div>
+    </aside>
 
-      <!-- Footer -->
-      <div class="auth-footer" :style="{ animationDelay: '0.24s' }">
-        还没有账号？<RouterLink to="/register">注册</RouterLink>
+    <!-- Right: form panel -->
+    <main class="login-main">
+      <div class="login-card">
+        <header class="login-card__header" :style="{ '--delay': '0ms' }">
+          <div class="login-card__logo-sm">
+            <Receipt :size="20" stroke-width="1.75" />
+          </div>
+          <h1>欢迎回来</h1>
+          <p>登录你的智能账本账号</p>
+        </header>
+
+        <form class="login-form" @submit.prevent="handleLogin" :style="{ '--delay': '80ms' }">
+          <div class="field">
+            <label for="login-email">邮箱</label>
+            <div class="field__control" :class="{ 'field__control--focused': emailFocused }">
+              <Mail :size="16" class="field__icon" />
+              <input
+                id="login-email"
+                type="email"
+                v-model="email"
+                required
+                placeholder="name@company.com"
+                autocomplete="email"
+                @focus="emailFocused = true"
+                @blur="emailFocused = false"
+              />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="login-password">密码</label>
+            <div class="field__control" :class="{ 'field__control--focused': passwordFocused }">
+              <Lock :size="16" class="field__icon" />
+              <input
+                id="login-password"
+                :type="showPassword ? 'text' : 'password'"
+                v-model="password"
+                required
+                placeholder="输入密码"
+                autocomplete="current-password"
+                @focus="passwordFocused = true"
+                @blur="passwordFocused = false"
+              />
+              <button
+                type="button"
+                class="field__toggle"
+                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                @click="showPassword = !showPassword"
+                tabindex="-1"
+              >
+                <EyeOff v-if="showPassword" :size="16" />
+                <Eye v-else :size="16" />
+              </button>
+            </div>
+          </div>
+
+          <Transition name="alert">
+            <div v-if="error" class="alert-error" role="alert">
+              <AlertCircle :size="15" />
+              <span>{{ error }}</span>
+            </div>
+          </Transition>
+
+          <button class="btn-primary" type="submit" :disabled="loading">
+            <Loader2 v-if="loading" :size="17" class="btn-spinner" />
+            <span>{{ loading ? "登录中…" : "登录" }}</span>
+          </button>
+        </form>
+
+        <footer class="login-card__footer" :style="{ '--delay': '160ms' }">
+          还没有账号？
+          <RouterLink to="/register">免费注册</RouterLink>
+        </footer>
       </div>
-    </div>
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import { BookOpenText, Mail, Lock, Eye, EyeOff, Loader2, ScanLine, Users, BarChart3, AlertCircle } from "lucide-vue-next";
+import {
+  Receipt,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  Loader2,
+  ScanLine,
+  Users,
+  BarChart3,
+  AlertCircle,
+} from "lucide-vue-next";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
@@ -103,6 +145,8 @@ const authStore = useAuthStore();
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
+const emailFocused = ref(false);
+const passwordFocused = ref(false);
 const loading = ref(false);
 const error = ref("");
 
@@ -125,92 +169,353 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-/* ── Page ── */
-.auth-page {
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&display=swap");
+
+/* ── Tokens ── */
+.login-page {
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 64px;
+
+  --hero-bg: oklch(0.26 0.035 255);
+  --hero-text: oklch(0.93 0.01 255);
+  --hero-muted: oklch(0.68 0.025 255);
+  --hero-accent: oklch(0.72 0.11 175);
+
+  --surface: oklch(0.995 0.004 200);
+  --surface-raised: oklch(1 0 0);
+  --text: oklch(0.28 0.02 255);
+  --text-muted: oklch(0.52 0.02 255);
+  --text-faint: oklch(0.68 0.015 255);
+  --border: oklch(0.90 0.012 200);
+  --border-focus: oklch(0.78 0.04 175);
+  --accent: oklch(0.48 0.11 175);
+  --accent-hover: oklch(0.42 0.11 175);
+  --accent-soft: oklch(0.48 0.11 175 / 0.1);
+  --danger: oklch(0.55 0.2 25);
+  --danger-soft: oklch(0.55 0.2 25 / 0.08);
+
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+  --duration: 240ms;
+  --radius: 10px;
+  --radius-lg: 14px;
+
   min-height: 100vh;
   min-height: 100svh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-family: "Source Sans 3", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--surface);
+}
+
+/* ── Hero panel ── */
+.login-hero {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: #f2f2f7;
-  padding: 20px;
-  position: relative;
+  padding: var(--space-4xl) var(--space-3xl);
+  background: var(--hero-bg);
+  color: var(--hero-text);
   overflow: hidden;
 }
 
-/* ── Ambient blobs ── */
-.auth-ambient {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.auth-blob {
+.login-hero__grid {
   position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(oklch(1 0 0 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 30% 50%, black 20%, transparent 75%);
+}
+
+.login-hero__glow {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  top: 10%;
+  right: -80px;
   border-radius: 50%;
+  background: oklch(0.55 0.12 175 / 0.18);
   filter: blur(80px);
-  opacity: 0.5;
+  pointer-events: none;
 }
 
-.auth-blob--1 {
-  width: 400px;
-  height: 400px;
-  background: rgba(0, 122, 255, 0.15);
-  top: -10%;
-  right: -5%;
-  animation: blobDrift 14s ease-in-out infinite;
-}
-
-.auth-blob--2 {
-  width: 300px;
-  height: 300px;
-  background: rgba(88, 86, 214, 0.12);
-  bottom: -5%;
-  left: -5%;
-  animation: blobDrift 18s ease-in-out infinite reverse;
-}
-
-.auth-blob--3 {
-  width: 200px;
-  height: 200px;
-  background: rgba(52, 199, 89, 0.1);
-  top: 40%;
-  left: 30%;
-  animation: blobDrift 12s ease-in-out infinite 2s;
-}
-
-@keyframes blobDrift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(20px, -30px) scale(1.05); }
-  66% { transform: translate(-15px, 20px) scale(0.95); }
-}
-
-/* ── Wrapper ── */
-.auth-wrapper {
+.login-hero__content {
   position: relative;
   z-index: 1;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xl);
+}
+
+.login-hero__brand,
+.login-hero__copy,
+.login-hero__features {
+  animation: riseIn var(--duration) var(--ease-out) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.login-hero__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.login-hero__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: oklch(0.48 0.11 175);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: oklch(0.98 0.01 175);
+}
+
+.login-hero__name {
+  font-family: "Sora", sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--hero-muted);
+}
+
+.login-hero__copy h2 {
+  font-family: "Sora", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  margin: 0 0 var(--space-md);
+  color: var(--hero-text);
+}
+
+.login-hero__copy p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--hero-muted);
+  max-width: 36ch;
+}
+
+.login-hero__features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.login-hero__features li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.login-hero__feature-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: oklch(1 0 0 / 0.06);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hero-accent);
+  flex-shrink: 0;
+}
+
+.login-hero__features strong {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--hero-text);
+  margin-bottom: 2px;
+}
+
+.login-hero__features small {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--hero-muted);
+  line-height: 1.4;
+}
+
+/* ── Form panel ── */
+.login-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-2xl);
+  background: var(--surface);
+}
+
+.login-card {
   width: 100%;
   max-width: 400px;
   display: flex;
   flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.login-card__header,
+.login-form,
+.login-card__footer {
+  animation: riseIn var(--duration) var(--ease-out) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.login-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.login-card__logo-sm {
+  display: none;
+}
+
+.login-card__header h1 {
+  font-family: "Sora", sans-serif;
+  font-size: 1.625rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: var(--text);
+}
+
+.login-card__header p {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+/* ── Form ── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.field label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.field__control {
+  display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-md);
+  padding: 0 var(--space-lg);
+  height: 44px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition:
+    border-color var(--duration) var(--ease-out),
+    box-shadow var(--duration) var(--ease-out);
 }
 
-/* Staggered entrance animation for children */
-.auth-brand,
-.auth-header,
-.auth-form,
-.auth-features,
-.auth-footer {
-  animation: iosSlideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+.field__control--focused,
+.field__control:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-@keyframes iosSlideUp {
+.field__icon {
+  color: var(--text-faint);
+  flex-shrink: 0;
+  transition: color var(--duration) var(--ease-out);
+}
+
+.field__control:focus-within .field__icon {
+  color: var(--accent);
+}
+
+.field__control input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  color: var(--text);
+  min-width: 0;
+}
+
+.field__control input::placeholder {
+  color: var(--text-faint);
+}
+
+.field__toggle {
+  background: none;
+  border: none;
+  padding: var(--space-xs);
+  cursor: pointer;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: color var(--duration) var(--ease-out);
+}
+
+.field__toggle:hover {
+  color: var(--text-muted);
+}
+
+/* ── Alert ── */
+.alert-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--danger-soft);
+  border: 1px solid oklch(0.55 0.2 25 / 0.15);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.alert-error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.alert-enter-active {
+  animation: alertIn 320ms var(--ease-out);
+}
+
+.alert-leave-active {
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+
+.alert-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+@keyframes alertIn {
   from {
     opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -218,311 +523,138 @@ async function handleLogin() {
   }
 }
 
-/* ── Brand ── */
-.auth-brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.auth-app-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  background: linear-gradient(145deg, #007aff, #5856d6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    0 8px 24px rgba(0, 122, 255, 0.3),
-    0 2px 8px rgba(0, 122, 255, 0.15);
-}
-
-.auth-app-name {
-  font-family: "Space Grotesk", -apple-system, sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--muted, #8e8e93);
-  letter-spacing: 0.3px;
-}
-
-/* ── Header ── */
-.auth-header {
-  text-align: center;
-}
-
-.auth-header h1 {
-  font-family: -apple-system, "SF Pro Display", "Space Grotesk", sans-serif;
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 6px;
-  color: #1c1c1e;
-  letter-spacing: -0.5px;
-}
-
-.auth-header p {
-  font-size: 15px;
-  color: #8e8e93;
-  margin: 0;
-}
-
-/* ── iOS Grouped Form ── */
-.auth-form {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.ios-group {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-radius: 14px;
-  border: 0.5px solid rgba(0, 0, 0, 0.06);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 4px 16px rgba(0, 0, 0, 0.03);
-  overflow: hidden;
-  transition: box-shadow 0.3s ease;
-}
-
-.ios-group:focus-within {
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 4px 16px rgba(0, 0, 0, 0.03),
-    0 0 0 3.5px rgba(0, 122, 255, 0.18);
-}
-
-.ios-field {
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  min-height: 50px;
-  gap: 12px;
-}
-
-.ios-field__icon {
-  color: #8e8e93;
-  flex-shrink: 0;
-  transition: color 0.25s ease;
-}
-
-.ios-field:focus-within .ios-field__icon {
-  color: #007aff;
-}
-
-.ios-field input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 16px;
-  color: #1c1c1e;
-  padding: 14px 0;
-  min-width: 0;
-}
-
-.ios-field input::placeholder {
-  color: #c7c7cc;
-}
-
-.ios-field__toggle {
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  color: #8e8e93;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  transition: color 0.2s, background 0.2s;
-}
-
-.ios-field__toggle:hover {
-  color: #636366;
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.ios-divider {
-  height: 0.5px;
-  background: rgba(0, 0, 0, 0.08);
-  margin-left: 45px;
-}
-
-/* ── Error ── */
-.ios-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
-  background: rgba(255, 59, 48, 0.08);
-  border-radius: 12px;
-  color: #ff3b30;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.ios-error svg {
-  flex-shrink: 0;
-}
-
-.ios-alert-enter-active {
-  animation: iosShake 0.4s ease;
-}
-
-.ios-alert-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.ios-alert-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-
-@keyframes iosShake {
-  0% { transform: translateX(0); opacity: 0; }
-  15% { transform: translateX(-6px); opacity: 1; }
-  30% { transform: translateX(5px); }
-  45% { transform: translateX(-4px); }
-  60% { transform: translateX(2px); }
-  75% { transform: translateX(-1px); }
-  100% { transform: translateX(0); }
-}
-
 /* ── Button ── */
-.ios-button {
+.btn-primary {
   width: 100%;
-  height: 50px;
+  height: 44px;
   border: none;
-  border-radius: 14px;
-  background: #007aff;
-  color: #fff;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: oklch(0.99 0.005 175);
   font-family: inherit;
-  font-size: 17px;
+  font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  letter-spacing: -0.2px;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  gap: var(--space-sm);
+  transition:
+    background var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
-  position: relative;
-  overflow: hidden;
 }
 
-.ios-button::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 50%);
-  pointer-events: none;
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
-.ios-button:hover:not(:disabled) {
-  background: #0066d6;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.3);
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.985);
 }
 
-.ios-button:active:not(:disabled) {
-  transform: scale(0.97);
-  box-shadow: none;
-}
-
-.ios-button:disabled {
-  opacity: 0.45;
+.btn-primary:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-.ios-button--loading {
-  pointer-events: none;
-}
-
-.ios-spinner {
+.btn-spinner {
   animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ── Features ── */
-.auth-features {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.auth-feature-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 0.5px solid rgba(0, 0, 0, 0.05);
-  font-size: 12px;
-  font-weight: 500;
-  color: #636366;
-}
-
-.auth-feature-chip svg {
-  color: #007aff;
-  flex-shrink: 0;
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Footer ── */
-.auth-footer {
-  text-align: center;
-  font-size: 15px;
-  color: #8e8e93;
+.login-card__footer {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
 }
 
-.auth-footer a {
-  color: #007aff;
-  text-decoration: none;
+.login-card__footer a {
+  color: var(--accent);
   font-weight: 600;
+  text-decoration: none;
+  margin-left: 4px;
+  transition: color var(--duration) var(--ease-out);
 }
 
-.auth-footer a:active {
-  opacity: 0.6;
+.login-card__footer a:hover {
+  color: var(--accent-hover);
+}
+
+/* ── Animations ── */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Responsive ── */
-@media (max-width: 480px) {
-  .auth-page {
-    padding: 0;
+@media (max-width: 900px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-hero {
+    display: none;
+  }
+
+  .login-main {
+    padding: var(--space-3xl) var(--space-xl);
+    min-height: 100svh;
     align-items: flex-start;
-    background: #f2f2f7;
+    padding-top: clamp(48px, 12vh, 96px);
   }
 
-  .auth-wrapper {
-    max-width: 100%;
-    padding: 60px 24px 40px;
-    gap: 20px;
+  .login-card__logo-sm {
+    display: flex;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: oklch(0.99 0.005 175);
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--space-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .login-main {
+    padding: var(--space-2xl) var(--space-lg);
+    padding-top: clamp(40px, 10vh, 72px);
   }
 
-  .auth-app-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 14px;
+  .login-card__header h1 {
+    font-size: 1.5rem;
   }
 
-  .auth-header h1 {
-    font-size: 24px;
+  .field__control input {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-hero__brand,
+  .login-hero__copy,
+  .login-hero__features,
+  .login-card__header,
+  .login-form,
+  .login-card__footer {
+    animation: none;
   }
 
-  .ios-field input {
-    font-size: 16px; /* prevent iOS zoom */
+  .btn-primary:active:not(:disabled) {
+    transform: none;
   }
 }
 </style>
